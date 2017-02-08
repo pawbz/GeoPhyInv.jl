@@ -1,0 +1,198 @@
+program="XWMI (Waveform Modeling and Inversion)"
+
+one=1
+two=2
+three=3
+four=4
+five=5
+six=6
+seven=7
+yes=yes
+no=no
+
+
+
+###------------------ Choosing a compiler -----------------------
+compflag = 2
+# complier flag is 1 for ifort 
+# 		   2 for gfortran-4.8
+# 		   3 for pgf95 (PGI compiler)
+# 		   4 for gfortran-4.4
+# 		   5 for open64 AMD compiler
+# 		   6 for cray compiler
+
+###------------------ Debugging flags   --- -----------------------
+debugflag=no
+# debugflag is    yes for debugging (produces relatively slow executables)
+#		   no for production
+
+gprofflag=no
+# gprof flag is used for profiling. If yes, execution of the program 
+# generates pgprof.out (or) gmon.out, which can be input to gprof
+#
+
+ompflag=yes
+# parallelize using openmp or not?
+#
+speedupflag=yes
+# use compiler optimizations
+#
+#
+blasflag=yes
+
+sacflag=no
+
+staticflag=no
+
+doubleflag=no
+
+#fftlib = -L/scratch/intelics/mkl/lib/intel64 -lfftw3_threads -lfftw3
+fftlib = -lfftw3 -lfftw3_threads
+#fftlib = -L/math/home/pawbz/fftw-3.3.5/lib -lfftw3_threads -lfftw3
+#fftlib = -L/math/home/pawbz/fftw-3.3.5/lib  -lfftw3
+ifeq ($(strip $(sacflag)),$(strip $(yes)))
+saclib = -I/home/pawbz/sac/include  -L/home/pawbz/sac/lib  -lsacio
+endif
+
+ACMLROOT = /home/bharadwj/acml
+ACMLLIB1 = -lirc -lifcore -L$(ACMLROOT)/ifort64_mp/lib -lacml_mp 
+
+
+ifeq ($(strip $(compflag)), $(strip $(one)))
+f90comp = ifort -assume byterecl 
+ifeq ($(strip $(speedupflag)),$(strip $(yes)))
+speedup = -fp-model fast=2 -Ofast
+endif
+ifeq ($(strip $(ompflag)),$(strip $(yes)))
+openmp = -qopenmp
+endif
+ifeq ($(strip $(blasflag)),$(strip $(yes)))
+blas = -mkl=parallel
+#blas = $(ACMLLIB1)
+endif
+ifeq ($(strip $(doubleflag)),$(strip $(yes)))
+double = -autodouble
+endif
+ifeq ($(strip $(staticflag)),$(strip $(yes)))
+static = -static -static-intel
+endif
+ifeq ($(strip $(debugflag)),$(strip $(yes)))
+debug = -CB -check all -check bounds -check format -assume none \
+	-check uninit -check  -assume norealloc_lhs \
+	-check pointers -check pointers -assume byterecl \
+	-warn interfaces -gen-interfaces -fstack-protector-all \
+	-debug all -debug parallel -g -debug inline-debug-info -traceback -O1
+endif
+ifeq ($(strip $(gprofflag)),$(strip $(yes)))
+gprof = -qopt-report-phase=openmp,vec
+endif
+endif
+
+
+
+ifeq ($(strip $(compflag)), $(strip $(two)))
+f90comp = gfortran
+ifeq ($(strip $(speedupflag)),$(strip $(yes)))
+speedup = -O3
+endif
+ifeq ($(strip $(ompflag)),$(strip $(yes)))
+openmp = -fopenmp
+endif
+ifeq ($(strip $(blasflag)),$(strip $(yes)))
+blas = -lblas
+endif
+ifeq ($(strip $(doubleflag)),$(strip $(yes)))
+double = -fdefault-real-8 -fdefault-double-8
+endif
+ifeq ($(strip $(staticflag)),$(strip $(yes)))
+static = -static-libgfortran -static
+endif
+ifeq ($(strip $(debugflag)),$(strip $(yes)))
+debug = -fbounds-check -fbacktrace -fimplicit-none -g3 -g \
+	-Waliasing -Wimplicit-interface -Wunused-parameter  \
+	-Wline-truncation -Warray-bounds -Wconversion \
+	-Wconversion-extra -Wimplicit-procedure \
+	-Wsurprising -Wunused-dummy-argument -Wunused-parameter \
+	-fno-backtrace \
+	#-Werror 
+	#-Wuninitialized \
+	#-Wrealloc-lhs-all 
+endif
+ifeq ($(strip $(gprofflag)),$(strip $(yes)))
+gprof = -pg
+endif
+endif
+
+
+ifeq ($(strip $(compflag)), $(strip $(three)))
+f90comp = pgf95
+ifeq ($(strip $(speedupflag)),$(strip $(yes)))
+speedup = -fast -O4
+endif
+ifeq ($(strip $(ompflag)),$(strip $(yes)))
+openmp = -mp
+endif
+ifeq ($(strip $(debugflag)),$(strip $(yes)))
+debug =  -C -g -Mbounds -traceback
+#debug =  -C -g -Mbounds -Mchkfpstk -Mchkptr -Mchkstk -Mcoff -Mdwarf1 -Mdwarf2 -Mdwarf3 -Melf -Mnodwarf -Mpgicoff -traceback
+endif
+ifeq ($(strip $(gprofflag)),$(strip $(yes)))
+gprof = -Mprof=line -Minfo 
+endif
+endif
+
+
+ifeq ($(strip $(compflag)), $(strip $(four)))
+f90comp = gfortran-4.4
+ifeq ($(strip $(speedupflag)),$(strip $(yes)))
+speedup = -O3
+endif
+ifeq ($(strip $(ompflag)),$(strip $(yes)))
+openmp = -fopenmp 
+endif
+ifeq ($(strip $(debugflag)),$(strip $(yes)))
+debug =  -fbounds-check -fbacktrace -fimplicit-none -g3 -g \
+	-Waliasing -Wimplicit-interface -Wunused-parameter  \
+	-Wline-truncation -Warray-bounds \
+	-Wsurprising -Wunused-parameter  \
+	-Wuninitialized \
+	-Werror -Wall -fno-backtrace
+endif
+ifeq ($(strip $(gprofflag)),$(strip $(yes)))
+gprof = -pg 
+endif
+endif
+
+ifeq ($(strip $(compflag)), $(strip $(five)))
+f90comp = openf95 
+ifeq ($(strip $(speedupflag)),$(strip $(yes)))
+speedup = -Ofast 
+endif
+ifeq ($(strip $(ompflag)),$(strip $(yes)))
+openmp = -openmp
+endif
+ifeq ($(strip $(debugflag)),$(strip $(yes)))
+debug = -g 
+endif
+ifeq ($(strip $(gprofflag)),$(strip $(yes)))
+gprof =  
+endif
+endif
+
+ifeq ($(strip $(compflag)), $(strip $(six)))
+f90comp = ftn
+ifeq ($(strip $(speedupflag)),$(strip $(yes)))
+speedup = 
+endif
+ifeq ($(strip $(ompflag)),$(strip $(yes)))
+openmp =  
+endif
+ifeq ($(strip $(debugflag)),$(strip $(yes)))
+debug = 
+endif
+ifeq ($(strip $(gprofflag)),$(strip $(yes)))
+gprof = 
+endif
+endif
+
+## End of the makefile.in
