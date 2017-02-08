@@ -1,13 +1,13 @@
 
 module f90libs
 
-function say_hello()
- println("HElo")
-end # function
+# maro to return the absolute path of the library
+macro libname(lib)
+	return :( joinpath(Pkg.dir("SeismicInversion"), $lib, ".so" ))
+end # macro
 
-export say_hello
 
-say_hello()
+export libname
 
 end # module 
 
