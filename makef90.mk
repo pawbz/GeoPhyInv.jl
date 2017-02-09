@@ -56,7 +56,7 @@ include $(all_deps)
 	$(f90comp) $(openmp) $(debug) $(gprof) $(speedup) $(static) $(double) -c $<
 	
 # generate *.so, shared libraries for all the modules
-%.so: %.f90 %.rtabs
+%.so: %.f90 #%.rtabs
 	$(f90comp) $(openmp) $(debug) $(gprof) $(speedup) $(static) $(double) $(fftlib) $(blas) $(saclib) -fPIC -shared $< -o $(lib_folder)$@
 
 # remove tab spaces in fortran source files
