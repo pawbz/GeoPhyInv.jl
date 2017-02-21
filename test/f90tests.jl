@@ -4,7 +4,8 @@ println("testing Julia wrappers for f90 libraries...")
 
 # simple print
 println(repeat(" ",5), "simple print...")
-ccall( (:sprint, SeismicInversion.f90libs.test), Void, () )
+sayhello = "Julia"
+ccall( (:sprint, SeismicInversion.f90libs.test), Void, (Ptr{UInt8},), sayhello )
 
 # simple print using OMP
 println(repeat(" ",5), "simple print using OMP...")
