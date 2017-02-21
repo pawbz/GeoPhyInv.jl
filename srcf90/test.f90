@@ -1,14 +1,18 @@
 module test
 use precision_mod! USEINDEPFILE
+use string_routines! USEINDEPFILE
+use iso_c_binding
+implicit none
 
 contains
 
 ! subroutine simple print 
-subroutine sprint() bind(c, name="sprint")
+subroutine sprint(sayhello) bind(c, name="sprint")
         implicit none
+        character(len=1, kind=C_char), intent(in)            :: sayhello(*)
 
-        write(*,*) repeat(" ",10),"sprint success in test.f90"
-
+        write(*,*) repeat(" ",10),"sprint success in test.f90 "
+        write(*,*) repeat(" ",10),"Hello from ", ctofstr(sayhello)
 end subroutine sprint
 
 ! subroutine simple print using many cores
