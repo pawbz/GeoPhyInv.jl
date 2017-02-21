@@ -44,7 +44,7 @@ sacflag=no
 
 staticflag=no
 
-doubleflag=no
+doubleflag=yes
 
 #fftlib = -L/scratch/intelics/mkl/lib/intel64 -lfftw3_threads -lfftw3
 fftlib = -lfftw3 -lfftw3_threads
