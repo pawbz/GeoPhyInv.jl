@@ -19,6 +19,7 @@ function __init__()
 #	end
 
 global const test = libname("test") 
+global const fdtd = libname("fdtd") 
 global const str = libname("string_routines") 
 global const fft = libname("fft") 
 

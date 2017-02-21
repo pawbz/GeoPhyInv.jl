@@ -1,6 +1,7 @@
 
 ###------------------ some folders -------------------------------
 folder=$(shell pwd)/
+doc_folder=$(shell pwd)/docs/
 bin_folder=$(shell pwd)/bin/
 lib_folder=$(shell pwd)/lib/
 f90src_folders=$(shell find $(shell pwd) -type f -name "*.f90" | sed -r 's|/[^/]+$$||' |sort |uniq)
@@ -9,6 +10,11 @@ include makefile.in
 all:
 	$(foreach var,$(f90src_folders), make lib_folder=$(lib_folder) -I $(folder) -C $(var) -f $(folder)makef90.mk)
 	
+
+.PHONY: docs
+docs: 
+	julia --color=yes $(doc_folder)/make.jl
+
 
 
 # clean *.o, *.d, *.mod  and executable files

@@ -1,0 +1,2 @@
+using Documenter, SeismicInversion
+makedocs()

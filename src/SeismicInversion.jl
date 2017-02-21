@@ -1,7 +1,7 @@
 module SeismicInversion
 
-# package code goes here
+# include all module files
 include("f90libs.jl")
+include("fdtd.jl")
 
-#f90libs.say_hello()
 end # module
