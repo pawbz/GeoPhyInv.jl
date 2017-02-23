@@ -1,6 +1,8 @@
 module fdtd
 
-include("f90libs.jl")
+using SeismicInversion.mesh
+using SeismicInversion.models
+using SeismicInversion.f90libs
 
 
 function __init__()
@@ -13,15 +15,8 @@ modeling
 function fdtd_mod(
 		  jobname="Hello",
 		  npropwav=1, 
-		  mesh_nx = 200,
-		  mesh_nz = 200,
-		  modtt = 2000.0 * ones(mesh_nz,mesh_nx),
-		  modrr = 0.0005 * ones(mesh_nz,mesh_nx),
-		  mesh_x = 2000.0*ones(mesh_nx),
-		  mesh_z = 2000.0*ones(mesh_nz),
-		  mesh_dx = 10, mesh_dz = 10,
-		  mesh_na_pml = 40,
-		  mesh_abs_trbl = "Hello",
+		  mesh::Mesh2D = Mesh2D(), 
+		  model::SeismicModel = SeismicModel("test_homo_acoustic", mesh),
 		  tim_nt = 2000, tim_del = 0.001,
 		  src_nt = 2000,
 		  src_wavelets = randn(2000),
@@ -45,8 +40,8 @@ function fdtd_mod(
 	recv_out = zeros(tim_nt)
 	snaps_in = zeros(tim_nt)
 	snaps_out = ones(tim_nt)
-	grad_modtt = zeros(mesh_nz, mesh_nx)
-	grad_modrr = zeros(mesh_nz, mesh_nx)
+	grad_modtt = zeros(mesh.nz, mesh.nx)
+	grad_modrr = zeros(mesh.nz, mesh.nx)
 
 
 ccall( (:fdtd_mod, f90libs.fdtd), Void, 
@@ -70,11 +65,12 @@ ccall( (:fdtd_mod, f90libs.fdtd), Void,
        Ptr{Float64}
        ), 
       jobname, npropwav,
-      modtt, modrr,
-      mesh_nx, mesh_nz,
-      mesh_dx, mesh_dz, 
-      mesh_x, mesh_z,
-      mesh_na_pml, mesh_abs_trbl,
+      χ(model.χKI, model.K0I,-1), 
+      χ(model.χρI, model.ρ0I,-1), 
+      mesh.nx, mesh.nz,
+      mesh.δx, mesh.δz, 
+      mesh.x, mesh.z,
+      mesh.npml, "mesh_abs_trbl",
       tim_nt, tim_del, 
       src_nt, src_wavelets,
       src_nseq, src_nsmul,
