@@ -1,7 +1,7 @@
 
-module f90libs
+module F90libs
 
-# maro to return the absolute path of the library
+# macro to return the absolute path of the library
 function libname(lib)
     libname = string(lib , ".so");
     return ( joinpath(Pkg.dir("SeismicInversion"), "lib", libname))

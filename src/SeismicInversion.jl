@@ -1,9 +1,11 @@
 module SeismicInversion
 
-# include rest of the modules (note: due to dependencies order is important!)
-include("mesh.jl")
-include("models.jl")
-include("f90libs.jl")
-include("fdtd.jl")
+# include modules (note: due to dependencies, order is important!)
+include("Grid.jl")
+include("Wavelets.jl")
+include("Models.jl")
+include("Acquisition.jl")
+include("F90libs.jl")
+include("Fdtd.jl")
 
 end # module

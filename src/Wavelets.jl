@@ -1,0 +1,45 @@
+module Wavelets
+
+import SeismicInversion.Grid: Tim
+
+function ricker(;
+		fqdom::Float64=20.0,
+		tgrid::Tim=Tim(),
+		tpeak::Float64=0.25,
+		attrib::AbstractString=""
+		)
+
+isapprox(fqdom,0.0) && error("dominant frequency cannot be zero")
+
+#! some constants
+pf = (π*π)*(fqdom^2.0)
+nt = tgrid.nt
+δt = tgrid.δt
+
+# a vector is odd number of samples (nt + 1 corresponds to time zero)
+wav = zeros(tgrid.t);
+# k = (1 - 2* pf * t^2) * Exp[-pf *t^2]
+# Simplify[D[k,t]] 
+# FortranForm[Simplify[D[k,t]]]
+if(contains(attrib,"[DIFF]"))
+                # ricker after a time derivative
+                for it = 1:nt
+			tsquare = (tgrid.t[it]-tpeak) * (tgrid.t[it]-tpeak)
+			t       = -1.0 * (tgrid.t[it]-tpeak)
+                        wav[it] = (2.0 * pf * t * (-3.0 + 2.0 * pf * tsquare)) * exp(-1.0 * pf * tsquare)
+                end
+else
+#! ricker wavelet
+        for it = 1:nt
+		tsquare = (tgrid.t[it]-tpeak) * (tgrid.t[it]-tpeak)
+                wav[it] = (1.0 - 2.0 * pf * tsquare) * exp(-1.0e0 * pf * tsquare)
+        end
+end
+
+isapprox(maximum(abs(wav)),0.0) && warn("wavelet is zeros")
+
+return wav
+end
+
+
+end # module

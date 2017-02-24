@@ -1,10 +1,8 @@
-module models
+module Models
 
-export SeismicModel, χ
+import SeismicInversion.Grid: Mod2D
 
-using SeismicInversion.mesh
-
-type SeismicModel
+type Seismic
 	vp0::Float64
 	vs0::Float64
 	ρ0::Float64
@@ -22,30 +20,30 @@ type SeismicModel
 	attrib::AbstractString
 end
 
-function SeismicModel(attrib::AbstractString, mesh::Mesh2D)
+function Seismic(attrib::AbstractString, mgrid::Mod2D)
 	if(attrib == "test_homo_acoustic")
 		vp0 = 2000.0;
 		vs0 = 0.0;
 		ρ0 = 2000.0; 
-		return SeismicModel(vp0, vs0, ρ0,
-		      vp0 .* ones(mesh.nz, mesh.nx),
-		      vs0 .* ones(mesh.nz, mesh.nx),
-		      ρ0 .* ones(mesh.nz, mesh.nx),
-		      attrib, mesh)
+		return Seismic(vp0, vs0, ρ0,
+		      fill(vp0, (mgrid.nz, mgrid.nx)),
+		      fill(vs0, (mgrid.nz, mgrid.nx)),
+		      fill(ρ0, (mgrid.nz, mgrid.nx)),
+		      attrib, mgrid)
 	end
 end
 
-function SeismicModel(vp0::Float64, 
-		      vs0::Float64, 
-		      ρ0::Float64, 
-		      vp::Array{Float64}, 
-		      vs::Array{Float64}, 
-		      ρ::Array{Float64},
-		      attrib::AbstractString, mesh::Mesh2D)
+function Seismic(vp0::Float64, 
+		 vs0::Float64, 
+		 ρ0::Float64, 
+		 vp::Array{Float64}, 
+		 vs::Array{Float64}, 
+		 ρ::Array{Float64},
+		 attrib::AbstractString, mgrid::Mod2D)
 		ρ0I = ρ0^(-1.0);
 		K0 = vp0 * vp0 * ρ0; K0I = K0^(-1.0);
 		μ0 = vs0 * vs0 * ρ0;
-		return SeismicModel(vp0,vs0,ρ0,ρ0I,K0,K0I,μ0,
+		return Seismic(vp0,vs0,ρ0,ρ0I,K0,K0I,μ0,
 		      χ(vp, vp0),
 		      χ(vs, vs0),
 		      χ(ρ, ρ0),
