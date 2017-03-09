@@ -1,6 +1,6 @@
 module Models
 
-import SeismicInversion.Grid: M2D
+import SIT.Grid: M2D
 
 type Seismic
 	vp0::Float64

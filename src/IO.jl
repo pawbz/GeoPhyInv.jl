@@ -1,6 +1,6 @@
 module IO
 
-import SeismicInversion.F90libs
+import SIT.F90libs
 
 
 function readsu_data(;

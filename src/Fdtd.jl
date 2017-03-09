@@ -1,9 +1,9 @@
 module Fdtd
 
-import SeismicInversion.Grid
-import SeismicInversion.Models
-import SeismicInversion.F90libs
-import SeismicInversion.Acquisition
+import SIT.Grid
+import SIT.Models
+import SIT.F90libs
+import SIT.Acquisition
 
 
 """

@@ -1,4 +1,4 @@
-module SeismicInversion
+module SIT
 
 # include modules (note: due to dependencies, order is important!)
 include("F90libs.jl")

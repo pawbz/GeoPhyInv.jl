@@ -1,6 +1,6 @@
 module Data
 
-using SeismicInversion.Acquisition
+using SIT.Acquisition
 
 type DataCSGTime
 	

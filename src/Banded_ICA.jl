@@ -1,7 +1,7 @@
 module Banded_ICA
 
 using MultivariateStats
-import SeismicInversion.Grid
+import SIT.Grid
 using Distributions
 
 function bica(;

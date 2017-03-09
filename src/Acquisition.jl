@@ -1,7 +1,7 @@
 module Acquisition
 
-import SeismicInversion.Grid: M1D
-import SeismicInversion.Wavelets
+import SIT.Grid: M1D
+import SIT.Wavelets
 
 type Geom
 	sx::Array{Float64}

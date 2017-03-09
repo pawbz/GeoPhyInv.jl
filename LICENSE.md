@@ -1,4 +1,4 @@
-The SeismicInversion.jl package is licensed under the MIT "Expat" License:
+The SIT.jl package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2017: Pawan Bharadwaj.
 > 

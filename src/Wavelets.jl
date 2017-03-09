@@ -1,6 +1,6 @@
 module Wavelets
 
-import SeismicInversion.Grid: M1D
+import SIT.Grid: M1D
 
 function ricker(;
 		fqdom::Float64=20.0,
