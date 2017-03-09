@@ -1,5 +1,10 @@
-using SeismicInversion
-using Base.Test
 
-# write your own tests here
-@test 1 == 1
+tests = ["f90tests"]
+
+println("Running tests:")
+
+for t in tests
+	fp = string(t, ".jl")
+	println(" * $(fp)")
+	include(fp)
+end

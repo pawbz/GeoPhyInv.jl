@@ -7,12 +7,21 @@ implicit none
 contains
 
 ! subroutine simple print 
-subroutine sprint(sayhello) bind(c, name="sprint")
+subroutine sprint(sayhelloin, sayhelloout) bind(c, name="sprint")
         implicit none
-        character(len=1, kind=C_char), intent(in)            :: sayhello(*)
+        character(len=1, kind=C_char), intent(in)            :: sayhelloin(*)
+        character(len=1, kind=C_char), intent(out)           :: sayhelloout(*)
+        integer                                              :: i
 
         write(*,*) repeat(" ",10),"sprint success in test.f90 "
-        write(*,*) repeat(" ",10),"Hello from ", ctofstr(sayhello)
+        write(*,*) repeat(" ",10),"Hello from ", ctofstr(sayhelloin)
+        i = 1;
+        do
+                sayhelloout(i) = sayhelloin(i);
+                if (sayhelloin(i) == c_null_char) exit
+                i = i + 1
+        end do
+
 end subroutine sprint
 
 ! subroutine simple print using many cores
@@ -27,19 +36,30 @@ subroutine sprint_core() bind(c, name="sprint_core")
 
 end subroutine sprint_core
 
+subroutine real64_in_out(kin, kout) bind(c, name="real64_in_out")
+        implicit  none
+        real(r_dp),intent(in)             :: kin
+        real(r_dp),intent(out)            :: kout
+        kout = kin 
+        write(*,*) repeat(" ",10), "real64_in_out: ", kin, kout
+end subroutine real64_in_out
+
+subroutine int64_in_out(kin, kout) bind(c, name="int64_in_out")
+        implicit  none
+        integer(i_dp),intent(in)                :: kin
+        integer(i_dp),intent(inout)             :: kout
+        kout = kin
+        write(*,*) repeat(" ",10), "int64_in_out: ", kin, kout
+end subroutine int64_in_out
+
+
+
 subroutine matrix_in_out(A, B, n1, n2) bind(c, name="matrix_in_out")
         implicit  none
         real(r_dp), intent(in)              :: A(n1,n2)
-        real(r_dp), intent(inout)           :: B(n1)
+        real(r_dp), intent(out)             :: B(n1,n2)
         integer(i_sp), intent(in)           :: n1, n2
-
-        write(*,*) repeat(" ",10),"in fortran n1 n2", n1, n2
-        write(*,*) repeat(" ",10),"in fortran A", size(A)
-        write(*,*) repeat(" ",10),"in fortran A", A
-        write(*,*) repeat(" ",10),"in fortran B", size(B)
-        write(*,*) repeat(" ",10),"in fortran B", B
-        B(1) = 0.0
-
+        B = A;
 end subroutine matrix_in_out
 
 !subroutine derived_data_type(model_in, model_out) bind(c, name="derived_data_type")

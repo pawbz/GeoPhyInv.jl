@@ -1,6 +1,6 @@
 module Acquisition
 
-import SeismicInversion.Grid: Tim
+import SeismicInversion.Grid: M1D
 import SeismicInversion.Wavelets
 
 type Geom
@@ -31,11 +31,11 @@ end
 
 type Src
 	wav::Array{Float64}
-	tgrid::Tim
+	tgrid::M1D
 end
 
 function Src()
-	tgrid = Tim()
+	tgrid = M1D(:timesamp1)
 	wav = Wavelets.ricker()
 	return Src(wav, tgrid)
 end

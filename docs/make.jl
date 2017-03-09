@@ -5,12 +5,14 @@ makedocs()
 makedocs(
     format = :html,
     sitename = "Seismic Inversion",
-    modules = [SeismicInversion.fdtd]
+    modules = [SeismicInversion.Fdtd]
 )
  
 deploydocs(
+    deps   = Deps.pip("mkdocs", "python-markdown-math"),
     repo   = "github.com/pawbz/SeismicInversion.jl.git",
+    julia  = "0.5",
+    osname = "linux",
     target = "build",
-    deps   = nothing,
     make   = nothing
 )

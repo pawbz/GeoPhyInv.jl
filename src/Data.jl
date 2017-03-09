@@ -1,9 +1,11 @@
 module Data
 
 using SeismicInversion.Acquisition
-type DataTime
-	δt :: Float64
-	tvec :: Float64
+
+type DataCSGTime
+	
+	
+	tgrid::Tim
 	attrib::AbstractString
 end
 

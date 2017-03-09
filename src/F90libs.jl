@@ -20,6 +20,8 @@ function __init__()
 
 global const test = libname("test") 
 global const fdtd = libname("fdtd") 
+global const interpolation = libname("interpolation") 
+global const io = libname("io") 
 global const str = libname("string_routines") 
 global const fft = libname("fft") 
 

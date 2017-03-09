@@ -2,7 +2,6 @@ site_name:        SeimicInversion.jl
 repo_url:         https://github.com/pawbz/SeimicInversion.jl
 site_description: Description
 site_author:      pawbz
-
 theme: readthedocs
 
 extra_css:
@@ -13,12 +12,23 @@ extra_javascript:
               - assets/mathjaxhelper.js
 
 markdown_extensions:
+          - codehilite
           - extra
-              - tables
-                  - fenced_code
-                      - mdx_math
+          - tables
+          - fenced_code
+          - mdx_math
+
+
+extra_css:
+          - assets/Documenter.css
 
 docs_dir: 'build'
 
 pages:
           - Home: index.md
+          - Tutorial:
+              - Title 1: tutorials/page1.md
+          - Another Section:
+              - Title 1: modeling/page1.md
+
+
