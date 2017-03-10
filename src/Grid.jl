@@ -96,6 +96,9 @@ function M1D_npow2(npow2::Int64, δ::Float64)
 	return M1D(vec, npow2, δ)
 end
 
+"convertion between time and frequency npow2 grids"
+M1D_npow2_tf(grid::M1D) = M1D_npow2(grid.nx, 1.0/grid.nx/grid.δx)
+
 
 
 end # module

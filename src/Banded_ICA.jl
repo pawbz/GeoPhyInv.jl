@@ -1,13 +1,13 @@
 module Banded_ICA
 
 using MultivariateStats
-import SIT.Grid
 using Distributions
+import SIT.Grid:M1D
 
 function bica(;
 	recv_n::Int64=1,
 	src_n::Int64=1,
-	grid::Grid.M1D=Grid.M1D(:samp1),
+	grid::M1D=M1D(:samp1),
 	nband::Int64=1, # number of bands 
 	X::Array{Float64}=zeros(grid.nx,recv_n) # data 
             	)
@@ -44,5 +44,25 @@ end
 
 return reshape(Yall, (src_n,grid.nx))
 end
+
+function exact_freq_mixing(;
+			   As::Array{Complex{Float64}}=nothing,
+			   Ab::Array{Complex{Float64}}=nothing,
+			   B::Array{Complex{Float64}}=nothing,
+			   S::Array{Complex{Float64}}=nothing, 
+			   fgrid::M1D=nothing
+			  )
+	recv_n = size(Ab,2)
+	D = fill(complex(0.0,0.0),fgrid.nx,recv_n); 
+	d = fill(complex(0.0,0.0),fgrid.nx,recv_n);
+	for ir = 1:recv_n
+		for iff = 1:fgrid.nx
+			D[iff, ir] = Ab[iff, ir] * B[iff] + As[iff, ir] * S[iff]
+		end
+		d[:, ir] = ifft(D[:, ir])
+	end
+	return D, d
+end
+
 
 end # module

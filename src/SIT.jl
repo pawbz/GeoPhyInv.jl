@@ -8,6 +8,7 @@ include("Wavelets.jl")
 include("Models.jl")
 include("Acquisition.jl")
 include("Fdtd.jl")
+include("DSP.jl")
 include("Banded_ICA.jl")
 
 end # module
