@@ -1,0 +1,44 @@
+{
+    "docs": [
+        {
+            "location": "/",
+            "text": "Documentation Title\n\n\nSome text describing the package.\n\n\n\n\nSubtitle\n\n\nMore text\n\n\n\n\nTutorials\n\n\n\n\nAnother Section\n\n\n\n\nIndex",
+            "title": "Home"
+        },
+        {
+            "location": "/#documentation-title",
+            "text": "Some text describing the package.",
+            "title": "Documentation Title"
+        },
+        {
+            "location": "/#subtitle",
+            "text": "More text",
+            "title": "Subtitle"
+        },
+        {
+            "location": "/#tutorials",
+            "text": "",
+            "title": "Tutorials"
+        },
+        {
+            "location": "/#another-section",
+            "text": "",
+            "title": "Another Section"
+        },
+        {
+            "location": "/#index",
+            "text": "",
+            "title": "Index"
+        },
+        {
+            "location": "/tutorials/page1/",
+            "text": "FFF FF",
+            "title": "Title 1"
+        },
+        {
+            "location": "/modeling/page1/",
+            "text": "ff",
+            "title": "Title 1"
+        }
+    ]
+}
