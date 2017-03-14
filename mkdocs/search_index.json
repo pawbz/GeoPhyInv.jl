@@ -2,18 +2,18 @@
     "docs": [
         {
             "location": "/",
-            "text": "Documentation Title\n\n\nSome text describing the package.\n\n\n\n\nSubtitle\n\n\nMore text\n\n\n\n\nSeismic Time-Domain Modeling\n\n\n#\n\n\nSIT.Fdtd.__init__\n \u2014 \nMethod\n.\n\n\ntest function\n\n\nsource\n\n\n#\n\n\nSIT.Fdtd.fdtd_born_mod\n \u2014 \nMethod\n.\n\n\nborn modeling\n\n\nsource\n\n\n#\n\n\nSIT.Fdtd.fdtd_mod\n \u2014 \nMethod\n.\n\n\nmodeling\n\n\nsource\n\n\n\n\nAnother Section\n\n\n\n\nIndex\n\n\n\n\nSIT.Fdtd.__init__\n\n\nSIT.Fdtd.fdtd_born_mod\n\n\nSIT.Fdtd.fdtd_mod",
+            "text": "Grids\n\n\n#\n\n\nSIT.Grid.M1D\n \u2014 \nMethod\n.\n\n\nConstruct 1-D grid based on nx or \u03b4x\n\n\nsource\n\n\n#\n\n\nSIT.Grid.M1D\n \u2014 \nMethod\n.\n\n\nDefault M1D grids based on attirb\n\n\nsource\n\n\n#\n\n\nSIT.Grid.M1D_npow2\n \u2014 \nMethod\n.\n\n\noutput an npow2grid of either time or frequency\n\n\nsource\n\n\n#\n\n\nSIT.Grid.M1D_npow2_tf\n \u2014 \nMethod\n.\n\n\nconvertion between time and frequency npow2 grids\n\n\nsource\n\n\n\n\nSource Wavelets\n\n\n\n\nSeismic Time-Domain Modeling\n\n\n#\n\n\nSIT.Fdtd.__init__\n \u2014 \nMethod\n.\n\n\ntest function\n\n\nsource\n\n\n#\n\n\nSIT.Fdtd.fdtd_born_mod\n \u2014 \nMethod\n.\n\n\nborn modeling\n\n\nsource\n\n\n#\n\n\nSIT.Fdtd.fdtd_mod\n \u2014 \nMethod\n.\n\n\nmodeling\n\n\nsource\n\n\n\n\nAnother Section\n\n\n\n\nIndex\n\n\n\n\nSIT.Grid.M1D\n\n\nSIT.Grid.M1D\n\n\nSIT.Fdtd.__init__\n\n\nSIT.Fdtd.fdtd_born_mod\n\n\nSIT.Fdtd.fdtd_mod\n\n\nSIT.Grid.M1D_npow2\n\n\nSIT.Grid.M1D_npow2_tf",
             "title": "Home"
         },
         {
-            "location": "/#documentation-title",
-            "text": "Some text describing the package.",
-            "title": "Documentation Title"
+            "location": "/#grids",
+            "text": "#  SIT.Grid.M1D  \u2014  Method .  Construct 1-D grid based on nx or \u03b4x  source  #  SIT.Grid.M1D  \u2014  Method .  Default M1D grids based on attirb  source  #  SIT.Grid.M1D_npow2  \u2014  Method .  output an npow2grid of either time or frequency  source  #  SIT.Grid.M1D_npow2_tf  \u2014  Method .  convertion between time and frequency npow2 grids  source",
+            "title": "Grids"
         },
         {
-            "location": "/#subtitle",
-            "text": "More text",
-            "title": "Subtitle"
+            "location": "/#source-wavelets",
+            "text": "",
+            "title": "Source Wavelets"
         },
         {
             "location": "/#seismic-time-domain-modeling",
@@ -27,7 +27,7 @@
         },
         {
             "location": "/#index",
-            "text": "SIT.Fdtd.__init__  SIT.Fdtd.fdtd_born_mod  SIT.Fdtd.fdtd_mod",
+            "text": "SIT.Grid.M1D  SIT.Grid.M1D  SIT.Fdtd.__init__  SIT.Fdtd.fdtd_born_mod  SIT.Fdtd.fdtd_mod  SIT.Grid.M1D_npow2  SIT.Grid.M1D_npow2_tf",
             "title": "Index"
         },
         {
