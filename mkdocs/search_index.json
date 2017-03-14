@@ -2,7 +2,7 @@
     "docs": [
         {
             "location": "/",
-            "text": "Documentation Title\n\n\nSome text describing the package.\n\n\n\n\nSubtitle\n\n\nMore text\n\n\n\n\nTutorials\n\n\n\n\nAnother Section\n\n\n\n\nIndex",
+            "text": "Documentation Title\n\n\nSome text describing the package.\n\n\n\n\nSubtitle\n\n\nMore text\n\n\n\n\nSeismic Time-Domain Modeling\n\n\n#\n\n\nSIT.Fdtd.__init__\n \u2014 \nMethod\n.\n\n\ntest function\n\n\nsource\n\n\n#\n\n\nSIT.Fdtd.fdtd_born_mod\n \u2014 \nMethod\n.\n\n\nborn modeling\n\n\nsource\n\n\n#\n\n\nSIT.Fdtd.fdtd_mod\n \u2014 \nMethod\n.\n\n\nmodeling\n\n\nsource\n\n\n\n\nAnother Section\n\n\n\n\nIndex\n\n\n\n\nSIT.Fdtd.__init__\n\n\nSIT.Fdtd.fdtd_born_mod\n\n\nSIT.Fdtd.fdtd_mod",
             "title": "Home"
         },
         {
@@ -16,9 +16,9 @@
             "title": "Subtitle"
         },
         {
-            "location": "/#tutorials",
-            "text": "",
-            "title": "Tutorials"
+            "location": "/#seismic-time-domain-modeling",
+            "text": "#  SIT.Fdtd.__init__  \u2014  Method .  test function  source  #  SIT.Fdtd.fdtd_born_mod  \u2014  Method .  born modeling  source  #  SIT.Fdtd.fdtd_mod  \u2014  Method .  modeling  source",
+            "title": "Seismic Time-Domain Modeling"
         },
         {
             "location": "/#another-section",
@@ -27,7 +27,7 @@
         },
         {
             "location": "/#index",
-            "text": "",
+            "text": "SIT.Fdtd.__init__  SIT.Fdtd.fdtd_born_mod  SIT.Fdtd.fdtd_mod",
             "title": "Index"
         },
         {
