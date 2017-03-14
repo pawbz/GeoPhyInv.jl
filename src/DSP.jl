@@ -16,9 +16,14 @@ S = fill(complex(0.0,0.0),fgrid.nx);
 s = fill(complex(0.0,0.0),fgrid.nx);
 
 Δf = 1.0 / tmax
+Δf <= fgrid.δx ? error("sampling smaller than grid sampling") :
+Δf >= (fmax-fmin) ? error("need to increase tmax") :
 fvec = [f for f in fmin:Δf:fmax]
 ifvec = fill(0, size(fvec))
 
+println("number of frequencies added to signal:\t", size(fvec,1))
+println("minimum frequency added to signal\t",minimum(fvec))
+println("maximum frequency added to signal\t",maximum(fvec))
 for iff in eachindex(fvec)
 	ifvec[iff] =  indmin((fgrid.x - fvec[iff]).^2.0)
 end

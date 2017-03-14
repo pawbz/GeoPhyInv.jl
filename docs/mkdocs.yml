@@ -1,5 +1,5 @@
-site_name:        SeimicInversion.jl
-repo_url:         https://github.com/pawbz/SeimicInversion.jl
+site_name:        SeimicInversionToolbox.jl
+repo_url:         https://github.com/pawbz/SIT.jl
 site_description: Description
 site_author:      pawbz
 theme: readthedocs
@@ -16,7 +16,6 @@ markdown_extensions:
           - extra
           - tables
           - fenced_code
-          - mdx_math
 
 
 extra_css:

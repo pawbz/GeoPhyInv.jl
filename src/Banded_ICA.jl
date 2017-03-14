@@ -13,18 +13,20 @@ function bica(;
             	)
 
 nb = (mod(grid.nx, nband) == 0) ? div(grid.nx, nband) : error("change nsamples");
-nbh = Int64(floor(nb / 2));
 
+nsubfac = 8;
+nbandtot = (nsubfac-1) * (nband-1) + nband
 # initialize
 Yband = zeros(src_n,nb)
-Xband = zeros(recv_n,nb,2*nband-1)
-Mband = Array(ICA, 2*nband-1)
+Xband = zeros(recv_n,nb,nbandtot)
+Mband = Array(ICA, nbandtot)
 
 # divide into bands and do ICA in each band
-for iband = 1: 2 * nband - 1
+for iband = 1: nbandtot
 	# indices for bands
-	ixmin = (div(iband,2))   * nb - (1-mod(iband,2)) * nbh + 1;
-	ixmax = (div(iband,2)+1) * nb - (1-mod(iband,2)) * nbh;
+	ixmin = (iband-1) * div(nb,nsubfac) + 1
+	ixmax = nb + (iband-1) * div(nb,nsubfac)
+
 	println("fffffff\t", ixmin, "\t", ixmax)
 
 	# window out the data in the band
@@ -39,38 +41,52 @@ for iband = 1: 2 * nband - 1
 	Yband = transform(Mband[iband],Xband[:,:,iband]);
 
 	# fix permutation problem
-	Mband[iband].W = entropy(Yband[1,:]) < entropy(Yband[2,:]) ? 
+	Mband[iband].W = kurtosis(Yband[1,:]) < kurtosis(Yband[2,:]) ? 
 			Mband[iband].W : Mband[iband].W[:,2:-1:1];
+
+			println("kurtosis 1\t", kurtosis(Yband[1,:]))
+			println("kurtosis 2\t", kurtosis(Yband[2,:]))
 end
 
 Yall = zeros(src_n,grid.nx);
 Ybandprev = zeros(src_n,nb);
 Yband = zeros(src_n,nb)
-for iband = 1: 2 * nband - 1 
+ixcmin  = 1
+ixcmax  = nb - div(nb,nsubfac)
+ixcpmin = div(nb,nsubfac) + 1
+ixcpmax = nb
+for iband = 1: nbandtot 
 	# indices
-	ixmin = (div(iband,2))   * nb - (1-mod(iband,2)) * nbh + 1;
-	ixmax = (div(iband,2)+1) * nb - (1-mod(iband,2)) * nbh;
+	ixmin = (iband-1) * div(nb,nsubfac) + 1
+	ixmax = nb + (iband-1) * div(nb,nsubfac)
 
 	# temp 
 	Yband = transform(Mband[iband],Xband[:,:,iband]); 
 
 	# fix scaling problem using previous band
-	if(iband > 1)
-		λ = [sum(Ybandprev[1,nb-nbh:nb]./Yband[1,1:1+nbh])/nbh, 
-			sum(Ybandprev[2,nb-nbh:nb]./Yband[2,1:1+nbh])/nbh]
-		println(λ)
+	if(isequal(iband,1))
 		Mbandtemp = Mband[iband];
-		Mbandtemp.W *= (diagm(λ));
-	#Mbandtemp.W *= diagm(diag((Mband[iband-1].W * inv(transpose(Mband[iband].W)))));
+		# final λbandtemp after fixing scaling and permutation
+		Yband = (transform(Mbandtemp,Xband[:,:,iband]));
+		Yall[:,ixmin:ixmax] = Yband[:,:];
 	else
-		λ = [1., 1.]
+		λ = [dot(Ybandprev[1,ixcpmin:ixcpmax],Yband[1,ixcmin:ixcmax])/
+		     dot(Yband[1,ixcmin:ixcmax],    Yband[1,ixcmin:ixcmax]),
+		     dot(Ybandprev[2,ixcpmin:ixcpmax],Yband[2,ixcmin:ixcmax])/
+		     dot(Yband[2,ixcmin:ixcmax],    Yband[2,ixcmin:ixcmax])]
 		Mbandtemp = Mband[iband];
+		println(λ)
+		println("before corr", Mbandtemp.W, iband)
+		#Mbandtemp.W = Mbandtemp.W * diagm(λ);
+		Mbandtemp.W = Mbandtemp.W * diagm(λ./abs(λ));
+		#Mbandtemp.W *= diagm(diag((Mband[iband-1].W * inv(transpose(Mband[iband].W)))));
 
+		# final λbandtemp after fixing scaling and permutation
+		Yband = (transform(Mbandtemp,Xband[:,:,iband]));
+		Yall[:,ixmax-div(nb,nsubfac)+1: ixmax] = Yband[:,nb - div(nb,nsubfac) + 1:nb];
 	end
+	println("after correc",Mbandtemp.W, iband)
 
-	# final λbandtemp after fixing scaling and permutation
-	Yband = (transform(Mbandtemp,Xband[:,:,iband]));
-	Yall[:,ixmin:ixmax] = Yband;
 	Ybandprev = Yband;
 end
 

@@ -2,11 +2,11 @@ using Documenter, SIT
 makedocs()
 
 
-makedocs(
-    format = :html,
-    sitename = "Seismic Inversion",
-    modules = [SIT.Fdtd]
-)
+#makedocs(
+#    format = :html,
+#    sitename = "Seismic Inversion Toolbox",
+#    modules = []
+#)
  
 deploydocs(
     deps   = Deps.pip("mkdocs", "python-markdown-math"),
