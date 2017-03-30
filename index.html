@@ -156,36 +156,53 @@
 <p><a id='SIT.Grid.M1D_npow2-Tuple{Int64,Float64}' href='#SIT.Grid.M1D_npow2-Tuple{Int64,Float64}'>#</a>
 <strong><code>SIT.Grid.M1D_npow2</code></strong> &mdash; <em>Method</em>.</p>
 <p>output an npow2grid of either time or frequency</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L77-L79' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L94-L96' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Grid.M1D_npow2_tf-Tuple{SIT.Grid.M1D}' href='#SIT.Grid.M1D_npow2_tf-Tuple{SIT.Grid.M1D}'>#</a>
 <strong><code>SIT.Grid.M1D_npow2_tf</code></strong> &mdash; <em>Method</em>.</p>
 <p>convertion between time and frequency npow2 grids</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L98' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L115' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Grid.M1D_resamp-Tuple{SIT.Grid.M1D,Float64}' href='#SIT.Grid.M1D_resamp-Tuple{SIT.Grid.M1D,Float64}'>#</a>
+<strong><code>SIT.Grid.M1D_resamp</code></strong> &mdash; <em>Method</em>.</p>
+<p>1-D grid with a different sampling interval</p>
+<ul>
+<li>Not yet implemented for npow2 grids</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L76-L79' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Grid.M1D_truncate-Tuple{SIT.Grid.M1D,Float64,Float64}' href='#SIT.Grid.M1D_truncate-Tuple{SIT.Grid.M1D,Float64,Float64}'>#</a>
+<strong><code>SIT.Grid.M1D_truncate</code></strong> &mdash; <em>Method</em>.</p>
+<p>1-D grid which is has a different size</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L82-L84' class='documenter-source'>source</a><br></p>
 <p><a id='Source-Wavelets-1'></a></p>
 <h2 id="source-wavelets">Source Wavelets</h2>
+<p><a id='SIT.Wavelets.ormsby-Tuple{}' href='#SIT.Wavelets.ormsby-Tuple{}'>#</a>
+<strong><code>SIT.Wavelets.ormsby</code></strong> &mdash; <em>Method</em>.</p>
+<p>ormbsy wavelet</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Wavelets.jl#L59-L61' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Wavelets.ricker-Tuple{}' href='#SIT.Wavelets.ricker-Tuple{}'>#</a>
 <strong><code>SIT.Wavelets.ricker</code></strong> &mdash; <em>Method</em>.</p>
 <p>Generate a Ricker Wavelet</p>
 <p><strong>Arguments</strong></p>
 <ul>
-<li><code>d</code>: 2D data to plot.</li>
-<li><code>extent</code>: extent of the data (optional).</li>
+<li><code>fqdom</code>: dominant frequency</li>
+<li><code>tgrid</code>: time-domain grid</li>
+<li><code>tpeak</code>: the peak of the ricker in time</li>
+<li>``</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Wavelets.jl#L5-L11' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Wavelets.jl#L5-L13' class='documenter-source'>source</a><br></p>
 <p><a id='Seismic-Time-Domain-Modeling-1'></a></p>
 <h2 id="seismic-time-domain-modeling">Seismic Time-Domain Modeling</h2>
 <p><a id='SIT.Fdtd.__init__-Tuple{}' href='#SIT.Fdtd.__init__-Tuple{}'>#</a>
 <strong><code>SIT.Fdtd.__init__</code></strong> &mdash; <em>Method</em>.</p>
 <p>test function</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L9-L11' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L11-L13' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Fdtd.fdtd_born_mod-Tuple{}' href='#SIT.Fdtd.fdtd_born_mod-Tuple{}'>#</a>
 <strong><code>SIT.Fdtd.fdtd_born_mod</code></strong> &mdash; <em>Method</em>.</p>
 <p>born modeling</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L16-L18' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L18-L20' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Fdtd.fdtd_mod-Tuple{}' href='#SIT.Fdtd.fdtd_mod-Tuple{}'>#</a>
 <strong><code>SIT.Fdtd.fdtd_mod</code></strong> &mdash; <em>Method</em>.</p>
 <p>modeling</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L71-L73' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L90-L92' class='documenter-source'>source</a><br></p>
 <p><a id='Another-Section-1'></a></p>
 <h2 id="another-section">Another Section</h2>
 <p><a id='Index-1'></a></p>
@@ -198,6 +215,9 @@
 <li><a href=".#SIT.Fdtd.fdtd_mod-Tuple{}"><code>SIT.Fdtd.fdtd_mod</code></a></li>
 <li><a href=".#SIT.Grid.M1D_npow2-Tuple{Int64,Float64}"><code>SIT.Grid.M1D_npow2</code></a></li>
 <li><a href=".#SIT.Grid.M1D_npow2_tf-Tuple{SIT.Grid.M1D}"><code>SIT.Grid.M1D_npow2_tf</code></a></li>
+<li><a href=".#SIT.Grid.M1D_resamp-Tuple{SIT.Grid.M1D,Float64}"><code>SIT.Grid.M1D_resamp</code></a></li>
+<li><a href=".#SIT.Grid.M1D_truncate-Tuple{SIT.Grid.M1D,Float64,Float64}"><code>SIT.Grid.M1D_truncate</code></a></li>
+<li><a href=".#SIT.Wavelets.ormsby-Tuple{}"><code>SIT.Wavelets.ormsby</code></a></li>
 <li><a href=".#SIT.Wavelets.ricker-Tuple{}"><code>SIT.Wavelets.ricker</code></a></li>
 </ul>
               
@@ -247,5 +267,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-03-14 23:24:40.634130
+Build Date UTC : 2017-03-30 21:50:42.322331
 -->
