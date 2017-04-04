@@ -226,7 +226,9 @@
 <p>Performs ICA for convolutive mixtures.</p>
 <p><strong>Arguments</strong></p>
 <p><em><code>magic_recv</code>: a receiver index, where deblending is performed </em><code>recv_n</code>: total number of receivers <em><code>src_n</code>: total number of sources </em><code>grid</code>: <code>M1D</code> grid <em><code>nband</code>: number of frequency bins, where ICA is performed </em><code>nsubfac</code>: overlap factor (testing) *<code>X</code>: blended data</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/CICA.jl#L8-L18' class='documenter-source'>source</a><br></p>
+<p><strong>Output</strong></p>
+<p>*<code>Y</code>: deblended data at <code>magic_recv</code></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/CICA.jl#L8-L21' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.CICA.exact_freq_mixing-Tuple{}' href='#SIT.CICA.exact_freq_mixing-Tuple{}'>#</a>
 <strong><code>SIT.CICA.exact_freq_mixing</code></strong> &mdash; <em>Method</em>.</p>
 <p>Convolutive mixing in the frequency domain.</p>
@@ -234,14 +236,14 @@
 <p><em><code>As</code>: </em><code>Ab</code>: <em><code>B</code>: </em><code>S</code>: *<code>fgrid</code>:</p>
 <p><strong>Outputs</strong></p>
 <p><em><code>D</code> </em><code>d</code> <em><code>Ds</code> </em><code>ds</code> <em><code>Db</code> </em><code>db</code></p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/CICA.jl#L218-L235' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/CICA.jl#L221-L238' class='documenter-source'>source</a><br></p>
 <p><a id='Another-Section-1'></a></p>
 <h2 id="another-section">Another Section</h2>
 <p><a id='Index-1'></a></p>
 <h2 id="index">Index</h2>
 <ul>
-<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D-Tuple{Symbol}"><code>SIT.Grid.M1D</code></a></li>
+<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.CICA.bica-Tuple{}"><code>SIT.CICA.bica</code></a></li>
 <li><a href=".#SIT.CICA.exact_freq_mixing-Tuple{}"><code>SIT.CICA.exact_freq_mixing</code></a></li>
 <li><a href=".#SIT.Fdtd.__init__-Tuple{}"><code>SIT.Fdtd.__init__</code></a></li>
@@ -301,5 +303,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-04-04 15:12:24.690883
+Build Date UTC : 2017-04-04 15:13:03.368674
 -->
