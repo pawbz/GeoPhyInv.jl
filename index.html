@@ -81,6 +81,9 @@
                 <li class="toctree-l3"><a href="#independent-component-analysis-for-convolutive-mixtures">Independent Component Analysis for Convolutive Mixtures</a></li>
                 
             
+                <li class="toctree-l3"><a href="#plotting">Plotting</a></li>
+                
+            
                 <li class="toctree-l3"><a href="#index">Index</a></li>
                 
             
@@ -295,11 +298,22 @@
 <p><a id='SIT.Data.TD' href='#SIT.Data.TD'>#</a>
 <strong><code>SIT.Data.TD</code></strong> &mdash; <em>Type</em>.</p>
 <p>time domain representation of Seismic Data</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Data.jl#L7-L9' class='documenter-source'>source</a><br></p>
+<p><strong>Fields</strong></p>
+<ul>
+<li><code>d</code> : data first sorted in time, then in receivers, and finally in sources</li>
+<li><code>tgrid</code> : <code>M1D</code> grid to represent time</li>
+<li><code>acqgeom</code> : acquisition geometry</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Data.jl#L7-L14' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Data.TD_resamp-Tuple{SIT.Data.TD,SIT.Grid.M1D}' href='#SIT.Data.TD_resamp-Tuple{SIT.Data.TD,SIT.Grid.M1D}'>#</a>
 <strong><code>SIT.Data.TD_resamp</code></strong> &mdash; <em>Method</em>.</p>
 <p>function to resample data in time domain</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Data.jl#L17-L19' class='documenter-source'>source</a><br></p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>data</code> : input data of type <code>TD</code></li>
+<li><code>tgrid</code> : resampling in time according to this time grid</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Data.jl#L22-L28' class='documenter-source'>source</a><br></p>
 <p><a id='Gallery-1'></a></p>
 <h2 id="gallery">Gallery</h2>
 <p><a id='SIT.Gallery.Geom-Tuple{SIT.Grid.M2D,Symbol}' href='#SIT.Gallery.Geom-Tuple{SIT.Grid.M2D,Symbol}'>#</a>
@@ -382,7 +396,7 @@
 <ul>
 <li><code>attrib=:oneonev</code> : seismic_homo1</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L145-L153' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L151-L159' class='documenter-source'>source</a><br></p>
 <p><a id='Seismic-Time-Domain-Modeling-1'></a></p>
 <h2 id="seismic-time-domain-modeling">Seismic Time-Domain Modeling</h2>
 <p><a id='SIT.Fdtd.__init__-Tuple{}' href='#SIT.Fdtd.__init__-Tuple{}'>#</a>
@@ -403,13 +417,15 @@
 <p>As forward modeling method, the  finite-difference method is employed.  It uses a discrete version of the two-dimensional isotropic acoustic wave equation. As shown in   Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used </p>
 <p><strong>Arguments</strong></p>
 <ul>
-<li><code>jobname</code>: dominant frequency</li>
-<li><code>npropwav</code>: number of wavefields propagating independently in the same medium time-domain grid</li>
-<li><code>model</code>: Seismic Model</li>
-<li><code>model0</code>: Background Seismic Model used for Born modeling</li>
+<li><code>jobname</code> : dominant frequency</li>
+<li><code>npropwav</code> : number of wavefields propagating independently in the same medium time-domain grid</li>
+<li><code>model</code> : Seismic Model</li>
+<li><code>model0</code> : Background Seismic Model used for Born modeling</li>
+<li><code>tgridmod</code> : time grid for modeling</li>
+<li><code>tgrid</code> : time grid for data output</li>
 <li><code>prop_flags</code>: flags that combine propagating wavefields</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L101-L113' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L101-L115' class='documenter-source'>source</a><br></p>
 <p><a id='Independent-Component-Analysis-for-Convolutive-Mixtures-1'></a></p>
 <h2 id="independent-component-analysis-for-convolutive-mixtures">Independent Component Analysis for Convolutive Mixtures</h2>
 <p><a id='SIT.CICA.bica-Tuple{}' href='#SIT.CICA.bica-Tuple{}'>#</a>
@@ -451,6 +467,20 @@
 <li><code>db</code></li>
 </ul>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/CICA.jl#L221-L238' class='documenter-source'>source</a><br></p>
+<p><a id='Plotting-1'></a></p>
+<h2 id="plotting">Plotting</h2>
+<p><a id='SIT.Plots.printfig-Tuple{Any}' href='#SIT.Plots.printfig-Tuple{Any}'>#</a>
+<strong><code>SIT.Plots.printfig</code></strong> &mdash; <em>Method</em>.</p>
+<p>save current fig using matlab2tikz</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Plots.jl#L17-L19' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Plots.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}' href='#SIT.Plots.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}'>#</a>
+<strong><code>SIT.Plots.Geom</code></strong> &mdash; <em>Method</em>.</p>
+<p>Plot acquisition geometry <code>Acquisition.Geom</code> on  and model grid <code>M2D</code>.</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Plots.jl#L51-L54' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Plots.TD-Tuple{SIT.Data.TD,Symbol}' href='#SIT.Plots.TD-Tuple{SIT.Data.TD,Symbol}'>#</a>
+<strong><code>SIT.Plots.TD</code></strong> &mdash; <em>Method</em>.</p>
+<p>Plot time-domain data of type <code>Data.TD</code></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Plots.jl#L68-L70' class='documenter-source'>source</a><br></p>
 <p>%## Another Section %<code>@contents %Pages = [ %    "modeling/page1.md"  %    ] %Depth = 2 %</code> %  %<code>@contents %Pages = [ %    "tutorials/page1.md", %    ] %Depth = 2 %</code></p>
 <p><a id='Index-1'></a></p>
 <h2 id="index">Index</h2>
@@ -473,8 +503,8 @@
 <li><a href=".#SIT.Fdtd.__init__-Tuple{}"><code>SIT.Fdtd.__init__</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_born_mod-Tuple{}"><code>SIT.Fdtd.fdtd_born_mod</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_mod-Tuple{}"><code>SIT.Fdtd.fdtd_mod</code></a></li>
-<li><a href=".#SIT.Gallery.Geom-Tuple{SIT.Grid.M2D,Symbol}"><code>SIT.Gallery.Geom</code></a></li>
 <li><a href=".#SIT.Gallery.Geom-Tuple{Symbol}"><code>SIT.Gallery.Geom</code></a></li>
+<li><a href=".#SIT.Gallery.Geom-Tuple{SIT.Grid.M2D,Symbol}"><code>SIT.Gallery.Geom</code></a></li>
 <li><a href=".#SIT.Gallery.M1D-Tuple{Symbol}"><code>SIT.Gallery.M1D</code></a></li>
 <li><a href=".#SIT.Gallery.M2D-Tuple{Symbol}"><code>SIT.Gallery.M2D</code></a></li>
 <li><a href=".#SIT.Gallery.Seismic-Tuple{Symbol}"><code>SIT.Gallery.Seismic</code></a></li>
@@ -485,6 +515,9 @@
 <li><a href=".#SIT.Grid.M1D_truncate-Tuple{SIT.Grid.M1D,Float64,Float64}"><code>SIT.Grid.M1D_truncate</code></a></li>
 <li><a href=".#SIT.Models.Seismic_resamp-Tuple{SIT.Models.Seismic,SIT.Grid.M2D}"><code>SIT.Models.Seismic_resamp</code></a></li>
 <li><a href=".#SIT.Models.χ"><code>SIT.Models.χ</code></a></li>
+<li><a href=".#SIT.Plots.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}"><code>SIT.Plots.Geom</code></a></li>
+<li><a href=".#SIT.Plots.TD-Tuple{SIT.Data.TD,Symbol}"><code>SIT.Plots.TD</code></a></li>
+<li><a href=".#SIT.Plots.printfig-Tuple{Any}"><code>SIT.Plots.printfig</code></a></li>
 <li><a href=".#SIT.Wavelets.ormsby-Tuple{}"><code>SIT.Wavelets.ormsby</code></a></li>
 <li><a href=".#SIT.Wavelets.ricker-Tuple{}"><code>SIT.Wavelets.ricker</code></a></li>
 </ul>
@@ -535,5 +568,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-04-04 17:00:37.003646
+Build Date UTC : 2017-04-04 20:21:56.530173
 -->
