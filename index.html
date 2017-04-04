@@ -225,9 +225,19 @@
 <strong><code>SIT.CICA.bica</code></strong> &mdash; <em>Method</em>.</p>
 <p>Performs ICA for convolutive mixtures.</p>
 <p><strong>Arguments</strong></p>
-<p><em><code>magic_recv</code>: a receiver index, where deblending is performed </em><code>recv_n</code>: total number of receivers <em><code>src_n</code>: total number of sources </em><code>grid</code>: <code>M1D</code> grid <em><code>nband</code>: number of frequency bins, where ICA is performed </em><code>nsubfac</code>: overlap factor (testing) *<code>X</code>: blended data</p>
+<ul>
+<li><code>magic_recv</code>: a receiver index, where deblending is performed</li>
+<li><code>recv_n</code>: total number of receivers</li>
+<li><code>src_n</code>: total number of sources</li>
+<li><code>grid</code>: <code>M1D</code> grid</li>
+<li><code>nband</code>: number of frequency bins, where ICA is performed</li>
+<li><code>nsubfac</code>: overlap factor (testing)</li>
+<li><code>X</code>: blended data</li>
+</ul>
 <p><strong>Output</strong></p>
-<p>*<code>Y</code>: deblended data at <code>magic_recv</code></p>
+<ul>
+<li><code>Y</code>: deblended data at <code>magic_recv</code></li>
+</ul>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/CICA.jl#L8-L21' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.CICA.exact_freq_mixing-Tuple{}' href='#SIT.CICA.exact_freq_mixing-Tuple{}'>#</a>
 <strong><code>SIT.CICA.exact_freq_mixing</code></strong> &mdash; <em>Method</em>.</p>
@@ -303,5 +313,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-04-04 15:13:57.036828
+Build Date UTC : 2017-04-04 15:15:10.489732
 -->
