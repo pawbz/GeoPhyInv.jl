@@ -66,6 +66,12 @@
                 <li class="toctree-l3"><a href="#acquisition">Acquisition</a></li>
                 
             
+                <li class="toctree-l3"><a href="#models">Models</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#data">Data</a></li>
+                
+            
                 <li class="toctree-l3"><a href="#gallery">Gallery</a></li>
                 
             
@@ -255,6 +261,48 @@
 <strong><code>SIT.Acquisition.get_vecSrc</code></strong> &mdash; <em>Method</em>.</p>
 <p>return a vector of the order </p>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Acquisition.jl#L147-L149' class='documenter-source'>source</a><br></p>
+<p><a id='Models-1'></a></p>
+<h2 id="models">Models</h2>
+<p><a id='SIT.Models.Seismic' href='#SIT.Models.Seismic'>#</a>
+<strong><code>SIT.Models.Seismic</code></strong> &mdash; <em>Type</em>.</p>
+<p>Data type fo represent a seismic model.</p>
+<p><strong>Fields</strong></p>
+<ul>
+<li><code>vp0</code> :</li>
+<li><code>vs0</code> :</li>
+<li><code>ρ0</code> :</li>
+<li><code>ρ0I</code> :</li>
+<li><code>K0</code> :</li>
+<li><code>K0I</code> :</li>
+<li><code>μ0</code> :</li>
+<li><code>χvp</code> :</li>
+<li><code>χvs</code> :</li>
+<li><code>χρ</code> :</li>
+<li><code>χρI</code> :</li>
+<li><code>χK</code> :</li>
+<li><code>χKI</code> :</li>
+<li><code>χμ</code> :</li>
+<li><code>mgrid</code> :</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L7-L25' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Models.Seismic_resamp-Tuple{SIT.Models.Seismic,SIT.Grid.M2D}' href='#SIT.Models.Seismic_resamp-Tuple{SIT.Models.Seismic,SIT.Grid.M2D}'>#</a>
+<strong><code>SIT.Models.Seismic_resamp</code></strong> &mdash; <em>Method</em>.</p>
+<p>function to resample in the model domain</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L80-L82' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Models.χ' href='#SIT.Models.χ'>#</a>
+<strong><code>SIT.Models.χ</code></strong> &mdash; <em>Function</em>.</p>
+<p>Return contrast model parameter using the reference value.</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L67-L70' class='documenter-source'>source</a><br></p>
+<p><a id='Data-1'></a></p>
+<h2 id="data">Data</h2>
+<p><a id='SIT.Data.TD' href='#SIT.Data.TD'>#</a>
+<strong><code>SIT.Data.TD</code></strong> &mdash; <em>Type</em>.</p>
+<p>time domain representation of Seismic Data</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Data.jl#L7-L9' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Data.TD_resamp-Tuple{SIT.Data.TD,SIT.Grid.M1D}' href='#SIT.Data.TD_resamp-Tuple{SIT.Data.TD,SIT.Grid.M1D}'>#</a>
+<strong><code>SIT.Data.TD_resamp</code></strong> &mdash; <em>Method</em>.</p>
+<p>function to resample data in time domain</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Data.jl#L17-L19' class='documenter-source'>source</a><br></p>
 <p><a id='Gallery-1'></a></p>
 <h2 id="gallery">Gallery</h2>
 <p><code>@autodocs
@@ -337,14 +385,17 @@ Order   = [:type, :function]</code></p>
 <li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Src-Tuple{Int64,Int64,Array{Float64,N},SIT.Grid.M1D}"><code>SIT.Acquisition.Src</code></a></li>
+<li><a href=".#SIT.Data.TD"><code>SIT.Data.TD</code></a></li>
 <li><a href=".#SIT.Grid.M1D"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M2D"><code>SIT.Grid.M2D</code></a></li>
+<li><a href=".#SIT.Models.Seismic"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom_swapsr-Tuple{SIT.Acquisition.Geom}"><code>SIT.Acquisition.Geom_swapsr</code></a></li>
 <li><a href=".#SIT.Acquisition.get_vecGeom-Tuple{Symbol,Array{SIT.Acquisition.Geom,N}}"><code>SIT.Acquisition.get_vecGeom</code></a></li>
 <li><a href=".#SIT.Acquisition.get_vecSrc-Tuple{Symbol,Array{SIT.Acquisition.Src,N}}"><code>SIT.Acquisition.get_vecSrc</code></a></li>
 <li><a href=".#SIT.CICA.bica-Tuple{}"><code>SIT.CICA.bica</code></a></li>
 <li><a href=".#SIT.CICA.exact_freq_mixing-Tuple{}"><code>SIT.CICA.exact_freq_mixing</code></a></li>
+<li><a href=".#SIT.Data.TD_resamp-Tuple{SIT.Data.TD,SIT.Grid.M1D}"><code>SIT.Data.TD_resamp</code></a></li>
 <li><a href=".#SIT.Fdtd.__init__-Tuple{}"><code>SIT.Fdtd.__init__</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_born_mod-Tuple{}"><code>SIT.Fdtd.fdtd_born_mod</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_mod-Tuple{}"><code>SIT.Fdtd.fdtd_mod</code></a></li>
@@ -352,6 +403,8 @@ Order   = [:type, :function]</code></p>
 <li><a href=".#SIT.Grid.M1D_npow2_tf-Tuple{SIT.Grid.M1D}"><code>SIT.Grid.M1D_npow2_tf</code></a></li>
 <li><a href=".#SIT.Grid.M1D_resamp-Tuple{SIT.Grid.M1D,Float64}"><code>SIT.Grid.M1D_resamp</code></a></li>
 <li><a href=".#SIT.Grid.M1D_truncate-Tuple{SIT.Grid.M1D,Float64,Float64}"><code>SIT.Grid.M1D_truncate</code></a></li>
+<li><a href=".#SIT.Models.Seismic_resamp-Tuple{SIT.Models.Seismic,SIT.Grid.M2D}"><code>SIT.Models.Seismic_resamp</code></a></li>
+<li><a href=".#SIT.Models.χ"><code>SIT.Models.χ</code></a></li>
 <li><a href=".#SIT.Wavelets.ormsby-Tuple{}"><code>SIT.Wavelets.ormsby</code></a></li>
 <li><a href=".#SIT.Wavelets.ricker-Tuple{}"><code>SIT.Wavelets.ricker</code></a></li>
 </ul>
@@ -402,5 +455,5 @@ Order   = [:type, :function]</code></p>
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-04-04 15:34:47.831106
+Build Date UTC : 2017-04-04 15:35:41.042374
 -->
