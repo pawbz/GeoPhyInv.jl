@@ -308,19 +308,27 @@
 <ul>
 <li><code>attrib</code>: Symbol attribute</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L86-L89' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L90-L93' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Gallery.M1D-Tuple{Symbol}' href='#SIT.Gallery.M1D-Tuple{Symbol}'>#</a>
 <strong><code>SIT.Gallery.M1D</code></strong> &mdash; <em>Method</em>.</p>
 <p>Default M1D grids based on attirb</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L25-L27' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L29-L31' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Gallery.M2D-Tuple{Symbol}' href='#SIT.Gallery.M2D-Tuple{Symbol}'>#</a>
 <strong><code>SIT.Gallery.M2D</code></strong> &mdash; <em>Method</em>.</p>
 <p>Gallery of <code>M2D</code> grids.</p>
 <p><strong>Arguments</strong></p>
 <ul>
-<li><code>attrib</code> : Symbol to select a particular grid</li>
+<li><code>attrib</code> : Symbol to select a particular grid.</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L8-L13' class='documenter-source'>source</a><br></p>
+<p><strong>Outputs</strong></p>
+<ul>
+<li><code>attrib=:seismic_homo1</code> : a square grid for with 201 grid points in each dimension, with 40 PML</li>
+</ul>
+<div class="codehilite"><pre><span></span>    points; both X and Z vary from -1000 to 1000.
+</pre></div>
+
+
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L8-L17' class='documenter-source'>source</a><br></p>
 <p><a id='Seismic-Time-Domain-Modeling-1'></a></p>
 <h2 id="seismic-time-domain-modeling">Seismic Time-Domain Modeling</h2>
 <p><a id='SIT.Fdtd.__init__-Tuple{}' href='#SIT.Fdtd.__init__-Tuple{}'>#</a>
@@ -394,8 +402,8 @@
 <h2 id="index">Index</h2>
 <ul>
 <li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
-<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}"><code>SIT.Acquisition.Geom</code></a></li>
+<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Src-Tuple{Int64,Int64,Array{Float64,N},SIT.Grid.M1D}"><code>SIT.Acquisition.Src</code></a></li>
 <li><a href=".#SIT.Data.TD"><code>SIT.Data.TD</code></a></li>
 <li><a href=".#SIT.Grid.M1D"><code>SIT.Grid.M1D</code></a></li>
@@ -470,5 +478,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-04-04 15:45:29.207739
+Build Date UTC : 2017-04-04 15:55:28.621535
 -->
