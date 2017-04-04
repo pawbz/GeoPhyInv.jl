@@ -66,6 +66,9 @@
                 <li class="toctree-l3"><a href="#seismic-time-domain-modeling">Seismic Time-Domain Modeling</a></li>
                 
             
+                <li class="toctree-l3"><a href="#independent-component-analysis-for-convolutive-mixtures">Independent Component Analysis for Convolutive Mixtures</a></li>
+                
+            
                 <li class="toctree-l3"><a href="#another-section">Another Section</a></li>
                 
             
@@ -198,25 +201,42 @@
 <p><a id='SIT.Fdtd.fdtd_born_mod-Tuple{}' href='#SIT.Fdtd.fdtd_born_mod-Tuple{}'>#</a>
 <strong><code>SIT.Fdtd.fdtd_born_mod</code></strong> &mdash; <em>Method</em>.</p>
 <p>born modeling</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L18-L20' class='documenter-source'>source</a><br></p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>tgridmod</code>: time-domain grid for modeling</li>
+<li><code>tgrid</code>: time grid for output data</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L18-L24' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Fdtd.fdtd_mod-Tuple{}' href='#SIT.Fdtd.fdtd_mod-Tuple{}'>#</a>
 <strong><code>SIT.Fdtd.fdtd_mod</code></strong> &mdash; <em>Method</em>.</p>
-<p>As forward modeling method, the  finite-difference method is employed.  It uses a discrete version of the two-dimensional isotropic acoustic wave equation. As shown in   Figure~ ef{fdshmesh_acou}, a staggered-grid mesh is used </p>
+<p>As forward modeling method, the  finite-difference method is employed.  It uses a discrete version of the two-dimensional isotropic acoustic wave equation. As shown in   Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used </p>
 <p><strong>Arguments</strong></p>
 <ul>
 <li><code>jobname</code>: dominant frequency</li>
 <li><code>npropwav</code>: number of wavefields propagating independently in the same medium time-domain grid</li>
 <li><code>model</code>: Seismic Model</li>
-<li>``</li>
+<li><code>model0</code>: Background Seismic Model used for Born modeling</li>
+<li><code>prop_flags</code>: flags that combine propagating wavefields</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L90-L102' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Fdtd.jl#L100-L112' class='documenter-source'>source</a><br></p>
+<p><a id='Independent-Component-Analysis-for-Convolutive-Mixtures-1'></a></p>
+<h2 id="independent-component-analysis-for-convolutive-mixtures">Independent Component Analysis for Convolutive Mixtures</h2>
+<p><a id='SIT.CICA.exact_freq_mixing-Tuple{}' href='#SIT.CICA.exact_freq_mixing-Tuple{}'>#</a>
+<strong><code>SIT.CICA.exact_freq_mixing</code></strong> &mdash; <em>Method</em>.</p>
+<p>Convolutive mixing in the frequency domain.</p>
+<p><strong>Arguments</strong></p>
+<p><em><code>As</code>: </em><code>Ab</code>: <em><code>B</code>: </em><code>S</code> *<code>fgrid</code></p>
+<p><strong>Outputs</strong></p>
+<p><em><code>D</code> </em><code>d</code> <em><code>Ds</code> </em><code>ds</code> <em><code>Db</code> </em><code>db</code></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/CICA.jl#L208-L225' class='documenter-source'>source</a><br></p>
 <p><a id='Another-Section-1'></a></p>
 <h2 id="another-section">Another Section</h2>
 <p><a id='Index-1'></a></p>
 <h2 id="index">Index</h2>
 <ul>
-<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D-Tuple{Symbol}"><code>SIT.Grid.M1D</code></a></li>
+<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
+<li><a href=".#SIT.CICA.exact_freq_mixing-Tuple{}"><code>SIT.CICA.exact_freq_mixing</code></a></li>
 <li><a href=".#SIT.Fdtd.__init__-Tuple{}"><code>SIT.Fdtd.__init__</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_born_mod-Tuple{}"><code>SIT.Fdtd.fdtd_born_mod</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_mod-Tuple{}"><code>SIT.Fdtd.fdtd_mod</code></a></li>
@@ -274,5 +294,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-03-30 21:57:17.409986
+Build Date UTC : 2017-04-04 14:52:33.655050
 -->
