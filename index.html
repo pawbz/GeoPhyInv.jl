@@ -307,11 +307,11 @@
 <p>Gallery of acquisition geometries <code>Geom</code> based on input <code>M2D</code>.</p>
 <p><strong>Arguments</strong></p>
 <ul>
-<li><code>attrib</code> : Symbol to select a particular grid.</li>
+<li><code>attrib::Symbol</code> :</li>
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
-<li><code>attrib=:seismic_homo1</code> : an homogeneous acoustic model with <code>vp0=2000</code> and <code>ρ0=2000</code></li>
+<li><code>attrib=:oneonev</code> : an homogeneous acoustic model with <code>vp0=2000</code> and <code>ρ0=2000</code></li>
 </ul>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L115-L123' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Gallery.Geom-Tuple{Symbol}' href='#SIT.Gallery.Geom-Tuple{Symbol}'>#</a>
@@ -319,11 +319,11 @@
 <p>Gallery of acquisition geometries <code>Geom</code>.</p>
 <p><strong>Arguments</strong></p>
 <ul>
-<li><code>attrib</code> : Symbol to select a particular grid.</li>
+<li><code>attrib::Symbol</code> :</li>
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
-<li><code>attrib=:seismic_homo1</code> : an homogeneous acoustic model with <code>vp0=2000</code> and <code>ρ0=2000</code></li>
+<li><code>attrib=:seismic_homo1</code> : a simple one source and one receiver configuration</li>
 </ul>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L100-L108' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Gallery.M1D-Tuple{Symbol}' href='#SIT.Gallery.M1D-Tuple{Symbol}'>#</a>
@@ -331,7 +331,7 @@
 <p>Gallery of <code>M1D</code> grids.</p>
 <p><strong>Arguments</strong></p>
 <ul>
-<li><code>attrib</code> : Symbol to select a particular grid.</li>
+<li><code>attrib::Symbol</code> :</li>
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
@@ -344,7 +344,7 @@
 <p>Gallery of <code>M2D</code> grids.</p>
 <p><strong>Arguments</strong></p>
 <ul>
-<li><code>attrib</code> : Symbol to select a particular grid.</li>
+<li><code>attrib::Symbol</code> :</li>
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
@@ -360,7 +360,7 @@
 <p>Gallery of <code>Seismic</code> models.</p>
 <p><strong>Arguments</strong></p>
 <ul>
-<li><code>attrib</code> : Symbol to select a particular grid.</li>
+<li><code>attrib::Symbol</code> :</li>
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
@@ -442,13 +442,13 @@
 <p><a id='Index-1'></a></p>
 <h2 id="index">Index</h2>
 <ul>
+<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
+<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}"><code>SIT.Acquisition.Geom</code></a></li>
-<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
-<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Src-Tuple{Int64,Int64,Array{Float64,N},SIT.Grid.M1D}"><code>SIT.Acquisition.Src</code></a></li>
 <li><a href=".#SIT.Data.TD"><code>SIT.Data.TD</code></a></li>
-<li><a href=".#SIT.Grid.M1D"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
+<li><a href=".#SIT.Grid.M1D"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M2D"><code>SIT.Grid.M2D</code></a></li>
 <li><a href=".#SIT.Models.Seismic"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom_swapsr-Tuple{SIT.Acquisition.Geom}"><code>SIT.Acquisition.Geom_swapsr</code></a></li>
@@ -460,8 +460,8 @@
 <li><a href=".#SIT.Fdtd.__init__-Tuple{}"><code>SIT.Fdtd.__init__</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_born_mod-Tuple{}"><code>SIT.Fdtd.fdtd_born_mod</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_mod-Tuple{}"><code>SIT.Fdtd.fdtd_mod</code></a></li>
-<li><a href=".#SIT.Gallery.Geom-Tuple{Symbol}"><code>SIT.Gallery.Geom</code></a></li>
 <li><a href=".#SIT.Gallery.Geom-Tuple{SIT.Grid.M2D,Symbol}"><code>SIT.Gallery.Geom</code></a></li>
+<li><a href=".#SIT.Gallery.Geom-Tuple{Symbol}"><code>SIT.Gallery.Geom</code></a></li>
 <li><a href=".#SIT.Gallery.M1D-Tuple{Symbol}"><code>SIT.Gallery.M1D</code></a></li>
 <li><a href=".#SIT.Gallery.M2D-Tuple{Symbol}"><code>SIT.Gallery.M2D</code></a></li>
 <li><a href=".#SIT.Gallery.Seismic-Tuple{Symbol}"><code>SIT.Gallery.Seismic</code></a></li>
@@ -521,5 +521,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-04-04 16:25:19.618215
+Build Date UTC : 2017-04-04 16:34:38.721772
 -->
