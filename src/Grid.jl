@@ -1,5 +1,16 @@
 module Grid
 
+"""
+Data type to represent 2D grid.
+# Fields
+* `x` : horizontal values
+* `z` : vertical values
+* `nx` : number of samples in horizontal direction
+* `nz` : number of samples in vertical direction
+* `δx` : sampling interval in horizontal direction
+* `δz` : sampling interval in vertical direction
+"""
+
 type M2D
 	x::Array{Float64}
 	z::Array{Float64}
@@ -10,13 +21,6 @@ type M2D
 	δz::Float64
 end
 
-function(attrib::Symbol)
-	if(attrib == :samp1)
-		return M2D(-1000.0,1000.0,-1000.0,1000.0,201,201,40)
-	else
-		error("invalid attrib")
-	end
-end
 
 function M2D(xmin::Float64, xmax::Float64,
 	zmin::Float64, zmax::Float64,
@@ -32,7 +36,6 @@ function M2D(xmin::Float64, xmax::Float64,
 	zmin::Float64, zmax::Float64,
 	δx::Float64, δz::Float64,
 	npml::Int64,
-	attrib::Symbol=nothing
 	)
 	x = [xx for xx in xmin:δx:xmax]
 	z = [zz for zz in zmin:δz:zmax]
@@ -40,25 +43,33 @@ function M2D(xmin::Float64, xmax::Float64,
 	return M2D(x, z, nx, nz, npml, x[2]-x[1], z[2]-z[1])
 end
 
+"""
+Extend M2D by npml grid points on all sides
+"""
+function M2D_extend(mgrid::M2D)
 
+	xmin = mgrid.x[1] - mgrid.npml*mgrid.δx
+	xmax = mgrid.x[end] + mgrid.npml*mgrid.δx
+	zmin = mgrid.z[1] - mgrid.npml*mgrid.δz
+	zmax = mgrid.z[end] + mgrid.npml*mgrid.δz
+	# npml = 0 for output
+	return M2D(xmin,xmax,zmin,zmax, mgrid.nx+2*mgrid.npml,mgrid.nz+2*mgrid.npml,0)
+end
+
+
+
+"""
+Data type to represent 1D grid.
+# Fields
+* `x` : values
+* `nx` : number of samples
+* `δx` : sampling interval
+"""
 type M1D
 	x::Array{Float64}
 	nx::Int64
 	δx::Float64
 #	OrderedPair(x,y) = x > y ? error("out of order") : new(x,y)
-end
-
-"""
-Default M1D grids based on attirb
-"""
-function M1D(attrib::Symbol)
-	if(attrib == :timesamp1)
-		return M1D(0.0,1.0,2000)
-	elseif(attrib == :npow2samp)
-		return M1D(npow2=16,δ=0.0001)
-	else
-		error("invalid attrib")
-	end
 end
 
 """
@@ -74,6 +85,23 @@ function M1D(xbeg::Float64, xend::Float64, δx::Float64)
 	return M1D(x, size(x,1), x[2]-x[1])
 end
 
+"""
+1-D grid with a different sampling interval
+* Not yet implemented for npow2 grids
+"""
+M1D_resamp(grid::M1D, δx::Float64) = M1D(grid.x[1], grid.x[end], δx)
+
+"""
+1-D grid which is has a different size
+"""
+function M1D_truncate(grid::M1D, xbeg::Float64, xend::Float64)
+	ix1 = indmin((grid.x - xbeg).^2.0);
+	ix2 = indmin((grid.x - xend).^2.0);
+	ixmin = minimum([ix1, ix2]); 
+	ixmax = maximum([ix1, ix2]); 
+	x = grid.x[ixmin:ixmax];
+	return M1D(x, size(x,1), x[2]-x[1])
+end
 
 """
 output an npow2grid of either time or frequency

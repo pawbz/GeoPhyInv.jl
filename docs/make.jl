@@ -1,6 +1,8 @@
 using Documenter, SIT
-makedocs()
 
+#makedocs(modules=[SIT],
+#	         doctest=true)
+makedocs()
 
 #makedocs(
 #    format = :html,

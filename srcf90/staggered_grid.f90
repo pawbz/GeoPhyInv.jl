@@ -46,12 +46,13 @@ enddo
 end subroutine get_musigmayz
 
 
-function extend(input, np, nxprev, nzprev)
+function extend(input, np, nxprev, nzprev, zero_flag)
 ! this subroutine extends the input model on all four sides by np points
 !       input                           : input (nxprev , nzprev) 
 !       np                              : number of pml layers to be added to extend models
 !       nxprev                          : size in x direction before extending
 !       nzprev                          : size in z direction before extending
+!       zero_flag                       : if true, then just zero pads
 !       
 ! output 
 !       extend                          : extended model of diemension (0:(nxprev + 2* np) +1 , 0:(nzprev + 2*np)+1)
@@ -59,6 +60,7 @@ function extend(input, np, nxprev, nzprev)
 implicit none
 integer, intent(in)                     :: np, nxprev, nzprev
 real, intent(in), dimension(:,:)        :: input
+logical, intent(in)                     :: zero_flag
 real                                    :: extend(0: (nzprev + 2*np) + 1, 0: (nxprev + 2*np) + 1)
 integer                                 :: ix,iz
 
@@ -69,18 +71,21 @@ extend(:,:)=rzero_de;
 
 ! padding 
 extend(np+1:nzprev+np,np+1:nxprev+np)=input;
-do ix=0,nxprev + 2*np +1
-        do iz=0,np
-                extend(iz,ix)=extend(np+1,ix)
-                extend(nzprev +2*np-iz+1,ix)=extend(nzprev+np,ix)
+if(.not.(zero_flag)) then
+        do ix=0,nxprev + 2*np +1
+                do iz=0,np
+                        extend(iz,ix)=extend(np+1,ix)
+                        extend(nzprev +2*np-iz+1,ix)=extend(nzprev+np,ix)
+                end do
         end do
-end do
-do iz=0,nzprev+2*np+1
-        do ix=0,np
-                extend(iz,ix)=extend(iz,np+1)
-                extend(iz,nxprev+2*np+1-ix)=extend(iz,nxprev+np)
+
+        do iz=0,nzprev+2*np+1
+                do ix=0,np
+                        extend(iz,ix)=extend(iz,np+1)
+                        extend(iz,nxprev+2*np+1-ix)=extend(iz,nxprev+np)
+                end do
         end do
-end do
+endif
 end function extend
 
 subroutine get_rhoI(rho, rhoI)
@@ -102,10 +107,10 @@ enddo
 end subroutine get_rhoI
 
 
-subroutine get_rhovxI(rhoI, rhovxI)
+function get_rhovxI(rhoI) result(rhovxI)
 implicit none
 real, intent(in)                                :: rhoI(:,:)
-real, intent(out)                               :: rhovxI(:,:)
+real                                            :: rhovxI(size(rhoI,1),size(rhoI,2))
 integer                                         :: iz, ix 
 call check_dimension("fd1acou: get_rhovxI", rhoI, rhovxI)
 rhovxI = rzero_de;
@@ -114,12 +119,12 @@ do ix = 1, size(rhoI, 2)-1
                 rhovxI(iz, ix) = 0.5e0 *(rhoI(iz,ix+1) + rhoI(iz,ix))
         enddo
 enddo
-end subroutine get_rhovxI
+end function get_rhovxI
 
-subroutine get_rhovzI(rhoI, rhovzI)
+function get_rhovzI(rhoI) result(rhovzI)
 implicit none
 real, intent(in)                                :: rhoI(:,:)
-real, intent(out)                               :: rhovzI(:,:)
+real                                            :: rhovzI(size(rhoI,1),size(rhoI,2))
 integer                                         :: iz, ix 
 call check_dimension("fd1acou: get_rhovzI", rhoI, rhovzI)
 rhovzI = rzero_de;
@@ -129,6 +134,6 @@ do ix = 1, size(rhoI, 2)
                         rhovzI(iz, ix) =  0.5e0 * (rhoI(iz+1,ix) + rhoI(iz,ix))
         enddo
 enddo
-end subroutine get_rhovzI
+end function get_rhovzI
 
 end module staggered_grid
