@@ -169,11 +169,11 @@
 <li><code>nx</code> : number of samples</li>
 <li><code>δx</code> : sampling interval</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L47-L53' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L61-L67' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Grid.M1D-Tuple{Float64,Float64,Int64}' href='#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}'>#</a>
 <strong><code>SIT.Grid.M1D</code></strong> &mdash; <em>Method</em>.</p>
 <p>Construct 1-D grid based on nx or δx</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L61-L63' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L75-L77' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Grid.M2D' href='#SIT.Grid.M2D'>#</a>
 <strong><code>SIT.Grid.M2D</code></strong> &mdash; <em>Type</em>.</p>
 <p>Data type to represent 2D grid.</p>
@@ -190,22 +190,26 @@
 <p><a id='SIT.Grid.M1D_npow2-Tuple{Int64,Float64}' href='#SIT.Grid.M1D_npow2-Tuple{Int64,Float64}'>#</a>
 <strong><code>SIT.Grid.M1D_npow2</code></strong> &mdash; <em>Method</em>.</p>
 <p>output an npow2grid of either time or frequency</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L92-L94' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L106-L108' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Grid.M1D_npow2_tf-Tuple{SIT.Grid.M1D}' href='#SIT.Grid.M1D_npow2_tf-Tuple{SIT.Grid.M1D}'>#</a>
 <strong><code>SIT.Grid.M1D_npow2_tf</code></strong> &mdash; <em>Method</em>.</p>
 <p>convertion between time and frequency npow2 grids</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L113' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L127' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Grid.M1D_resamp-Tuple{SIT.Grid.M1D,Float64}' href='#SIT.Grid.M1D_resamp-Tuple{SIT.Grid.M1D,Float64}'>#</a>
 <strong><code>SIT.Grid.M1D_resamp</code></strong> &mdash; <em>Method</em>.</p>
 <p>1-D grid with a different sampling interval</p>
 <ul>
 <li>Not yet implemented for npow2 grids</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L74-L77' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L88-L91' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Grid.M1D_truncate-Tuple{SIT.Grid.M1D,Float64,Float64}' href='#SIT.Grid.M1D_truncate-Tuple{SIT.Grid.M1D,Float64,Float64}'>#</a>
 <strong><code>SIT.Grid.M1D_truncate</code></strong> &mdash; <em>Method</em>.</p>
 <p>1-D grid which is has a different size</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L80-L82' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L94-L96' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Grid.M2D_extend-Tuple{SIT.Grid.M2D}' href='#SIT.Grid.M2D_extend-Tuple{SIT.Grid.M2D}'>#</a>
+<strong><code>SIT.Grid.M2D_extend</code></strong> &mdash; <em>Method</em>.</p>
+<p>Extend M2D by npml grid points on all sides</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Grid.jl#L46-L48' class='documenter-source'>source</a><br></p>
 <p><a id='Source-Wavelets-1'></a></p>
 <h2 id="source-wavelets">Source Wavelets</h2>
 <p><a id='SIT.Wavelets.ormsby-Tuple{}' href='#SIT.Wavelets.ormsby-Tuple{}'>#</a>
@@ -285,14 +289,26 @@
 <li><code>mgrid</code> :</li>
 </ul>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L7-L25' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Models.Seismic-Tuple{Float64,Float64,Float64,Array{Float64,N},Array{Float64,N},Array{Float64,N},SIT.Grid.M2D}' href='#SIT.Models.Seismic-Tuple{Float64,Float64,Float64,Array{Float64,N},Array{Float64,N},Array{Float64,N},SIT.Grid.M2D}'>#</a>
+<strong><code>SIT.Models.Seismic</code></strong> &mdash; <em>Method</em>.</p>
+<p>Construct using input velocity and density arrays</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L44-L46' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Models.Seismic_extend-Tuple{SIT.Models.Seismic}' href='#SIT.Models.Seismic_extend-Tuple{SIT.Models.Seismic}'>#</a>
+<strong><code>SIT.Models.Seismic_extend</code></strong> &mdash; <em>Method</em>.</p>
+<p>Extend a seismic model into PML layers</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L83-L85' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Models.Seismic_resamp-Tuple{SIT.Models.Seismic,SIT.Grid.M2D}' href='#SIT.Models.Seismic_resamp-Tuple{SIT.Models.Seismic,SIT.Grid.M2D}'>#</a>
 <strong><code>SIT.Models.Seismic_resamp</code></strong> &mdash; <em>Method</em>.</p>
 <p>function to resample in the model domain</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L80-L82' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L116-L118' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Models.extend-Tuple{Array{Float64,2},Int64}' href='#SIT.Models.extend-Tuple{Array{Float64,2},Int64}'>#</a>
+<strong><code>SIT.Models.extend</code></strong> &mdash; <em>Method</em>.</p>
+<p>Extend a model on all four sides</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L100-L102' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Models.χ' href='#SIT.Models.χ'>#</a>
 <strong><code>SIT.Models.χ</code></strong> &mdash; <em>Function</em>.</p>
 <p>Return contrast model parameter using the reference value.</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L67-L70' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Models.jl#L70-L73' class='documenter-source'>source</a><br></p>
 <p><a id='Data-1'></a></p>
 <h2 id="data">Data</h2>
 <p><a id='SIT.Data.TD' href='#SIT.Data.TD'>#</a>
@@ -328,7 +344,7 @@
 <li><code>attrib=:oneonev</code> : one source at (xmin, mean(z)) and one receiver at (xmax, mean(z))</li>
 <li><code>attrib=:twotwov</code> : two vertical wells, two sources at xmin and two receivers at xmax</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L115-L124' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L117-L126' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Gallery.Geom-Tuple{Symbol}' href='#SIT.Gallery.Geom-Tuple{Symbol}'>#</a>
 <strong><code>SIT.Gallery.Geom</code></strong> &mdash; <em>Method</em>.</p>
 <p>Gallery of acquisition geometries <code>Geom</code>.</p>
@@ -394,9 +410,9 @@
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
-<li><code>attrib=:oneonev</code> : seismic_homo1</li>
+<li><code>attrib=:seismic_homo1</code> :</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L151-L159' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Gallery.jl#L153-L161' class='documenter-source'>source</a><br></p>
 <p><a id='Seismic-Time-Domain-Modeling-1'></a></p>
 <h2 id="seismic-time-domain-modeling">Seismic Time-Domain Modeling</h2>
 <p><a id='SIT.Fdtd.__init__-Tuple{}' href='#SIT.Fdtd.__init__-Tuple{}'>#</a>
@@ -477,22 +493,27 @@
 <strong><code>SIT.Plots.Geom</code></strong> &mdash; <em>Method</em>.</p>
 <p>Plot acquisition geometry <code>Acquisition.Geom</code> on  and model grid <code>M2D</code>.</p>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Plots.jl#L51-L54' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Plots.Src-Tuple{SIT.Acquisition.Src,Symbol}' href='#SIT.Plots.Src-Tuple{SIT.Acquisition.Src,Symbol}'>#</a>
+<strong><code>SIT.Plots.Src</code></strong> &mdash; <em>Method</em>.</p>
+<p>Plot acqsrc</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Plots.jl#L67-L69' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Plots.TD-Tuple{SIT.Data.TD,Symbol}' href='#SIT.Plots.TD-Tuple{SIT.Data.TD,Symbol}'>#</a>
 <strong><code>SIT.Plots.TD</code></strong> &mdash; <em>Method</em>.</p>
 <p>Plot time-domain data of type <code>Data.TD</code></p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Plots.jl#L68-L70' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Plots.jl#L79-L81' class='documenter-source'>source</a><br></p>
 <p>%## Another Section %<code>@contents %Pages = [ %    "modeling/page1.md"  %    ] %Depth = 2 %</code> %  %<code>@contents %Pages = [ %    "tutorials/page1.md", %    ] %Depth = 2 %</code></p>
 <p><a id='Index-1'></a></p>
 <h2 id="index">Index</h2>
 <ul>
 <li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
-<li><a href=".#SIT.Acquisition.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
+<li><a href=".#SIT.Acquisition.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Src-Tuple{Int64,Int64,Array{Float64,N},SIT.Grid.M1D}"><code>SIT.Acquisition.Src</code></a></li>
 <li><a href=".#SIT.Data.TD"><code>SIT.Data.TD</code></a></li>
 <li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M2D"><code>SIT.Grid.M2D</code></a></li>
+<li><a href=".#SIT.Models.Seismic-Tuple{Float64,Float64,Float64,Array{Float64,N},Array{Float64,N},Array{Float64,N},SIT.Grid.M2D}"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Models.Seismic"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom_swapsr-Tuple{SIT.Acquisition.Geom}"><code>SIT.Acquisition.Geom_swapsr</code></a></li>
 <li><a href=".#SIT.Acquisition.get_vecGeom-Tuple{Symbol,Array{SIT.Acquisition.Geom,N}}"><code>SIT.Acquisition.get_vecGeom</code></a></li>
@@ -513,9 +534,13 @@
 <li><a href=".#SIT.Grid.M1D_npow2_tf-Tuple{SIT.Grid.M1D}"><code>SIT.Grid.M1D_npow2_tf</code></a></li>
 <li><a href=".#SIT.Grid.M1D_resamp-Tuple{SIT.Grid.M1D,Float64}"><code>SIT.Grid.M1D_resamp</code></a></li>
 <li><a href=".#SIT.Grid.M1D_truncate-Tuple{SIT.Grid.M1D,Float64,Float64}"><code>SIT.Grid.M1D_truncate</code></a></li>
+<li><a href=".#SIT.Grid.M2D_extend-Tuple{SIT.Grid.M2D}"><code>SIT.Grid.M2D_extend</code></a></li>
+<li><a href=".#SIT.Models.Seismic_extend-Tuple{SIT.Models.Seismic}"><code>SIT.Models.Seismic_extend</code></a></li>
 <li><a href=".#SIT.Models.Seismic_resamp-Tuple{SIT.Models.Seismic,SIT.Grid.M2D}"><code>SIT.Models.Seismic_resamp</code></a></li>
+<li><a href=".#SIT.Models.extend-Tuple{Array{Float64,2},Int64}"><code>SIT.Models.extend</code></a></li>
 <li><a href=".#SIT.Models.χ"><code>SIT.Models.χ</code></a></li>
 <li><a href=".#SIT.Plots.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}"><code>SIT.Plots.Geom</code></a></li>
+<li><a href=".#SIT.Plots.Src-Tuple{SIT.Acquisition.Src,Symbol}"><code>SIT.Plots.Src</code></a></li>
 <li><a href=".#SIT.Plots.TD-Tuple{SIT.Data.TD,Symbol}"><code>SIT.Plots.TD</code></a></li>
 <li><a href=".#SIT.Plots.printfig-Tuple{Any}"><code>SIT.Plots.printfig</code></a></li>
 <li><a href=".#SIT.Wavelets.ormsby-Tuple{}"><code>SIT.Wavelets.ormsby</code></a></li>
@@ -568,5 +593,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-04-04 20:22:11.166217
+Build Date UTC : 2017-04-05 19:55:13.502419
 -->
