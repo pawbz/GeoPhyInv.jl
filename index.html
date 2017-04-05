@@ -249,14 +249,33 @@
 <strong><code>SIT.Acquisition.Geom</code></strong> &mdash; <em>Method</em>.</p>
 <p>modify exixting acquisitin geometries same source but receivers at the border</p>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Acquisition.jl#L26-L29' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Acquisition.Src' href='#SIT.Acquisition.Src'>#</a>
+<strong><code>SIT.Acquisition.Src</code></strong> &mdash; <em>Type</em>.</p>
+<p>Data type for the sources used.</p>
+<p><strong>Fields</strong></p>
+<ul>
+<li><code>nss::Int64</code> : number of supersources</li>
+<li><code>ns::Array{Int64}</code> : number of sources for each supersource</li>
+<li><code>wav::Array{Float64}</code> : wavelets in time domain</li>
+<li><code>tgrid::Grid.M1D</code> : time grid</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Acquisition.jl#L125-L133' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.Src-Tuple{Int64,Int64,Array{Float64,N},SIT.Grid.M1D}' href='#SIT.Acquisition.Src-Tuple{Int64,Int64,Array{Float64,N},SIT.Grid.M1D}'>#</a>
 <strong><code>SIT.Acquisition.Src</code></strong> &mdash; <em>Method</em>.</p>
-<p>repeat same source wavelet for all sources and supersources</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Acquisition.jl#L134-L136' class='documenter-source'>source</a><br></p>
+<p>Constructor for <code>Src</code> data type. repeat same source wavelet for all sources and supersources</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>nss</code> : number</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Acquisition.jl#L142-L148' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.Geom_swapsr-Tuple{SIT.Acquisition.Geom}' href='#SIT.Acquisition.Geom_swapsr-Tuple{SIT.Acquisition.Geom}'>#</a>
 <strong><code>SIT.Acquisition.Geom_swapsr</code></strong> &mdash; <em>Method</em>.</p>
 <p>swap the positions of sources and recievers</p>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Acquisition.jl#L98' class='documenter-source'>source</a><br></p>
+<p><a id='SIT.Acquisition.Src_tr-Tuple{SIT.Acquisition.Src}' href='#SIT.Acquisition.Src_tr-Tuple{SIT.Acquisition.Src}'>#</a>
+<strong><code>SIT.Acquisition.Src_tr</code></strong> &mdash; <em>Method</em>.</p>
+<p>Function that returns Src after time reversal</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Acquisition.jl#L157-L159' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.get_vecGeom-Tuple{Symbol,Array{SIT.Acquisition.Geom,N}}' href='#SIT.Acquisition.get_vecGeom-Tuple{Symbol,Array{SIT.Acquisition.Geom,N}}'>#</a>
 <strong><code>SIT.Acquisition.get_vecGeom</code></strong> &mdash; <em>Method</em>.</p>
 <p>return a vector of the order </p>
@@ -264,7 +283,7 @@
 <p><a id='SIT.Acquisition.get_vecSrc-Tuple{Symbol,Array{SIT.Acquisition.Src,N}}' href='#SIT.Acquisition.get_vecSrc-Tuple{Symbol,Array{SIT.Acquisition.Src,N}}'>#</a>
 <strong><code>SIT.Acquisition.get_vecSrc</code></strong> &mdash; <em>Method</em>.</p>
 <p>return a vector of the order </p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Acquisition.jl#L147-L149' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/7ebb329b9316026ced82d312c81279f78a95f31d/src/Acquisition.jl#L165-L167' class='documenter-source'>source</a><br></p>
 <p><a id='Models-1'></a></p>
 <h2 id="models">Models</h2>
 <p><a id='SIT.Models.Seismic' href='#SIT.Models.Seismic'>#</a>
@@ -505,17 +524,19 @@
 <p><a id='Index-1'></a></p>
 <h2 id="index">Index</h2>
 <ul>
+<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
-<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Src-Tuple{Int64,Int64,Array{Float64,N},SIT.Grid.M1D}"><code>SIT.Acquisition.Src</code></a></li>
+<li><a href=".#SIT.Acquisition.Src"><code>SIT.Acquisition.Src</code></a></li>
 <li><a href=".#SIT.Data.TD"><code>SIT.Data.TD</code></a></li>
-<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D"><code>SIT.Grid.M1D</code></a></li>
+<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M2D"><code>SIT.Grid.M2D</code></a></li>
 <li><a href=".#SIT.Models.Seismic-Tuple{Float64,Float64,Float64,Array{Float64,N},Array{Float64,N},Array{Float64,N},SIT.Grid.M2D}"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Models.Seismic"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom_swapsr-Tuple{SIT.Acquisition.Geom}"><code>SIT.Acquisition.Geom_swapsr</code></a></li>
+<li><a href=".#SIT.Acquisition.Src_tr-Tuple{SIT.Acquisition.Src}"><code>SIT.Acquisition.Src_tr</code></a></li>
 <li><a href=".#SIT.Acquisition.get_vecGeom-Tuple{Symbol,Array{SIT.Acquisition.Geom,N}}"><code>SIT.Acquisition.get_vecGeom</code></a></li>
 <li><a href=".#SIT.Acquisition.get_vecSrc-Tuple{Symbol,Array{SIT.Acquisition.Src,N}}"><code>SIT.Acquisition.get_vecSrc</code></a></li>
 <li><a href=".#SIT.CICA.bica-Tuple{}"><code>SIT.CICA.bica</code></a></li>
@@ -593,5 +614,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-04-05 19:55:28.917854
+Build Date UTC : 2017-04-05 20:15:57.944389
 -->
