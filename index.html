@@ -232,14 +232,20 @@
 <p><a id='SIT.Acquisition.Geom' href='#SIT.Acquisition.Geom'>#</a>
 <strong><code>SIT.Acquisition.Geom</code></strong> &mdash; <em>Type</em>.</p>
 <p>return acquisition geometry depending  on either horizontal or vertical array It has only one source for every supersource</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L77-L81' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L83-L87' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.Geom' href='#SIT.Acquisition.Geom'>#</a>
 <strong><code>SIT.Acquisition.Geom</code></strong> &mdash; <em>Type</em>.</p>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L6' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}' href='#SIT.Acquisition.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}'>#</a>
 <strong><code>SIT.Acquisition.Geom</code></strong> &mdash; <em>Method</em>.</p>
-<p>modify exixting acquisitin geometries same source but receivers at the border</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L26-L29' class='documenter-source'>source</a><br></p>
+<p>Modify input <code>Geom</code> such that the output has either sources or receivers on the boundary of  <code>mgrid</code>.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>acqgeom::Geom</code> : input geometry</li>
+<li><code>mgrid::Grid.M2D</code> : to determine the boundary</li>
+<li><code>attrib::Symbol</code> : either <code>:srcborder</code> or <code>:recborder</code></li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L26-L35' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.Src' href='#SIT.Acquisition.Src'>#</a>
 <strong><code>SIT.Acquisition.Src</code></strong> &mdash; <em>Type</em>.</p>
 <p>Data type for the sources used.</p>
@@ -251,7 +257,7 @@
 <li><code>wav::Array{Float64}</code> : wavelets in time domain</li>
 <li><code>tgrid::Grid.M1D</code> : time grid</li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L147-L156' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L153-L162' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.Src-Tuple{Int64,Int64,Int64,Array{Float64,N},SIT.Grid.M1D}' href='#SIT.Acquisition.Src-Tuple{Int64,Int64,Int64,Array{Float64,N},SIT.Grid.M1D}'>#</a>
 <strong><code>SIT.Acquisition.Src</code></strong> &mdash; <em>Method</em>.</p>
 <p>Constructor for <code>Src</code> data type. repeat same source wavelet for all sources and supersources</p>
@@ -261,23 +267,23 @@
 <li><code>ns::Int64</code> : number of sources</li>
 <li><code>wav::Array{Float64}</code></li>
 </ul>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L166-L174' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L172-L180' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.Geom_swapsr-Tuple{SIT.Acquisition.Geom}' href='#SIT.Acquisition.Geom_swapsr-Tuple{SIT.Acquisition.Geom}'>#</a>
 <strong><code>SIT.Acquisition.Geom_swapsr</code></strong> &mdash; <em>Method</em>.</p>
 <p>swap the positions of sources and recievers</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L120' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L126' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.Src_tr-Tuple{SIT.Acquisition.Src}' href='#SIT.Acquisition.Src_tr-Tuple{SIT.Acquisition.Src}'>#</a>
 <strong><code>SIT.Acquisition.Src_tr</code></strong> &mdash; <em>Method</em>.</p>
 <p>Function that returns Src after time reversal</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L185-L187' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L191-L193' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.get_vecGeom-Tuple{Symbol,Array{SIT.Acquisition.Geom,N}}' href='#SIT.Acquisition.get_vecGeom-Tuple{Symbol,Array{SIT.Acquisition.Geom,N}}'>#</a>
 <strong><code>SIT.Acquisition.get_vecGeom</code></strong> &mdash; <em>Method</em>.</p>
 <p>return a vector of the order </p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L131-L133' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L137-L139' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.get_vecSrc-Tuple{Symbol,Array{SIT.Acquisition.Src,N}}' href='#SIT.Acquisition.get_vecSrc-Tuple{Symbol,Array{SIT.Acquisition.Src,N}}'>#</a>
 <strong><code>SIT.Acquisition.get_vecSrc</code></strong> &mdash; <em>Method</em>.</p>
 <p>return a vector of the order </p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L193-L195' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Acquisition.jl#L199-L201' class='documenter-source'>source</a><br></p>
 <p><a id='Models-1'></a></p>
 <h2 id="models">Models</h2>
 <p><a id='SIT.Models.Seismic' href='#SIT.Models.Seismic'>#</a>
@@ -368,7 +374,7 @@
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
-<li><code>attrib=:seismic_homo1</code> : a simple one source and one receiver configuration</li>
+<li><code>attrib=:acou_homo1</code> : a simple one source and one receiver configuration</li>
 </ul>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Gallery.jl#L100-L108' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Gallery.M1D-Tuple{Symbol}' href='#SIT.Gallery.M1D-Tuple{Symbol}'>#</a>
@@ -380,7 +386,7 @@
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
-<li><code>attrib=:seismic_homo1</code> : a time grid for with 2000 samples; maximum time is 1 s</li>
+<li><code>attrib=:acou_homo1</code> : a time grid for with 2000 samples; maximum time is 1 s</li>
 <li><code>attrib=:npow2samp1</code> : a sample npow2 grid with 16 samples</li>
 </ul>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Gallery.jl#L29-L38' class='documenter-source'>source</a><br></p>
@@ -393,7 +399,7 @@
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
-<li><code>attrib=:seismic_homo1</code> : a square grid for with 201 samples in each dimension, with 40 PML</li>
+<li><code>attrib=:acou_homo1</code> : a square grid for with 201 samples in each dimension, with 40 PML</li>
 </ul>
 <div class="codehilite"><pre><span></span>    points; both X and Z vary from -1000 to 1000.
 </pre></div>
@@ -409,7 +415,7 @@
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
-<li><code>attrib=:seismic_homo1</code> : an homogeneous acoustic model with <code>vp0=2000</code> and <code>ρ0=2000</code></li>
+<li><code>attrib=:acou_homo1</code> : an homogeneous acoustic model with <code>vp0=2000</code> and <code>ρ0=2000</code></li>
 <li><code>attrib=:seismic_marmousi2</code> : marmousi model with lower resolution; ideal for surface seismic experiments</li>
 <li><code>attrib=:seismic_marmousi2_high_res</code> : marmousi model high resolution; slower to load</li>
 <li><code>attrib=:seismic_marmousi2_box1</code> : 1x1 kilometer box of marmousi model; ideal for crosswell, borehole seismic studies</li>
@@ -424,7 +430,7 @@
 </ul>
 <p><strong>Outputs</strong></p>
 <ul>
-<li><code>attrib=:seismic_homo1</code> :</li>
+<li><code>attrib=:acou_homo1</code> :</li>
 </ul>
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/6039b2032d0696cb3205039325b2e51b4367c577/src/Gallery.jl#L153-L161' class='documenter-source'>source</a><br></p>
 <p><a id='Seismic-Time-Domain-Modeling-1'></a></p>
@@ -445,7 +451,7 @@
 <p><a id='SIT.Fdtd.fdtd_mod-Tuple{}' href='#SIT.Fdtd.fdtd_mod-Tuple{}'>#</a>
 <strong><code>SIT.Fdtd.fdtd_mod</code></strong> &mdash; <em>Method</em>.</p>
 <p>As forward modeling method, the  finite-difference method is employed.  It uses a discrete version of the two-dimensional isotropic acoustic wave equation. As shown in   Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used </p>
-<p><strong>Arguments</strong></p>
+<p><strong>Keyword Arguments</strong></p>
 <ul>
 <li><code>jobname</code> : dominant frequency</li>
 <li><code>npropwav</code> : number of wavefields propagating independently in the same medium time-domain grid</li>
@@ -531,17 +537,17 @@
 <p><a id='Index-1'></a></p>
 <h2 id="index">Index</h2>
 <ul>
-<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
-<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom-Tuple{SIT.Acquisition.Geom,SIT.Grid.M2D,Symbol}"><code>SIT.Acquisition.Geom</code></a></li>
+<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
+<li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Src-Tuple{Int64,Int64,Int64,Array{Float64,N},SIT.Grid.M1D}"><code>SIT.Acquisition.Src</code></a></li>
 <li><a href=".#SIT.Acquisition.Src"><code>SIT.Acquisition.Src</code></a></li>
 <li><a href=".#SIT.Data.TD"><code>SIT.Data.TD</code></a></li>
 <li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M2D"><code>SIT.Grid.M2D</code></a></li>
-<li><a href=".#SIT.Models.Seismic"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Models.Seismic-Tuple{Float64,Float64,Float64,Array{Float64,N},Array{Float64,N},Array{Float64,N},SIT.Grid.M2D}"><code>SIT.Models.Seismic</code></a></li>
+<li><a href=".#SIT.Models.Seismic"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom_swapsr-Tuple{SIT.Acquisition.Geom}"><code>SIT.Acquisition.Geom_swapsr</code></a></li>
 <li><a href=".#SIT.Acquisition.Src_tr-Tuple{SIT.Acquisition.Src}"><code>SIT.Acquisition.Src_tr</code></a></li>
 <li><a href=".#SIT.Acquisition.get_vecGeom-Tuple{Symbol,Array{SIT.Acquisition.Geom,N}}"><code>SIT.Acquisition.get_vecGeom</code></a></li>
@@ -552,8 +558,8 @@
 <li><a href=".#SIT.Fdtd.__init__-Tuple{}"><code>SIT.Fdtd.__init__</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_born_mod-Tuple{}"><code>SIT.Fdtd.fdtd_born_mod</code></a></li>
 <li><a href=".#SIT.Fdtd.fdtd_mod-Tuple{}"><code>SIT.Fdtd.fdtd_mod</code></a></li>
-<li><a href=".#SIT.Gallery.Geom-Tuple{Symbol}"><code>SIT.Gallery.Geom</code></a></li>
 <li><a href=".#SIT.Gallery.Geom-Tuple{SIT.Grid.M2D,Symbol}"><code>SIT.Gallery.Geom</code></a></li>
+<li><a href=".#SIT.Gallery.Geom-Tuple{Symbol}"><code>SIT.Gallery.Geom</code></a></li>
 <li><a href=".#SIT.Gallery.M1D-Tuple{Symbol}"><code>SIT.Gallery.M1D</code></a></li>
 <li><a href=".#SIT.Gallery.M2D-Tuple{Symbol}"><code>SIT.Gallery.M2D</code></a></li>
 <li><a href=".#SIT.Gallery.Seismic-Tuple{Symbol}"><code>SIT.Gallery.Seismic</code></a></li>
@@ -621,5 +627,5 @@
 
 <!--
 MkDocs version : 0.14.0
-Build Date UTC : 2017-04-08 21:40:00.424737
+Build Date UTC : 2017-04-08 23:25:42.341225
 -->
