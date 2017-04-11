@@ -53,6 +53,15 @@ subroutine int64_in_out(kin, kout) bind(c, name="int64_in_out")
 end subroutine int64_in_out
 
 
+subroutine bool_in_out(bin, bout) bind(c, name="bool_in_out")
+        implicit  none
+        logical,intent(in)                :: bin
+        logical,intent(inout)             :: bout
+        bout = bin
+        write(*,*) repeat(" ",10), "bool_in_out: ", bin, bout
+end subroutine bool_in_out
+
+
 
 subroutine matrix_in_out(A, B, n1, n2) bind(c, name="matrix_in_out")
         implicit  none

@@ -26,14 +26,14 @@ born modeling
 function fdtd_born_mod(;
 		  jobname::AbstractString = "Hello",
 		  npropwav::Int64 = 1, 
-		  model::Models.Seismic = Gallery.Seismic(:seismic_homo1),
-		  tgridmod::Grid.M1D = Gallery.M1D(:seismic_homo1),
+		  model::Models.Seismic = Gallery.Seismic(:acou_homo1),
+		  tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
 		  tgrid::Grid.M1D = tgridmod,
-		  acqgeom::Acquisition.Geom = Gallery.Geom(:seismic_homo1),
-		  acqsrc::Acquisition.Src = Gallery.Src(:seismic_homo1),
+		  acqgeom::Acquisition.Geom = Gallery.Geom(:acou_homo1),
+		  acqsrc::Acquisition.Src = Gallery.Src(:acou_homo1),
 		  src_nsmul::Int64 = 1,
-		  src_flags::AbstractString = "[BILINEAR]",
-		  recv_flags = "[BILINEAR]"
+		  src_flags::Vector{Float64}=fill(2.0,npropwav), # bilinear for all
+		  recv_flags::Vector{Float64}=fill(2.0,npropwav), # bilinear for all
 		 )
 
 #if(tgrid.nx .lt. src_nt) call abort_msg("fd2_mod: tgrid.nx .lt. src_nt")
@@ -104,28 +104,43 @@ finite-difference method is employed.
 It uses a discrete version of the two-dimensional isotropic acoustic wave equation.
 As shown in  
 Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used 
-# Arguments
+# Keyword Arguments
 * `jobname` : dominant frequency
 * `npropwav` : number of wavefields propagating independently in the same medium time-domain grid
 * `model` : Seismic Model
 * `model0` : Background Seismic Model used for Born modeling 
 * `tgridmod` : time grid for modeling
 * `tgrid` : time grid for data output
+* `recv_nfield::Int64=1` : number of fields that receivers record 
 * `prop_flags`: flags that combine propagating wavefields
+* `boundary_save_flag::Bool=false` : save final state variables and the boundary conditions for later use
+* `boundary_in::Any=nothing` : input final state variables and boundary
+
+# Example
+```julia
+julia> records, boundary_save  = fdtd_mod();
+```
+Credits: Pawan Bharadwaj, 2017
 """
 function fdtd_mod(;
 		  jobname::AbstractString = "Hello",
 		  npropwav::Int64 = 1, 
-		  model::Models.Seismic = Gallery.Seismic(:seismic_homo1),
-		  model0::Models.Seismic = Gallery.Seismic(:seismic_homo1),
-		  tgridmod::Grid.M1D = Gallery.M1D(:seismic_homo1),
+		  model::Models.Seismic = Gallery.Seismic(:acou_homo1),
+		  model0::Models.Seismic = Gallery.Seismic(:acou_homo1),
+		  tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
 		  tgrid::Grid.M1D = tgridmod,
-		  acqgeom::Array{Acquisition.Geom} = [Gallery.Geom(:seismic_homo1)],
-		  acqsrc::Array{Acquisition.Src} = [Gallery.Src(:seismic_homo1)],
-		  src_flags::AbstractString = "[BILINEAR]",
-		  recv_flags = "[BILINEAR]",
+		  acqgeom::Array{Acquisition.Geom} = [Gallery.Geom(:acou_homo1)],
+		  acqsrc::Array{Acquisition.Src} = [Gallery.Src(:acou_homo1)],
+		  src_flags::Vector{Float64}=fill(2.0,npropwav), # bilinear for all
+		  recv_flags::Vector{Float64}=fill(2.0,npropwav), # bilinear for all
+		  recv_nfield::Int64=1, 
 		  prop_flags = "[BILINEAR]",
-		  verbose::Bool = false
+		  boundary_save_flag::Bool=false,  
+		  boundary_in::Any=nothing,
+		  abs_trbl::AbstractString = "[T][R][B][L]",
+		  born_flag::Bool=false,
+		  grad_out_flag=false,
+		  verbose::Bool=false
 		 )
 
 maximum(tgridmod.x) < maximum(acqsrc[1].tgrid.x) ? error("modeling time is less than source time") :
@@ -171,6 +186,7 @@ any([getfield(acqgeom[ip],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npropwav])  
 recv_n = maximum(acqgeom[1].nr);
 src_nsmul = maximum(acqgeom[1].ns);
 src_nseq = acqgeom[1].nss;
+src_nfield = acqsrc[1].nfield
 
 if(verbose)
 	println(string("number of receivers:\t",recv_n))	
@@ -178,16 +194,31 @@ if(verbose)
 	println(string("number of super sources:\t",src_nseq))	
 end
 
-recv_out = zeros(tgridmod.nx*recv_n*npropwav*src_nseq)
-snaps_in = zeros(tgridmod.nx) # dummy
-snaps_out = ones(tgridmod.nx) # dummy
-grad_modtt = zeros(model.mgrid.nz, model.mgrid.nx) # dummy
-grad_modrr = zeros(model.mgrid.nz, model.mgrid.nx) # dummy
+recv_out = zeros(tgridmod.nx*recv_n*recv_nfield*npropwav*src_nseq)
 
 # extend models in the PML layers
 exmodel = Models.Seismic_extend(model);
 exmodel0 = Models.Seismic_extend(model0);
 
+# gradient outputs
+grad_modtt = zeros(exmodel.mgrid.nz+2, exmodel.mgrid.nx+2,src_nseq) 
+grad_modrr = zeros(exmodel.mgrid.nz+2, exmodel.mgrid.nx+2,src_nseq) 
+
+# border coordinates
+border_z, border_x, border_n = Grid.M2D_border(model.mgrid, 3, :outer)
+border_out = zeros(border_n,tgridmod.nx,src_nseq) 
+p_out = zeros(exmodel.mgrid.nz+2,exmodel.mgrid.nx+2,3,src_nseq,2)
+
+border_out_flag = boundary_save_flag;
+
+# saving 3 fields on the border
+if(boundary_in == nothing) 
+	border_in_flag = false
+	boundary_in = (zeros(border_n,tgridmod.nx,src_nseq), 
+	      zeros(exmodel.mgrid.nz+2,exmodel.mgrid.nx+2,3,src_nseq,2))
+else	
+	border_in_flag = true
+end
 
 ccall( (:fdtd_mod, F90libs.fdtd), Void,
       (Ptr{UInt8}, Ref{Int64},       Ptr{Float64}, Ptr{Float64},
@@ -195,32 +226,51 @@ ccall( (:fdtd_mod, F90libs.fdtd), Void,
        Ref{Int64}, Ref{Int64},       Ref{Float64}, Ref{Float64},
        Ref{Float64}, Ref{Float64},   Ref{Int64}, Ptr{UInt8},
        Ref{Int64}, Ref{Float64},     Ref{Int64}, Ptr{Float64},
-       Ref{Int64}, Ref{Int64},       Ptr{Float64}, Ptr{Float64},
-       Ptr{UInt8}, Ref{Int64},       Ptr{Float64}, Ptr{Float64},
-       Ptr{Float64}, Ptr{UInt8}, Ptr{UInt8},
+       Ref{Int64}, Ref{Int64}, Ref{Int64},
        Ptr{Float64}, Ptr{Float64},
-       Ptr{Float64}, Ptr{Float64}
+       Ptr{Float64},
+       Ref{Int64},  Ref{Int64},
+       Ptr{Float64}, Ptr{Float64},
+       Ptr{Float64}, Ptr{Float64}, Ptr{UInt8},
+       Ref{Int64}, Ptr{Float64}, Ptr{Float64},
+       Ref{Int64}, Ptr{Float64}, 
+       Ref{Int64}, Ptr{Float64},
+       Ptr{Float64}, Ptr{Float64},
+       Ref{Int64},
+       Ptr{Float64}, Ptr{Float64},
+       Ref{Int64}
        ),
-      jobname, npropwav,     Models.χ(exmodel.χKI, exmodel.K0I,-1), Models.χ(exmodel.χρI, exmodel.ρ0I,-1),
-      Models.χ(exmodel0.χKI, exmodel0.K0I,-1), Models.χ(exmodel0.χρI, exmodel0.ρ0I,-1),
-      model.mgrid.nx, model.mgrid.nz,    model.mgrid.δx, model.mgrid.δz,
-      model.mgrid.x, model.mgrid.z,      model.mgrid.npml-1, # reduce npml by one, see fdtd.f90
-      "model.mgrid_abs_trbl",
+      jobname, npropwav,     
+      Models.Seismic_get(exmodel, :KI), Models.Seismic_get(exmodel, :ρI),
+      Models.Seismic_get(exmodel0, :KI), Models.Seismic_get(exmodel0, :ρI),
+      exmodel.mgrid.nx, exmodel.mgrid.nz,    exmodel.mgrid.δx, exmodel.mgrid.δz,
+      exmodel.mgrid.x, exmodel.mgrid.z,      model.mgrid.npml-5, # reduce npml by one, see fdtd.f90
+      abs_trbl, 
       tgridmod.nx, tgridmod.δx,    acqsrc[1].tgrid.nx, Acquisition.get_vecSrc(:wav,acqsrc),
-      src_nseq, src_nsmul, Acquisition.get_vecGeom(:sx,acqgeom), Acquisition.get_vecGeom(:sz,acqgeom),
-      src_flags, recv_n, Acquisition.get_vecGeom(:rx,acqgeom), Acquisition.get_vecGeom(:rz,acqgeom),
+      src_nseq, src_nsmul, src_nfield,
+      Acquisition.get_vecGeom(:sx,acqgeom), Acquisition.get_vecGeom(:sz,acqgeom),
+      src_flags, 
+      recv_n, recv_nfield,
+      Acquisition.get_vecGeom(:rx,acqgeom), Acquisition.get_vecGeom(:rz,acqgeom),
       recv_out, recv_flags,  prop_flags,
-      snaps_in, snaps_out,
+      border_n, border_x, border_z,
+      border_in_flag,boundary_in[1], 
+      border_out_flag,border_out,
+      boundary_in[2], p_out, 
+      grad_out_flag,
       grad_modtt, grad_modrr,
+      born_flag
      )
 
 # check if ccall return zeros
 isapprox(maximum(abs(recv_out)),0.0) && warn("recv_out are zeros")
 
 # return after forming a vector and resampling
-nd = src_nseq*tgridmod.nx*recv_n; # number of samples for each iprop
-return [Data.TD_resamp(Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),
-		       tgridmod, acqgeom[1]), tgrid) for iprop in 1:npropwav]
+nd = src_nseq*tgridmod.nx*recv_n*recv_nfield; # number of samples for each iprop
+return [Data.TD_resamp(Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq,recv_nfield),
+			       recv_nfield,
+			       tgridmod, acqgeom[1]), tgrid) for iprop in 1:npropwav], 
+		(border_out[:,end:-1:1,:], p_out[:,:,:,:,end:-1:1])
 
 # return without resampling for testing
 #return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),

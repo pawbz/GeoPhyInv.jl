@@ -7,7 +7,6 @@ public
 
 contains
 
-
 subroutine get_musigmayx(mu, musigmayx)
 implicit none
 real, intent(in)                                :: mu(:,:)

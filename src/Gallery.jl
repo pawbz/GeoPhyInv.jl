@@ -12,13 +12,13 @@ Gallery of `M2D` grids.
 * `attrib::Symbol` : 
 
 # Outputs
-* `attrib=:seismic_homo1` : a square grid for with 201 samples in each dimension, with 40 PML 
+* `attrib=:acou_homo1` : a square grid for with 201 samples in each dimension, with 50 PML 
 		points; both X and Z vary from -1000 to 1000.
 """
 
 function M2D(attrib::Symbol)
-	if(attrib == :seismic_homo1)
-		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,201,201,40)
+	if(attrib == :acou_homo1)
+		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,201,201,50)
 	else
 		error("invalid attrib")
 	end
@@ -33,11 +33,11 @@ Gallery of `M1D` grids.
 * `attrib::Symbol` : 
 
 # Outputs
-* `attrib=:seismic_homo1` : a time grid for with 2000 samples; maximum time is 1 s
+* `attrib=:acou_homo1` : a time grid for with 2000 samples; maximum time is 1 s
 * `attrib=:npow2samp1` : a sample npow2 grid with 16 samples
 """
 function M1D(attrib::Symbol)
-	if(attrib == :seismic_homo1)
+	if(attrib == :acou_homo1)
 		return Grid.M1D(0.0,2.0,2000)
 	elseif(attrib == :npow2samp)
 		return Grid.M1D(npow2=16,δ=0.0001)
@@ -54,22 +54,22 @@ Gallery of `Seismic` models.
 * `attrib::Symbol` : 
 
 # Outputs
-* `attrib=:seismic_homo1` : an homogeneous acoustic model with `vp0=2000` and `ρ0=2000`
+* `attrib=:acou_homo1` : an homogeneous acoustic model with `vp0=2000` and `ρ0=2000`
 * `attrib=:seismic_marmousi2` : marmousi model with lower resolution; ideal for surface seismic experiments
 * `attrib=:seismic_marmousi2_high_res` : marmousi model high resolution; slower to load
 * `attrib=:seismic_marmousi2_box1` : 1x1 kilometer box of marmousi model; ideal for crosswell, borehole seismic studies
 """
 
 function Seismic(attrib::Symbol)
-	if(attrib == :seismic_homo1)
+	if(attrib == :acou_homo1)
 		vp0 = 2000.0;
 		vs0 = 0.0;
 		ρ0 = 2000.0;
-		mgrid = M2D(:seismic_homo1)
+		mgrid = M2D(:acou_homo1)
 		return Models.Seismic(vp0, vs0, ρ0,
-		      fill(vp0, (mgrid.nz, mgrid.nx)),
-		      fill(vs0, (mgrid.nz, mgrid.nx)),
-		      fill(ρ0, (mgrid.nz, mgrid.nx)),
+		      fill(0.0, (mgrid.nz, mgrid.nx)),
+		      fill(0.0, (mgrid.nz, mgrid.nx)),
+		      fill(0.0, (mgrid.nz, mgrid.nx)),
 		      mgrid)
 	elseif(attrib == :seismic_marmousi2)
 		vp, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/vp_marmousi-ii_0.1.su")
@@ -104,10 +104,10 @@ Gallery of acquisition geometries `Geom`.
 * `attrib::Symbol` : 
 
 # Outputs
-* `attrib=:seismic_homo1` : a simple one source and one receiver configuration
+* `attrib=:acou_homo1` : a simple one source and one receiver configuration
 """
 function Geom(attrib::Symbol)
-	if(attrib == :seismic_homo1)
+	if(attrib == :acou_homo1)
 		return Acquisition.Geom(-300.0,-300.0,-300.0,300.0,300.0,300.0,1,1)
 	else
 		error("invalid attrib")
@@ -145,6 +145,12 @@ function Geom(mgrid::Grid.M2D,
 	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
 		      1,50,:vertical,:vertical
 				)
+	elseif(attrib == :onefiftys)
+		return Acquisition.Geom(
+	      mgrid.x[round(Int,0.5*mgrid.nx)], mgrid.x[round(Int,0.5*mgrid.nx)], mgrid.z[1],
+	      mgrid.x[round(Int,0.25*mgrid.nx)], mgrid.x[round(Int,0.75*mgrid.nx)], mgrid.z[1],
+		      1,50,:horizontal,:horizontal
+				)
 	else
 		error("invalid attrib")
 	end
@@ -157,13 +163,17 @@ Gallery of source signals `Src`.
 * `attrib::Symbol` : 
 
 # Outputs
-* `attrib=:seismic_homo1` : 
+* `attrib=:acou_homo1` : 
 """
 function Src(attrib::Symbol)
-	if(attrib == :seismic_homo1)
-		tgrid = M1D(:seismic_homo1)
+	if(attrib == :acou_homo1)
+		tgrid = M1D(:acou_homo1)
 		wav = Wavelets.ricker(fqdom=10.0, tgrid=tgrid, tpeak=0.25, )
-		return Acquisition.Src(1, 1, wav, tgrid)
+		return Acquisition.Src(1, 1, 1, wav, tgrid)
+	elseif(attrib == :vecacou_homo1)
+		tgrid = M1D(:acou_homo1)
+		wav = Wavelets.ricker(fqdom=10.0, tgrid=tgrid, tpeak=0.25, )
+		return Acquisition.Src(1, 1, 3, wav, tgrid)
 	end
 end
 

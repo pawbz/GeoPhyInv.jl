@@ -24,28 +24,35 @@ end
 
 
 """
-modify exixting acquisitin geometries
-same source but receivers at the border
+Modify input `Geom` such that the output has
+either sources or receivers on the boundary of 
+`mgrid`.
+
+# Arguments
+* `acqgeom::Geom` : input geometry
+* `mgrid::Grid.M2D` : to determine the boundary
+* `attrib::Symbol` : either `:srcborder` or `:recborder` 
 """
 function Geom(acqgeom::Geom,
 	      mgrid::Grid.M2D,
 	      attrib::Symbol
 	     )
+
+	if((attrib == :recborder) | (attrib == :srcborder))
+		bz, bx, nb = Grid.M2D_border(mgrid, 3, :inner)
+	end
+	"change the position of receivers to the boundary"
 	if(attrib == :recborder)
-		rx = append!(mgrid.x, 
-		     append!(mgrid.x[end]*ones(mgrid.nz-1),
-		     append!(mgrid.x[end-1:-1:1],
-		             mgrid.x[1]*ones(mgrid.nz-2))))
-		rz = append!(mgrid.z[1]*ones(mgrid.nx), 
-		     append!(mgrid.z[2:end],
-		     append!(mgrid.z[end]*ones(mgrid.nx-1),
-		             mgrid.z[end-1:-1:2])))
-		nr = size(rx,1);
-		sx = acqgeom.sx;
-		sz = acqgeom.sz;
-		ns = acqgeom.ns;
+		nr = nb; 		sx = acqgeom.sx;
+		sz = acqgeom.sz;		ns = acqgeom.ns;
 		nss = acqgeom.nss;
-		return Geom(sx, sz, repmat(rx,1,nss), repmat(rz,1,nss), nss, ns, fill(nr,nss))
+		return Geom(sx, sz, repmat(bx,1,nss), repmat(bz,1,nss), nss, ns, fill(nr,nss))
+	"change the position of source (not supersources) to the boundary for back propagation"
+	elseif(attrib == :srcborder)
+		ns = nb;		rx = acqgeom.rx;
+		rz = acqgeom.rz;		nr = acqgeom.nr;
+		nss = acqgeom.nss;
+		return Geom(repmat(bx,1,nss), repmat(bz,1,nss), rx, rz, nss, fill(ns,nss), nr)
 	else
 		error("invalid attrib")
 	end
@@ -128,12 +135,14 @@ Data type for the sources used.
 # Fields
 * `nss::Int64` : number of supersources
 * `ns::Array{Int64}` : number of sources for each supersource
+* `nfield::Int64` : number of fields
 * `wav::Array{Float64}` : wavelets in time domain
 * `tgrid::Grid.M1D` : time grid 
 """
 type Src
 	nss::Int64
 	ns::Array{Int64}
+	nfield::Int64
 	wav::Array{Float64}
 	tgrid::Grid.M1D
 end
@@ -150,10 +159,11 @@ repeat same source wavelet for all sources and supersources
 """
 function Src(nss::Int64, 
 	     ns::Int64, 
+	     nfield::Int64,
 	     wav::Array{Float64},
 	     tgrid::Grid.M1D
 	     )
-	return Src(nss, fill(ns, nss), repeat(wav, inner=(1,ns,nss)), tgrid)
+	return Src(nss, fill(ns, nss), nfield, repeat(wav, inner=(1,ns,nss,nfield)), tgrid)
 end
 
 
@@ -161,7 +171,7 @@ end
 Function that returns Src after time reversal
 """
 function Src_tr(src::Src)
-	return Src(src.nss,src.ns,src.wav[end:-1:1,:,:],src.tgrid)
+	return Src(src.nss,src.ns,src.nfield,src.wav[end:-1:1,:,:,:],src.tgrid)
 end
 
 

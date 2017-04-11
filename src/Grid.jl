@@ -56,6 +56,49 @@ function M2D_extend(mgrid::M2D)
 	return M2D(xmin,xmax,zmin,zmax, mgrid.nx+2*mgrid.npml,mgrid.nz+2*mgrid.npml,0)
 end
 
+"""
+Return the X and Z positions of the border of mgrid
+"""
+function M2D_border(mgrid::M2D, nlayer::Int64, attrib::Symbol)
+	if(attrib == :inner)
+		x = mgrid.x; z = mgrid.z;
+	elseif(attrib == :outer)
+		# extending x and z
+		x = vcat(
+	   		[mgrid.x[1]-(ilayer)*mgrid.δx for ilayer=1:nlayer:-1],
+	   		mgrid.x,
+			[mgrid.x[end]+(ilayer)*mgrid.δx for ilayer=1:nlayer],
+			)
+		z = vcat(
+	   		[mgrid.z[1]-(ilayer)*mgrid.δz for ilayer=1:nlayer:-1],
+	   		mgrid.z,
+			[mgrid.z[end]+(ilayer)*mgrid.δz for ilayer=1:nlayer],
+			)
+	end
+	nx = length(x); nz = length(z);
+	bx = vcat(
+		  x, x[end]*ones(nz-1),	  x[end-1:-1:1], x[1]*ones(nz-2))
+	bz = vcat(
+		  z[1]*ones(nx), z[2:end],  z[end]*ones(nx-1), z[end-1:-1:2])
+
+	if(nlayer > 1)
+		bx = vcat(bx,  x[2:end-1], x[end-1]*ones(nz-3), 
+		  x[end-2:-1:2], x[2]*ones(nz-4))
+
+		bz = vcat(bz,  z[2]*ones(nx-2), z[3:end-1],
+		  z[end-1]*ones(nx-3), z[end-2:-1:3])
+	end
+	if(nlayer > 2)
+		bx = vcat(bx,  x[3:end-2], x[end-2]*ones(nz-5), 
+		  x[end-3:-1:3], x[3]*ones(nz-6)
+		  )
+		bz = vcat(bz,  z[3]*ones(nx-4), z[4:end-2],
+		  z[end-2]*ones(nx-5), z[end-3:-1:4]
+		  )
+	end
+	isequal(length(bz), length(bx)) ? nothing : error("unequal dimensions")
+	return bz, bx, length(bz)
+end
 
 
 """

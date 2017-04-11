@@ -35,3 +35,8 @@ ccall( (:int64_in_out, SIT.F90libs.test), Void, (Ref{Int64},Ref{Int64}), n1in, n
 n1 = n1[1]
 @test_approx_eq n1 n1in 
 
+
+bin = true; bout = false
+ccall( (:bool_in_out, SIT.F90libs.test), Void, (Ref{Int64},Ref{Int64}), bin, bout)
+@test_approx_eq bin bout 
+

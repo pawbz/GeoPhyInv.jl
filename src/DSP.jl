@@ -78,7 +78,11 @@ cx = fft(cx);
 ax = real(cx.*conj(cx));
 ax[fnpow2grid.x .< 0.] = 0. # remove negative frequencies
 
-maximum(ax) == 0.0 ? error("x is zero") : ax /= maximum(ax);
+if(maximum(ax) == 0.0)
+	warn("x is zero"); return 0.0
+else 
+	ax /= maximum(ax);
+end
 
 if(attrib == :max)
 	return maximum(fnpow2grid.x[ax .>= threshold])

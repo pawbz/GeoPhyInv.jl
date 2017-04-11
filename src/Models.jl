@@ -10,60 +10,54 @@ Data type fo represent a seismic model.
 * `vp0` :
 * `vs0` :
 * `ρ0` :
-* `ρ0I` :
-* `K0` :
-* `K0I` :
-* `μ0` :
 * `χvp` :
 * `χvs` :
 * `χρ` :
-* `χρI` :
-* `χK` :
-* `χKI` :
-* `χμ` :
 * `mgrid` :
 """
 type Seismic
 	vp0::Float64
 	vs0::Float64
 	ρ0::Float64
-	ρ0I::Float64
-	K0::Float64
-	K0I::Float64
-	μ0::Float64
 	χvp::Array{Float64}
 	χvs::Array{Float64}
 	χρ::Array{Float64}
-	χρI::Array{Float64}
-	χK::Array{Float64}
-	χKI::Array{Float64}
-	χμ::Array{Float64}
 	mgrid::Grid.M2D
 end
 
 """
-Construct using input velocity and density arrays
+Get other dependent fields of a seismic model
 """
-function Seismic(vp0::Float64,
-		 vs0::Float64,
-		 ρ0::Float64,
-		 vp::Array{Float64},
-		 vs::Array{Float64},
-		 ρ::Array{Float64},
-		 mgrid::Grid.M2D)
-
-	ρ0I = ρ0^(-1.0);
-	K0 = vp0 * vp0 * ρ0; K0I = K0^(-1.0);
-	μ0 = vs0 * vs0 * ρ0;
-	return Seismic(vp0,vs0,ρ0,ρ0I,K0,K0I,μ0,
-	      χ(vp, vp0),
-	      χ(vs, vs0),
-	      χ(ρ, ρ0),
-	      χ(ρ.^(-1.0), ρ0I),
-	      χ(vp .* vp .* ρ, K0),
-	      χ((vp .* vp .* ρ).^(-1), K0I),
-	      χ(vs .* vs .* ρ, μ0),
-	      mgrid)
+function Seismic_get(mod::Seismic, attrib::Symbol)
+	K0 = mod.vp0 * mod.vp0 * mod.ρ0; K0I = K0^(-1.0);
+	μ0 = mod.vs0 * mod.vs0 * mod.ρ0;
+	vp = χ(mod.χvp, mod.vp0, -1)
+	vs = χ(mod.χvs, mod.vs0, -1)
+	ρ = χ(mod.χρ, mod.ρ0, -1)
+	if(attrib == :ρI)
+		return ρ.^(-1.0)
+	elseif(attrib == :χρI)
+		return χ(ρ.^(-1.0), mod.ρ0^(-1.0))
+	elseif(attrib == :χK)
+		return χ(vp .* vp .* ρ, K0) 
+	elseif(attrib == :χμ)
+		return χ(vs .* vs .* ρ, μ0) 
+	elseif(attrib == :K0)
+		return K0
+	elseif(attrib == :μ0)
+		return μ0
+	elseif(attrib == :K0I)
+		return K0I
+	elseif(attrib == :χKI)
+		K0 = vp0 * vp0 * ρ0; K0I = K0^(-1.0);
+		return χ((vp .* vp .* ρ).^(-1), K0I) 
+	elseif(attrib == :KI)
+		return (vp .* vp .* ρ).^(-1)
+	elseif(attrib == :K)
+		return (vp .* vp .* ρ)
+	else
+		error("invalid attrib")
+	end
 end
 
 
@@ -81,6 +75,41 @@ end
 
 
 """
+Add features to a model.
+
+# Arguments
+* `mod::Seismic` : model that is modified
+
+# Keyword Arguments
+* `circ_loc::Vector{Float64}=nothing` : location of center of perturbation
+* `circ_rad::Float64=0.0` : radius of circular perturbation
+* 
+
+"""
+function Seismic_addon(mod::Seismic; 
+		       circ_loc::Array{Float64}=nothing,
+		       circ_rad::Float64=0.0,
+		       circ_pert::Float64=0.1,
+		       fields::Vector{Symbol}=[:χvp,:χρ,:χvs]
+		       )
+
+	if(!(circ_loc == nothing))
+		temp = [((sqrt((mod.mgrid.x[ix]-circ_loc[2])^2 + 
+			(mod.mgrid.z[iz]-circ_loc[1])^2 ) <= circ_rad) ? circ_pert : 0.0)
+		 for iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx  ]
+	else
+		temp = zeros(mod.mgrid.nz, mod.mgrid.nx)
+
+	end
+
+	mod_out = mod
+	for field in fields
+		setfield!(mod_out, field, (getfield(mod, field)+temp))
+	end
+	return mod_out
+end
+
+"""
 Extend a seismic model into PML layers
 """
 function Seismic_extend(mod::Seismic)
@@ -91,9 +120,9 @@ function Seismic_extend(mod::Seismic)
 	return Seismic(mod.vp0,
 		 mod.vs0,
 		 mod.ρ0,
-		 vpex,
-		 vsex,
-		 ρex,
+		 χ(vpex,mod.vp0),
+		 χ(vsex,mod.vs0),
+		 χ(ρex,mod.ρ0),
 		 Grid.M2D_extend(mod.mgrid))
 end
 
@@ -132,9 +161,9 @@ function Seismic_resamp(mod::Seismic,
 		     Gridded(Linear()))
 
 	return Seismic(mod.vp0, mod.vs0, mod.ρ0, 
-		χ(itpvp[mgrid.z, mgrid.x], mod.vp0, -1), 
-		χ(itpvs[mgrid.z, mgrid.x], mod.vs0, -1),
-		χ(itpρ[mgrid.z, mgrid.x], mod.ρ0, -1),
+		itpvp[mgrid.z, mgrid.x], 
+		itpvs[mgrid.z, mgrid.x],
+		itpρ[mgrid.z, mgrid.x],
 			      mgrid)
 
 end

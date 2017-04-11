@@ -261,9 +261,10 @@ subroutine fdtd_mod(&
         tim_del, & ! time sampling
 ! >>>>>>> source parameters
         src_nt, & ! number time samples in source wavelet (src_nt <= tim_nt)
-        src_wavelets, & ! source wavelets [src_nt] * [src_nsmul] * [npropwav] * [src_nseq]
-        src_nseq, & ! number of sequential sources (OMP loop)
+        src_wavelets, & ! source wavelets [src_nt] * [src_nsmul] * [src_nseq] * [src_nfield] * [npropwav]
+        src_nseq, & ! number of sequential sources; OMP loop
         src_nsmul, & ! number of simultaneous sources
+        src_nfield, & ! number of source fields
         src_x, & ! x coordinates of all the sources [src_nsmul] * [src_nseq] * [npropwav]
         src_z, & ! z coordinated of all the sources [src_nsmul] * [src_nseq] * [npropwav]
         src_flags, & ! parameters determining source 
@@ -273,20 +274,33 @@ subroutine fdtd_mod(&
                         ! contains [NEAREST_NEIGH], then nearest neighbour interpolation
 ! >>>>>>> receiver parameters
         recv_n, & ! number of receivers for each source 
+        recv_nfield, & ! number of field recorded        
         recv_x, & ! x coord for receivers [recv_n] * [npropwav] * [src_nseq]
         recv_z, & ! z  "                  [recv_n] * [npropwav] * [src_nseq]
-        recv_out, & ! recorded pressure at receivers [tim_nt] * [recv_n] * [src_nseq] * [npropwav]
-        recv_flags, & ! '[P]' recv_out contain only pressure
-                        ! '[P][Vz]' recv_out contain pressure and Vz (need to be implemented)  
-                        ! '[DLDVEL_P]' 
-                        ! 
+        recv_out, & ! recorded pressure at receivers [tim_nt] * [recv_n] * [src_nseq] * [recv_nfield] * [npropwav]
+        recv_flags, & ! 0 means no records; 1 means nearest neighbour; 2 means bilinear [npropwav]
 ! >>>>>>> flags between propagating wavefields
         prop_flags, &
-! >>>>>>> snapsshots and illumination and gradients
-        snaps_in, & ! input snaps shots in the order [mesh_nz,mesh_nx,tim_nt,src_nseq] 
-        snaps_out, & ! output snaps shots in the order [mesh_nz,mesh_nx,tim_nt,src_nseq]
+! >>>>>>> indices of borders
+        border_n, & ! total number of grid points on the boundary
+        border_x, & ! x indices of boundary 
+        border_z, & ! z indices of boundary
+! >>>>>>> boundary storage -- input; only for the first propagating field
+        border_in_flag, & ! border_in used when true
+        border_in, & !  
+! >>>>>>> boundary storage -- output; only for the first propagating field
+        border_out_flag, & ! border_out used when true
+        border_out, & ! 
+! >>>>>>> initial values; only for the first propagating field
+        p_in, &
+        p_out, &
+! >>>>>>> gradients; assumes that the first propagating wavefield is 
+                        !forward state and the second is adjoint state
+        grad_out_flag, & 
         grad_modtt,  &  ! output gradient models w.r.t velocity and density  [src_nseq]      
-        grad_modrr & ! output gradient 
+        grad_modrr, & ! output gradient 
+! >>>>>>>
+        born_flag &
         ) bind(c, name="fdtd_mod")
 ! Author: Pawan Bharadwaj
 !         p.b.pisupati@tudelft.nl
@@ -297,11 +311,11 @@ subroutine fdtd_mod(&
                 ! dimensions 
 
         implicit none
-character(len=1, kind=C_char), intent(in)               :: jobname(*), mesh_abs_trbl(*), src_flags(*), recv_flags(*)
+character(len=1, kind=C_char), intent(in)               :: jobname(*), mesh_abs_trbl(*)
+real, intent(in)                                        :: recv_flags(npropwav), src_flags(npropwav)
 character(len=1, kind=C_char), intent(in)               :: prop_flags(*)
 integer, intent(in)                                     :: npropwav
-real, dimension(mesh_nz+2*mesh_na_pml+2,mesh_nx+2*mesh_na_pml+2), &
-                                intent(in)            :: modtt, modrr, modtt0, modrr0
+real, dimension(mesh_nz,mesh_nx), intent(in)            :: modtt, modrr, modtt0, modrr0
 
 
 integer, intent(in)                                     :: mesh_nx, mesh_nz
@@ -311,23 +325,38 @@ integer, intent(in)                                     :: mesh_na_pml  !number 
 
 real, intent(in)                                        :: tim_del
 integer, intent(in)                                     :: tim_nt
+integer, intent(in)                                     :: src_nfield
+integer, intent(in)                                     :: recv_nfield
 
 
 integer, intent(in)                                     :: src_nt, src_nsmul, src_nseq
-real, dimension(src_nt*src_nsmul*src_nseq*npropwav), intent(in) &
+real, dimension(src_nt*src_nsmul*src_nseq*src_nfield*npropwav), intent(in) &
                                                         :: src_wavelets
 real, dimension(src_nsmul*src_nseq*npropwav), intent(in):: src_x, src_z
 
 integer, intent(in)                                     :: recv_n
-real, dimension(tim_nt*recv_n*src_nseq*npropwav), intent(out) &
+real, dimension(tim_nt*recv_n*src_nseq*recv_nfield*npropwav), intent(out) &
                                                         :: recv_out
 real, dimension(recv_n*src_nseq*npropwav), intent(in) &
                                                         :: recv_x, recv_z
 
-real, dimension(:,:,:,:), intent(in)                    :: snaps_in
-real, dimension(:,:,:,:), intent(out)                   :: snaps_out
+
+integer, intent(in)                                     :: border_n
+real, dimension(border_n,tim_nt,src_nseq),   intent(in) :: border_in
+real, dimension(border_n,tim_nt,src_nseq),   intent(out):: border_out
+logical, intent(in)                                     :: border_in_flag, border_out_flag
+
+real, dimension(border_n), intent(in) &
+                                                        :: border_x, border_z
 
 
+real, intent(in)                                        :: p_in(0:mesh_nz+1,0:mesh_nx+1,3,src_nseq,2)
+real, intent(out)                                       :: p_out(0:mesh_nz+1,0:mesh_nx+1,3,src_nseq,2)                                                
+
+
+real, dimension(0:mesh_nz+1,0:mesh_nx+1,src_nseq), intent(out) &
+                                                        :: grad_modtt, grad_modrr
+logical, intent(in)                                     :: born_flag, grad_out_flag 
 
 ! other variables for this only this subroutine
 ! total number of grid points in each direction of the grid
@@ -340,7 +369,8 @@ real                                                    :: deltaz, deltaz24I
 real                                                    :: tim_delI 
 
 integer                                                 :: ix, iz, it, ixx, izz, irec, issmul, isseq, ipropwav
-real, dimension(:,:,:,:), allocatable                   :: src_wav_mat
+integer                                                 :: ifield, iborder
+real, dimension(:,:,:,:,:), allocatable                 :: src_wav_mat
 real                                                    :: source_term
 
 ! source position variables                            
@@ -357,8 +387,10 @@ real, dimension(:,:), allocatable                       :: denomrecI
 real, dimension(:,:,:), allocatable                     :: rec_interpolate_weights
 real                                                    :: recv_xtemp, recv_ztemp
 
+
+integer, allocatable, dimension(:)                      :: iborderx, iborderz
 ! recording data
-real, dimension(:,:,:), allocatable                     :: rec_mat
+real, dimension(:,:,:,:), allocatable                   :: rec_mat
 
 ! to find indices
 logical, allocatable                                    :: maskX(:), maskZ(:)
@@ -399,12 +431,11 @@ real                                                    :: Rcoef,d0_x,d0_z,&
 
 
 ! main arrays while wave propagation
-real, dimension(:,:,:), allocatable                     :: vx,vz,p
-real, dimension(:,:,:), allocatable                     :: pp, ppp ! for time differential of pressure
-real, dimension(:,:,:), allocatable                     :: dpFdx,dpFdz,dpdx,dpdz ! spatial derivatives of pressure in vx and vz grids
+real, dimension(:,:,:,:), allocatable                   :: p
+real, dimension(:,:,:,:), allocatable                   :: pp, ppp ! for time differential of pressure
+real, dimension(:,:,:), allocatable                     :: dpdx,dpdz ! spatial derivatives of pressure in vx and vz grids
 real, dimension(:,:,:), allocatable                     :: dvxdx,dvzdz
 
-real, dimension(:,:), intent(out)                       :: grad_modtt, grad_modrr
 real, dimension(:,:), allocatable                       :: grad_modrrvx, grad_modrrvz
 
 real, allocatable                                       :: saved_snap(:,:)
@@ -429,43 +460,55 @@ real, parameter                                         :: pi=3.141592654
 
 ! output to zeros
 recv_out = rzero_de
+border_out = rzero_de
+p_out = rzero_de
+grad_modtt =  rzero_de;
+grad_modrr = rzero_de;
 
 cpu_time1  = omp_get_wtime();
 
 ! convert src_wavelets to src_wav_mat
-allocate(src_wav_mat(src_nsmul, npropwav, 0:tim_nt+1, src_nseq))
+allocate(src_wav_mat(src_nsmul, src_nfield, npropwav, 0:tim_nt+1, src_nseq))
 src_wav_mat = rzero_de;
-do isseq = 1, src_nseq
-        do ipropwav = 1, npropwav
+do ipropwav = 1, npropwav
+        do ifield = 1, src_nfield
+        do isseq = 1, src_nseq
                 do issmul = 1, src_nsmul
                         source_term = rzero_de
                         do it = 1, src_nt-1
-                                if(index(ctofstr(src_flags),'[TIME_REVERSE]') .ne. 0) then
-                                        source_term = &
-                                        src_wavelets(src_nt - it  &
-                                                + (issmul-1)*src_nt &
-                                                + (isseq-1)*src_nsmul*src_nt &
-                                                + (ipropwav-1)*src_nseq*src_nsmul*src_nt &
-                                                        ) 
-                                else
+                              !  if(index(ctofstr(src_flags),'[TIME_REVERSE]') .ne. 0) then
+                              !          source_term = &
+                              !          src_wavelets(src_nt - it  &
+                              !                  + (issmul-1)*src_nt &
+                              !                  + (isseq-1)*src_nsmul*src_nt &
+                              !                  + (ifield-1)*src_nseq*src_nsmul*src_nt &
+                              !                  + (ipropwav-1)*src_nfield*src_nseq*src_nsmul*src_nt &
+                              !                          ) 
+                              !  else
                                         source_term = &
                                         src_wavelets(it &
                                                 + (issmul-1)*src_nt &
                                                 + (isseq-1)*src_nsmul*src_nt &
-                                                + (ipropwav-1)*src_nseq*src_nsmul*src_nt &
+                                                + (ifield-1)*src_nseq*src_nsmul*src_nt &
+                                                + (ipropwav-1)*src_nseq*src_nfield*src_nsmul*src_nt &
                                                 )
-                                endif
-                                if(index(ctofstr(src_flags),'[IRATE]') .eq. 0) then
-                                        src_wav_mat(issmul, ipropwav, it + 1, isseq) = 2.0 * source_term + &
-                                                src_wav_mat(issmul, ipropwav, it - 1, isseq)
+                              !  endif
+                                if(src_flags(ipropwav) .lt. 0) then
+                                        src_wav_mat(issmul, ifield, ipropwav, it + 1, isseq) = 2.0 * source_term + &
+                                                src_wav_mat(issmul, ifield, ipropwav, it - 1, isseq)
                                 else
-                                        src_wav_mat(issmul, ipropwav, it, isseq) = source_term
+                                        src_wav_mat(issmul, ifield, ipropwav, it, isseq) = source_term
                                 endif
                         enddo
                 enddo
         enddo
+        enddo
 enddo
 if(maxval(src_wav_mat) .ge. huge(1.0e0)) call abort_msg("fd2_mod: huge src_wav_mat?")
+
+if(born_flag .or. grad_out_flag) then
+        if(npropwav .lt. 2) stop "fdtd_mod: need atleast 2 propagating wavefields"
+endif
 
 ! allocate masks
 allocate(maskX(mesh_nx)); maskX = .true.
@@ -474,8 +517,8 @@ allocate(maskZ(mesh_nz)); maskZ = .true.
 if(mesh_na_pml .le. 0) call abort_msg("fd2_mod: invalid mesh_na_pml")
 
 ! extended dimensions of the modeling grid
-nx    = mesh_nx+2*mesh_na_pml
-nz    = mesh_nz+2*mesh_na_pml
+nx    = mesh_nx
+nz    = mesh_nz
 
 ! assign variables
 deltax=mesh_dx
@@ -492,17 +535,19 @@ write(*,*) "minimum and maximum velocities", velmin, velmax
 ! minimum and maximum frequencies
 freqmin = huge(1.e0); freqmax = 0.0;
 do ipropwav = 1, npropwav
+        do ifield=1, src_nfield
         do isseq = 1, src_nseq
                 do issmul = 1, src_nsmul
-                        if(maxval(abs(src_wav_mat(issmul,ipropwav,:,isseq))) .gt. tiny(rzero_de)) then
+                if(maxval(abs(src_wav_mat(issmul,ifield,ipropwav,:,isseq))) .gt. tiny(rzero_de)) then
                                 freqmin = &
-                                min(freqmin,findfreq(x=pack(src_wav_mat(issmul,ipropwav,:,isseq),.true.),&
+                                        min(freqmin,findfreq(x=pack(src_wav_mat(issmul,ifield,ipropwav,:,isseq),.true.),&
                                 dt=tim_del,str="MIN",threshold=2e-2))
                                 freqmax = &
-                                max(freqmax,findfreq(x=pack(src_wav_mat(issmul,ipropwav,:,isseq),.true.),&
+                                        max(freqmax,findfreq(x=pack(src_wav_mat(issmul,ifield,ipropwav,:,isseq),.true.),&
                                 dt=tim_del, str="MAX",threshold=2e-2))
                         endif
                 enddo
+        enddo
         enddo
 enddo
 ALPHA_MAX_PML = 2.e0*PI*((freqmin + freqmax))/4.e0 ! from Festa and Vilotte
@@ -534,6 +579,12 @@ allocate(boundary_vz(0:nz+1,0:nx+1))
 ! default
 boundary_p = rone_de; boundary_vx = rone_de; boundary_vz = rone_de;
 USE_PML_ZMIN = .true.; USE_PML_XMAX = .true.; USE_PML_ZMAX = .true.; USE_PML_XMIN = .true.
+
+if(index(ctofstr(mesh_abs_trbl),"[T]") .eq. 0) USE_PML_ZMIN = .false.
+if(index(ctofstr(mesh_abs_trbl),"[R]") .eq. 0) USE_PML_XMAX = .false.
+if(index(ctofstr(mesh_abs_trbl),"[L]") .eq. 0) USE_PML_XMIN = .false.
+if(index(ctofstr(mesh_abs_trbl),"[B]") .eq. 0) USE_PML_ZMAX = .false.
+
 
 ! free surface boundary conditions on sides of the model.
 if(ctofstr(mesh_abs_trbl) .eq. "0") then
@@ -766,14 +817,27 @@ courant_number = velmin * tim_del * sqrt(1.e0/deltax**2 + 1.e0/deltaz**2)
 if(courant_number > 1.e0) call abort_msg("fd2_mod: time step is too large, simulation will be unstable")
 
 
+allocate(iborderx(border_n), iborderz(border_n))
+! border indices
+do iborder = 1, border_n
+        iborderx(iborder) = &
+                minloc(array = &
+                abs(mesh_x - border_x(iborder)), dim = 1)
+
+        iborderz(iborder) = &
+                minloc(array = &
+                abs(mesh_z - border_z(iborder)), dim = 1)
+enddo
+
+
 !$OMP PARALLEL NUM_THREADS(OMP_GET_MAX_THREADS()) DEFAULT(NONE) &
 !$OMP PRIVATE(ipropwav, isseq, it, issmul, ixx, izz, maskX, maskZ, denomsrcI, denomrecI, svalue, &
 !$OMP issmulxtemp1,issmulxtemp2,issmulztemp1,issmulztemp2,issmulx1,issmulz1,issmulx2,issmulz2,src_spray_weights, &
 !$OMP issmultemp, src_ztemp, src_xtemp, &
 !$OMP irecxtemp1,irecxtemp2,irecztemp1,irecztemp2,irecx1,irecz1,irecx2,irecz2,rec_interpolate_weights, &
-!$OMP irectemp, recv_xtemp, recv_ztemp, &
-!$OMP pp,ppp,dpFdx,dpFdz,dpdx,dpdz,dvxdx,dvzdz,grad_modtt,grad_modrrvx,grad_modrrvz,grad_modrr, &
-!$OMP vx,vz,p, &
+!$OMP irectemp, recv_xtemp, recv_ztemp, iborder, &
+!$OMP pp,ppp,dpdx,dpdz,dvxdx,dvzdz,grad_modrrvx,grad_modrrvz, &
+!$OMP p, &
 !$OMP memory_dvx_dx, &
 !$OMP memory_dvx_dz, &
 !$OMP memory_dvz_dx, &
@@ -781,10 +845,11 @@ if(courant_number > 1.e0) call abort_msg("fd2_mod: time step is too large, simul
 !$OMP memory_dp_dx, &
 !$OMP memory_dp_dz, &
 !$OMP saved_snap, rec_mat) &
-!$OMP SHARED(npropwav,src_nseq,src_wav_mat,src_flags, mesh_nz, mesh_nx, nz, nx, snaps_in, &
-!$OMP mesh_x, mesh_z, &
-!$OMP snaps_out, tim_nt, src_nt, src_nsmul, mesh_na_pml, deltax, deltaz, deltax24I, deltaz24I, tim_del, tim_delI, & 
-!$OMP src_x, src_z, recv_n, recv_z, recv_x, recv_out, recv_flags, &
+!$OMP SHARED(npropwav,src_nseq,src_nfield,src_wav_mat,src_flags, mesh_nz, mesh_nx, nz, nx, border_in, border_in_flag,&
+!$OMP border_out_flag, mesh_x, mesh_z, p_in, p_out, grad_modtt, grad_modrr, &
+!$OMP border_out, grad_out_flag, tim_nt, src_nt, src_nsmul, deltax, deltaz, deltax24I, deltaz24I, tim_del, tim_delI, & 
+!$OMP src_x, src_z, recv_n, recv_z, recv_x, recv_out, recv_flags, recv_nfield, &
+!$OMP iborderx, iborderz, border_n, born_flag,&
 !$OMP jobname, modttI, modrrvx,modrrvz, &
 !$OMP deltamodtt, deltamodrrvx, deltamodrrvz, &
 !$OMP b_x_half, a_x_half, b_z_half, a_z_half, b_x, b_z, a_x, a_z, &
@@ -795,9 +860,8 @@ if(courant_number > 1.e0) call abort_msg("fd2_mod: time step is too large, simul
 !$OMP DO 
 src_par_loop: do isseq = 1, src_nseq
 
-        allocate (p(0:nz+1,0:nx+1,npropwav), pp(0:nz+1,0:nx+1,npropwav), &
-                ppp(0:nz+1,0:nx+1,npropwav), &
-                vx(0:nz+1,0:nx+1,npropwav),vz(0:nz+1,0:nx+1,npropwav))
+        allocate (p(0:nz+1,0:nx+1,3,npropwav), pp(0:nz+1,0:nx+1,3,npropwav), &
+                ppp(0:nz+1,0:nx+1,3,npropwav))
         allocate (dpdx(0:nz+1,0:nx+1,npropwav), dpdz(0:nz+1,0:nx+1,npropwav))
         allocate (dvxdx(0:nz+1,0:nx+1,npropwav), dvzdz(0:nz+1,0:nx+1,npropwav))
 
@@ -809,12 +873,14 @@ src_par_loop: do isseq = 1, src_nseq
                 memory_dp_dz(0:nz+1,0:nx+1,npropwav))
 
         ! initialize main arrays
-        p = rzero_de; pp = rzero_de; ppp=rzero_de; vx = rzero_de; vz = rzero_de
+        p = rzero_de; pp = rzero_de; ppp =rzero_de
+        ! initial conditions for propagating field 1
+        p(:,:,:,1) = p_in(:,:,:,isseq,1); pp(:,:,:,1) = p_in(:,:,:,isseq,2); ppp=rzero_de;
         dpdx = rzero_de; dpdz = rzero_de;
         dvxdx = rzero_de; dvzdz = rzero_de;
 
         ! temp array per thread to store recv_out
-        allocate   (rec_mat(recv_n,npropwav,tim_nt)); rec_mat = rzero_de
+        allocate   (rec_mat(recv_n, recv_nfield, npropwav, tim_nt)); rec_mat = rzero_de
 
         ! initialize PML arrays
         memory_dp_dx  = rzero_de
@@ -824,15 +890,10 @@ src_par_loop: do isseq = 1, src_nseq
         memory_dvz_dx = rzero_de
         memory_dvz_dz = rzero_de
 
-        !if(present(grad)) then
-        !        allocate(grad_modrrvx(mesh_nz, mesh_nx), grad_modrrvz(mesh_nz, mesh_nx), grad_modtt(mesh_nz,mesh_nx))
-        !        grad_modrrvx =  rzero_de; grad_modrrvz = rzero_de; grad_modtt = rzero_de;
-        !        allocate(grad_modrr(mesh_nz, mesh_nx)); grad_modrr = rzero_de;
-        !        allocate(dpFdx(mesh_nz, mesh_nx),dpFdz(mesh_nz, mesh_nx)) 
-        !        dpFdx(:,:) = rzero_de ; dpFdz(:,:) = rzero_de; ! spatial derivatives of forward propagated field
-
-        !        if(.not.(present(snaps_in))) stop "fd2_mod: need snaps_in for gradient"
-        !endif
+        if(grad_out_flag) then
+                allocate(grad_modrrvx(0:nz+1, 0:nx+1), grad_modrrvz(0:nz+1, 0:nx+1))
+                grad_modrrvx =  rzero_de; grad_modrrvz = rzero_de;
+        endif
 
 
         ! source indices 
@@ -846,7 +907,7 @@ src_par_loop: do isseq = 1, src_nseq
                         issmultemp = issmul+(isseq-1)*src_nsmul+(ipropwav-1)*src_nsmul*src_nseq;
                         src_xtemp = src_x(issmultemp);
                         src_ztemp = src_z(issmultemp);
-                        if(index(ctofstr(src_flags),'[BILINEAR]') .ne. 0) then
+                        if(abs(src_flags(ipropwav)) .eq. 2) then ! [BILINEAR]
                                 maskX = .true.
                                 issmulxtemp1 = &
                                 minloc(array = abs(mesh_x - &
@@ -906,7 +967,7 @@ src_par_loop: do isseq = 1, src_nseq
                                 mesh_z(issmulz1(issmul,ipropwav)))*&
                                 denomsrcI(issmul,ipropwav)
 
-                        elseif(index(ctofstr(src_flags),'[NEAREST_NEIGH]') .ne. 0) then
+                        elseif(abs(src_flags(ipropwav)) .eq. 1) then ! [NEAREST_NEIGH]
                                 issmulx1(issmul,ipropwav) = &
                                 minloc(array = abs(mesh_x - &
                                 src_xtemp), dim = 1)
@@ -921,6 +982,14 @@ src_par_loop: do isseq = 1, src_nseq
                                 
                                 ! only add source at nearest grid point
                                 src_spray_weights(1,issmul,ipropwav) = rone_de;
+                        elseif(abs(src_flags(ipropwav)) .eq. 0) then ! [OFF]
+                                ! dummy 
+                                issmulz1(issmul,ipropwav) = int(mesh_nz*0.5)
+                                issmulx1(issmul,ipropwav) = int(mesh_nx*0.5)
+                                issmulz2(issmul,ipropwav) = int(mesh_nz*0.5)
+                                issmulx2(issmul,ipropwav) = int(mesh_nx*0.5)
+                                src_spray_weights(1,issmul,ipropwav) = rzero_de;
+
                         endif
                 enddo
         enddo
@@ -936,7 +1005,7 @@ src_par_loop: do isseq = 1, src_nseq
                         irectemp = irec+(isseq-1)*recv_n+(ipropwav-1)*recv_n*src_nseq
                         recv_xtemp = recv_x(irectemp);
                         recv_ztemp = recv_z(irectemp);
-                        if(index(ctofstr(recv_flags), '[BILINEAR]') .ne. 0) then
+                        if(recv_flags(ipropwav) .eq. 2) then
                                 maskX = .true.
                                 irecxtemp1 = &
                                 minloc(array = &
@@ -993,7 +1062,7 @@ src_par_loop: do isseq = 1, src_nseq
                                         (recv_ztemp-&
                                         mesh_z(irecz1(irec,ipropwav))))*&
                                         denomrecI(irec,ipropwav)
-                        elseif(index(ctofstr(recv_flags),'[NEAREST_NEIGH]') .ne. 0) then
+                        elseif(recv_flags(ipropwav) .eq. 1) then
                                 irecx1(irec,ipropwav) = &
                                 minloc(array = &
                                 abs(mesh_x - recv_xtemp), dim = 1)
@@ -1008,6 +1077,14 @@ src_par_loop: do isseq = 1, src_nseq
 
                                 ! record at nearest grid point
                                 rec_interpolate_weights(1,irec,ipropwav) = rone_de;
+                        elseif(recv_flags(ipropwav) .eq. 0) then
+                                ! dummies
+                                irecz1(irec,ipropwav) = int(mesh_nz*0.5)
+                                irecx1(irec,ipropwav) = int(mesh_nx*0.5)
+                                irecz2(irec,ipropwav) = int(mesh_nz*0.5)
+                                irecx2(irec,ipropwav) = int(mesh_nx*0.5)
+                                ! record at nearest grid point
+                                rec_interpolate_weights = rzero_de;
                         endif
                 enddo
         enddo
@@ -1019,7 +1096,7 @@ src_par_loop: do isseq = 1, src_nseq
 !                        " % complete"
 !                endif
 
-                ! save p at [it-1] to pp
+                ! save p at [it-1] to pp and [it-2] to ppp
                 ppp = pp
                 pp = p
 
@@ -1033,15 +1110,15 @@ src_par_loop: do isseq = 1, src_nseq
                 do ix=2,nx
                 do iz=2,nz
                         dvxdx(iz,ix,ipropwav) = &
-                        (27.e0*vx(iz,ix,ipropwav)-&
-                        27.e0*vx(iz,ix-1,ipropwav)-&
-                            vx(iz,ix+1,ipropwav)+&
-                            vx(iz,ix-2,ipropwav)) * (deltax24I)
+                        (27.e0*p(iz,ix,2,ipropwav)-&
+                        27.e0*p(iz,ix-1,2,ipropwav)-&
+                            p(iz,ix+1,2,ipropwav)+&
+                            p(iz,ix-2,2,ipropwav)) * (deltax24I)
                         dvzdz(iz,ix,ipropwav) = &
-                        (27.e0*vz(iz,ix,ipropwav)-&
-                        27.e0*vz(iz-1,ix,ipropwav)-&
-                            vz(iz+1,ix,ipropwav)+&
-                            vz(iz-2,ix,ipropwav)) * (deltaz24I)
+                        (27.e0*p(iz,ix,3,ipropwav)-&
+                        27.e0*p(iz-1,ix,3,ipropwav)-&
+                            p(iz+1,ix,3,ipropwav)+&
+                            p(iz-2,ix,3,ipropwav)) * (deltaz24I)
                         memory_dvx_dx(iz,ix,ipropwav) = b_x(ix) * memory_dvx_dx(iz,ix,ipropwav) + &
                                                         a_x(ix) * dvxdx(iz,ix,ipropwav) ! pml 
                         memory_dvz_dz(iz,ix,ipropwav) = b_z(iz) * memory_dvz_dz(iz,ix,ipropwav) + &
@@ -1053,7 +1130,7 @@ src_par_loop: do isseq = 1, src_nseq
 
                         ! compute pressure at [it] using p at [it-1] and dvxdx
                         ! and dvzdz at [it-1/2]
-                        p(iz,ix,ipropwav) = p(iz,ix,ipropwav) + &
+                        p(iz,ix,1,ipropwav) = p(iz,ix,1,ipropwav) + &
                                 (modttI(iz,ix) * (dvxdx(iz,ix,ipropwav) + &
                                                 dvzdz(iz,ix,ipropwav))) * &
                                                         tim_del * boundary_p(iz,ix)
@@ -1067,70 +1144,54 @@ src_par_loop: do isseq = 1, src_nseq
 
                 ! adding source to pressure at [it] 
                 do ipropwav = 1,npropwav
+                do ifield = 1, src_nfield
                 do issmul = 1, src_nsmul
                         ! compute source wavelet at [it-1/2] by simple
                         ! interpolation
                         ! division of source term with deltax and deltaz (see Jan's fdelmodc manual)
-                        svalue  = 0.5e0 * (src_wav_mat(issmul,ipropwav,it, isseq) + &
-                                src_wav_mat(issmul,ipropwav,it-1,isseq)) * tim_del &
+                        svalue  = 0.5e0 * (src_wav_mat(issmul,ifield,ipropwav,it, isseq) + &
+                                src_wav_mat(issmul,ifield,ipropwav,it-1,isseq)) * tim_del &
                                         * deltax24I * deltaz24I
-                        p(mesh_na_pml+issmulz1(issmul,ipropwav), mesh_na_pml+issmulx1(issmul,ipropwav),ipropwav) = &
-                                p(mesh_na_pml+issmulz1(issmul,ipropwav),mesh_na_pml+issmulx1(issmul,ipropwav),ipropwav) &
+
+
+                                p(issmulz1(issmul,ipropwav), issmulx1(issmul,ipropwav),ifield, ipropwav) = &
+                        p(issmulz1(issmul,ipropwav),issmulx1(issmul,ipropwav),ifield, ipropwav) &
                                 + svalue * src_spray_weights(1,issmul,ipropwav) * &
-                                modttI(mesh_na_pml+issmulz1(issmul,ipropwav), mesh_na_pml+issmulx1(issmul,ipropwav))  
-                        p(mesh_na_pml+issmulz1(issmul,ipropwav), mesh_na_pml+issmulx2(issmul,ipropwav),ipropwav) = &
-                                p(mesh_na_pml+issmulz1(issmul,ipropwav),mesh_na_pml+issmulx2(issmul,ipropwav),ipropwav) &
+                                modttI(issmulz1(issmul,ipropwav), issmulx1(issmul,ipropwav))  
+                        p(issmulz1(issmul,ipropwav), issmulx2(issmul,ipropwav),ifield, ipropwav) = &
+                                p(issmulz1(issmul,ipropwav),issmulx2(issmul,ipropwav),ifield, ipropwav) &
                                 + svalue * src_spray_weights(2,issmul,ipropwav) * &
-                                modttI(mesh_na_pml+issmulz1(issmul,ipropwav), mesh_na_pml+issmulx2(issmul,ipropwav))
-                        p(mesh_na_pml+issmulz2(issmul,ipropwav), mesh_na_pml+issmulx1(issmul,ipropwav),ipropwav) = &
-                                p(mesh_na_pml+issmulz2(issmul,ipropwav),mesh_na_pml+issmulx1(issmul,ipropwav),ipropwav) &
+                                modttI(issmulz1(issmul,ipropwav), issmulx2(issmul,ipropwav))
+                        p(issmulz2(issmul,ipropwav), issmulx1(issmul,ipropwav),ifield, ipropwav) = &
+                                p(issmulz2(issmul,ipropwav),issmulx1(issmul,ipropwav),ifield, ipropwav) &
                                 + svalue * src_spray_weights(3,issmul,ipropwav) * &
-                                modttI(mesh_na_pml+issmulz2(issmul,ipropwav), mesh_na_pml+issmulx1(issmul,ipropwav))
-                        p(mesh_na_pml+issmulz2(issmul,ipropwav), mesh_na_pml+issmulx2(issmul,ipropwav),ipropwav) = &
-                                p(mesh_na_pml+issmulz2(issmul,ipropwav),mesh_na_pml+issmulx2(issmul,ipropwav),ipropwav) &
+                                modttI(issmulz2(issmul,ipropwav), issmulx1(issmul,ipropwav))
+                        p(issmulz2(issmul,ipropwav), issmulx2(issmul,ipropwav),ifield, ipropwav) = &
+                                p(issmulz2(issmul,ipropwav),issmulx2(issmul,ipropwav),ifield, ipropwav) &
                                 + svalue * src_spray_weights(4,issmul,ipropwav) * &
-                                modttI(mesh_na_pml+issmulz2(issmul,ipropwav), mesh_na_pml+issmulx2(issmul,ipropwav))
+                                modttI(issmulz2(issmul,ipropwav), issmulx2(issmul,ipropwav))
+                enddo
                 enddo
                 enddo
 
-!                if(npropwav .ge. 2) then
-!                ! adding born sources from pressure(:,:,1) to pressure(:,:,2)
-!                do ix=1,nx-1
-!                do iz=1,nz-1
-!                        !p(iz,ix,2) = p(iz,ix,1);
-!                        p(iz,ix,2) = p(iz,ix,2) + & 
-!                                ! lambdaI scatterrer
-!                                (-1.0 * &
-!                                (ppp(iz, ix, 1) + p(iz, ix,  1) - 2.0 * pp(iz, ix,  1)) &
-!                                                 * deltamodtt(iz, ix) * tim_delI * tim_delI) + &
-!                                ! modrrvx scatterrer
-!                                (27.e0*dpdx(iz,ix,1) * deltamodrrvx(iz,ix) &
-!                                        -27.e0*dpdx(iz,ix-1,1) * deltamodrrvx(iz,ix-1) &
-!                                        -dpdx(iz,ix+1,1) * deltamodrrvx(iz,ix+1) &
-!                                        +dpdx(iz,ix-2,1) * deltamodrrvx(iz,ix-2) &
-!                                        ) * (deltax24I) + &
-!                                ! modrrvz scatterrer
-!                                (27.e0*dpdz(iz,ix,1) * deltamodrrvz(iz,ix) &
-!                                        -27.e0*dpdz(iz-1,ix,1) * deltamodrrvz(iz-1,ix) &
-!                                        -dpdz(iz+1,ix,1) * deltamodrrvz(iz+1,ix) &
-!                                        +dpdz(iz-2,ix,1) * deltamodrrvz(iz-2,ix) &
-!                                        ) * (deltaz24I)
-!        
-!                enddo
-!                enddo
-!                endif
-!
+                ! force p[1] on borders
+                if(border_in_flag) then
+                do iborder = 1, border_n
+                        p(iborderz(iborder), iborderx(iborder),1,1) = &
+                        border_in(iborder,it,isseq) 
+                enddo
+                endif
 
-                ! compute dpdx and dpdz at [it]
+                ! compute dpdx and dpdz at [it] only for the first propagating field, to use for born modeling
                 !forall(ix=1:nx-1,iz=1:nz-1)
-                do ipropwav = 1,npropwav
+                ipropwav = 1
                 do ix=1,nx-1
                 do iz=1,nz-1
                         dpdx(iz,ix,ipropwav) = &
-                                (27.e0*p(iz,ix+1,ipropwav)-&
-                                27.e0*p(iz,ix,ipropwav)-&
-                                    p(iz,ix+2,ipropwav)+&
-                                    p(iz,ix-1,ipropwav)) * (deltax24I)
+                                (27.e0*p(iz,ix+1,1,ipropwav)-&
+                                27.e0*p(iz,ix,1,ipropwav)-&
+                                    p(iz,ix+2,1,ipropwav)+&
+                                    p(iz,ix-1,1,ipropwav)) * (deltax24I)
                         memory_dp_dx(iz,ix,ipropwav) = b_x_half(ix) * memory_dp_dx(iz,ix,ipropwav) + &
                                                     a_x_half(ix) * dpdx(iz,ix,ipropwav) ! pml
                         dpdx(iz,ix,ipropwav) = dpdx(iz,ix,ipropwav) * K_x_halfI(ix) + &
@@ -1143,10 +1204,72 @@ src_par_loop: do isseq = 1, src_nseq
                 do ix=1,nx-1
                 do iz=1,nz-1
                         dpdz(iz,ix,ipropwav) = &
-                                (27.e0*p(iz+1,ix,ipropwav)-&
-                                27.e0*p(iz,ix,ipropwav)-&
-                                    p(iz+2,ix,ipropwav)+&
-                                    p(iz-1,ix,ipropwav)) * (deltaz24I)
+                                (27.e0*p(iz+1,ix,1,ipropwav)-&
+                                27.e0*p(iz,ix,1,ipropwav)-&
+                                    p(iz+2,ix,1,ipropwav)+&
+                                    p(iz-1,ix,1,ipropwav)) * (deltaz24I)
+                        memory_dp_dz(iz,ix,ipropwav) = b_z_half(iz) * memory_dp_dz(iz,ix,ipropwav) + &
+                                                    a_z_half(iz) * dpdz(iz,ix,ipropwav) !pml
+                        dpdz(iz,ix,ipropwav) = dpdz(iz,ix,ipropwav) * K_z_halfI(iz) + &
+                                            memory_dp_dz(iz,ix,ipropwav) !pml
+                enddo
+                enddo
+
+
+                if(born_flag) then
+                ! adding born sources from pressure(:,:,1) to pressure(:,:,2)
+                do ix=1,nx-1
+                do iz=1,nz-1
+                        !p(iz,ix,2) = p(iz,ix,1);
+                        p(iz,ix,1,2) = p(iz,ix,1,2) + & 
+                                ! lambdaI scatterrer
+                                (-1.0 * &
+                                (ppp(iz, ix, 1,1) + p(iz, ix,  1,1) - 2.0 * pp(iz, ix,  1,1)) &
+                                                 * deltamodtt(iz, ix) * tim_delI * tim_delI) + &
+                                ! modrrvx scatterrer
+                                (27.e0*dpdx(iz,ix,1) * deltamodrrvx(iz,ix) &
+                                        -27.e0*dpdx(iz,ix-1,1) * deltamodrrvx(iz,ix-1) &
+                                        -dpdx(iz,ix+1,1) * deltamodrrvx(iz,ix+1) &
+                                        +dpdx(iz,ix-2,1) * deltamodrrvx(iz,ix-2) &
+                                        ) * (deltax24I) + &
+                                ! modrrvz scatterrer
+                                (27.e0*dpdz(iz,ix,1) * deltamodrrvz(iz,ix) &
+                                        -27.e0*dpdz(iz-1,ix,1) * deltamodrrvz(iz-1,ix) &
+                                        -dpdz(iz+1,ix,1) * deltamodrrvz(iz+1,ix) &
+                                        +dpdz(iz-2,ix,1) * deltamodrrvz(iz-2,ix) &
+                                        ) * (deltaz24I)
+        
+                enddo
+                enddo
+                endif
+
+
+                ! compute dpdx and dpdz at [it] for all other propagating fields
+                !forall(ix=1:nx-1,iz=1:nz-1)
+                do ipropwav = 2, npropwav
+                do ix=1,nx-1
+                do iz=1,nz-1
+                        dpdx(iz,ix,ipropwav) = &
+                                (27.e0*p(iz,ix+1,1,ipropwav)-&
+                                27.e0*p(iz,ix,1,ipropwav)-&
+                                    p(iz,ix+2,1,ipropwav)+&
+                                    p(iz,ix-1,1,ipropwav)) * (deltax24I)
+                        memory_dp_dx(iz,ix,ipropwav) = b_x_half(ix) * memory_dp_dx(iz,ix,ipropwav) + &
+                                                    a_x_half(ix) * dpdx(iz,ix,ipropwav) ! pml
+                        dpdx(iz,ix,ipropwav) = dpdx(iz,ix,ipropwav) * K_x_halfI(ix) + &
+                                            memory_dp_dx(iz,ix,ipropwav) ! pml
+                enddo
+                enddo
+                !endforall
+
+                !forall(ix=1:nx-1,iz=1:nz-1)
+                do ix=1,nx-1
+                do iz=1,nz-1
+                        dpdz(iz,ix,ipropwav) = &
+                                (27.e0*p(iz+1,ix,1,ipropwav)-&
+                                27.e0*p(iz,ix,1,ipropwav)-&
+                                    p(iz+2,ix,1,ipropwav)+&
+                                    p(iz-1,ix,1,ipropwav)) * (deltaz24I)
                         memory_dp_dz(iz,ix,ipropwav) = b_z_half(iz) * memory_dp_dz(iz,ix,ipropwav) + &
                                                     a_z_half(iz) * dpdz(iz,ix,ipropwav) !pml
                         dpdz(iz,ix,ipropwav) = dpdz(iz,ix,ipropwav) * K_z_halfI(iz) + &
@@ -1157,77 +1280,29 @@ src_par_loop: do isseq = 1, src_nseq
                 !endforall
 
 
-!                ! gradient calculation
-!                if(present(grad) .and. (it .ne. tim_nt) .and. (it .ne. 1)) then
-!
-!                        ! p at [it], pp at [it-1]
-!                        ! dpdx and dpdz at [it]
-!                        ! gradients w.r.t inverse of modttI, i.e., 1/rho/c^2 
-!                        forall(ix=1:mesh_nx,iz=1:mesh_nz)
-!                                grad_modtt(iz,ix) = grad_modtt(iz,ix) + &
-!                                        (snaps_in(iz,ix,tim_nt-it,isseq)-snaps_in(iz,ix,tim_nt-it+1,isseq)) * tim_delI * &
-!                                        (p(iz+mesh_na_pml,ix+mesh_na_pml)-pp(iz+mesh_na_pml,ix+mesh_na_pml)) * tim_delI
-!                        endforall
-!                        
-!
-!                        if(allocated(grad(isseq)%rho)) then
-!                                forall(ix=2:mesh_nx-2,iz=2:mesh_nz-2)
-!                                        ! calculating dpFdx are on vx grid
-!                                        dpFdx(iz,ix) = &
-!                                                ((27.e0*snaps_in(iz,ix+1,tim_nt-it,isseq)-27.e0*snaps_in(iz,ix,tim_nt-it,isseq)-&
-!                                                snaps_in(iz,ix+2,tim_nt-it,isseq)+snaps_in(iz,ix-1,tim_nt-it,isseq)) &
-!                                                * (deltax24I))     
-!                                        ! calculating dpFdz are on vz grid
-!                                        dpFdz(iz,ix) = &
-!                                                ((27.e0*snaps_in(iz+1,ix,tim_nt-it,isseq)-27.e0*snaps_in(iz,ix,tim_nt-it,isseq)-&
-!                                                snaps_in(iz+2,ix,tim_nt-it,isseq)+snaps_in(iz-1,ix,tim_nt-it,isseq)) &
-!                                                * (deltaz24I))     
-!                                endforall
-!                                ! gradient w.r.t. rho_inv
-!                                forall(ix=2:mesh_nx,iz=2:mesh_nz)
-!!                                        grad_rho_inv(iz,ix) = grad_rho_inv(iz,ix) - &
-!!                                                        ((rhalf * (dpFdx(iz,ix) + dpFdx(iz,ix-1)) * &
-!!                                        rhalf * (dpdx(iz+mesh_na_pml,ix+mesh_na_pml) + dpdx(iz+mesh_na_pml,ix-1+mesh_na_pml))) + &
-!!                                                        (rhalf * (dpFdz(iz,ix) + dpFdz(iz-1,ix)) *&
-!!                                        rhalf * (dpdz(iz+mesh_na_pml,ix+mesh_na_pml) + dpdz(iz-1+mesh_na_pml,ix+mesh_na_pml))))
-!                                        grad_modrrvx(iz,ix) = grad_modrrvx(iz,ix) - dpdx(iz+mesh_na_pml,ix+mesh_na_pml)*dpFdx(iz,ix) 
-!                                        grad_modrrvz(iz,ix) = grad_modrrvz(iz,ix) - dpdz(iz+mesh_na_pml,ix+mesh_na_pml)*dpFdz(iz,ix) 
-!                                endforall
-!                        endif
-!                                
-!                endif
-!
+
+                ! gradient calculation
+                if(grad_out_flag) then
+
+                        ! p at [it], pp at [it-1]
+                        ! dpdx and dpdz at [it]
+                        ! gradients w.r.t inverse of modttI, i.e., 1/rho/c^2 
+                        grad_modtt(:,:,isseq) = grad_modtt(:,:,isseq) + (p(:,:,1,1) - pp(:,:,1,1)) * tim_delI * &
+                                        (p(:,:,1,2) - pp(:,:,1,2)) * tim_delI
+                        
+
+                        ! gradient w.r.t. inverse of rho on vx and vz grids
+                        grad_modrrvx = grad_modrrvx - dpdx(:,:,2)*dpdx(:,:,1) 
+                        grad_modrrvz = grad_modrrvz - dpdz(:,:,2)*dpdz(:,:,1) 
+
+                endif
+
                 ! saving a field snapshot (commented for speed)
                 !if(allocated(saved_snap) ) then
                 !        if(it .eq. int(tim_nt * snap_save_at)) then
-                !                saved_snap(:,:) = p(mesh_na_pml+1:mesh_nz+mesh_na_pml,1+mesh_na_pml:mesh_nx+mesh_na_pml) ;
+                !                saved_snap(:,:) = p(1:mesh_nz+mesh_na_pml,1+mesh_na_pml:mesh_nx+mesh_na_pml) ;
                 !        endif
                 !endif
-
-                ! store pressure seismograms to "recv_out" 
-                        do ipropwav = 1, npropwav
-                        do irec = 1, recv_n
-!                                        if(index(recv_flags, '[P]') .ne. 0) then
-                                rec_mat(irec,ipropwav,it) = &
-                                        (&
-                                        p(mesh_na_pml+irecz1(irec,ipropwav),mesh_na_pml+irecx1(irec,ipropwav),ipropwav)*&
-                                        rec_interpolate_weights(1,irec,ipropwav)+&
-                                        p(mesh_na_pml+irecz1(irec,ipropwav),mesh_na_pml+irecx2(irec,ipropwav),ipropwav)*&
-                                        rec_interpolate_weights(2,irec,ipropwav)+&
-                                        p(mesh_na_pml+irecz2(irec,ipropwav),mesh_na_pml+irecx1(irec,ipropwav),ipropwav)*&
-                                        rec_interpolate_weights(3,irec,ipropwav)+&
-                                        p(mesh_na_pml+irecz2(irec,ipropwav),mesh_na_pml+irecx2(irec,ipropwav),ipropwav)*&
-                                        rec_interpolate_weights(4,irec,ipropwav)&
-                                        )
-!                                       endif
-                        enddo
-                        enddo
-
-!                if(present(snaps_out)) then
-!                        forall(ix=1:mesh_nx,iz=1:mesh_nz) 
-!                                snaps_out(iz,ix,it,isseq) = p(mesh_na_pml+iz,mesh_na_pml+ix)
-!                        endforall
-!                end if
 
                 ! update velocity at [it+1/2] using 
                 ! velcity at [it-1/2] and dpdx and dpdz at [it] 
@@ -1235,7 +1310,7 @@ src_par_loop: do isseq = 1, src_nseq
                 do ipropwav = 1, npropwav
                 do ix=1,nx-1
                 do iz=1,nz-1
-                        vx(iz,ix,ipropwav) = vx(iz,ix,ipropwav) + (dpdx(iz,ix,ipropwav)) * tim_del * &
+                        p(iz,ix,2,ipropwav) = p(iz,ix,2,ipropwav) + (dpdx(iz,ix,ipropwav)) * tim_del * &
                                 modrrvx(iz,ix) * boundary_vx(iz,ix)
                 enddo
                 enddo
@@ -1244,26 +1319,71 @@ src_par_loop: do isseq = 1, src_nseq
                 !forall(ix=1:nx-1,iz=1:nz-1)
                 do ix=1,nx-1
                 do iz=1,nz-1
-                        vz(iz,ix,ipropwav) = vz(iz,ix,ipropwav) + (dpdz(iz,ix,ipropwav)) * tim_del * &
+                        p(iz,ix,3,ipropwav) = p(iz,ix,3,ipropwav) + (dpdz(iz,ix,ipropwav)) * tim_del * &
                                 modrrvz(iz,ix) * boundary_vz(iz,ix)
                 enddo
                 enddo
                 enddo
                 !endforall
 
+                ! store pressure seismograms to rec_mat 
+                do ipropwav = 1, npropwav
+                do ifield = 1, recv_nfield
+                do irec = 1, recv_n
+!                                if(index(recv_flags, '[P]') .ne. 0) then
+                                rec_mat(irec,ifield,ipropwav, it) = &
+                                (&
+                                p(irecz1(irec,ipropwav),irecx1(irec,ipropwav),ifield,ipropwav)*&
+                                rec_interpolate_weights(1,irec,ipropwav)+&
+                                p(irecz1(irec,ipropwav),irecx2(irec,ipropwav),ifield,ipropwav)*&
+                                rec_interpolate_weights(2,irec,ipropwav)+&
+                                p(irecz2(irec,ipropwav),irecx1(irec,ipropwav),ifield,ipropwav)*&
+                                rec_interpolate_weights(3,irec,ipropwav)+&
+                                p(irecz2(irec,ipropwav),irecx2(irec,ipropwav),ifield,ipropwav)*&
+                                rec_interpolate_weights(4,irec,ipropwav)&
+                                )
+!                               endif
+                enddo
+                enddo
+                enddo
+
+
+                ! record borders
+                if(border_out_flag) then
+                !do ipropwav = 1, npropwav
+                !do ifield = 1, 3
+                do iborder = 1, border_n
+                        border_out(iborder,it,isseq) = &
+                        p(iborderz(iborder),iborderx(iborder),1,1)
+                enddo
+                !enddo
+                !enddo
+                endif
+
         enddo time_loop
 
         do ipropwav = 1, npropwav
+        do ifield=1, recv_nfield
         do irec = 1, recv_n
         do it = 1, tim_nt 
                 ! output recv_out
-                recv_out(it + (irec-1)*tim_nt + (isseq-1)*recv_n*tim_nt + (ipropwav-1)*recv_n*tim_nt*src_nseq) = &
-                        rec_mat(irec,ipropwav,it)
+                recv_out(it + & 
+                         (irec-1)*tim_nt + &
+                         (isseq-1)*recv_n*tim_nt + &
+                         (ifield-1)*recv_n*tim_nt*src_nseq + &
+                         (ipropwav-1)*recv_nfield*recv_n*tim_nt*src_nseq &
+                        ) = &
+                        rec_mat(irec,ifield,ipropwav,it)
+        enddo
         enddo
         enddo
         enddo
 
-        ! output gradient
+        ! output p_out of the first propagating field
+        p_out(:,:,:,isseq,1) = p(:,:,:,1) 
+        p_out(:,:,:,isseq,2) = pp(:,:,:,1)
+
+
         ! edges of the gradient zero
         !if(present(grad)) then
         !        ! grad of vel
@@ -1274,13 +1394,16 @@ src_par_loop: do isseq = 1, src_nseq
         !        endforall
         !
 
-        !        grad_modrr = rzero_de;
-        !        forall(ix=2:mesh_nx-2,iz=2:mesh_nz-2)
-        !                grad_modrr(iz,ix) = grad_modrr(iz,ix) + 0.5e0 * grad_modrrvx(iz,ix)
-        !                grad_modrr(iz,ix+1) = grad_modrr(iz,ix+1) + 0.5e0 * grad_modrrvx(iz,ix)
-        !                grad_modrr(iz,ix) = grad_modrr(iz,ix) + 0.5e0 * grad_modrrvz(iz,ix)
-        !                grad_modrr(iz+1,ix) = grad_modrr(iz+1,ix) + 0.5e0 * grad_modrrvz(iz,ix)
-        !        endforall
+        ! output gradient
+        if(grad_out_flag) then
+                grad_modrr = rzero_de;
+                forall(ix=2:nx-2,iz=2:nz-2)
+                        grad_modrr(iz,ix, isseq) = grad_modrr(iz,ix,isseq) + 0.5e0 * grad_modrrvx(iz,ix)
+                        grad_modrr(iz,ix+1, isseq) = grad_modrr(iz,ix+1,isseq) + 0.5e0 * grad_modrrvx(iz,ix)
+                        grad_modrr(iz,ix, isseq) = grad_modrr(iz,ix,isseq) + 0.5e0 * grad_modrrvz(iz,ix)
+                        grad_modrr(iz+1,ix, isseq) = grad_modrr(iz+1,ix,isseq) + 0.5e0 * grad_modrrvz(iz,ix)
+                endforall
+        endif
 
 
         !        grad(isseq)%rho = rzero_de;
@@ -1290,20 +1413,9 @@ src_par_loop: do isseq = 1, src_nseq
         !        endforall
         !endif
 
-        !if(allocated(saved_snap) .and. isseq .eq. 1) then
-        !        if(present(jobname))    then
-        !                junk = trim(out_dir)//"/snapshot"//trim(jobname)
-        !        else
-        !                junk = trim(out_dir)//"/snapshot"
-        !        endif
-        !        call makesu(dat=pack(saved_snap,.true.),fname=junk,&
-        !                dx=deltax,dz=deltaz,nrec=mesh_nx,nt=mesh_nz, fileid=OMP_get_thread_num())
-        !        deallocate(saved_snap)
-        !endif
 
-
-        deallocate                      (p, pp, ppp,&
-                                        vx,vz)
+        deallocate                      (p, pp, ppp&
+                                        )
         deallocate			(dpdx, dpdz)
         deallocate			(dvxdx, dvzdz)
 
@@ -1319,9 +1431,6 @@ src_par_loop: do isseq = 1, src_nseq
         deallocate(denomrecI, rec_interpolate_weights)
 
         if(allocated(rec_mat)) deallocate  (rec_mat)
-        if(allocated(dpFdz)) deallocate(dpFdz)
-        if(allocated(dpFdx)) deallocate(dpFdx)
-        if(allocated(saved_snap)) deallocate(saved_snap)
         if(allocated(grad_modrrvx)) deallocate(grad_modrrvx)
         if(allocated(grad_modrrvz)) deallocate(grad_modrrvz)
 
@@ -1330,6 +1439,7 @@ enddo src_par_loop
 !$OMP ENDDO 
 !$OMP END PARALLEL
 
+deallocate                      (iborderx, iborderz)
 deallocate                      (d_x,K_x,K_xI,alpha_x,&
                                 a_x,b_x,d_x_half,&
                                 K_x_half,K_x_halfI,alpha_x_half,a_x_half,b_x_half)
