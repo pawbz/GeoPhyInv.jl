@@ -118,11 +118,20 @@ end
 Plot seismic model
 """
 function Seismic(model::Models.Seismic)
+	subplot(121)
 	ax = imshow(Models.χ(model.χvp,model.vp0,-1), cmap="gray",
 	         extent=[model.mgrid.x[1], model.mgrid.x[end], model.mgrid.z[end], model.mgrid.z[1],]);
 		 xlabel(L"$x$ (m)");
 		 ylabel(L"$z$ (m)");
 		 colorbar();
+	subplot(122)
+	ax = imshow(Models.χ(model.χρ,model.ρ0,-1), cmap="gray",
+	         extent=[model.mgrid.x[1], model.mgrid.x[end], model.mgrid.z[end], model.mgrid.z[1],]);
+		 xlabel(L"$x$ (m)");
+		 ylabel(L"$z$ (m)");
+		 colorbar();
+	 tight_layout()
+
 end
 
 end # module

@@ -44,16 +44,26 @@ function M2D(xmin::Float64, xmax::Float64,
 end
 
 """
-Extend M2D by npml grid points on all sides
+Extend M2D by its npml grid points on all sides
 """
-function M2D_extend(mgrid::M2D)
+function M2D_pad_trun(mgrid::M2D; flag::Int64=1)
 
-	xmin = mgrid.x[1] - mgrid.npml*mgrid.δx
-	xmax = mgrid.x[end] + mgrid.npml*mgrid.δx
-	zmin = mgrid.z[1] - mgrid.npml*mgrid.δz
-	zmax = mgrid.z[end] + mgrid.npml*mgrid.δz
-	# npml = 0 for output
-	return M2D(xmin,xmax,zmin,zmax, mgrid.nx+2*mgrid.npml,mgrid.nz+2*mgrid.npml,0)
+	if(isequal(flag,1)) 
+		xmin = mgrid.x[1] - mgrid.npml*mgrid.δx
+		xmax = mgrid.x[end] + mgrid.npml*mgrid.δx
+		zmin = mgrid.z[1] - mgrid.npml*mgrid.δz
+		zmax = mgrid.z[end] + mgrid.npml*mgrid.δz
+		return M2D(xmin,xmax,zmin,zmax, mgrid.nx+2*mgrid.npml,mgrid.nz+2*mgrid.npml,mgrid.npml)
+	elseif(isequal(flag,-1))
+		xmin = mgrid.x[1] + mgrid.npml*mgrid.δx
+		xmax = mgrid.x[end] - mgrid.npml*mgrid.δx
+		zmin = mgrid.z[1] + mgrid.npml*mgrid.δz
+		zmax = mgrid.z[end] - mgrid.npml*mgrid.δz
+		return M2D(xmin,xmax,zmin,zmax, mgrid.nx-2*mgrid.npml,mgrid.nz-2*mgrid.npml,mgrid.npml)
+	else
+		error("invalid flag")
+	end
+	
 end
 
 """

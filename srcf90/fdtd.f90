@@ -354,7 +354,7 @@ real, intent(in)                                        :: p_in(0:mesh_nz+1,0:me
 real, intent(out)                                       :: p_out(0:mesh_nz+1,0:mesh_nx+1,3,src_nseq,2)                                                
 
 
-real, dimension(0:mesh_nz+1,0:mesh_nx+1,src_nseq), intent(out) &
+real, dimension(1:mesh_nz,1:mesh_nx,src_nseq), intent(inout) &
                                                         :: grad_modtt, grad_modrr
 logical, intent(in)                                     :: born_flag, grad_out_flag 
 
@@ -436,7 +436,7 @@ real, dimension(:,:,:,:), allocatable                   :: pp, ppp ! for time di
 real, dimension(:,:,:), allocatable                     :: dpdx,dpdz ! spatial derivatives of pressure in vx and vz grids
 real, dimension(:,:,:), allocatable                     :: dvxdx,dvzdz
 
-real, dimension(:,:), allocatable                       :: grad_modrrvx, grad_modrrvz
+real, dimension(:,:), allocatable                       :: gradis_modrrvx, gradis_modrrvz, gradis_modtt
 
 real, allocatable                                       :: saved_snap(:,:)
 
@@ -836,7 +836,7 @@ enddo
 !$OMP issmultemp, src_ztemp, src_xtemp, &
 !$OMP irecxtemp1,irecxtemp2,irecztemp1,irecztemp2,irecx1,irecz1,irecx2,irecz2,rec_interpolate_weights, &
 !$OMP irectemp, recv_xtemp, recv_ztemp, iborder, &
-!$OMP pp,ppp,dpdx,dpdz,dvxdx,dvzdz,grad_modrrvx,grad_modrrvz, &
+!$OMP pp,ppp,dpdx,dpdz,dvxdx,dvzdz,gradis_modrrvx,gradis_modrrvz, gradis_modtt,&
 !$OMP p, &
 !$OMP memory_dvx_dx, &
 !$OMP memory_dvx_dz, &
@@ -891,8 +891,10 @@ src_par_loop: do isseq = 1, src_nseq
         memory_dvz_dz = rzero_de
 
         if(grad_out_flag) then
-                allocate(grad_modrrvx(0:nz+1, 0:nx+1), grad_modrrvz(0:nz+1, 0:nx+1))
-                grad_modrrvx =  rzero_de; grad_modrrvz = rzero_de;
+                allocate(gradis_modrrvx(0:nz+1, 0:nx+1), gradis_modrrvz(0:nz+1, 0:nx+1))
+                allocate(gradis_modtt(0:nz+1, 0:nx+1))
+                gradis_modrrvx =  rzero_de; gradis_modrrvz = rzero_de;
+                gradis_modtt = rzero_de;
         endif
 
 
@@ -1287,13 +1289,13 @@ src_par_loop: do isseq = 1, src_nseq
                         ! p at [it], pp at [it-1]
                         ! dpdx and dpdz at [it]
                         ! gradients w.r.t inverse of modttI, i.e., 1/rho/c^2 
-                        grad_modtt(:,:,isseq) = grad_modtt(:,:,isseq) + (p(:,:,1,1) - pp(:,:,1,1)) * tim_delI * &
+                        gradis_modtt = gradis_modtt + (p(:,:,1,1) - pp(:,:,1,1)) * tim_delI * &
                                         (p(:,:,1,2) - pp(:,:,1,2)) * tim_delI
                         
 
                         ! gradient w.r.t. inverse of rho on vx and vz grids
-                        grad_modrrvx = grad_modrrvx - dpdx(:,:,2)*dpdx(:,:,1) 
-                        grad_modrrvz = grad_modrrvz - dpdz(:,:,2)*dpdz(:,:,1) 
+                        gradis_modrrvx = gradis_modrrvx - dpdx(:,:,2)*dpdx(:,:,1) 
+                        gradis_modrrvz = gradis_modrrvz - dpdz(:,:,2)*dpdz(:,:,1) 
 
                 endif
 
@@ -1396,12 +1398,13 @@ src_par_loop: do isseq = 1, src_nseq
 
         ! output gradient
         if(grad_out_flag) then
-                grad_modrr = rzero_de;
+                grad_modtt(:,:,isseq) = gradis_modtt(1:nz,1:nx);
+
                 forall(ix=2:nx-2,iz=2:nz-2)
-                        grad_modrr(iz,ix, isseq) = grad_modrr(iz,ix,isseq) + 0.5e0 * grad_modrrvx(iz,ix)
-                        grad_modrr(iz,ix+1, isseq) = grad_modrr(iz,ix+1,isseq) + 0.5e0 * grad_modrrvx(iz,ix)
-                        grad_modrr(iz,ix, isseq) = grad_modrr(iz,ix,isseq) + 0.5e0 * grad_modrrvz(iz,ix)
-                        grad_modrr(iz+1,ix, isseq) = grad_modrr(iz+1,ix,isseq) + 0.5e0 * grad_modrrvz(iz,ix)
+                        grad_modrr(iz,ix, isseq) = grad_modrr(iz,ix,isseq) + 0.5e0 * gradis_modrrvx(iz,ix)
+                        grad_modrr(iz,ix+1, isseq) = grad_modrr(iz,ix+1,isseq) + 0.5e0 * gradis_modrrvx(iz,ix)
+                        grad_modrr(iz,ix, isseq) = grad_modrr(iz,ix,isseq) + 0.5e0 * gradis_modrrvz(iz,ix)
+                        grad_modrr(iz+1,ix, isseq) = grad_modrr(iz+1,ix,isseq) + 0.5e0 * gradis_modrrvz(iz,ix)
                 endforall
         endif
 
@@ -1431,8 +1434,9 @@ src_par_loop: do isseq = 1, src_nseq
         deallocate(denomrecI, rec_interpolate_weights)
 
         if(allocated(rec_mat)) deallocate  (rec_mat)
-        if(allocated(grad_modrrvx)) deallocate(grad_modrrvx)
-        if(allocated(grad_modrrvz)) deallocate(grad_modrrvz)
+        if(allocated(gradis_modrrvx)) deallocate(gradis_modrrvx)
+        if(allocated(gradis_modrrvz)) deallocate(gradis_modrrvz)
+        if(allocated(gradis_modtt)) deallocate(gradis_modtt)
 
 
 enddo src_par_loop

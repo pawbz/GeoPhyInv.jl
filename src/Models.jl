@@ -26,7 +26,8 @@ type Seismic
 end
 
 """
-Get other dependent fields of a seismic model
+Get other dependent model parameters of a seismic model
+that are not present in `Seismic`.
 """
 function Seismic_get(mod::Seismic, attrib::Symbol)
 	K0 = mod.vp0 * mod.vp0 * mod.ρ0; K0I = K0^(-1.0);
@@ -36,6 +37,8 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 	ρ = χ(mod.χρ, mod.ρ0, -1)
 	if(attrib == :ρI)
 		return ρ.^(-1.0)
+	elseif(attrib == :ρ0I)
+		return mod.ρ0.^(-1.0)
 	elseif(attrib == :χρI)
 		return χ(ρ.^(-1.0), mod.ρ0^(-1.0))
 	elseif(attrib == :χK)
@@ -49,7 +52,6 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 	elseif(attrib == :K0I)
 		return K0I
 	elseif(attrib == :χKI)
-		K0 = vp0 * vp0 * ρ0; K0I = K0^(-1.0);
 		return χ((vp .* vp .* ρ).^(-1), K0I) 
 	elseif(attrib == :KI)
 		return (vp .* vp .* ρ).^(-1)
@@ -70,6 +72,19 @@ function χ(mod::Array{Float64}, mod0::Float64, flag::Int64=1)
 		return	((mod - mod0) * mod0^(-1.0))
 	elseif(flag == -1)
 		return  (mod .* mod0 + mod0)
+	end
+end
+
+"""
+Gradients
+Return contrast model parameter using the
+reference value.
+"""
+function χg(mod::Array{Float64}, mod0::Float64, flag::Int64=1)
+	if(flag == 1)
+		return	mod * mod0^(-1.0)
+	elseif(flag == -1)
+		return  mod * mod0
 	end
 end
 
@@ -112,33 +127,40 @@ end
 """
 Extend a seismic model into PML layers
 """
-function Seismic_extend(mod::Seismic)
+function Seismic_pad_trun(mod::Seismic)
 
-	vpex = extend(χ(mod.χvp, mod.vp0, -1),mod.mgrid.npml);
-	vsex = extend(χ(mod.χvs, mod.vs0, -1),mod.mgrid.npml);
-	ρex = extend(χ(mod.χρ, mod.ρ0, -1),mod.mgrid.npml);
+	vpex = pad_trun(χ(mod.χvp, mod.vp0, -1),mod.mgrid.npml);
+	vsex = pad_trun(χ(mod.χvs, mod.vs0, -1),mod.mgrid.npml);
+	ρex = pad_trun(χ(mod.χρ, mod.ρ0, -1),mod.mgrid.npml);
 	return Seismic(mod.vp0,
 		 mod.vs0,
 		 mod.ρ0,
 		 χ(vpex,mod.vp0),
 		 χ(vsex,mod.vs0),
 		 χ(ρex,mod.ρ0),
-		 Grid.M2D_extend(mod.mgrid))
+		 Grid.M2D_pad_trun(mod.mgrid))
 end
 
 """
 Extend a model on all four sides
 """
-function extend(mod::Array{Float64,2}, np::Int64)
-	nz = size(mod,1); nx = size(mod,2)
-	modex = zeros(nz + 2*np, nx + 2*np)
+function pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
+	if(isequal(flag,1)) 
+		nz = size(mod,1); nx = size(mod,2)
+		modex = zeros(nz + 2*np, nx + 2*np)
 
-	modex[np+1:np+nz,np+1:np+nx] = mod 
-	modex[1:np,:] = repeat(modex[np+1,:], inner=np);
-	modex[nz+1+np:end,:] = repeat(modex[nz+np,:],inner=np);
-	modex[:,1:np] = repeat(modex[:,np+1], outer=np);
-	modex[:,nx+1+np:end] = repeat(modex[:,nx+np], outer=np);
-	return modex
+		modex[np+1:np+nz,np+1:np+nx] = mod 
+		modex[1:np,:] = repeat(modex[np+1,:], inner=np);
+		modex[nz+1+np:end,:] = repeat(modex[nz+np,:],inner=np);
+		modex[:,1:np] = repeat(modex[:,np+1], outer=np);
+		modex[:,nx+1+np:end] = repeat(modex[:,nx+np], outer=np);
+		return modex
+	elseif(isequal(flag,-1)) 
+		nz = size(mod,1); nx = size(mod,2)
+		return mod[np+1:nz-np,np+1:nx-np]
+	else
+		error("invalid flag")
+	end
 end
 
 

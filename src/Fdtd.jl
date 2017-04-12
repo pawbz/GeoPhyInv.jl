@@ -197,12 +197,12 @@ end
 recv_out = zeros(tgridmod.nx*recv_n*recv_nfield*npropwav*src_nseq)
 
 # extend models in the PML layers
-exmodel = Models.Seismic_extend(model);
-exmodel0 = Models.Seismic_extend(model0);
+exmodel = Models.Seismic_pad_trun(model);
+exmodel0 = Models.Seismic_pad_trun(model0);
 
 # gradient outputs
-grad_modtt = zeros(exmodel.mgrid.nz+2, exmodel.mgrid.nx+2,src_nseq) 
-grad_modrr = zeros(exmodel.mgrid.nz+2, exmodel.mgrid.nx+2,src_nseq) 
+grad_modtt = zeros(exmodel.mgrid.nz, exmodel.mgrid.nx,src_nseq) 
+grad_modrr = zeros(exmodel.mgrid.nz, exmodel.mgrid.nx,src_nseq) 
 
 # border coordinates
 border_z, border_x, border_n = Grid.M2D_border(model.mgrid, 3, :outer)
@@ -221,7 +221,8 @@ else
 end
 
 ccall( (:fdtd_mod, F90libs.fdtd), Void,
-      (Ptr{UInt8}, Ref{Int64},       Ptr{Float64}, Ptr{Float64},
+      (Ptr{UInt8}, Ref{Int64},       
+       Ptr{Float64}, Ptr{Float64},
        Ptr{Float64}, Ptr{Float64},
        Ref{Int64}, Ref{Int64},       Ref{Float64}, Ref{Float64},
        Ref{Float64}, Ref{Float64},   Ref{Int64}, Ptr{UInt8},
@@ -265,12 +266,25 @@ ccall( (:fdtd_mod, F90libs.fdtd), Void,
 # check if ccall return zeros
 isapprox(maximum(abs(recv_out)),0.0) && warn("recv_out are zeros")
 
+# summing over all the sources
+grad_modtt = Models.pad_trun(squeeze(sum(grad_modtt,3),3),model.mgrid.npml,-1);
+grad_modrr = Models.pad_trun(squeeze(sum(grad_modrr,3),3),model.mgrid.npml,-1);
+
+# for gradient model
+gmodel = Models.Seismic(model.vp0, model.vs0, model.ρ0,
+			Models.χg(grad_modtt,Models.Seismic_get(model, :K0I)),
+			zeros(grad_modtt),
+			Models.χg(grad_modrr,Models.Seismic_get(model, :ρ0I)),
+			model.mgrid
+			) 
+
 # return after forming a vector and resampling
 nd = src_nseq*tgridmod.nx*recv_n*recv_nfield; # number of samples for each iprop
 return [Data.TD_resamp(Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq,recv_nfield),
 			       recv_nfield,
 			       tgridmod, acqgeom[1]), tgrid) for iprop in 1:npropwav], 
-		(border_out[:,end:-1:1,:], p_out[:,:,:,:,end:-1:1])
+		(border_out[:,end:-1:1,:], p_out[:,:,:,:,end:-1:1]),
+		gmodel
 
 # return without resampling for testing
 #return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),

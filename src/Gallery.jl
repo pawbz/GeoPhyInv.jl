@@ -123,6 +123,7 @@ Gallery of acquisition geometries `Geom` based on input `M2D`.
 # Outputs
 * `attrib=:oneonev` : one source at (xmin, mean(z)) and one receiver at (xmax, mean(z))
 * `attrib=:twotwov` : two vertical wells, two sources at xmin and two receivers at xmax
+* `attrib=:tentenv` : two vertical wells, two sources at xmin and two receivers at xmax
 """
 function Geom(mgrid::Grid.M2D,
 	      attrib::Symbol
@@ -138,6 +139,12 @@ function Geom(mgrid::Grid.M2D,
 	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[1],
 	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
 		      2,2,:vertical,:vertical
+				)
+	elseif(attrib == :tentenv)
+		return Acquisition.Geom(
+	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[1],
+	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
+		      10,10,:vertical,:vertical
 				)
 	elseif(attrib == :onefiftyv)
 		return Acquisition.Geom(

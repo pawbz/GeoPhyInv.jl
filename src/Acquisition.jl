@@ -102,12 +102,54 @@ function Geom(
 	return Geom(sxall, szall, rxall, rzall, nss, fill(1,nss), fill(nr,nss))
 end
 
-"swap the positions of sources and recievers"
-function Geom_swapsr(geomin::Geom)
+"""
+Circular acquisition. The sources and receivers can also be placed on a circle of radius
+`rad`. The origin of the circle is at `loc`. 
+This geometry is unrealistic, but useful for testing.
+Receivers are placed such that the limits 
+of the angular offset are given by `θlim`
+
+# Arguments
+`θlim::Vector{Float64}=[0.,2*pi]` : range of angular offset between source and receiver
+
+"""
+function Geom_circ(;
+		   nss::Int64=10,
+		   nr::Int64=10,
+		   loc::Vector{Float64}=[0.,0.],
+		   rad::Float64=100.,
+		   θlim::Vector{Float64}=[0.,2*pi]
+	       )
+	rxall = zeros(nr,nss)
+	rzall = zeros(nr,nss)
+	sx = zeros(nss)
+	sz = zeros(nss)
+	δθr = abs((θlim[2] - θlim[1])) / nr;
+	for iss =1:nss
+		θs = (iss)*2.*pi / (nss);
+		sx[iss] = rad*cos(θs) + loc[2]
+		sz[iss] = rad*sin(θs) + loc[1]
+		rxall[:,iss] = [rad * cos(θs + θlim[1] + (ir-1)*δθr) + loc[2] for ir in 1:nr]
+		rzall[:,iss] = [rad * sin(θs + θlim[1] + (ir-1)*δθr) + loc[1] for ir in 1:nr]
+	end
+	sxall = reshape(sx, 1, nss);
+	szall = reshape(sz, 1, nss);
+	return Geom(sxall, szall, rxall, rzall, nss, fill(1,nss), fill(nr,nss))
+
+
+end
+
+"""
+Modify the input acquisition geometry 
+such that the adjoint source time functions can 
+be propagated from the receiver positions.
+The number of supersources will remain the same.
+All the recievers will be fired as simultaneous sources.
+"""
+function Geom_adj(geomin::Geom)
 	geomout = geomin;
-	geomout.rx = geomin.sx; geomout.rz = geomin.sz;
 	geomout.sx = geomin.rx; geomout.sz = geomin.rz;
-	geomout.ns = geomin.nr; geomout.nr = geomin.ns;
+	geomout.ns = geomin.nr; 
 
 	return geomout
 end
