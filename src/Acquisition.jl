@@ -61,6 +61,28 @@ function Geom_get(acq::Geom, attrib::Symbol)
 end
 
 """
+Given receiver positions `rpos` and `rpos0`.
+Returns a Bool array of the dimension of number of supersources
+with `true` at indices, if the waves due to that particular source are 
+recorded.
+"""
+function Geom_find(acq::Geom; rpos::Array{Float64,1}=nothing, rpos0::Array{Float64,1}=nothing)
+	rpos==nothing ? error("need rpos") : nothing
+	sson = fill(false, acq.nss);
+	for iss = 1:acq.nss
+		rvec = [[acq.rz[iss][ir],acq.rx[iss][ir]] for ir=1:acq.nr[iss]]
+		ir=findfirst(rvec, rpos)
+		if(rpos0==nothing)
+			ir0=1;
+		else
+			ir0=findfirst(rvec, rpos0);
+		end
+		sson[iss] = ((ir != 0) && (ir0 != 0)) ? true : false
+	end
+	return sson
+end
+
+"""
 Modify input `Geom` such that the output has
 either sources or receivers on the boundary of 
 `mgrid`.
