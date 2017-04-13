@@ -1,5 +1,6 @@
 module Interferometry
 
+import SIT.Acquisition
 import SIT.Data
 
 
@@ -18,52 +19,49 @@ function TD_virtual_diff(
 
 	# get unique receiver postions; a virtual source at each
 	urpos = Acquisition.Geom_get(data.acqgeom,:urpos)
+	nur = Acquisition.Geom_get(data.acqgeom,:nur)
 
+	rx = Array(Vector{Float64}, nur); rz = Array(Vector{Float64}, nur);
 	for ifield =1:data.nfield
-		dattemp = zeros(2*nt-1, length(urpos), length(urpos));
-		sx = [[]];
+		dattemp = zeros(2*nt-1, nur, nur);
 		# loop over virtual sources
-		for irs = 1:length(urpos)
-			rx = []
-			rz = []
+		for irs = 1:nur
+
+			irvec = [];
 			# loop over second receiver
-			for ir = 1:length(urpos)
+			for ir = 1:nur
 				# find sources that shoot at these two receivers
-				sson = Acquisition.Geom_find((acqgeom; 
+				sson = Acquisition.Geom_find(data.acqgeom; 
 					 rpos=[urpos[1][irs], urpos[2][irs]],
-					rpos0=[urpos[1][ir], urpos[2][ir]]))
-				nsson = length(find(sson));
+					rpos0=[urpos[1][ir], urpos[2][ir]])
+				nsson = count(x->x!=[0],sson);
 				if(nss!=0)
-					rx[irs] = vcat(rx[irs],urpos[2][ir])
-					rz[irs] = vcat(rz[irs],urpos[1][ir])
+					push!(irvec, ir)
 				end
 				# stacking over these sources
 				for isson=1:length(sson)
-					if(sson[isson])
-						dattemp[:, ir, irs] += xcorr(datan[:, ig, isson, ifield],
-							datan[:, igs, isson, ifield])
+					if(sson[isson] != [0])
+						dattemp[:, ir, irs] += 
+							xcorr(datan.d[:, sson[isson][2], isson, ifield],
+						   datan.d[:, sson[isson][1], isson, ifield])
 					end
 				end
 				# normalize depending on the stack
 				nsson != 0 ? dattemp[:, ir, irs] /= nsson : nothing
+
 			end
+			if(irvec != [])
+				println(irvec)
+				rx[irs] = [urpos[2][i] for i in irvec]
+				rz[irs] = [urpos[1][i] for i in irvec]
+			end
+
 		end
 	end
 
-
-	dattemp = zeros(nt, ng, ng, ifield) # each receiver is turned into a virtual source
-	for ifield = 1:data.nfield, is = 1:nss, ig = 1:nr
-		dattemp[:, ig, is, ifield] += xcorr(datan[:, ig, is, ifield],
-							datan[:, ig, is, ifield])
-	end
-	acqvirtual = data.acqgeom;
-	acqvirtual.nss = maximum(acqvirtual.nr);
-	for 
-	acqvirtual.sx = reshape(sx, 1, acqvirtual.nss);
-	szall = reshape(sz, 1, nss);
-
-	dataout = TD(dattemp,data.nfield,data.tgrid,acqvirtual)
-	return Data.TD()
+	println(rx, typeof(rx))
+	sx = Array(Vector{Float64}, nur); sz = Array(Vector{Float64}, nur);
+	return rx, rz
 
 end
 
