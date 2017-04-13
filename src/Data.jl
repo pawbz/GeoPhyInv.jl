@@ -35,15 +35,11 @@ function TD_resamp(data::TD,
 	nr = maximum(data.acqgeom.nr)
 	nss = data.acqgeom.nss
 	dataout = TD(zeros(tgrid.nx, nr, nss, data.nfield),data.nfield,tgrid,data.acqgeom)
-	for ifield = 1:data.nfield
-		for is = 1:nss
-			for ig = 1:nr
-				itp = interpolate((data.tgrid.x,),
-					     data.d[:, ig, is, ifield], 
-					     Gridded(Linear()))
-				dataout.d[:,ig,is,ifield] = itp[tgrid.x]
-			end
-		end
+	for ifield = 1:data.nfield, is = 1:nss, ig = 1:nr
+		itp = interpolate((data.tgrid.x,),
+			     data.d[:, ig, is, ifield], 
+			     Gridded(Linear()))
+		dataout.d[:,ig,is,ifield] = itp[tgrid.x]
 	end
 	return dataout
 end

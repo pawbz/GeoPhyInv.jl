@@ -52,15 +52,22 @@ end
 """
 Plot acquisition geometry `Acquisition.Geom` on 
 and model grid `M2D`.
+
+`attrib::Symbol=:unique` : default; plots unique source and receiver positions 
 """
-function Geom(geom::Acquisition.Geom,
-	      attrib::Symbol=nothing
+function Geom(geom::Acquisition.Geom;
+	      iss::Int64=0
 	     )
+	if(iss==0)
+		urpos = Acquisition.Geom_get(geom,:urpos)
+		uspos = Acquisition.Geom_get(geom,:uspos)
 
-plot(geom.rx, geom.rz, "v", color="blue",ms=10)
-plot(geom.sx, geom.sz, "*", color="red",ms=15)
-
-
+		plot(urpos[2], urpos[1], "v", color="blue",ms=10)
+		plot(uspos[2], uspos[1], "*", color="red",ms=15)
+	else
+		plot(geom.rx[iss][:], geom.rz[iss][:], "v", color="blue",ms=10)
+		plot(geom.sx[iss][:], geom.sz[iss][:], "*", color="red",ms=15)
+	end
 end
 
 
