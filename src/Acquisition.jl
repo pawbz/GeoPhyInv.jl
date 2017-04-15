@@ -46,15 +46,23 @@ function Geom_get(acq::Geom, attrib::Symbol)
 
 	uspos = unique(spos); nus=length(uspos)
 	urpos = unique(rpos); nur=length(urpos)
+	uspost = ([uspos[iu][1] for iu in 1:nus], [uspos[iu][2] for iu in 1:nus]);
+        urpost = ([urpos[iu][1] for iu in 1:nur], [urpos[iu][2] for iu in 1:nur]);
+
 
 	if(attrib == :nus)
 		return nus
 	elseif(attrib == :nur)
 		return nur
 	elseif(attrib == :uspos)
-		return [uspos[iu][1] for iu in 1:nus], [uspos[iu][2] for iu in 1:nus]
+		return uspost
 	elseif(attrib == :urpos)
-		return [urpos[iu][1] for iu in 1:nur], [urpos[iu][2] for iu in 1:nur]
+		return urpost
+	elseif(attrib == :geomurpos)
+		return Geom(acq.sx, acq.sz, 
+		      fill(urpost[2],acq.nss), 
+		      fill(urpost[1],acq.nss), acq.nss, acq.ns, 
+		      fill(nur,acq.nss))
 	else
 		error("invalid attrib")
 	end
@@ -119,7 +127,7 @@ end
 
 
 """
-return acquisition geometry depending 
+Return fixed spread acquisition geometry depending 
 on either horizontal or vertical array
 It has only one source for every supersource
 """

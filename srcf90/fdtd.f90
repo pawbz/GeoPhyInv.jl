@@ -275,8 +275,8 @@ subroutine fdtd_mod(&
 ! >>>>>>> receiver parameters
         recv_n, & ! number of receivers for each source 
         recv_nfield, & ! number of field recorded        
-        recv_x, & ! x coord for receivers [recv_n] * [npropwav] * [src_nseq]
-        recv_z, & ! z  "                  [recv_n] * [npropwav] * [src_nseq]
+        recv_x, & ! x coord for receivers [recv_n] * [src_nseq] * [npropwav]
+        recv_z, & ! z  "                  [recv_n] * [src_nseq] * [npropwav]
         recv_out, & ! recorded pressure at receivers [tim_nt] * [recv_n] * [src_nseq] * [recv_nfield] * [npropwav]
         recv_flags, & ! 0 means no records; 1 means nearest neighbour; 2 means bilinear [npropwav]
 ! >>>>>>> flags between propagating wavefields

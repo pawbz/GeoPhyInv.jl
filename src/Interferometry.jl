@@ -1,5 +1,6 @@
 module Interferometry
 
+import SIT.Grid
 import SIT.Acquisition
 import SIT.Data
 
@@ -21,47 +22,75 @@ function TD_virtual_diff(
 	urpos = Acquisition.Geom_get(data.acqgeom,:urpos)
 	nur = Acquisition.Geom_get(data.acqgeom,:nur)
 
+	# central wavelength (use zero for testing)
+	λ = 0.0;
+	println(string("dominant wavelength in the data:\t",λ))
+
 	rx = Array(Vector{Float64}, nur); rz = Array(Vector{Float64}, nur);
+	datmat = zeros(2*nt-1, nur, nur, data.nfield);
 	for ifield =1:data.nfield
-		dattemp = zeros(2*nt-1, nur, nur);
 		# loop over virtual sources
 		for irs = 1:nur
 
 			irvec = [];
 			# loop over second receiver
 			for ir = 1:nur
-				# find sources that shoot at these two receivers
-				sson = Acquisition.Geom_find(data.acqgeom; 
-					 rpos=[urpos[1][irs], urpos[2][irs]],
-					rpos0=[urpos[1][ir], urpos[2][ir]])
-				nsson = count(x->x!=[0],sson);
-				if(nss!=0)
-					push!(irvec, ir)
-				end
-				# stacking over these sources
-				for isson=1:length(sson)
-					if(sson[isson] != [0])
-						dattemp[:, ir, irs] += 
-							xcorr(datan.d[:, sson[isson][2], isson, ifield],
-						   datan.d[:, sson[isson][1], isson, ifield])
-					end
-				end
-				# normalize depending on the stack
-				nsson != 0 ? dattemp[:, ir, irs] /= nsson : nothing
+				rpos = [urpos[1][irs], urpos[2][irs]];
+				rpos0 = [urpos[1][ir], urpos[2][ir]];
+				δrpos = sqrt((rpos[1] - rpos0[1])^2 + (rpos[2] - rpos0[2])^2)
+			
+				# the distance between receivers must be greater than 2λ
+				# here λ is the central wavelength (Shapiro 2005)
+				if(δrpos > 2.*λ)
 
+					# find sources that shoot at these two receivers
+					sson = Acquisition.Geom_find(data.acqgeom; rpos=rpos, rpos0=rpos0)
+					nsson = count(x->x!=[0],sson);
+					if(nsson!=0)
+						push!(irvec, ir)
+					end
+					# stacking over these sources
+					for isson=1:length(sson)
+						if(sson[isson] != [0])
+							datmat[:, ir, irs, ifield] += 
+							xcorr(
+							  datan.d[isson,ifield][:, sson[isson][2]], 
+							  datan.d[isson,ifield][:, sson[isson][1]])
+						end
+					end
+					# normalize depending on the stack
+					nsson != 0 ? datmat[:, ir, irs, ifield] /= nsson : nothing
+				end
 			end
 			if(irvec != [])
-				println(irvec)
 				rx[irs] = [urpos[2][i] for i in irvec]
 				rz[irs] = [urpos[1][i] for i in irvec]
 			end
-
 		end
 	end
+	# virtual source positions 
+	sx = [[urpos[2][irs]] for irs in 1:nur];
+	sz = [[urpos[1][irs]] for irs in 1:nur];
 
-	println(rx, typeof(rx))
-	sx = Array(Vector{Float64}, nur); sz = Array(Vector{Float64}, nur);
-	return rx, rz
+	# bool array acoording to undef
+	ars = [isdefined(rx,irs) ? true : false for irs=1:nur];
+
+	# select only positions that are active
+	rx = rx[ars];	rz = rz[ars];
+	sx = sx[ars];	sz = sz[ars];
+	
+	# number of virtual sources
+	nvs = length(rx) == length(sx) ? length(sx) : error("some error")
+
+	# geom
+	vacqgeom = Acquisition.Geom(sx, sz, rx, rz, nvs, fill(1,nss), 
+			     [length(rx[ir]) for ir=1:length(rx)])
+
+	# tgrid after correlation
+	dt = data.tgrid.x[end]-data.tgrid.x[1]
+	tgridxcorr=Grid.M1D(-dt, +dt, data.tgrid.δx)
+
+	return Data.TD_urpos(datmat,data.nfield,tgridxcorr,vacqgeom,nur,urpos)
 
 end
 

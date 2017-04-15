@@ -65,8 +65,8 @@ function Geom(geom::Acquisition.Geom;
 		plot(urpos[2], urpos[1], "v", color="blue",ms=10)
 		plot(uspos[2], uspos[1], "*", color="red",ms=15)
 	else
-		plot(geom.rx[iss][:], geom.rz[iss][:], "v", color="blue",ms=10)
-		plot(geom.sx[iss][:], geom.sz[iss][:], "*", color="red",ms=15)
+		plot(geom.rx[iss], geom.rz[iss], "v", color="blue",ms=10)
+		plot(geom.sx[iss], geom.sz[iss], "*", color="red",ms=15)
 	end
 end
 
@@ -103,19 +103,25 @@ function TD(td::Data.TD; ssvec::Vector{Int64}=[1], fieldvec::Vector{Int64}=[1],
 	nr = maximum(td.acqgeom.nr);
 
 	if(tr_flag)
-		dp = reshape(td.d[end:-1:1,:,ssvec,fieldvec],td.tgrid.nx,nr*ns*nfield);
+		dp = reshape(hcat(td.d[ssvec,fieldvec][end:-1:1,:]...),td.tgrid.nx,nr*ns*nfield);
 		extent=[1, nr*ns*nfield, td.tgrid.x[1],td.tgrid.x[end],]
 	else
-		dp = reshape(td.d[:,:,ssvec,fieldvec],td.tgrid.nx,nr*ns*nfield);
+		dp = reshape(hcat(td.d[ssvec,fieldvec][:,:]...),td.tgrid.nx,nr*ns*nfield);
 		extent=[1, nr*ns*nfield, td.tgrid.x[end],td.tgrid.x[1],]
 	end
 	if(attrib == :seis)
 		imshow(dp, cmap="gray",aspect="auto", extent=extent)
+
+		xlabel("receiver index");
+		ylabel(L"$t$ (s)");
+		colorbar();
+		tight_layout()
 	elseif(attrib == :wav)
 		plot(td.tgrid.x,dp)
 	else
 		error("invalid attrib")
 	end
+
 
 
 end

@@ -129,31 +129,31 @@ function Geom(mgrid::Grid.M2D,
 	      attrib::Symbol
 	     )
 	if(attrib == :oneonev)
-		return Acquisition.Geom(
+		return Acquisition.Geom_fixed(
 		      maximum(mgrid.z), maximum(mgrid.z), mean(mgrid.x),
 		      minimum(mgrid.z), minimum(mgrid.z), mean(mgrid.x),
 		      1,1,:vertical,:vertical
 				)
 	elseif(attrib == :twotwov)
-		return Acquisition.Geom(
+		return Acquisition.Geom_fixed(
 	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[1],
 	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
 		      2,2,:vertical,:vertical
 				)
 	elseif(attrib == :tentenv)
-		return Acquisition.Geom(
+		return Acquisition.Geom_fixed(
 	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[1],
 	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
 		      10,10,:vertical,:vertical
 				)
 	elseif(attrib == :onefiftyv)
-		return Acquisition.Geom(
+		return Acquisition.Geom_fixed(
 	      mgrid.z[round(Int,0.5*mgrid.nz)], mgrid.z[round(Int,0.5*mgrid.nz)], mgrid.x[1],
 	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
 		      1,50,:vertical,:vertical
 				)
 	elseif(attrib == :onefiftys)
-		return Acquisition.Geom(
+		return Acquisition.Geom_fixed(
 	      mgrid.x[round(Int,0.5*mgrid.nx)], mgrid.x[round(Int,0.5*mgrid.nx)], mgrid.z[1],
 	      mgrid.x[round(Int,0.25*mgrid.nx)], mgrid.x[round(Int,0.75*mgrid.nx)], mgrid.z[1],
 		      1,50,:horizontal,:horizontal

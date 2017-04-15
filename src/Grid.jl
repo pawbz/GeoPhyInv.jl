@@ -130,12 +130,14 @@ Construct 1-D grid based on nx or δx
 """
 function M1D(xbeg::Float64, xend::Float64, nx::Int64)
 	x = Array(linspace(xbeg, xend, nx))
-	return M1D(x, nx, x[2]-x[1])
+	δx = length(x)==1 ? 0. : x[2]-x[1]
+	return M1D(x, nx, δx)
 end
 
 function M1D(xbeg::Float64, xend::Float64, δx::Float64)
 	x = [tt for tt in xbeg:δx:xend]
-	return M1D(x, size(x,1), x[2]-x[1])
+	δx = length(x)==1 ? 0. : x[2]-x[1]
+	return M1D(x, size(x,1), δx)
 end
 
 """

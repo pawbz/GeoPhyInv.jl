@@ -94,10 +94,15 @@ length(acqsrc) != npropwav ? error("acqsrc size") : nothing
 any([getfield(acqgeom[ip],:nss) != getfield(acqsrc[ip],:nss) for ip=1:npropwav])  ? error("different supersources") : nothing
 any([getfield(acqgeom[ip],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npropwav])  ? error("different sources") : nothing
 
-recv_n = maximum(acqgeom[1].nr);
+# same values of these of all nprop, but values can be diff
 src_nsmul = maximum(acqgeom[1].ns);
 src_nseq = acqgeom[1].nss;
 src_nfield = acqsrc[1].nfield
+
+# create acquisition geometry with each source shooting 
+# at every unique receiver position
+acqgeom_urpos = [Acquisition.Geom_get(acqgeom[i],:geomurpos) for i=1:npropwav];
+recv_n = acqgeom_urpos[1].nr[1] # same for all sources
 
 if(verbose)
 	println(string("number of receivers:\t",recv_n))	
@@ -158,12 +163,12 @@ ccall( (:fdtd_mod, F90libs.fdtd), Void,
       exmodel.mgrid.nx, exmodel.mgrid.nz,    exmodel.mgrid.δx, exmodel.mgrid.δz,
       exmodel.mgrid.x, exmodel.mgrid.z,      model.mgrid.npml-5, # reduce npml by one, see fdtd.f90
       abs_trbl, 
-      tgridmod.nx, tgridmod.δx,    acqsrc[1].tgrid.nx, Acquisition.get_vecSrc(:wav,acqsrc),
+      tgridmod.nx, tgridmod.δx,    acqsrc[1].tgrid.nx, Acquisition.Src_getvec(acqsrc,:wav),
       src_nseq, src_nsmul, src_nfield,
-      Acquisition.get_vecGeom(:sx,acqgeom), Acquisition.get_vecGeom(:sz,acqgeom),
+      Acquisition.Geom_getvec(acqgeom,:sx), Acquisition.Geom_getvec(acqgeom,:sz),
       src_flags, 
       recv_n, recv_nfield,
-      Acquisition.get_vecGeom(:rx,acqgeom), Acquisition.get_vecGeom(:rz,acqgeom),
+      Acquisition.Geom_getvec(acqgeom_urpos,:rx), Acquisition.Geom_getvec(acqgeom_urpos,:rz),
       recv_out, recv_flags,  prop_flags,
       border_n, border_x, border_z,
       border_in_flag,boundary_in[1], 
@@ -191,9 +196,15 @@ gmodel = Models.Seismic(model.vp0, model.vs0, model.ρ0,
 
 # return after forming a vector and resampling
 nd = src_nseq*tgridmod.nx*recv_n*recv_nfield; # number of samples for each iprop
-return [Data.TD_resamp(Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq,recv_nfield),
-			       recv_nfield,
-			       tgridmod, acqgeom[1]), tgrid) for iprop in 1:npropwav], 
+return [Data.TD_resamp(
+		       Data.TD_urpos(
+		       reshape(recv_out[1+(iprop-1)*nd : iprop*nd],
+		 	tgridmod.nx,recv_n,src_nseq,recv_nfield),
+			recv_nfield,
+			tgridmod, acqgeom[iprop],
+			acqgeom_urpos[iprop].nr[1],
+			(acqgeom_urpos[iprop].rz[1], acqgeom_urpos[iprop].rx[1])
+			), tgrid) for iprop in 1:npropwav], 
 		(border_out[:,end:-1:1,:], p_out[:,:,:,:,end:-1:1]),
 		gmodel
 
