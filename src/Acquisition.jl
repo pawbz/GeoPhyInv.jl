@@ -63,6 +63,12 @@ function Geom_get(acq::Geom, attrib::Symbol)
 		      fill(urpost[2],acq.nss), 
 		      fill(urpost[1],acq.nss), acq.nss, acq.ns, 
 		      fill(nur,acq.nss))
+	elseif(attrib == :geomuspos)
+		return Geom(fill(uspost[2],acq.nss), 
+	      		fill(uspost[1],acq.nss),
+		      acq.rx, acq.rz, 
+		      acq.nss, fill(nus,acq.nss),
+		      acq.nr)
 	else
 		error("invalid attrib")
 	end
@@ -113,13 +119,13 @@ function Geom_boundary(acqgeom::Geom,
 		nr = nb; 		sx = acqgeom.sx;
 		sz = acqgeom.sz;		ns = acqgeom.ns;
 		nss = acqgeom.nss;
-		return Geom(sx, sz, fill(bx,1,nss), fill(bz,1,nss), nss, ns, fill(nr,nss))
+		return Geom(sx, sz, fill(bx,nss), fill(bz,nss), nss, ns, fill(nr,nss))
 	"change the position of source (not supersources) to the boundary for back propagation"
 	elseif(attrib == :srcborder)
 		ns = nb;		rx = acqgeom.rx;
 		rz = acqgeom.rz;		nr = acqgeom.nr;
 		nss = acqgeom.nss;
-		return Geom(fill(bx,1,nss), fill(bz,1,nss), rx, rz, nss, fill(ns,nss), nr)
+		return Geom(fill(bx,nss), fill(bz,nss), rx, rz, nss, fill(ns,nss), nr)
 	else
 		error("invalid attrib")
 	end
@@ -216,49 +222,21 @@ The number of supersources will remain the same.
 All the recievers will be fired as simultaneous sources.
 """
 function Geom_adj(geomin::Geom)
-	geomout = geomin;
+	geomout = deepcopy(geomin);
 	geomout.sx = geomin.rx; geomout.sz = geomin.rz;
 	geomout.ns = geomin.nr; 
 
 	return geomout
 end
 
-"""
-Modify the input acquisition geometry 
-such that a virtual source is present at 
-each receiver position. And 
-the virtual-source wavefield is recorded at
-other receivers.
-"""
-function Geom_virtualize(geomin::Geom)
-	# first
-	#for irs
-	#for iss=1:geomin.nss
-#		rx = [iss][]
-#	sx = vcat(sx, [])
-#		
-#	geomout = geomin; # copy
-#	geomout.sx = geomin.rx; geomout.sz = geomin.rz;
-#	geomout.ns = geomin.nr; 
-
-#	return geomout
-end
-
-
 
 """
 return a vector of the order 
 """
 function Geom_getvec(geom::Array{Geom}, field::Symbol)
-
 	np = length(geom);
-	vecGeom = vcat(getfield(geom[1],field)...);
-	if(np > 1)
-		for ip = 2:np
-			vecGeom = vcat(vecGeom,vcat(getfield(geom[ip],field)...))
-		end
-	end
-	return vecGeom
+	vect = [getfield(geom[ip],field) for ip=1:np]
+	return vec(vcat(vcat(vect...)...))
 end
 
 
@@ -274,9 +252,9 @@ Data type for the sources used.
 """
 type Src
 	nss::Int64
-	ns::Array{Int64}
+	ns::Vector{Int64}
 	nfield::Int64
-	wav::Array{Float64}
+	wav::Array{Array{Float64,2},2}
 	tgrid::Grid.M1D
 end
 
@@ -290,13 +268,15 @@ repeat same source wavelet for all sources and supersources
 * `ns::Int64` : number of sources
 * `wav::Array{Float64}`
 """
-function Src(nss::Int64, 
+function Src_fixed(nss::Int64, 
 	     ns::Int64, 
 	     nfield::Int64,
 	     wav::Array{Float64},
 	     tgrid::Grid.M1D
 	     )
-	return Src(nss, fill(ns, nss), nfield, repeat(wav, inner=(1,ns,nss,nfield)), tgrid)
+
+	wavsrc = [repeat(wav,inner=(1,ns)) for iss=1:nss, ifield=1:nfield] 
+	return Src(nss, fill(ns, nss), nfield, wavsrc, tgrid)
 end
 
 
@@ -304,7 +284,32 @@ end
 Function that returns Src after time reversal
 """
 function Src_tr(src::Src)
-	return Src(src.nss,src.ns,src.nfield,src.wav[end:-1:1,:,:,:],src.tgrid)
+	return Src(src.nss,src.ns,src.nfield,
+	    [flipdim(src.wav[i,j],1) for i in 1:src.nss, j in 1:src.nfield],src.tgrid)
+end
+
+
+
+"""
+Pad `Src` 
+"""
+function Src_uspos(src::Src, acq::Geom)
+	# unique source positions
+	nus=Geom_get(acq,:nus) 
+	uspos=Geom_get(acq,:uspos)
+	nss = src.nss;
+	nfield = src.nfield;
+	# all zeros for all unique positions
+	wavout = [zeros(src.tgrid.nx,nus) for iss=1:nss, ifield=1:nfield] 
+	# fill source wavelets when necessary
+	for ifield=1:nfield, iss=1:nss, is=1:acq.ns[iss]
+		is0=find([[uspos[1][i]-acq.sz[iss][is],
+		       uspos[2][i]-acq.sx[iss][is]] == [0., 0.,] for i in 1:nus])
+
+		wavout[iss, ifield][:,is0] = src.wav[iss, ifield][:,is] 
+	end
+	# output src
+	return Src(src.nss,fill(nus, nss),nfield,wavout,src.tgrid)
 end
 
 
@@ -312,15 +317,9 @@ end
 return a vector of the order 
 """
 function Src_getvec(src::Array{Src}, field::Symbol)
-
 	np = length(src);
-	vecSrc = vec(getfield(src[1],field));
-	if(np > 1)
-		for ip = 2:np
-			vecSrc = vcat(vecSrc,vec(getfield(src[ip],field)))
-		end
-	end
-	return vecSrc
+	vect = [getfield(src[ip],field) for ip=1:np]
+	return vec(vcat(vcat(vect...)...))
 end
 
 end # module

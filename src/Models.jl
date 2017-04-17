@@ -117,7 +117,7 @@ function Seismic_addon(mod::Seismic;
 
 	end
 
-	mod_out = mod
+	mod_out = deepcopy(mod)
 	for field in fields
 		setfield!(mod_out, field, (getfield(mod, field)+temp))
 	end

@@ -108,7 +108,7 @@ Gallery of acquisition geometries `Geom`.
 """
 function Geom(attrib::Symbol)
 	if(attrib == :acou_homo1)
-		return Acquisition.Geom(-300.0,-300.0,-300.0,300.0,300.0,300.0,1,1)
+		return Acquisition.Geom_fixed(-300.0,-300.0,-300.0,300.0,300.0,300.0,1,1)
 	else
 		error("invalid attrib")
 	end
@@ -168,19 +168,20 @@ Gallery of source signals `Src`.
 
 # Arguments 
 * `attrib::Symbol` : 
+* `nss::Int64=1` : number of supersources
 
 # Outputs
 * `attrib=:acou_homo1` : 
 """
-function Src(attrib::Symbol)
+function Src(attrib::Symbol, nss::Int64=1)
 	if(attrib == :acou_homo1)
 		tgrid = M1D(:acou_homo1)
 		wav = Wavelets.ricker(fqdom=10.0, tgrid=tgrid, tpeak=0.25, )
-		return Acquisition.Src(1, 1, 1, wav, tgrid)
+		return Acquisition.Src_fixed(nss, 1, 1, wav, tgrid)
 	elseif(attrib == :vecacou_homo1)
 		tgrid = M1D(:acou_homo1)
 		wav = Wavelets.ricker(fqdom=10.0, tgrid=tgrid, tpeak=0.25, )
-		return Acquisition.Src(1, 1, 3, wav, tgrid)
+		return Acquisition.Src_fixed(nss, 1, 3, wav, tgrid)
 	end
 end
 

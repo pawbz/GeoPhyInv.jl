@@ -1406,6 +1406,8 @@ src_par_loop: do isseq = 1, src_nseq
                         grad_modrr(iz,ix, isseq) = grad_modrr(iz,ix,isseq) + 0.5e0 * gradis_modrrvz(iz,ix)
                         grad_modrr(iz+1,ix, isseq) = grad_modrr(iz+1,ix,isseq) + 0.5e0 * gradis_modrrvz(iz,ix)
                 endforall
+                write(*,*) "ffff",maxval(grad_modtt(:,:,isseq))
+                write(*,*) "ggggffff",maxval(grad_modrr(:,:,isseq))
         endif
 
 

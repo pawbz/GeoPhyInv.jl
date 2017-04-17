@@ -59,8 +59,8 @@ maximum(tgridmod.x) < maximum(acqsrc[1].tgrid.x) ? error("modeling time is less 
 tgridmod.δx > tgrid.δx ? error("output time grid sampling finer than modeling") :
 
 # find maximum and minimum frequencies in the source wavelets
-freqmin = DSP.findfreq(acqsrc[1].wav[:,1,1],acqsrc[1].tgrid,attrib=:min) 
-freqmax = DSP.findfreq(acqsrc[1].wav[:,1,1],acqsrc[1].tgrid,attrib=:max) 
+freqmin = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
+freqmax = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
 
 # check spatial sampling
 ds_temp=Models.χ([minimum(model.χvp)],model.vp0,-1)[1]/5.0/freqmax;
@@ -95,7 +95,6 @@ any([getfield(acqgeom[ip],:nss) != getfield(acqsrc[ip],:nss) for ip=1:npropwav])
 any([getfield(acqgeom[ip],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npropwav])  ? error("different sources") : nothing
 
 # same values of these of all nprop, but values can be diff
-src_nsmul = maximum(acqgeom[1].ns);
 src_nseq = acqgeom[1].nss;
 src_nfield = acqsrc[1].nfield
 
@@ -103,6 +102,12 @@ src_nfield = acqsrc[1].nfield
 # at every unique receiver position
 acqgeom_urpos = [Acquisition.Geom_get(acqgeom[i],:geomurpos) for i=1:npropwav];
 recv_n = acqgeom_urpos[1].nr[1] # same for all sources
+
+# same number of sources for all super sources
+acqgeom_uspos = [Acquisition.Geom_get(acqgeom[i],:geomuspos) for i=1:npropwav];
+acqsrc_uspos = [Acquisition.Src_uspos(acqsrc[i],acqgeom[i]) for i=1:npropwav]
+src_nsmul = acqsrc_uspos[1].ns[1];
+
 
 if(verbose)
 	println(string("number of receivers:\t",recv_n))	
@@ -136,6 +141,9 @@ else
 	border_in_flag = true
 end
 
+println(Acquisition.Geom_getvec(acqgeom_uspos,:sx))
+println(Acquisition.Geom_getvec(acqgeom_urpos,:rx))
+
 ccall( (:fdtd_mod, F90libs.fdtd), Void,
       (Ptr{UInt8}, Ref{Int64},       
        Ptr{Float64}, Ptr{Float64},
@@ -163,9 +171,10 @@ ccall( (:fdtd_mod, F90libs.fdtd), Void,
       exmodel.mgrid.nx, exmodel.mgrid.nz,    exmodel.mgrid.δx, exmodel.mgrid.δz,
       exmodel.mgrid.x, exmodel.mgrid.z,      model.mgrid.npml-5, # reduce npml by one, see fdtd.f90
       abs_trbl, 
-      tgridmod.nx, tgridmod.δx,    acqsrc[1].tgrid.nx, Acquisition.Src_getvec(acqsrc,:wav),
+      tgridmod.nx, tgridmod.δx,    acqsrc_uspos[1].tgrid.nx, 
+      				Acquisition.Src_getvec(acqsrc_uspos,:wav),
       src_nseq, src_nsmul, src_nfield,
-      Acquisition.Geom_getvec(acqgeom,:sx), Acquisition.Geom_getvec(acqgeom,:sz),
+      Acquisition.Geom_getvec(acqgeom_uspos,:sx), Acquisition.Geom_getvec(acqgeom_uspos,:sz),
       src_flags, 
       recv_n, recv_nfield,
       Acquisition.Geom_getvec(acqgeom_urpos,:rx), Acquisition.Geom_getvec(acqgeom_urpos,:rz),
@@ -182,11 +191,13 @@ ccall( (:fdtd_mod, F90libs.fdtd), Void,
 # check if ccall return zeros
 isapprox(maximum(abs(recv_out)),0.0) && warn("recv_out are zeros")
 
+println(maximum(grad_modtt[:,:,1]))
+println(maximum(grad_modtt[:,:,2]))
 # summing over all the sources
 grad_modtt = Models.pad_trun(squeeze(sum(grad_modtt,3),3),model.mgrid.npml,-1);
 grad_modrr = Models.pad_trun(squeeze(sum(grad_modrr,3),3),model.mgrid.npml,-1);
 
-# for gradient model
+# for gradient model (change this, incorrect)
 gmodel = Models.Seismic(model.vp0, model.vs0, model.ρ0,
 			Models.χg(grad_modtt,Models.Seismic_get(model, :K0I)),
 			zeros(grad_modtt),

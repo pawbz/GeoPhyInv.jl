@@ -53,7 +53,7 @@ function TD_normalize(data::TD, attrib::Symbol)
 	nr = data.acqgeom.nr;
 	nss = data.acqgeom.nss;
 	nt = data.tgrid.nx;
-	datan = data;
+	datan = deepcopy(data);
 	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
 		if(attrib == :recrms)
 			nval = sqrt(mean(datan.d[iss, ifield][:,ir].^2.))

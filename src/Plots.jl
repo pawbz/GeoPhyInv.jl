@@ -76,7 +76,7 @@ Plot acqsrc
 """
 function Src(acqsrc::Acquisition.Src, attrib::Symbol)
 	
-	plot(acqsrc.tgrid.x, acqsrc.wav[:,1,1])
+	plot(acqsrc.tgrid.x, acqsrc.wav[1,1][:,1])
 
 end
 
@@ -97,16 +97,16 @@ Plot time-domain data of type `Data.TD`
 """
 function TD(td::Data.TD; ssvec::Vector{Int64}=[1], fieldvec::Vector{Int64}=[1],
 	    tr_flag::Bool=false, attrib::Symbol=:wav)
-	
+	any(ssvec .> td.acqgeom.nss) ? error("invalid ssvec") : nothing	
 	nfield = length(fieldvec);
 	ns = length(ssvec);
 	nr = maximum(td.acqgeom.nr);
 
 	if(tr_flag)
-		dp = reshape(hcat(td.d[ssvec,fieldvec][end:-1:1,:]...),td.tgrid.nx,nr*ns*nfield);
+		dp = hcat(td.d[ssvec,fieldvec][end:-1:1,:]...);
 		extent=[1, nr*ns*nfield, td.tgrid.x[1],td.tgrid.x[end],]
 	else
-		dp = reshape(hcat(td.d[ssvec,fieldvec][:,:]...),td.tgrid.nx,nr*ns*nfield);
+		dp = hcat(td.d[ssvec,fieldvec][:,:]...);
 		extent=[1, nr*ns*nfield, td.tgrid.x[end],td.tgrid.x[1],]
 	end
 	if(attrib == :seis)
