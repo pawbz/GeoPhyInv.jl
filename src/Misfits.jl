@@ -13,7 +13,6 @@ function error_after_scaling(
 			     x::Array{Float64},
 			     y::Array{Float64}
 			    )
-
 length(x) != length(y) ? error("vectors of different length") :
 
 α = dot(x,y)/dot(x,x)

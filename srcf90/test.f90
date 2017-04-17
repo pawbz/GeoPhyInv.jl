@@ -65,9 +65,9 @@ end subroutine bool_in_out
 
 subroutine matrix_in_out(A, B, n1, n2) bind(c, name="matrix_in_out")
         implicit  none
+        integer(i_sp), intent(in)           :: n1, n2
         real(r_dp), intent(in)              :: A(n1,n2)
         real(r_dp), intent(out)             :: B(n1,n2)
-        integer(i_sp), intent(in)           :: n1, n2
         B = A;
 end subroutine matrix_in_out
 

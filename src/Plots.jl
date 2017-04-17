@@ -3,7 +3,7 @@ module Plots
 using PyCall, PyPlot
 import PyCall: @pyimport
 import PyPlot: pygui
-@pyimport matplotlib2tikz
+#@pyimport matplotlib2tikz
 import SIT.Acquisition
 import SIT.Grid
 import SIT.Data
@@ -59,8 +59,8 @@ function Geom(geom::Acquisition.Geom;
 	      iss::Int64=0
 	     )
 	if(iss==0)
-		urpos = Acquisition.Geom_get(geom,:urpos)
-		uspos = Acquisition.Geom_get(geom,:uspos)
+		urpos = Acquisition.Geom_get([geom],:urpos)
+		uspos = Acquisition.Geom_get([geom],:uspos)
 
 		plot(urpos[2], urpos[1], "v", color="blue",ms=10)
 		plot(uspos[2], uspos[1], "*", color="red",ms=15)

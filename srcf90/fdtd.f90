@@ -260,7 +260,7 @@ subroutine fdtd_mod(&
         tim_nt,& ! total time samples
         tim_del, & ! time sampling
 ! >>>>>>> source parameters
-        src_nt, & ! number time samples in source wavelet (src_nt <= tim_nt)
+        src_nt, & ! number time samples in source wavelet [src_nt <= tim_nt]
         src_wavelets, & ! source wavelets [src_nt] * [src_nsmul] * [src_nseq] * [src_nfield] * [npropwav]
         src_nseq, & ! number of sequential sources; OMP loop
         src_nsmul, & ! number of simultaneous sources
@@ -493,7 +493,7 @@ do ipropwav = 1, npropwav
                                                 + (ipropwav-1)*src_nseq*src_nfield*src_nsmul*src_nt &
                                                 )
                               !  endif
-                                if(src_flags(ipropwav) .lt. 0) then
+                                if(src_flags(ipropwav) .lt. rzero_de) then
                                         src_wav_mat(issmul, ifield, ipropwav, it + 1, isseq) = 2.0 * source_term + &
                                                 src_wav_mat(issmul, ifield, ipropwav, it - 1, isseq)
                                 else
@@ -909,7 +909,7 @@ src_par_loop: do isseq = 1, src_nseq
                         issmultemp = issmul+(isseq-1)*src_nsmul+(ipropwav-1)*src_nsmul*src_nseq;
                         src_xtemp = src_x(issmultemp);
                         src_ztemp = src_z(issmultemp);
-                        if(abs(src_flags(ipropwav)) .eq. 2) then ! [BILINEAR]
+                        if(abs(src_flags(ipropwav)) .eq. rtwo_de) then ! [BILINEAR]
                                 maskX = .true.
                                 issmulxtemp1 = &
                                 minloc(array = abs(mesh_x - &
@@ -969,7 +969,7 @@ src_par_loop: do isseq = 1, src_nseq
                                 mesh_z(issmulz1(issmul,ipropwav)))*&
                                 denomsrcI(issmul,ipropwav)
 
-                        elseif(abs(src_flags(ipropwav)) .eq. 1) then ! [NEAREST_NEIGH]
+                        elseif(abs(src_flags(ipropwav)) .eq. rone_de) then ! [NEAREST_NEIGH]
                                 issmulx1(issmul,ipropwav) = &
                                 minloc(array = abs(mesh_x - &
                                 src_xtemp), dim = 1)
@@ -984,7 +984,7 @@ src_par_loop: do isseq = 1, src_nseq
                                 
                                 ! only add source at nearest grid point
                                 src_spray_weights(1,issmul,ipropwav) = rone_de;
-                        elseif(abs(src_flags(ipropwav)) .eq. 0) then ! [OFF]
+                        elseif(abs(src_flags(ipropwav)) .eq. rzero_de) then ! [OFF]
                                 ! dummy 
                                 issmulz1(issmul,ipropwav) = int(mesh_nz*0.5)
                                 issmulx1(issmul,ipropwav) = int(mesh_nx*0.5)
@@ -1312,7 +1312,8 @@ src_par_loop: do isseq = 1, src_nseq
                 do ipropwav = 1, npropwav
                 do ix=1,nx-1
                 do iz=1,nz-1
-                        p(iz,ix,2,ipropwav) = p(iz,ix,2,ipropwav) + (dpdx(iz,ix,ipropwav)) * tim_del * &
+                        p(iz,ix,2,ipropwav) = p(iz,ix,2,ipropwav) + &
+                                (dpdx(iz,ix,ipropwav)) * tim_del * &
                                 modrrvx(iz,ix) * boundary_vx(iz,ix)
                 enddo
                 enddo
@@ -1321,7 +1322,8 @@ src_par_loop: do isseq = 1, src_nseq
                 !forall(ix=1:nx-1,iz=1:nz-1)
                 do ix=1,nx-1
                 do iz=1,nz-1
-                        p(iz,ix,3,ipropwav) = p(iz,ix,3,ipropwav) + (dpdz(iz,ix,ipropwav)) * tim_del * &
+                        p(iz,ix,3,ipropwav) = p(iz,ix,3,ipropwav) + & 
+                                (dpdz(iz,ix,ipropwav)) * tim_del * &
                                 modrrvz(iz,ix) * boundary_vz(iz,ix)
                 enddo
                 enddo
@@ -1406,8 +1408,6 @@ src_par_loop: do isseq = 1, src_nseq
                         grad_modrr(iz,ix, isseq) = grad_modrr(iz,ix,isseq) + 0.5e0 * gradis_modrrvz(iz,ix)
                         grad_modrr(iz+1,ix, isseq) = grad_modrr(iz+1,ix,isseq) + 0.5e0 * gradis_modrrvz(iz,ix)
                 endforall
-                write(*,*) "ffff",maxval(grad_modtt(:,:,isseq))
-                write(*,*) "ggggffff",maxval(grad_modrr(:,:,isseq))
         endif
 
 
@@ -1455,6 +1455,8 @@ deallocate                      (d_z,K_z,K_zI,alpha_z,&
                                 K_z_half,K_z_halfI,alpha_z_half,a_z_half,b_z_half)
 deallocate                      (modttI,  modrrvx, modrrvz, deltamodtt, deltamodrrvx, deltamodrrvz)
 
+
+deallocate(boundary_p, boundary_vx, boundary_vz)
 deallocate(maskX); deallocate(maskZ)
 if(allocated(src_wav_mat)) deallocate(src_wav_mat)
 

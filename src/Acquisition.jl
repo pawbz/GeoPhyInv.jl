@@ -35,12 +35,13 @@ Return some derived fields of `Geom`
 `attrib=:nus` : number of unique source positions
 `attrib=:nur` : number of unique source positions
 """
-function Geom_get(acq::Geom, attrib::Symbol)
-	sposx = Geom_getvec([acq],:sx);	sposz = Geom_getvec([acq],:sz)
+function Geom_get(acq::Vector{Geom}, attrib::Symbol)
+	ngeom = length(acq)
+	sposx = Geom_getvec(acq,:sx);	sposz = Geom_getvec(acq,:sz)
 	isequal(length(sposx), length(sposz)) ? 
 		spos = [[sposz[is],sposx[is]] for is in 1:length(sposx)] : error("input acq corrupt")
 
-	rposx = Geom_getvec([acq],:rx);	rposz = Geom_getvec([acq],:rz)
+	rposx = Geom_getvec(acq,:rx);	rposz = Geom_getvec(acq,:rz)
 	isequal(length(rposx), length(rposz)) ? 
 		rpos = [[rposz[ir],rposx[ir]] for ir in 1:length(rposx)] : error("input acq corrupt")
 
@@ -59,16 +60,16 @@ function Geom_get(acq::Geom, attrib::Symbol)
 	elseif(attrib == :urpos)
 		return urpost
 	elseif(attrib == :geomurpos)
-		return Geom(acq.sx, acq.sz, 
-		      fill(urpost[2],acq.nss), 
-		      fill(urpost[1],acq.nss), acq.nss, acq.ns, 
-		      fill(nur,acq.nss))
+		return [Geom(acq[igeom].sx, acq[igeom].sz, 
+	       fill(urpost[2],acq[igeom].nss), 
+	       fill(urpost[1],acq[igeom].nss), acq[igeom].nss, acq[igeom].ns, 
+	       fill(nur,acq[igeom].nss)) for igeom=1:ngeom]
 	elseif(attrib == :geomuspos)
-		return Geom(fill(uspost[2],acq.nss), 
-	      		fill(uspost[1],acq.nss),
-		      acq.rx, acq.rz, 
-		      acq.nss, fill(nus,acq.nss),
-		      acq.nr)
+		return [Geom(fill(uspost[2],acq[igeom].nss), 
+	       fill(uspost[1],acq[igeom].nss),
+	       acq[igeom].rx, acq[igeom].rz, 
+	       acq[igeom].nss, fill(nus,acq[igeom].nss),
+	       acq[igeom].nr) for igeom=1:ngeom]
 	else
 		error("invalid attrib")
 	end
@@ -233,7 +234,7 @@ end
 """
 return a vector of the order 
 """
-function Geom_getvec(geom::Array{Geom}, field::Symbol)
+function Geom_getvec(geom::Vector{Geom}, field::Symbol)
 	np = length(geom);
 	vect = [getfield(geom[ip],field) for ip=1:np]
 	return vec(vcat(vcat(vect...)...))
@@ -292,34 +293,39 @@ end
 
 """
 Pad `Src` 
+tgrids should be same in all Src
 """
-function Src_uspos(src::Src, acq::Geom)
+function Src_uspos(src::Vector{Src}, acq::Vector{Geom})
+	np = length(src) == length(acq) ? length(src) : error("unequal sizez")
+
 	# unique source positions
 	nus=Geom_get(acq,:nus) 
 	uspos=Geom_get(acq,:uspos)
-	nss = src.nss;
-	nfield = src.nfield;
 	# all zeros for all unique positions
-	wavout = [zeros(src.tgrid.nx,nus) for iss=1:nss, ifield=1:nfield] 
+	wavout = [[zeros(src[ip].tgrid.nx,nus) for iss=1:src[ip].nss, ifield=1:src[ip].nfield] for ip=1:np]
 	# fill source wavelets when necessary
-	for ifield=1:nfield, iss=1:nss, is=1:acq.ns[iss]
-		is0=find([[uspos[1][i]-acq.sz[iss][is],
-		       uspos[2][i]-acq.sx[iss][is]] == [0., 0.,] for i in 1:nus])
+	for ip=1:np
+		for ifield=1:src[ip].nfield, iss=1:src[ip].nss, is=1:acq[ip].ns[iss]
+			is0=find([[uspos[1][i]-acq[ip].sz[iss][is],
+		      uspos[2][i]-acq[ip].sx[iss][is]] == [0., 0.,] for i in 1:nus])
 
-		wavout[iss, ifield][:,is0] = src.wav[iss, ifield][:,is] 
+			wavout[ip][iss, ifield][:,is0] = src[ip].wav[iss, ifield][:,is] 
+		end
 	end
 	# output src
-	return Src(src.nss,fill(nus, nss),nfield,wavout,src.tgrid)
+	return [Src(src[ip].nss,fill(nus, src[ip].nss),
+	     	src[ip].nfield,wavout[ip],src[ip].tgrid) for ip=1:np]
 end
 
 
 """
 return a vector of the order 
+
 """
-function Src_getvec(src::Array{Src}, field::Symbol)
+function Src_getvec(src::Vector{Src}, field::Symbol)
 	np = length(src);
 	vect = [getfield(src[ip],field) for ip=1:np]
-	return vec(vcat(vcat(vect...)...))
+	return vec(hcat(hcat(vect...)...))
 end
 
 end # module

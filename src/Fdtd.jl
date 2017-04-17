@@ -94,19 +94,21 @@ length(acqsrc) != npropwav ? error("acqsrc size") : nothing
 any([getfield(acqgeom[ip],:nss) != getfield(acqsrc[ip],:nss) for ip=1:npropwav])  ? error("different supersources") : nothing
 any([getfield(acqgeom[ip],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npropwav])  ? error("different sources") : nothing
 
-# same values of these of all nprop, but values can be diff
+# necessary that nss and nfield should be same for all nprop
 src_nseq = acqgeom[1].nss;
 src_nfield = acqsrc[1].nfield
+fill(src_nseq, npropwav) != [getfield(acqgeom[ip],:nss) for ip=1:npropwav] ? error("different supersources") : nothing
+fill(src_nfield, npropwav) != [getfield(acqsrc[ip],:nfield) for ip=1:npropwav] ? error("different fields") : nothing
 
 # create acquisition geometry with each source shooting 
 # at every unique receiver position
-acqgeom_urpos = [Acquisition.Geom_get(acqgeom[i],:geomurpos) for i=1:npropwav];
+acqgeom_urpos = Acquisition.Geom_get(acqgeom,:geomurpos);
 recv_n = acqgeom_urpos[1].nr[1] # same for all sources
 
 # same number of sources for all super sources
-acqgeom_uspos = [Acquisition.Geom_get(acqgeom[i],:geomuspos) for i=1:npropwav];
-acqsrc_uspos = [Acquisition.Src_uspos(acqsrc[i],acqgeom[i]) for i=1:npropwav]
-src_nsmul = acqsrc_uspos[1].ns[1];
+acqgeom_uspos = Acquisition.Geom_get(acqgeom,:geomuspos);
+acqsrc_uspos = Acquisition.Src_uspos(acqsrc,acqgeom);
+src_nsmul = acqsrc_uspos[1].ns[1]; # same number of sources in all
 
 
 if(verbose)
@@ -140,9 +142,6 @@ if(boundary_in == nothing)
 else	
 	border_in_flag = true
 end
-
-println(Acquisition.Geom_getvec(acqgeom_uspos,:sx))
-println(Acquisition.Geom_getvec(acqgeom_urpos,:rx))
 
 ccall( (:fdtd_mod, F90libs.fdtd), Void,
       (Ptr{UInt8}, Ref{Int64},       
@@ -191,8 +190,6 @@ ccall( (:fdtd_mod, F90libs.fdtd), Void,
 # check if ccall return zeros
 isapprox(maximum(abs(recv_out)),0.0) && warn("recv_out are zeros")
 
-println(maximum(grad_modtt[:,:,1]))
-println(maximum(grad_modtt[:,:,2]))
 # summing over all the sources
 grad_modtt = Models.pad_trun(squeeze(sum(grad_modtt,3),3),model.mgrid.npml,-1);
 grad_modrr = Models.pad_trun(squeeze(sum(grad_modrr,3),3),model.mgrid.npml,-1);
@@ -223,5 +220,6 @@ return [Data.TD_resamp(
 #return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),
 #		       tgridmod, acqgeom[1]) for iprop in 1:npropwav]
 end
+
 
 end # module

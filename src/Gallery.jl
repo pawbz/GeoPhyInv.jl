@@ -128,6 +128,9 @@ Gallery of acquisition geometries `Geom` based on input `M2D`.
 function Geom(mgrid::Grid.M2D,
 	      attrib::Symbol
 	     )
+	quatx = (0.75*mgrid.x[1]+0.25*mgrid.x[end]); quatz = (0.75*mgrid.z[1]+0.25*mgrid.z[end]) 
+	tquatx = (0.25*mgrid.x[1]+0.75*mgrid.x[end]); tquatz = (0.25*mgrid.z[1]+0.75*mgrid.z[end]) 
+	halfx = 0.5*(mgrid.x[1]+mgrid.x[end]);	halfz = 0.5*(mgrid.z[1]+mgrid.z[end]);
 	if(attrib == :oneonev)
 		return Acquisition.Geom_fixed(
 		      maximum(mgrid.z), maximum(mgrid.z), mean(mgrid.x),
@@ -136,14 +139,22 @@ function Geom(mgrid::Grid.M2D,
 				)
 	elseif(attrib == :twotwov)
 		return Acquisition.Geom_fixed(
-	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[1],
-	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
+		quatz, tquatz, quatx, quatz, tquatz, tquatx,
 		      2,2,:vertical,:vertical
+				)
+	elseif(attrib == :twotwodv)
+		return Acquisition.Geom_fixed(
+		quatz, halfz, quatx, halfz, tquatz, tquatx,
+		      2,2,:vertical,:vertical
+				)
+	elseif(attrib == :twotenv)
+		return Acquisition.Geom_fixed(
+		quatz, tquatz, quatx, quatz, tquatz, tquatx,
+		      2,10,:vertical,:vertical
 				)
 	elseif(attrib == :tentenv)
 		return Acquisition.Geom_fixed(
-	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[1],
-	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
+		quatz, tquatz, mgrid.x[1], quatz, tquatz, mgrid.x[end],
 		      10,10,:vertical,:vertical
 				)
 	elseif(attrib == :onefiftyv)

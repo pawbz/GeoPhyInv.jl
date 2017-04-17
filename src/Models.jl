@@ -98,23 +98,32 @@ Add features to a model.
 # Keyword Arguments
 * `circ_loc::Vector{Float64}=nothing` : location of center of perturbation
 * `circ_rad::Float64=0.0` : radius of circular perturbation
-* 
+* `circ_pert::Float64=0.1` : perturbation inside a circle
+* `rect_loc::Array{Float64}=nothing` : rectangle location
+* `rect_pert::Float64=0.1` : perturbation in a rectangle
 
 """
 function Seismic_addon(mod::Seismic; 
-		       circ_loc::Array{Float64}=nothing,
+		       circ_loc::Vector{Float64}=[0., 0.,],
 		       circ_rad::Float64=0.0,
 		       circ_pert::Float64=0.1,
+		       rect_loc::Vector{Float64}=[0., 0., 0., 0.,],
+		       rect_pert::Float64=0.1,
 		       fields::Vector{Symbol}=[:χvp,:χρ,:χvs]
 		       )
 
+	temp = zeros(mod.mgrid.nz, mod.mgrid.nx)
 	if(!(circ_loc == nothing))
-		temp = [((sqrt((mod.mgrid.x[ix]-circ_loc[2])^2 + 
-			(mod.mgrid.z[iz]-circ_loc[1])^2 ) <= circ_rad) ? circ_pert : 0.0)
-		 for iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx  ]
-	else
-		temp = zeros(mod.mgrid.nz, mod.mgrid.nx)
-
+		temp += [((sqrt((mod.mgrid.x[ix]-circ_loc[2])^2 + 
+			(mod.mgrid.z[iz]-circ_loc[1])^2 ) <= circ_rad) ? circ_pert : 0.0)  for 
+	   		iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx ]
+	end
+	if(!(rect_loc == nothing))
+		temp += [
+			(((mod.mgrid.x[ix]-rect_loc[4]) * (mod.mgrid.x[ix]-rect_loc[2]) < 0.0) & 
+			((mod.mgrid.z[iz]-rect_loc[3]) * (mod.mgrid.z[iz]-rect_loc[1]) < 0.0)) ?
+			rect_pert : 0.0  for
+			iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx ]
 	end
 
 	mod_out = deepcopy(mod)
