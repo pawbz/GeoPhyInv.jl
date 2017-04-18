@@ -119,9 +119,15 @@ end
 
 recv_out = zeros(tgridmod.nx*recv_n*recv_nfield*npropwav*src_nseq)
 
-# extend models in the PML layers
-exmodel = Models.Seismic_pad_trun(model);
-exmodel0 = Models.Seismic_pad_trun(model0);
+if(born_flag)
+	# extend models in the PML layers
+	exmodel = Models.Seismic_pad_trun(model0);
+	exmodel0 = Models.Seismic_pad_trun(model);
+else
+	# extend models in the PML layers
+	exmodel = Models.Seismic_pad_trun(model);
+	exmodel0 = Models.Seismic_pad_trun(model0);
+end
 
 # gradient outputs
 grad_modtt = zeros(exmodel.mgrid.nz, exmodel.mgrid.nx,src_nseq) 
@@ -210,10 +216,10 @@ return [Data.TD_resamp(
 		 	tgridmod.nx,recv_n,src_nseq,recv_nfield),
 			recv_nfield,
 			tgridmod, acqgeom[iprop],
-			acqgeom_urpos[iprop].nr[1],
-			(acqgeom_urpos[iprop].rz[1], acqgeom_urpos[iprop].rx[1])
+			acqgeom_urpos[1].nr[1],
+			(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
 			), tgrid) for iprop in 1:npropwav], 
-		(border_out[:,end:-1:1,:], p_out[:,:,:,:,end:-1:1]),
+			(flipdim(border_out,2), flipdim(p_out,5)),
 		gmodel
 
 # return without resampling for testing

@@ -311,10 +311,10 @@ subroutine fdtd_mod(&
                 ! dimensions 
 
         implicit none
+integer, intent(in)                                     :: npropwav
 character(len=1, kind=C_char), intent(in)               :: jobname(*), mesh_abs_trbl(*)
 real, intent(in)                                        :: recv_flags(npropwav), src_flags(npropwav)
 character(len=1, kind=C_char), intent(in)               :: prop_flags(*)
-integer, intent(in)                                     :: npropwav
 real, dimension(mesh_nz,mesh_nx), intent(in)            :: modtt, modrr, modtt0, modrr0
 
 
@@ -553,21 +553,21 @@ enddo
 ALPHA_MAX_PML = 2.e0*PI*((freqmin + freqmax))/4.e0 ! from Festa and Vilotte
 
 ! model parameters - modttI
-allocate(modttI(0:nz+1,0:nx+1), deltamodtt(0:nz+1,0:nx+1)); modttI=rzero_de; deltamodtt = rzero_de;
+allocate(modttI(nz,nx), deltamodtt(nz,nx)); modttI=rzero_de; deltamodtt = rzero_de;
 modttI = modtt**(-rone_de) 
-deltamodtt = modtt-modtt0
+deltamodtt = modtt0-modtt ! note the the propagation is in background 
 
 ! model parameters - modrrvx and modrrvz
-allocate(modrrvx(0:nz+1,0:nx+1),modrrvz(0:nz+1,0:nx+1)); 
-allocate(deltamodrrvx(0:nz+1,0:nx+1),deltamodrrvz(0:nz+1,0:nx+1));
+allocate(modrrvx(nz,nx),modrrvz(nz,nx)); 
+allocate(deltamodrrvx(nz,nx),deltamodrrvz(nz,nx));
 modrrvx(:,:) = rzero_de; modrrvz(:,:) = rzero_de
 deltamodrrvx = rzero_de; deltamodrrvz = rzero_de;
 
 modrrvx = get_rhovxI(modrr)
 modrrvz = get_rhovzI(modrr)
 
-deltamodrrvx = modrrvx - get_rhovxI(modrr0)
-deltamodrrvz = modrrvz - get_rhovzI(modrr0)
+deltamodrrvx = get_rhovxI(modrr0) - modrrvx
+deltamodrrvz = get_rhovzI(modrr0) - modrrvz
 
 call is_nan("fd2_mod: modttI", modttI)
 call is_nan("fd2_mod: modrrvz", modrrvz)
@@ -1220,8 +1220,8 @@ src_par_loop: do isseq = 1, src_nseq
 
                 if(born_flag) then
                 ! adding born sources from pressure(:,:,1) to pressure(:,:,2)
-                do ix=1,nx-1
-                do iz=1,nz-1
+                do ix=3,nx-2
+                do iz=3,nz-2
                         !p(iz,ix,2) = p(iz,ix,1);
                         p(iz,ix,1,2) = p(iz,ix,1,2) + & 
                                 ! lambdaI scatterrer
@@ -1248,7 +1248,8 @@ src_par_loop: do isseq = 1, src_nseq
 
                 ! compute dpdx and dpdz at [it] for all other propagating fields
                 !forall(ix=1:nx-1,iz=1:nz-1)
-                do ipropwav = 2, npropwav
+                if(npropwav .eq. 2) then
+                        ipropwav=2;
                 do ix=1,nx-1
                 do iz=1,nz-1
                         dpdx(iz,ix,ipropwav) = &
@@ -1278,7 +1279,7 @@ src_par_loop: do isseq = 1, src_nseq
                                             memory_dp_dz(iz,ix,ipropwav) !pml
                 enddo
                 enddo
-                enddo
+                endif
                 !endforall
 
 
