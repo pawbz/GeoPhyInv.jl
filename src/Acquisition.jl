@@ -215,21 +215,6 @@ function Geom_circ(;
 	return Geom(sxall, szall, rxall, rzall, nss, fill(1,nss), fill(nr,nss))
 end
 
-"""
-Modify the input acquisition geometry 
-such that the adjoint source time functions can 
-be propagated from the receiver positions.
-The number of supersources will remain the same.
-All the recievers will be fired as simultaneous sources.
-"""
-function Geom_adj(geomin::Geom)
-	geomout = deepcopy(geomin);
-	geomout.sx = geomin.rx; geomout.sz = geomin.rz;
-	geomout.ns = geomin.nr; 
-
-	return geomout
-end
-
 
 """
 return a vector of the order 

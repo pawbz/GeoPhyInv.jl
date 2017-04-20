@@ -1,3 +1,7 @@
 julia 0.5
 PyPlot
 Documenter
+Optim
+MultivariateStats
+Distributions
+Interpolations

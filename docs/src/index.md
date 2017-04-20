@@ -37,13 +37,28 @@ Order   = [:type, :function]
 ```
 
 
-## Seismic Time-Domain Modeling
+## Fdtd
 
 ```@autodocs
 Modules = [SIT.Fdtd]
 Order   = [:type, :function]
 ```
  
+## Inversion
+
+```@autodocs
+Modules = [SIT.Inversion]
+Order   = [:type, :function]
+```
+
+## Interferometry
+
+```@autodocs
+Modules = [SIT.Interferometry]
+Order   = [:type, :function]
+```
+
+
 ## Independent Component Analysis for Convolutive Mixtures
 
 ```@autodocs

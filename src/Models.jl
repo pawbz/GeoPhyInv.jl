@@ -26,8 +26,23 @@ type Seismic
 end
 
 """
+Return `Seismic` with zeros everywhere;
+this method is used for preallocation.
+
+# Arguments
+* `mgrid::Grid.M2D` : 
+"""
+function Seismic_zeros(mgrid::Grid.M2D)
+	return Seismic(0.0, 0.0, 0.0, zeros(mgrid.nz, mgrid.nx), zeros(mgrid.nz, mgrid.nx),
+		zeros(mgrid.nz, mgrid.nx), mgrid)
+end
+
+"""
 Get other dependent model parameters of a seismic model
 that are not present in `Seismic`.
+
+* `:ρI` : inverse of density
+* `:Zp` : P-wave impedance
 """
 function Seismic_get(mod::Seismic, attrib::Symbol)
 	K0 = mod.vp0 * mod.vp0 * mod.ρ0; K0I = K0^(-1.0);
@@ -37,6 +52,10 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 	ρ = χ(mod.χρ, mod.ρ0, -1)
 	if(attrib == :ρI)
 		return ρ.^(-1.0)
+	elseif(attrib == :ρ)
+		return ρ
+	elseif(attrib == :vp)
+		return vp
 	elseif(attrib == :ρ0I)
 		return mod.ρ0.^(-1.0)
 	elseif(attrib == :χρI)
@@ -57,9 +76,58 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 		return (vp .* vp .* ρ).^(-1)
 	elseif(attrib == :K)
 		return (vp .* vp .* ρ)
+	elseif(attrib == :Zp)
+		return (vp .* ρ)
 	else
 		error("invalid attrib")
 	end
+end
+
+"""
+Output gradient due to other parameters
+"""
+function Seismic_getgrad(mod::Seismic, attrib::Symbol)
+	gvp = mod.χvp / mod.vp0;
+	gρ = mod.χρ / mod.ρ0;
+	K0 = Seismic_get(mod, :K0)
+	ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
+	ρ = Seismic_get(mod,:ρ)
+
+	if(attrib == :χK_χρ)
+		g1 = 0.5 .* K0 * gvp .* ρI .* vp.^(-1)
+		g2 = (gρ .* ρ0) - (0.5 .* ρ0 .* (gvp) .* (vp) ./ (ρ) )
+	elseif(attrib == :χKI_χρI)
+		g1 =  -0.5 .* K0^(-1) .* gvp .* ρ .*  vp.^(3.)
+		g2 = (gρ .* ρ0^(-1) .* (-1.) .*  (ρ.^(2))) +
+			 (0.5 * ρ0^(-1.) .* (gvp) .*  (vp) .* (ρ))
+	else
+		error("invalid attrib")
+	end
+
+	return g1, g2
+
+end
+
+"""
+Create a gradient model using 
+"""
+function Seismic_grad(mod::Seismic,
+		      gKI::Array{Float64,2},
+		      gρI::Array{Float64,2})
+
+	vp0 = mod.vp0;	vs0 = mod.vs0;	ρ0 = mod.ρ0
+	ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
+	Zp = Seismic_get(mod,:Zp)
+
+	# gradient w.r.t  χρ
+	gχρ = (-1. .* ρI.^2 .* gρI - (Zp).^(-2) .* gKI) .* ρ0
+	# gradient w.r.t χvp
+	gχvp = (-2. .* (vp).^(-3) .* ρI .* gKI) .* vp0
+	# to be implemented later
+	gχvs = zeros(gχvp)
+
+	return Seismic(vp0, vs0, ρ0, gχvp, gχvs, gχρ, mod.mgrid)
+
 end
 
 

@@ -47,6 +47,22 @@ function TD_resamp(data::TD,
 end
 
 """
+Return zeros
+"""
+function TD_zeros(data::TD)
+	return TD([zeros(data.tgrid.nx,data.acqgeom.nr[iss]) for iss=1:data.acqgeom.nss, ifield=1:data.nfield],
+    				data.nfield,data.tgrid,data.acqgeom)
+end
+
+"""
+Check if zeros
+"""
+function TD_iszero(data::TD)
+	return maximum(broadcast(maximum,data.d)) == 0.0 ? true : false
+end
+
+
+"""
 normalize time-domain seismic data
 """
 function TD_normalize(data::TD, attrib::Symbol)

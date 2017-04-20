@@ -37,7 +37,7 @@ function fdtd_mod(;
 		  jobname::AbstractString = "Hello",
 		  npropwav::Int64 = 1, 
 		  model::Models.Seismic = Gallery.Seismic(:acou_homo1),
-		  model0::Models.Seismic = Gallery.Seismic(:acou_homo1),
+		  model0::Models.Seismic = model,
 		  tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
 		  tgrid::Grid.M1D = tgridmod,
 		  acqgeom::Array{Acquisition.Geom} = [Gallery.Geom(:acou_homo1)],
@@ -62,19 +62,25 @@ tgridmod.δx > tgrid.δx ? error("output time grid sampling finer than modeling"
 freqmin = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
 freqmax = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
 
+# minimum and maximum velocities
+vpmin = minimum(broadcast(minimum,[Models.Seismic_get(model,:vp), Models.Seismic_get(model0,:vp)]))
+vpmax = maximum(broadcast(maximum,[Models.Seismic_get(model,:vp), Models.Seismic_get(model0,:vp)]))
+verbose ? println("minimum and maximum velocities:\t",vpmin,"\t",vpmax) : nothing
+
+
 # check spatial sampling
 ds_temp=Models.χ([minimum(model.χvp)],model.vp0,-1)[1]/5.0/freqmax;
 ds_max = maximum([model.mgrid.δx, model.mgrid.δz])
 all(ds_max .> ds_temp) ? 
 		error(string("spatial sampling\t",ds_max,"\ndecrease spatial sampling below:\t",ds_temp)) :
-		verbose ? println("spatial sampling can be as high as:\t",ds_temp) : nothing 
+		verbose ? println("spatial sampling\t",ds_max,"\tcan be as high as:\t",ds_temp) : nothing 
 
 # check time sampling
 ds_min = minimum([model.mgrid.δx, model.mgrid.δz])
 dt_temp=0.5*ds_min/Models.χ([(maximum(model.χvp))],model.vp0,-1)[1]
 all(tgridmod.δx .> dt_temp) ? 
 		error(string("time sampling\t",tgridmod.δx,"\ndecrease time sampling below:\t",dt_temp)) :
-		verbose ? println("time sampling can be as high as:\t",dt_temp) : nothing
+		verbose ? println("time sampling\t",tgridmod.δx,"\tcan be as high as:\t",dt_temp) : nothing
 
 
 
@@ -201,12 +207,7 @@ grad_modtt = Models.pad_trun(squeeze(sum(grad_modtt,3),3),model.mgrid.npml,-1);
 grad_modrr = Models.pad_trun(squeeze(sum(grad_modrr,3),3),model.mgrid.npml,-1);
 
 # for gradient model (change this, incorrect)
-gmodel = Models.Seismic(model.vp0, model.vs0, model.ρ0,
-			Models.χg(grad_modtt,Models.Seismic_get(model, :K0I)),
-			zeros(grad_modtt),
-			Models.χg(grad_modrr,Models.Seismic_get(model, :ρ0I)),
-			model.mgrid
-			) 
+gmodel = Models.Seismic_grad(model, grad_modtt, grad_modrr)
 
 # return after forming a vector and resampling
 nd = src_nseq*tgridmod.nx*recv_n*recv_nfield; # number of samples for each iprop

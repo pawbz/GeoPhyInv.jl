@@ -33,12 +33,12 @@ Gallery of `M1D` grids.
 * `attrib::Symbol` : 
 
 # Outputs
-* `attrib=:acou_homo1` : a time grid for with 2000 samples; maximum time is 1 s
+* `attrib=:acou_homo1` : a time grid for with 1000 samples; maximum time is 2 s
 * `attrib=:npow2samp1` : a sample npow2 grid with 16 samples
 """
 function M1D(attrib::Symbol)
 	if(attrib == :acou_homo1)
-		return Grid.M1D(0.0,2.0,2000)
+		return Grid.M1D(0.0,0.5,1000)
 	elseif(attrib == :npow2samp)
 		return Grid.M1D(npow2=16,δ=0.0001)
 	else

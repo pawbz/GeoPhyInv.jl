@@ -530,7 +530,7 @@ tim_delI= (tim_del)**(-1.e0)
 ! minimum and maximum velocities
 velmin = minval(sqrt(modrr*modtt**(-rone_de))); 
 velmax = maxval(sqrt(modrr*modtt**(-rone_de))); 
-write(*,*) "minimum and maximum velocities", velmin, velmax
+!write(*,*) "minimum and maximum velocities", velmin, velmax
 
 ! minimum and maximum frequencies
 freqmin = huge(1.e0); freqmax = 0.0;
