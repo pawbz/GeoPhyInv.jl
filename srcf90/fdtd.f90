@@ -245,8 +245,8 @@ subroutine fdtd_mod(&
         modtt, & ! model parameter matrix before second order time derivative [mesh_nz][mesh_nx]
         modrr, & ! model parameter vector before  [mesh_nz][mesh_nx]
 ! >>>>>>> background model parameters
-        modtt0, & ! model parameter matrix before second order time derivative [mesh_nz][mesh_nx]
-        modrr0, & ! model parameter vector before  [mesh_nz][mesh_nx]
+        modtt_pert, & ! model parameter matrix before second order time derivative [mesh_nz][mesh_nx]
+        modrr_pert, & ! model parameter vector before  [mesh_nz][mesh_nx]
 ! >>>>>>> modeling mesh parameters
         mesh_nx, & !
         mesh_nz, & !
@@ -315,7 +315,7 @@ integer, intent(in)                                     :: npropwav
 character(len=1, kind=C_char), intent(in)               :: jobname(*), mesh_abs_trbl(*)
 real, intent(in)                                        :: recv_flags(npropwav), src_flags(npropwav)
 character(len=1, kind=C_char), intent(in)               :: prop_flags(*)
-real, dimension(mesh_nz,mesh_nx), intent(in)            :: modtt, modrr, modtt0, modrr0
+real, dimension(mesh_nz,mesh_nx), intent(in)            :: modtt, modrr, modtt_pert, modrr_pert
 
 
 integer, intent(in)                                     :: mesh_nx, mesh_nz
@@ -555,7 +555,7 @@ ALPHA_MAX_PML = 2.e0*PI*((freqmin + freqmax))/4.e0 ! from Festa and Vilotte
 ! model parameters - modttI
 allocate(modttI(nz,nx), deltamodtt(nz,nx)); modttI=rzero_de; deltamodtt = rzero_de;
 modttI = modtt**(-rone_de) 
-deltamodtt = modtt0-modtt ! note the the propagation is in background 
+deltamodtt = modtt_pert-modtt ! note the the propagation is in background 
 
 ! model parameters - modrrvx and modrrvz
 allocate(modrrvx(nz,nx),modrrvz(nz,nx)); 
@@ -566,8 +566,8 @@ deltamodrrvx = rzero_de; deltamodrrvz = rzero_de;
 modrrvx = get_rhovxI(modrr)
 modrrvz = get_rhovzI(modrr)
 
-deltamodrrvx = get_rhovxI(modrr0) - modrrvx
-deltamodrrvz = get_rhovzI(modrr0) - modrrvz
+deltamodrrvx = get_rhovxI(modrr_pert) - modrrvx
+deltamodrrvz = get_rhovzI(modrr_pert) - modrrvz
 
 call is_nan("fd2_mod: modttI", modttI)
 call is_nan("fd2_mod: modrrvz", modrrvz)

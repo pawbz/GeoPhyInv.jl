@@ -2,6 +2,7 @@ module Data
 
 import SIT.Acquisition
 import SIT.Grid
+import SIT.Coupling
 using Interpolations
 
 """
@@ -49,16 +50,19 @@ end
 """
 Return zeros
 """
-function TD_zeros(data::TD)
-	return TD([zeros(data.tgrid.nx,data.acqgeom.nr[iss]) for iss=1:data.acqgeom.nss, ifield=1:data.nfield],
-    				data.nfield,data.tgrid,data.acqgeom)
+function TD_zeros(nfield::Int64,
+		 tgrid::Grid.M1D,
+		 acqgeom::Acquisition.Geom
+		 )
+	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],
+    				nfield,tgrid,acqgeom)
 end
 
 """
 Check if zeros
 """
 function TD_iszero(data::TD)
-	return maximum(broadcast(maximum,data.d)) == 0.0 ? true : false
+	return maximum(broadcast(maximum,broadcast(abs,data.d))) == 0.0 ? true : false
 end
 
 
@@ -66,9 +70,7 @@ end
 normalize time-domain seismic data
 """
 function TD_normalize(data::TD, attrib::Symbol)
-	nr = data.acqgeom.nr;
-	nss = data.acqgeom.nss;
-	nt = data.tgrid.nx;
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
 	datan = deepcopy(data);
 	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
 		if(attrib == :recrms)
@@ -111,5 +113,25 @@ function TD_urpos(d::Array{Float64},
 	return TD(dout, nfield, tgrid, acq)
 
 end
+
+"""
+Apply SR to TD
+"""
+function TDcoup(
+	       r::TD,
+	       w::Coupling.TD,
+	       )
+	nr = r.acqgeom.nr;	nss = r.acqgeom.nss;	nt = r.tgrid.nx;
+	s =  deepcopy(r)
+	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
+		# receiver coupling
+	#	DSP.fast_filt!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],
+#		 w.rf[iss, ifield][:,ir],:s)
+		# source coupling
+		DSP.fast_filt!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],
+		 w.ssf[iss, ifield][:],:s)
+	end
+end # TDcoup
+
 
 end # module

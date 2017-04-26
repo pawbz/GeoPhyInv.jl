@@ -7,9 +7,17 @@ import SIT.Data
 
 """
 enhance diffractions in the `TD`
+
+# Keyword Arguments
+
+`λdom::Float64=0.0` : distance between receivers must be greater than twice central wavelength, 2*λdom (Shapiro 2005)
+`tlag::Float64=data.tgrid.x[end]-data.tgrid.x[1]` : maximum lag time in the output traces 
+
 """
 function TD_virtual_diff(
-			 data::Data.TD,
+			 data::Data.TD;
+			 λdom::Float64=0.0,
+			 tlag::Float64=data.tgrid.x[end]-data.tgrid.x[1]
 			)
 
 	nr = maximum(data.acqgeom.nr);	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
@@ -19,12 +27,11 @@ function TD_virtual_diff(
 
 
 	# get unique receiver postions; a virtual source at each
-	urpos = Acquisition.Geom_get(data.acqgeom,:urpos)
-	nur = Acquisition.Geom_get(data.acqgeom,:nur)
+	urpos = Acquisition.Geom_get([data.acqgeom],:urpos)
+	nur = Acquisition.Geom_get([data.acqgeom],:nur)
 
 	# central wavelength (use zero for testing)
-	λ = 0.0;
-	println(string("dominant wavelength in the data:\t",λ))
+	println(string("dominant wavelength in the data:\t",λdom))
 
 	rx = Array(Vector{Float64}, nur); rz = Array(Vector{Float64}, nur);
 	datmat = zeros(2*nt-1, nur, nur, data.nfield);
@@ -39,9 +46,9 @@ function TD_virtual_diff(
 				rpos0 = [urpos[1][ir], urpos[2][ir]];
 				δrpos = sqrt((rpos[1] - rpos0[1])^2 + (rpos[2] - rpos0[2])^2)
 			
-				# the distance between receivers must be greater than 2λ
-				# here λ is the central wavelength (Shapiro 2005)
-				if(δrpos > 2.*λ)
+				# the distance between receivers must be greater than 2λdom
+				# here λdom is the central wavelength (Shapiro 2005)
+				if(δrpos > 2.*λdom)
 
 					# find sources that shoot at these two receivers
 					sson = Acquisition.Geom_find(data.acqgeom; rpos=rpos, rpos0=rpos0)
@@ -83,14 +90,18 @@ function TD_virtual_diff(
 	nvs = length(rx) == length(sx) ? length(sx) : error("some error")
 
 	# geom
-	vacqgeom = Acquisition.Geom(sx, sz, rx, rz, nvs, fill(1,nss), 
+	vacqgeom = Acquisition.Geom(sx, sz, rx, rz, nvs, fill(1,nvs), 
 			     [length(rx[ir]) for ir=1:length(rx)])
 
 	# tgrid after correlation
 	dt = data.tgrid.x[end]-data.tgrid.x[1]
 	tgridxcorr=Grid.M1D(-dt, +dt, data.tgrid.δx)
+	
+	tlag > 0.0 ? tgridcut=Grid.M1D(-tlag, +tlag, data.tgrid.δx) : error("tlag < 0")
 
-	return Data.TD_urpos(datmat,data.nfield,tgridxcorr,vacqgeom,nur,urpos)
+	return Data.TD_resamp(
+		       Data.TD_urpos(datmat,data.nfield,tgridxcorr,vacqgeom,nur,urpos), 
+		       tgridcut)
 
 end
 

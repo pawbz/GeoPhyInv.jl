@@ -43,15 +43,29 @@ function TD(x::Data.TD, y::Data.TD
 
 	f = 0.0;
 	for ifield=1:x.nfield, iss=1:acq.nss, ir=1:acq.nr[iss]
-		diff = x.d[iss, ifield][:,ir] - y.d[iss, ifield][:,ir];
-		f += sum((diff).^2)
-		δx.d[iss, ifield][:,ir] = 2.*diff
+		ft, δx.d[iss, ifield][:,ir] = fg_cls(x.d[iss, ifield][:,ir], y.d[iss, ifield][:,ir]);
+		f += ft;
 	end
+	f == 0.0 ? warn("misfit is zero") : nothing
 
 	# check for zeros
 	Data.TD_iszero(δx) ? error("δx cannot be zero") : nothing
 
 	return f, δx
+end
+
+
+function fg_cls{N}(x::Array{Float64,N}, y::Array{Float64,N})
+	size(x) == size(y) ? nothing : error("size mismatch")
+	diff = x - y
+	f = sum((vec(diff)).^2)
+	δx = 2.0 .* diff
+	return f, δx
+end
+
+function fg_cls_conv(r, s, w)
+
+
 end
 
 

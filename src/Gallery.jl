@@ -38,7 +38,7 @@ Gallery of `M1D` grids.
 """
 function M1D(attrib::Symbol)
 	if(attrib == :acou_homo1)
-		return Grid.M1D(0.0,0.5,1000)
+		return Grid.M1D(0.0,2.0,1000)
 	elseif(attrib == :npow2samp)
 		return Grid.M1D(npow2=16,δ=0.0001)
 	else

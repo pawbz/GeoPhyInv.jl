@@ -19,7 +19,7 @@ Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used
 * `jobname` : dominant frequency
 * `npropwav` : number of wavefields propagating independently in the same medium time-domain grid
 * `model` : Seismic Model
-* `model0` : Background Seismic Model used for Born modeling 
+* `model_pert` : Perturbed Seismic Model used for Born modeling 
 * `tgridmod` : time grid for modeling
 * `tgrid` : time grid for data output
 * `recv_nfield::Int64=1` : number of fields that receivers record 
@@ -29,15 +29,15 @@ Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used
 
 # Example
 ```julia
-julia> records, boundary_save  = fdtd_mod();
+julia> records, boundary_save  = mod();
 ```
 Credits: Pawan Bharadwaj, 2017
 """
-function fdtd_mod(;
+function mod(;
 		  jobname::AbstractString = "Hello",
 		  npropwav::Int64 = 1, 
 		  model::Models.Seismic = Gallery.Seismic(:acou_homo1),
-		  model0::Models.Seismic = model,
+		  model_pert::Models.Seismic = model,
 		  tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
 		  tgrid::Grid.M1D = tgridmod,
 		  acqgeom::Array{Acquisition.Geom} = [Gallery.Geom(:acou_homo1)],
@@ -63,8 +63,8 @@ freqmin = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min)
 freqmax = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
 
 # minimum and maximum velocities
-vpmin = minimum(broadcast(minimum,[Models.Seismic_get(model,:vp), Models.Seismic_get(model0,:vp)]))
-vpmax = maximum(broadcast(maximum,[Models.Seismic_get(model,:vp), Models.Seismic_get(model0,:vp)]))
+vpmin = minimum(broadcast(minimum,[Models.Seismic_get(model,:vp), Models.Seismic_get(model_pert,:vp)]))
+vpmax = maximum(broadcast(maximum,[Models.Seismic_get(model,:vp), Models.Seismic_get(model_pert,:vp)]))
 verbose ? println("minimum and maximum velocities:\t",vpmin,"\t",vpmax) : nothing
 
 
@@ -91,7 +91,7 @@ all(tgridmod.δx .> dt_temp) ?
 
 # all the propagating wavefield should have same sources, receivers, ? check that?
 
-# check dimension of model and model0
+# check dimension of model and model_pert
 
 # check if all sources are receivers are inside model
 
@@ -125,15 +125,9 @@ end
 
 recv_out = zeros(tgridmod.nx*recv_n*recv_nfield*npropwav*src_nseq)
 
-if(born_flag)
-	# extend models in the PML layers
-	exmodel = Models.Seismic_pad_trun(model0);
-	exmodel0 = Models.Seismic_pad_trun(model);
-else
-	# extend models in the PML layers
-	exmodel = Models.Seismic_pad_trun(model);
-	exmodel0 = Models.Seismic_pad_trun(model0);
-end
+# extend models in the PML layers
+exmodel = Models.Seismic_pad_trun(model);
+exmodel_pert = Models.Seismic_pad_trun(model_pert);
 
 # gradient outputs
 grad_modtt = zeros(exmodel.mgrid.nz, exmodel.mgrid.nx,src_nseq) 
@@ -178,7 +172,7 @@ ccall( (:fdtd_mod, F90libs.fdtd), Void,
        ),
       jobname, npropwav,     
       Models.Seismic_get(exmodel, :KI), Models.Seismic_get(exmodel, :ρI),
-      Models.Seismic_get(exmodel0, :KI), Models.Seismic_get(exmodel0, :ρI),
+      Models.Seismic_get(exmodel_pert, :KI), Models.Seismic_get(exmodel_pert, :ρI),
       exmodel.mgrid.nx, exmodel.mgrid.nz,    exmodel.mgrid.δx, exmodel.mgrid.δz,
       exmodel.mgrid.x, exmodel.mgrid.z,      model.mgrid.npml-5, # reduce npml by one, see fdtd.f90
       abs_trbl, 
@@ -211,7 +205,7 @@ gmodel = Models.Seismic_grad(model, grad_modtt, grad_modrr)
 
 # return after forming a vector and resampling
 nd = src_nseq*tgridmod.nx*recv_n*recv_nfield; # number of samples for each iprop
-return [Data.TD_resamp(
+TDout = [Data.TD_resamp(
 		       Data.TD_urpos(
 		       reshape(recv_out[1+(iprop-1)*nd : iprop*nd],
 		 	tgridmod.nx,recv_n,src_nseq,recv_nfield),
@@ -219,9 +213,10 @@ return [Data.TD_resamp(
 			tgridmod, acqgeom[iprop],
 			acqgeom_urpos[1].nr[1],
 			(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
-			), tgrid) for iprop in 1:npropwav], 
-			(flipdim(border_out,2), flipdim(p_out,5)),
-		gmodel
+			), tgrid) for iprop in 1:npropwav]
+
+# return data depending on the receiver flags
+return TDout[findn(recv_flags .!= 0)], (flipdim(border_out,2), flipdim(p_out,5)), gmodel
 
 # return without resampling for testing
 #return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),

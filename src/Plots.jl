@@ -129,17 +129,33 @@ end
 
 """
 Plot seismic model
+
+# Arguments
+* `model::Models.Seismic` = 
+# Keyword Arguments
+* `xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]]` : 
+* `zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]]` : 
 """
-function Seismic(model::Models.Seismic)
+function Seismic(model::Models.Seismic; 
+		 xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]],
+		 zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]] 
+		 )
+	#indices
+	ixmin = findfirst(model.mgrid.x, xlim[1]); ixmax = findfirst(model.mgrid.x, xlim[2])
+	izmin = findfirst(model.mgrid.z, zlim[1]); izmax = findfirst(model.mgrid.z, zlim[2])
 	subplot(121)
-	ax = imshow(Models.χ(model.χvp,model.vp0,-1), cmap="gray",
-	         extent=[model.mgrid.x[1], model.mgrid.x[end], model.mgrid.z[end], model.mgrid.z[1],]);
+	ax = imshow(Models.χ(model.χvp[izmin:izmax,ixmin:ixmax],model.vp0,-1), 
+	     cmap="gray",
+	         extent=[model.mgrid.x[ixmin], 
+		  model.mgrid.x[ixmax], model.mgrid.z[izmax], model.mgrid.z[izmin],]);
 		 xlabel(L"$x$ (m)");
 		 ylabel(L"$z$ (m)");
 		 colorbar();
 	subplot(122)
-	ax = imshow(Models.χ(model.χρ,model.ρ0,-1), cmap="gray",
-	         extent=[model.mgrid.x[1], model.mgrid.x[end], model.mgrid.z[end], model.mgrid.z[1],]);
+	ax = imshow(Models.χ(model.χρ[izmin:izmax,ixmin:ixmax],model.ρ0,-1), 
+	     cmap="gray",
+	         extent=[model.mgrid.x[ixmin], 
+		  model.mgrid.x[ixmax], model.mgrid.z[izmax], model.mgrid.z[izmin],]);
 		 xlabel(L"$x$ (m)");
 		 ylabel(L"$z$ (m)");
 		 colorbar();
