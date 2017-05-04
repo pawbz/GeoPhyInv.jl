@@ -19,8 +19,19 @@ type M2D
 	npml::Int64
 	δx::Float64
 	δz::Float64
+	"adding conditions that are to be false while construction"
+	M2D(x, z, nx, nz, npml, δx, δz) = 
+		any([
+       		  δx < 0.0, length(x) != nx,
+       		  δz < 0.0, length(z) != nz
+		  ]) ? 
+		error("M2D construct") : new(x, z, nx, nz, npml, δx, δz)
 end
 
+"Logical operation for `M2D`"
+function M2D_isequal(grid1::M2D, grid2::M2D)
+	return all([(isequal(getfield(grid1, name),getfield(grid2, name))) for name in fieldnames(M2D)])
+end
 
 function M2D(xmin::Float64, xmax::Float64,
 	zmin::Float64, zmax::Float64,
@@ -42,6 +53,12 @@ function M2D(xmin::Float64, xmax::Float64,
 	nx = size(x,1); nz = size(x,1);
 	return M2D(x, z, nx, nz, npml, x[2]-x[1], z[2]-z[1])
 end
+
+"""
+2-D grid with a different sampling interval
+"""
+M2D_resamp(grid::M2D, δx::Float64, δz::Float64) = M2D(grid.x[1], grid.x[end], 
+					grid.z[1], grid.z[end], δx, δz, grid.npml)
 
 """
 Extend M2D by its npml grid points on all sides
@@ -122,7 +139,15 @@ type M1D
 	x::Array{Float64}
 	nx::Int64
 	δx::Float64
-#	OrderedPair(x,y) = x > y ? error("out of order") : new(x,y)
+	"adding conditions that are to be false while construction"
+	M1D(x, nx, δx) = 
+		any([δx < 0.0, length(x) != nx]) ? 
+			error("M1D construct") : new(x, nx, δx)
+end
+
+"Logical operation for `M1D`"
+function M1D_isequal(grid1::M1D, grid2::M1D)
+	return all([(isequal(getfield(grid1, name),getfield(grid2, name))) for name in fieldnames(M1D)])
 end
 
 """

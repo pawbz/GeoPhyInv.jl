@@ -65,6 +65,17 @@ function TD_iszero(data::TD)
 	return maximum(broadcast(maximum,broadcast(abs,data.d))) == 0.0 ? true : false
 end
 
+"""
+Returns dot product of the data
+"""
+function TD_dot(data1::TD, data2::TD)
+	dotd = 0.0;
+	for ifield = 1:data1.nfield, iss = 1:data1.acqgeom.nss, ir = 1:data1.acqgeom.nr[iss]
+		dotd += dot(data1.d[iss, ifield][:, ir],data2.d[iss, ifield][:, ir])
+	end
+	return dotd
+end
+
 
 """
 normalize time-domain seismic data

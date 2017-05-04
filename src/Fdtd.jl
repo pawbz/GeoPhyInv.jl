@@ -201,7 +201,12 @@ grad_modtt = Models.pad_trun(squeeze(sum(grad_modtt,3),3),model.mgrid.npml,-1);
 grad_modrr = Models.pad_trun(squeeze(sum(grad_modrr,3),3),model.mgrid.npml,-1);
 
 # for gradient model (change this, incorrect)
-gmodel = Models.Seismic_grad(model, grad_modtt, grad_modrr)
+gmodel = Models.Seismic_zeros(model.mgrid)
+Models.Seismic_chainrule!(gmodel, model, 
+			     vec(Models.χg(grad_modtt, Models.Seismic_get(model,:K0I),1)),
+			     vec(Models.χg(grad_modrr, Models.Seismic_get(model,:ρ0I),1)),
+			     [:χKI, :χρI]
+			     )
 
 # return after forming a vector and resampling
 nd = src_nseq*tgridmod.nx*recv_n*recv_nfield; # number of samples for each iprop

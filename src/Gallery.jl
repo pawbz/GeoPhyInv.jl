@@ -14,11 +14,15 @@ Gallery of `M2D` grids.
 # Outputs
 * `attrib=:acou_homo1` : a square grid for with 201 samples in each dimension, with 50 PML 
 		points; both X and Z vary from -1000 to 1000.
+* `attrib=:acou_homo2` : a square grid for with 51 samples in each dimension, with 50 PML 
+		points; both X and Z vary from -1000 to 1000. 
 """
 
 function M2D(attrib::Symbol)
 	if(attrib == :acou_homo1)
 		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,201,201,50)
+	elseif(attrib == :acou_homo2)
+		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,51,51,50)
 	else
 		error("invalid attrib")
 	end
@@ -39,6 +43,8 @@ Gallery of `M1D` grids.
 function M1D(attrib::Symbol)
 	if(attrib == :acou_homo1)
 		return Grid.M1D(0.0,2.0,1000)
+	elseif(attrib == :acou_homo2)
+		return Grid.M1D(0.0,2.0,250)
 	elseif(attrib == :npow2samp)
 		return Grid.M1D(npow2=16,δ=0.0001)
 	else
@@ -61,11 +67,11 @@ Gallery of `Seismic` models.
 """
 
 function Seismic(attrib::Symbol)
-	if(attrib == :acou_homo1)
+	if((attrib == :acou_homo1) | (attrib == :acou_homo2))
 		vp0 = 2000.0;
 		vs0 = 0.0;
 		ρ0 = 2000.0;
-		mgrid = M2D(:acou_homo1)
+		mgrid = M2D(attrib)
 		return Models.Seismic(vp0, vs0, ρ0,
 		      fill(0.0, (mgrid.nz, mgrid.nx)),
 		      fill(0.0, (mgrid.nz, mgrid.nx)),
@@ -107,7 +113,7 @@ Gallery of acquisition geometries `Geom`.
 * `attrib=:acou_homo1` : a simple one source and one receiver configuration
 """
 function Geom(attrib::Symbol)
-	if(attrib == :acou_homo1)
+	if((attrib == :acou_homo1) | (attrib == :acou_homo2))
 		return Acquisition.Geom_fixed(-300.0,-300.0,-300.0,300.0,300.0,300.0,1,1)
 	else
 		error("invalid attrib")
@@ -186,8 +192,12 @@ Gallery of source signals `Src`.
 """
 function Src(attrib::Symbol, nss::Int64=1)
 	if(attrib == :acou_homo1)
-		tgrid = M1D(:acou_homo1)
+		tgrid = M1D(attrib)
 		wav = Wavelets.ricker(fqdom=10.0, tgrid=tgrid, tpeak=0.25, )
+		return Acquisition.Src_fixed(nss, 1, 1, wav, tgrid)
+	elseif(attrib == :acou_homo2)
+		tgrid = M1D(attrib)
+		wav = Wavelets.ricker(fqdom=3.0, tgrid=tgrid, tpeak=0.3, )
 		return Acquisition.Src_fixed(nss, 1, 1, wav, tgrid)
 	elseif(attrib == :vecacou_homo1)
 		tgrid = M1D(:acou_homo1)

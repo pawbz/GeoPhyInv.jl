@@ -1,5 +1,6 @@
 module Models
 
+
 import SIT.Grid
 import SIT.IO
 using Interpolations
@@ -23,6 +24,17 @@ type Seismic
 	χvs::Array{Float64}
 	χρ::Array{Float64}
 	mgrid::Grid.M2D
+	"adding conditions that are to be false while construction"
+	Seismic(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid) = 
+		any([
+       	 	     vp0<0.0, 
+		     vs0<0.0,
+		     ρ0<0.0,
+		     size(χvp) != (length(mgrid.z), length(mgrid.x)),
+		     size(χvs) != (length(mgrid.z), length(mgrid.x)),
+		     size(χρ) != (length(mgrid.z), length(mgrid.x))
+		    ]) ? 
+		       error("Seismic construct") : new(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid)
 end
 
 """
@@ -36,6 +48,31 @@ function Seismic_zeros(mgrid::Grid.M2D)
 	return Seismic(0.0, 0.0, 0.0, zeros(mgrid.nz, mgrid.nx), zeros(mgrid.nz, mgrid.nx),
 		zeros(mgrid.nz, mgrid.nx), mgrid)
 end
+
+function Seismic_iszero(mod::Seismic)
+	return mod.vp0 * mod.ρ0 == 0.0 ? true : false
+end
+
+"Logical operation for `Seismic`"
+function Seismic_isequal(mod1::Seismic, mod2::Seismic)
+	fnames = fieldnames(Seismic)
+	pop!(fnames) # last one has different isequal
+	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
+	push!(vec, Grid.M2D_isequal(mod1.mgrid, mod2.mgrid))
+	return all(vec)
+end
+
+"Logical operation for `Seismic`"
+function Seismic_issimilar(mod1::Seismic, mod2::Seismic)
+	return Grid.M2D_isequal(mod1.mgrid, mod2.mgrid)
+end
+
+"Logical operation for `Seismic`"
+function Seismic_issimilar(mod1::Seismic, grid::Grid.M2D)
+	return Grid.M2D_isequal(mod1.mgrid, grid)
+end
+
+
 
 """
 Get other dependent model parameters of a seismic model
@@ -84,56 +121,119 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 end
 
 """
-Output gradient due to other parameters
+Use chain rule to output gradients after
+re-parameterization.
+
+# Arguments
+* `gmod::Seismic` : gradient model 
+* `mod::Seismic` : model 
+* `attribs::Vector{Symbol}` : parameterization, for example [:χKI, :χρI]
+* `g1::Vector{Float64}` : 
+* `g2::Vector{Float64}` : 
 """
-function Seismic_getgrad(mod::Seismic, attrib::Symbol)
-	gvp = mod.χvp / mod.vp0;
-	gρ = mod.χρ / mod.ρ0;
+function Seismic_getgrad!(gmod::Seismic, 
+			  mod::Seismic, 
+			  attribs::Vector{Symbol}, 
+			  g1::Vector{Float64}, g2::Vector{Float64})
+	gvp = vec(χg(gmod.χvp, mod.vp0, -1))
+	gρ = vec(χg(gmod.χρ, mod.ρ0, -1))
 	K0 = Seismic_get(mod, :K0)
-	ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
-	ρ = Seismic_get(mod,:ρ)
+	ρI = vec(Seismic_get(mod,:ρI));	vp = vec(Seismic_get(mod,:vp))
+	ρ = vec(Seismic_get(mod,:ρ)); ρ0 = mod.ρ0 
 
-	if(attrib == :χK_χρ)
-		g1 = 0.5 .* K0 * gvp .* ρI .* vp.^(-1)
-		g2 = (gρ .* ρ0) - (0.5 .* ρ0 .* (gvp) .* (vp) ./ (ρ) )
-	elseif(attrib == :χKI_χρI)
-		g1 =  -0.5 .* K0^(-1) .* gvp .* ρ .*  vp.^(3.)
-		g2 = (gρ .* ρ0^(-1) .* (-1.) .*  (ρ.^(2))) +
-			 (0.5 * ρ0^(-1.) .* (gvp) .*  (vp) .* (ρ))
+	nznx = mod.mgrid.nz * mod.mgrid.nx;
+	if(attribs == [:χK, :χρ])
+		g1[1:nznx] = copy(0.5 .* K0 * gvp .* ρI .* vp.^(-1))
+		g2[1:nznx] = copy((gρ .* ρ0) - (0.5 .* ρ0 .* (gvp) .* (vp) ./ (ρ) ))
+	elseif(attribs == [:χKI, :χρI])
+		g1[1:nznx] =  copy(-0.5 .* K0^(-1) .* gvp .* ρ .*  vp.^(3.))
+		g2[1:nznx] = copy((gρ .* ρ0^(-1) .* (-1.) .*  (ρ.^(2))) +
+		    (0.5 * ρ0^(-1.) .* (gvp) .*  (vp) .* (ρ)))
 	else
-		error("invalid attrib")
+		error("invalid attribs")
 	end
-
 	return g1, g2
-
 end
 
 """
-Create a gradient model using 
+Re-parameterization routine 
+that modifies the fields 
+`χvp` and `χρ` of an input seismic model
+using two input vectors.
+
+# Arguments
+
+* `mod::Seismic` : to be updated
+* `x1::Array{Float64,2}` : contrast of inverse bulk modulus
+* `x2::Array{Float64,2}` : contrast of inverse density
+* `attribs:::Vector{Symbol}` : [:χKI, :χρI]
 """
-function Seismic_grad(mod::Seismic,
-		      gKI::Array{Float64,2},
-		      gρI::Array{Float64,2})
+function Seismic_reparameterize!(
+	              mod::Seismic,
+		      x1::Array{Float64,2},
+		      x2::Array{Float64,2},
+		      attribs::Vector{Symbol}=[:χKI, :χρI]
+		      )
+	if(attribs = [:χKI, :χρI]) 
+		ρ = (χ(x2, Seismic_get(mod, :ρ0I), -1)).^(-1)
+		K = (χ(x1, Seismic_get(mod, :K0I), -1)).^(-1)
+		vp = broadcast(sqrt, (K .* (χ(x2, Seismic_get(mod, :ρ0I), -1))))
+		mod.χvp = copy(χ(vp, mod.vp0, 1))
+		mod.χρ = copy(χ(ρ, mod.ρ0, 1))
+	else
+		error("invalid attribs")
+	end
+end
 
-	vp0 = mod.vp0;	vs0 = mod.vs0;	ρ0 = mod.ρ0
-	ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
-	Zp = Seismic_get(mod,:Zp)
+"""
+Use chain rule to output gradients with 
+respect to χvp and χρ from  gradients 
+with respect to KI and ρI.
 
-	# gradient w.r.t  χρ
-	gχρ = (-1. .* ρI.^2 .* gρI - (Zp).^(-2) .* gKI) .* ρ0
-	# gradient w.r.t χvp
-	gχvp = (-2. .* (vp).^(-3) .* ρI .* gKI) .* vp0
-	# to be implemented later
-	gχvs = zeros(gχvp)
+# Arguments
+* `mod::Seismic` : model required for chain rule
+* `gKI` : gradient of an objective function with respect to KI
+* `gρI` : gradient of an objective function with respect to ρI
+"""
+function Seismic_chainrule!(
+		      gmod::Seismic,
+		      mod::Seismic,
+		      g1::Vector{Float64},
+		      g2::Vector{Float64},
+		      attribs::Vector{Symbol}=[:χKI, :χρI]
+		      )
 
-	return Seismic(vp0, vs0, ρ0, gχvp, gχvs, gχρ, mod.mgrid)
+	if(attribs = [:χKI, :χρI]) 
+		vp0 = mod.vp0;	vs0 = mod.vs0;	ρ0 = mod.ρ0
+		ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
+		Zp = Seismic_get(mod,:Zp)
 
+		gKI = χg(reshape(g1, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:K0I), -1)
+		gρI = χg(reshape(g2, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:ρ0I), -1)
+
+		# gradient w.r.t  χρ
+		gmod.χρ = copy(χg((-1. .* ρI.^2 .* gρI - (Zp).^(-2) .* gKI), ρ0, 1))
+		# gradient w.r.t χvp
+		gmod.χvp = copy(χg((-2. .* (vp).^(-3) .* ρI .* gKI), vp0, 1))
+		# to be implemented later
+		gmod.χvs = copy(zeros(gmod.χvp))
+		gmod.mgrid = deepcopy(mod.mgrid);	gmod.vp0 = copy(mod.vp0);	gmod.ρ0 = copy(mod.ρ0)
+
+		return gmod
+	else
+		error("invalid attribs")
+	end
 end
 
 
 """
-Return contrast model parameter using the
+Return dimensionless contrast model parameter using the
 reference value.
+
+# Arguments
+* `mod::Array{Float64}` : subsurface parameter
+* `mod0::Float64` : reference value
+* `flag::Int64=1` : 
 """
 function χ(mod::Array{Float64}, mod0::Float64, flag::Int64=1)
 	if(flag == 1)
@@ -150,9 +250,9 @@ reference value.
 """
 function χg(mod::Array{Float64}, mod0::Float64, flag::Int64=1)
 	if(flag == 1)
-		return	mod * mod0^(-1.0)
-	elseif(flag == -1)
 		return  mod * mod0
+	elseif(flag == -1)
+		return	mod * mod0^(-1.0)
 	end
 end
 
@@ -243,10 +343,12 @@ end
 
 """
 function to resample in the model domain
+
+# Arguments
+* `mod::Seismic` : model
+* `modi::Seismic` : model after interpolation
 """
-function Seismic_resamp(mod::Seismic,
-		mgrid::Grid.M2D
-		)
+function Seismic_interp_spray!(mod::Seismic, mod_out::Seismic, attrib::Symbol)
 
 	itpvp = interpolate((mod.mgrid.z, mod.mgrid.x),
 		     mod.χvp, 
@@ -259,12 +361,22 @@ function Seismic_resamp(mod::Seismic,
 		     mod.χρ, 
 		     Gridded(Linear()))
 
-	return Seismic(mod.vp0, mod.vs0, mod.ρ0, 
-		itpvp[mgrid.z, mgrid.x], 
-		itpvs[mgrid.z, mgrid.x],
-		itpρ[mgrid.z, mgrid.x],
-			      mgrid)
+	if(attrib == :interp) 
+		mod_out.χvp = copy(itpvp[mod_out.mgrid.z, mod_out.mgrid.x])
+		mod_out.χρ = copy(itpρ[mod_out.mgrid.z, mod_out.mgrid.x])
+		mod_out.χvs = copy(itpvs[mod_out.mgrid.z, mod_out.mgrid.x])
 
+	elseif(attrib == :spray)
+
+		mod_out.χvp = copy(gradient(itpvp[mod_out.mgrid.z, mod_out.mgrid.x]))
+		mod_out.χρ = copy(gradient(itpρ[mod_out.mgrid.z, mod_out.mgrid.x]))
+		mod_out.χvs = copy(gradient(itpvs[mod_out.mgrid.z, mod_out.mgrid.x]))
+
+	else
+		error("invalid flag")
+	end
+	mod_out.vp0 = copy(mod.vp0); mod_out.vs0 = copy(mod.vs0); 
+	mod_out.ρ0 = copy(mod.ρ0);
 end
 #
 #macro inter
