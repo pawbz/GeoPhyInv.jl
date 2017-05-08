@@ -69,7 +69,7 @@ Gallery of `Seismic` models.
 function Seismic(attrib::Symbol)
 	if((attrib == :acou_homo1) | (attrib == :acou_homo2))
 		vp0 = 2000.0;
-		vs0 = 0.0;
+		vs0 = 1.0;
 		ρ0 = 2000.0;
 		mgrid = M2D(attrib)
 		return Models.Seismic(vp0, vs0, ρ0,

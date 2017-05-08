@@ -56,6 +56,7 @@ end
 FWI using Optim
 
 # Arguments
+* `dobs::Data.TD=Data.TD_zeros(1,pa.tgrid,pa.acqgeom)` : input observed data
 """
 function xfwi(
 	      pa::Param;
@@ -75,8 +76,9 @@ function xfwi(
 	end
 
 	last_x = rand(size(last_x)) # reset last_x
-	# replace x with initial model
-	Seismic_x!(model_init, x, pa, 1)
+	modi = Models.Seismic_zeros(pa.igrid);
+	# replace x and modi with initial model
+	Seismic_x!(model_init, modi, x, pa, 1)
 
 	if(pa.attrib_inv == :cls)
 		df = OnceDifferentiable(x -> func(x, last_x, dobs, pa),
@@ -97,21 +99,22 @@ function xfwi(
 		       show_trace = false))
 
 		# convert gradient vector to model
-		gmod = deepcopy(model_init); 
-		Seismic_gx!(gmod,model_init,Optim.trace(res)[1].metadata["g(x)"],pa,-1)
+		gmodi = Models.Seismic_zeros(pa.igrid); 
+		gmodm = Models.Seismic_zeros(pa.mgrid); 
+		Seismic_gx!(gmodm,model_init,gmodi,modi,Optim.trace(res)[1].metadata["g(x)"],pa,-1)
 
-		return gmod, dobs
+		return gmodi, dobs
 	elseif(pa.attrib_inv == :migr_finite_difference)
 
 		gx = similar(x);
 		gx = finite_difference!(x -> func(x, last_x, dobs, pa), x, gx, :central)
 
 		# convert gradient vector to model
-		gmod = Models.Seismic_zeros(pa.igrid); 
-		Models.Seismic_chainrule!(gmod, mod, g1, g2, pa.parameterization)
-		Seismic_gx!(gmod,model_init,gx,pa,-1)
+		gmodi = Models.Seismic_zeros(pa.igrid); 
+		gmodm = Models.Seismic_zeros(pa.mgrid); 
+		Seismic_gx!(gmodm,model_init,gmodi,modi,gx,pa,-1)
 
-		return gmod, dobs
+		return gmodi, dobs
 
 	else
 		error("invalid pa.attrib_inv")
@@ -230,7 +233,7 @@ function grad!(x::Vector{Float64}, storage::Vector{Float64},
 
 	# preallocate model
 	modm = Models.Seismic_zeros(pa.mgrid);
-	modi = Models.Seismic_zeros(pa.mgrid);
+	modi = Models.Seismic_zeros(pa.igrid);
 	# x to model
 	Seismic_x!(modm, modi, x, pa, -1)		
 
@@ -242,7 +245,7 @@ function grad!(x::Vector{Float64}, storage::Vector{Float64},
 
 		
 		# adjoint simulation
-		adj = Fdtd.mod(npropwav=2, model=mod,
+		adj = Fdtd.mod(npropwav=2, model=modm,
 		     acqgeom=[pa.acqgeom,adjacq], acqsrc=[acqsrcsink, adjsrc], src_flags=[2.0, -2.0], 
 		     tgridmod=dobs.tgrid, grad_out_flag=true, boundary_in=buffer[2], verbose=false)
 
@@ -267,8 +270,9 @@ function grad!(x::Vector{Float64}, storage::Vector{Float64},
 		error("invalid pa.attrib_mod")
 	end
 
+	gmodi = Models.Seismic_zeros(pa.igrid);
 	# convert gradient model to gradient vector
-	Seismic_gx!(adj[3],mod,storage,pa,1) 
+	Seismic_gx!(adj[3],modm,gmodi,modi,storage,pa,1) 
 
 	return storage
 end # grad!
@@ -292,6 +296,8 @@ function Seismic_x!(
 		    pa::Param, 
 		    flag::Int64)
 	if(flag ==1) # convert modm or modi to x
+		all([Models.Seismic_iszero(modm), Models.Seismic_iszero(modi)]) ? 
+					error("input modi or modm") : nothing
 
 		# 1. get modi using interpolation and modm
 		Models.Seismic_iszero(modm) ? nothing : Models.Seismic_interp_spray!(modm, modi, :interp)
@@ -303,12 +309,13 @@ function Seismic_x!(
 
 	elseif(flag == -1) # convert x to mod
 		nznx = pa.igrid.nz*pa.igrid.nx
+		modi.mgrid = deepcopy(pa.igrid); 
+		modi.vp0 = pa.vp0; modi.vs0 = pa.vs0; modi.ρ0 = pa.ρ0;
 		# 1. re-parameterization on the inversion grid
 		Models.Seismic_reparameterize!(modi, reshape(x[1:nznx],pa.igrid.nz, pa.igrid.nx), 
 			     reshape(x[nznx+1:2*nznx],pa.igrid.nz,pa.igrid.nx), pa.parameterization)
 
 		# 2. interpolation from the inversion grid to the modelling grid
-		modi.mgrid = deepcopy(pa.igrid); 
 		modm.mgrid = deepcopy(pa.mgrid); 
 		Models.Seismic_interp_spray!(modi, modm, :interp)
 	else
@@ -322,38 +329,52 @@ Convert gradient vector to `Seismic` type and vice versa
 This will be different from the previous one, once 
 the parameterizations come in
 
-* `gmod::Models.Seismic` 
+* `gmodm::Models.Seismic` : gradient model on the modelling grid
+* `modm::Models.Seismic` : model on the modelling grid
+* `gmodi::Models.Seismic` : gradient model on the inversion grid
+* `modi::Models.Seismic` : model on the inversion grid
+* `gx::Vector{Float64}` : gradient vector
+* `pa::Param` :
 * `flag::Int64` :
   * `=1` update the vector `gx` using `gmod`
   * `=-1` update gmod 
 """
-function Seismic_gx!(gmod::Models.Seismic,
-		     mod:: Models.Seismic,
-		       gx::Vector{Float64},
-		       pa::Param,
-		       flag::Int64 
+function Seismic_gx!(gmodm::Models.Seismic,
+		     modm:: Models.Seismic,
+		     gmodi::Models.Seismic,
+		     modi::Models.Seismic,
+	             gx::Vector{Float64},
+	             pa::Param,
+	             flag::Int64 
 		      )
-	nznx=mod.mgrid.nz*mod.mgrid.nx
+	nznx=modi.mgrid.nz*modi.mgrid.nx
 	g1=zeros(nznx); g2 =zeros(nznx)
-	Models.Seismic_issimilar(gmod, mod) ? nothing : error("gmod, mod dimensions")
+	Models.Seismic_issimilar(gmodm, modm) ? nothing : error("gmodm, modm dimensions")
+	Models.Seismic_issimilar(gmodi, modi) ? nothing : error("gmodi, modi dimensions")
 	length(gx) == fwi_ninv(pa) ? nothing : error("gx dimensions")
 	if(flag ==1) # convert gmod to gx
 
+		# either gmodi or gmodm should be nonzero
+		all([Models.Seismic_iszero(gmodm), Models.Seismic_iszero(gmodi)]) ? 
+					error("input gmodi or gmodm") : nothing
 
-		# 1. spray gradient values from modelling grid to the inversion grid
-		Models.Seismic_interp_spray!(gmod, gmodinv, :spray)
+		# 1. update gmodi by spraying gmodm
+		Models.Seismic_iszero(gmodm) ? nothing : Models.Seismic_interp_spray!(gmodm, gmodi, :spray)
 
-		# 2. chain rule on the inversion grid
-		Models.Seismic_getgrad!(gmod, mod, pa.parameterization, g1, g2)
+		# 2. chain rule on gmodi 
+		Models.Seismic_chainrule!(gmodi, modi, g1, g2, pa.parameterization,-1)
 
-		# 2
+		# 3. copy 
 		gx[1:nznx] = copy(g1);
 		gx[nznx+1:2*nznx] = copy(g2)
 	elseif(flag == -1) # convert gx to mod
 		# 1. chain rule depending on re-parameterization
 		#    and 
 		g1 = gx[1:nznx]; g2 = gx[nznx+1:2*nznx];
-		Models.Seismic_chainrule!(gmod, mod, g1, g2, pa.parameterization)
+		Models.Seismic_chainrule!(gmodi, modi, g1, g2, pa.parameterization, 1)
+
+		# 2. get gradient after interpolation (just for visualization, not exact)
+		Models.Seismic_interp_spray!(gmodi, gmodm, :interp)
 	else
 		error("invalid flag")
 	end
@@ -467,7 +488,7 @@ function finite_difference!{S <: Number, T <: Number}(f::Function,
 		error("dtype must be :forward or :central")
 	end
 
-	#g = copy(gpar);
+	g[:] = copy(gpar);
 	return g
 end
 

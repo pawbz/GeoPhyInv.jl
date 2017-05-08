@@ -121,41 +121,6 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 end
 
 """
-Use chain rule to output gradients after
-re-parameterization.
-
-# Arguments
-* `gmod::Seismic` : gradient model 
-* `mod::Seismic` : model 
-* `attribs::Vector{Symbol}` : parameterization, for example [:χKI, :χρI]
-* `g1::Vector{Float64}` : 
-* `g2::Vector{Float64}` : 
-"""
-function Seismic_getgrad!(gmod::Seismic, 
-			  mod::Seismic, 
-			  attribs::Vector{Symbol}, 
-			  g1::Vector{Float64}, g2::Vector{Float64})
-	gvp = vec(χg(gmod.χvp, mod.vp0, -1))
-	gρ = vec(χg(gmod.χρ, mod.ρ0, -1))
-	K0 = Seismic_get(mod, :K0)
-	ρI = vec(Seismic_get(mod,:ρI));	vp = vec(Seismic_get(mod,:vp))
-	ρ = vec(Seismic_get(mod,:ρ)); ρ0 = mod.ρ0 
-
-	nznx = mod.mgrid.nz * mod.mgrid.nx;
-	if(attribs == [:χK, :χρ])
-		g1[1:nznx] = copy(0.5 .* K0 * gvp .* ρI .* vp.^(-1))
-		g2[1:nznx] = copy((gρ .* ρ0) - (0.5 .* ρ0 .* (gvp) .* (vp) ./ (ρ) ))
-	elseif(attribs == [:χKI, :χρI])
-		g1[1:nznx] =  copy(-0.5 .* K0^(-1) .* gvp .* ρ .*  vp.^(3.))
-		g2[1:nznx] = copy((gρ .* ρ0^(-1) .* (-1.) .*  (ρ.^(2))) +
-		    (0.5 * ρ0^(-1.) .* (gvp) .*  (vp) .* (ρ)))
-	else
-		error("invalid attribs")
-	end
-	return g1, g2
-end
-
-"""
 Re-parameterization routine 
 that modifies the fields 
 `χvp` and `χρ` of an input seismic model
@@ -174,7 +139,8 @@ function Seismic_reparameterize!(
 		      x2::Array{Float64,2},
 		      attribs::Vector{Symbol}=[:χKI, :χρI]
 		      )
-	if(attribs = [:χKI, :χρI]) 
+	Seismic_iszero(mod) ? error("mod cannot be zero") :
+	if(attribs == [:χKI, :χρI]) 
 		ρ = (χ(x2, Seismic_get(mod, :ρ0I), -1)).^(-1)
 		K = (χ(x1, Seismic_get(mod, :K0I), -1)).^(-1)
 		vp = broadcast(sqrt, (K .* (χ(x2, Seismic_get(mod, :ρ0I), -1))))
@@ -194,35 +160,60 @@ with respect to KI and ρI.
 * `mod::Seismic` : model required for chain rule
 * `gKI` : gradient of an objective function with respect to KI
 * `gρI` : gradient of an objective function with respect to ρI
+* `flag::Int64=1` :
+  * `=1` updates `gmod` using `g1` and `g2`
+  * `=-1` updates `g1` and `g2` using `gmod`
 """
 function Seismic_chainrule!(
 		      gmod::Seismic,
 		      mod::Seismic,
 		      g1::Vector{Float64},
 		      g2::Vector{Float64},
-		      attribs::Vector{Symbol}=[:χKI, :χρI]
+		      attribs::Vector{Symbol}=[:χKI, :χρI],
+		      flag::Int64=1
 		      )
 
-	if(attribs = [:χKI, :χρI]) 
-		vp0 = mod.vp0;	vs0 = mod.vs0;	ρ0 = mod.ρ0
-		ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
-		Zp = Seismic_get(mod,:Zp)
+	if(flag == 1)
+		if(attribs == [:χKI, :χρI]) 
+			vp0 = mod.vp0;	vs0 = mod.vs0;	ρ0 = mod.ρ0
+			ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
+			Zp = Seismic_get(mod,:Zp)
 
-		gKI = χg(reshape(g1, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:K0I), -1)
-		gρI = χg(reshape(g2, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:ρ0I), -1)
+			gKI = χg(reshape(g1, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:K0I), -1)
+			gρI = χg(reshape(g2, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:ρ0I), -1)
 
-		# gradient w.r.t  χρ
-		gmod.χρ = copy(χg((-1. .* ρI.^2 .* gρI - (Zp).^(-2) .* gKI), ρ0, 1))
-		# gradient w.r.t χvp
-		gmod.χvp = copy(χg((-2. .* (vp).^(-3) .* ρI .* gKI), vp0, 1))
-		# to be implemented later
-		gmod.χvs = copy(zeros(gmod.χvp))
-		gmod.mgrid = deepcopy(mod.mgrid);	gmod.vp0 = copy(mod.vp0);	gmod.ρ0 = copy(mod.ρ0)
+			# gradient w.r.t  χρ
+			gmod.χρ = copy(χg((-1. .* ρI.^2 .* gρI - (Zp).^(-2) .* gKI), ρ0, 1))
+			# gradient w.r.t χvp
+			gmod.χvp = copy(χg((-2. .* (vp).^(-3) .* ρI .* gKI), vp0, 1))
+			# to be implemented later
+			gmod.χvs = copy(zeros(gmod.χvp))
+			gmod.mgrid = deepcopy(mod.mgrid);	gmod.vp0 = copy(mod.vp0);	gmod.ρ0 = copy(mod.ρ0)
+		else
+			error("invalid attribs")
+		end
+	elseif(flag == -1)
+		gvp = vec(χg(gmod.χvp, mod.vp0, -1))
+		gρ = vec(χg(gmod.χρ, mod.ρ0, -1))
+		K0 = Seismic_get(mod, :K0)
+		ρI = vec(Seismic_get(mod,:ρI));	vp = vec(Seismic_get(mod,:vp))
+		ρ = vec(Seismic_get(mod,:ρ)); ρ0 = mod.ρ0 
 
-		return gmod
+		nznx = mod.mgrid.nz * mod.mgrid.nx;
+		if(attribs == [:χK, :χρ])
+			g1[1:nznx] = copy(0.5 .* K0 * gvp .* ρI .* vp.^(-1))
+			g2[1:nznx] = copy((gρ .* ρ0) - (0.5 .* ρ0 .* (gvp) .* (vp) ./ (ρ) ))
+		elseif(attribs == [:χKI, :χρI])
+			g1[1:nznx] =  copy(-0.5 .* K0^(-1) .* gvp .* ρ .*  vp.^(3.))
+			g2[1:nznx] = copy((gρ .* ρ0^(-1) .* (-1.) .*  (ρ.^(2))) +
+			    (0.5 * ρ0^(-1.) .* (gvp) .*  (vp) .* (ρ)))
+		else
+			error("invalid attribs")
+		end
 	else
-		error("invalid attribs")
+		error("invalid flag")
 	end
+
 end
 
 
@@ -236,6 +227,7 @@ reference value.
 * `flag::Int64=1` : 
 """
 function χ(mod::Array{Float64}, mod0::Float64, flag::Int64=1)
+	(mod0 == 0) ? error("mod0 cannot be zero") : nothing
 	if(flag == 1)
 		return	((mod - mod0) * mod0^(-1.0))
 	elseif(flag == -1)
@@ -249,6 +241,7 @@ Return contrast model parameter using the
 reference value.
 """
 function χg(mod::Array{Float64}, mod0::Float64, flag::Int64=1)
+	(mod0 == 0) ? error("mod0 cannot be zero") : nothing
 	if(flag == 1)
 		return  mod * mod0
 	elseif(flag == -1)
@@ -368,12 +361,16 @@ function Seismic_interp_spray!(mod::Seismic, mod_out::Seismic, attrib::Symbol)
 
 	elseif(attrib == :spray)
 
-		mod_out.χvp = copy(gradient(itpvp[mod_out.mgrid.z, mod_out.mgrid.x]))
-		mod_out.χρ = copy(gradient(itpρ[mod_out.mgrid.z, mod_out.mgrid.x]))
-		mod_out.χvs = copy(gradient(itpvs[mod_out.mgrid.z, mod_out.mgrid.x]))
+
+		mod_out.χvp = copy(itpvp[mod_out.mgrid.z, mod_out.mgrid.x])
+		mod_out.χρ = copy(itpρ[mod_out.mgrid.z, mod_out.mgrid.x])
+		mod_out.χvs = copy(itpvs[mod_out.mgrid.z, mod_out.mgrid.x])
+		#mod_out.χvp = copy(gradient(itpvp, mod_out.mgrid.z, mod_out.mgrid.x))
+		#mod_out.χρ = copy(gradient(itpρ, mod_out.mgrid.z, mod_out.mgrid.x))
+		#mod_out.χvs = copy(gradient(itpvs, mod_out.mgrid.z, mod_out.mgrid.x))
 
 	else
-		error("invalid flag")
+		error("invalid attrib")
 	end
 	mod_out.vp0 = copy(mod.vp0); mod_out.vs0 = copy(mod.vs0); 
 	mod_out.ρ0 = copy(mod.ρ0);
