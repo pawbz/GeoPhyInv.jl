@@ -22,13 +22,13 @@ record waves.
 * `nr::Vector{Int64,1}` : number of receivers for every supersource 
 """
 type Geom
-	sx::Vector{Vector{Float64,1},1}
-	sz::Vector{Vector{Float64,1},1}
-	rx::Vector{Vector{Float64,1},1}
-	rz::Vector{Vector{Float64,1},1}
+	sx::Vector{Vector{Float64}}
+	sz::Vector{Vector{Float64}}
+	rx::Vector{Vector{Float64}}
+	rz::Vector{Vector{Float64}}
 	nss::Int64 # change to +ve only integer later
-	ns::Vector{Int64,1} # change to +ve only integer later
-	nr::Vector{Int64,1} # change to +ve only integer later
+	ns::Vector{Int64} # change to +ve only integer later
+	nr::Vector{Int64} # change to +ve only integer later
 	"adding conditions that are to be false while construction"
 	Geom(sx, sz, rx, rz, nss, ns, nr) = 
 		any([
@@ -42,7 +42,7 @@ type Geom
        		  length(rx) != nss 
 		  ]) ? 
 		error("Geom construct") : new(sx, sz, rx, rz, nss, ns, nr)
-end
+end # type
 
 """
 Return some derived fields of `Geom`

@@ -6,20 +6,28 @@ import SIT.Coupling
 using Interpolations
 
 """
-time domain representation of Seismic Data
+Time domain representation of Seismic Data.
 TODO: Also include acqsrc?
 
 # Fields
-* `d` : data first sorted in time, then in receivers, and finally in sources
-* `nfield` : number of components
-* `tgrid` : `M1D` grid to represent time
-* `acqgeom` : acquisition geometry
+* `d::Array{Array{Float64,2},2}` : data 
+* `nfield::Int64` : number of components at each receiver
+* `tgrid::Grid.M1D` : grid to represent time
+* `acqgeom::Acquisition.Geom` : geometry used to generate the data
 """
 type TD
 	d::Array{Array{Float64,2},2}
 	nfield::Int64
 	tgrid::Grid.M1D
 	acqgeom::Acquisition.Geom
+	"adding conditions that are to be false while construction"
+	TD(d, nfield, tgrid, acqgeom) = 
+		any([
+       		  nfield < 0.0,
+		  broadcast(size,d) != [(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield]
+		  ]) ? 
+		error("TD construct") : new(d, nfield, tgrid, acqgeom)
+
 end
 
 

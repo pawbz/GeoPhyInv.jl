@@ -2,7 +2,14 @@ module IO
 
 import SIT.F90libs
 
+"""
+Read an input SeismicUnix file and output 
+the time-domain data as `Data.TD`.
 
+# Arguments
+* `fname::AbstractString` : name of the SeismicUnix file
+TODO: conversion to `TD`, currently the ouput is just a data matrix.
+"""
 function readsu_data(;
 		     fname::AbstractString=""
 		     )
