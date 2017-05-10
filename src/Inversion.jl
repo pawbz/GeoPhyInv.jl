@@ -17,12 +17,14 @@ are fixed throughout the inversion
 
 # Fields
 
-* `mgrid` : modelling grid
-* `igrid` : inversion grid
-* `acqsrc` : base source wavelet for modelling data
-* `acqgeom` : acquisition geometry
-* `model0` : background velocity model (only used during Born modeling)
-* `parameterization` : a vector of Symbols specifying parameterization during inversion
+* `mgrid::Grid.M2D` : modelling grid
+* `igrid::Grid.M2D` : inversion grid
+* `acqsrc::Acquisition.Src` : base source wavelet for modelling data
+* `acqgeom::Acquisition.Geom` : acquisition geometry
+* `tgrid::Grid.M1D` : 
+* `attrib_mod::Symbol`
+* `model0` : background velocity model (only used during Born modeling and inversion)
+* `parameterization` : a vector of Symbols specifying parameterization of the inversion vector
 """
 type Param
 	"refe"

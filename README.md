@@ -1,5 +1,8 @@
 # SeismicInversionToolbox
 
+
+* We followed this documentation [![guide](http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/)](http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/)
+
 [![Build Status](https://travis-ci.org/pawbz/SIT.jl.svg?branch=master)](https://travis-ci.org/pawbz/SIT.jl)
 
 [![Coverage Status](https://coveralls.io/repos/pawbz/SIT.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/pawbz/SIT.jl?branch=master)

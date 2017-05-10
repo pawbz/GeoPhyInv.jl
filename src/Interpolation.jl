@@ -1,106 +1,250 @@
-module Models_Interpolation
+module Interpolation
+"""
+## TODO:
+* add dimension checks to interp_spray!
+* implement cubic 
+Reference: https://www.ibiblio.org/e-notes/Splines/bezier.html
 
+Return n indices in order
+Cannot find a julia method which does, this.
+If a faster method is found, replace it later.
+"""
+function indminn{T<:Real}(x::Vector{T}, n::Int64)
+	xc = copy(x);
+	((n >= 1) & (n <= length(x))) ? nothing : error("invalid n")
+	ivec = [];
+	for i in 1:n
+		ii = indmin(xc);
+		xc[ii] = typemax(T);
+		push!(ivec, ii)
+	end
+	return sort(ivec)
+end
+
+function interp_spray!{T1<:Real, T2<:Real}(xin::Vector{T1}, yin::Vector{T2},
+					   xout::Vector{T1}, yout::Vector{T2},
+					   attrib::Symbol,
+					   Battrib::Symbol=:B1
+					  )
+
+	if(Battrib == :B1)
+		np=2;
+		interp_func = interp_B1_1D
+		spray_func = spray_B1_1D
+	elseif(Battrib == :B2)
+		np=4;
+		interp_func = interp_B2_1D
+		spray_func = spray_B2_1D
+	else
+		error("invalid attrib")
+	end
+
+	yout[:] = zero(T2);
+	if(attrib == :interp)
+		for i in eachindex(xout)
+			ivec=indminn(abs(xin-xout[i]), np);
+			yout[i] = interp_func(xin[ivec], yin[ivec], xout[i])
+		end
+	elseif(attrib == :spray)
+		for i in eachindex(xin)
+			ivec=indminn(abs(xout-xin[i]), np);
+			yout[ivec] += spray_func(xout[ivec], xin[i], yin[i])
+		end
+	end
+end # interp_spray!
+
+function interp_spray!{T1<:Real, T2<:Real}(xin::Array{T1,1}, zin::Array{T1,1}, yin::Array{T2,2},
+					   xout::Array{T1,1}, zout::Array{T1,1}, yout::Array{T2,2},
+					   attrib::Symbol, 
+					   Battrib::Symbol=:B1
+					  )
+	if(Battrib == :B1)
+		np=2;
+		interp_func = interp_B1_1D
+		spray_func = spray_B1_1D
+	elseif(Battrib == :B2)
+		np=4;
+		interp_func = interp_B2_1D
+		spray_func = spray_B2_1D
+	else
+		error("invalid attrib")
+	end
+
+	yout[:,:] = zero(T2);
+	if(attrib == :interp)
+		y_x=zeros(T2, length(zin), length(xout))
+		# first along x
+		for iz in eachindex(zin)
+			for ix in eachindex(xout)
+				ivec=indminn(abs(xin-xout[ix]), np);
+				y_x[iz,ix] = interp_func(xin[ivec], yin[iz,ivec], xout[ix])
+			end
+		end
+		# then along z
+		for ix in eachindex(xout)
+			for iz in eachindex(zout)
+				ivec=indminn(abs(zin-zout[iz]), np);
+				yout[iz,ix] = interp_func(zin[ivec], y_x[ivec,ix], zout[iz])
+			end
+		end
+	elseif(attrib == :spray)
+		y_z = zeros(T2, length(zout), length(xin))
+		# first along z
+		for ix in eachindex(xin)
+			for iz in eachindex(zin)
+				ivec=indminn(abs(zout-zin[iz]), np);
+				y_z[ivec,ix] += spray_func(zout[ivec], zin[iz], yin[iz,ix])
+			end
+		end
+		# then along x
+		for iz in eachindex(zout)
+			for ix in eachindex(xin)
+				ivec=indminn(abs(xout-xin[ix]), np);
+				yout[iz,ivec] += spray_func(xout[ivec], xin[ix], y_z[iz,ix])
+			end
+		end
+	end
+end # interp_spray!
 
 
 """
-this subroutine interpolates or sprays by nearest neighbour
-interpolation returns y using y11, y12, y22, y21
-spraying returns y11, y12, y21, y22 using y
-
-"""
-function interpolate_spray_B0_2D( &
-        x1, x2, &
-        z1, z2, &
-        z,  x,  &
-        y11, y12, &
-        y21, y22, &
-        y, &
-        flag &
-        )
-implicit none
-real, intent(inout)                     :: y11, y12, y21, y22, y
-real, intent(in)                        :: x, z, x1, z1, x2, z2
-real                                    :: d(4), ytemp(4)
-integer, intent(in)                     :: flag
-
-d(1) = sqrt((x-x1)**2 + (z-z1)**2)
-d(2) = sqrt((x-x2)**2 + (z-z1)**2)
-d(3) = sqrt((x-x2)**2 + (z-z2)**2)
-d(4) = sqrt((x-x1)**2 + (z-z2)**2)
-ytemp(4) = rzero_de;
-
-if(flag .eq. 1) then
-        ytemp = rzero_de
-        ytemp(minloc(d)) = y;
-        y11 = ytemp(1); y12 = ytemp(2); y22 = ytemp(3); y21 = ytemp(4)
-        return
-elseif(flag .eq. -1) then
-        ytemp(1) = y11; ytemp(2) = y12; ytemp(3) = y22; ytemp(4) = y21;
-        y = sum(ytemp(minloc(d)))
-        return
-endif
-
-return 
-
-end subroutine interpolate_spray_B0_2D
-
-
-
-
-
-
-
-
-function interp_model(;modelin::Seismic=Seismic("test_homo_acou"), modelout=Seis
-	 meshgridin::Grid.Mod2D = Grid.Mod2D(), 
-	 meshgridout::Grid.Mod2D = Grid.Mod2D(), 
-
-
-	ccall( (:resample2D, F90libs.fdtd), Void, 
-	      (Ptr{UInt8}, Ref{Int64},
-	       Ptr{Float64}, Ptr{Float64}, 
-	       Ref{Int64}, Ref{Int64},
-	       Ref{Float64}, Ref{Float64}, 
-	       Ref{Float64}, Ref{Float64}, 
-	       Ref{Int64}, Ptr{UInt8},
-	       Ref{Int64}, Ref{Float64},
-	       Ref{Int64}, Ptr{Float64},
-	       Ref{Int64}, Ref{Int64},
-	       Ptr{Float64}, Ptr{Float64},
-	       Ptr{UInt8},
-	       Ref{Int64}, Ptr{Float64}, Ptr{Float64},
-	       Ptr{Float64},
-	       Ptr{UInt8},
-	       Ptr{Float64},
-	       Ptr{Float64},
-	       Ptr{Float64},
-	       Ptr{Float64}
-	       ), 
-
-	      meshgridin.x, 
-	      meshgridin.z,  
-	      meshgridin.δx,  
-	      meshgridin.δz,  
-	      meshgridin.nx,  
-	      meshgridin.nz,  
-	      meshgridout.x, 
-	      meshgridout.z,  
-	      meshgridout.δx,  
-	      meshgridout.δz,  
-	      meshgridout.nx,  
-	      meshgridout.nz,  
-	      y_in, 
-	      y_out, 
-	      zero_flag, 
-	      flag 
-	     )
-
-      jobname, npropwav,
-      Models.χ(model.χKI, model.K0I,-1), 
-      Models.χ(model.χρI, model.ρ0I,-1), 
-      mgrid.nx, mgrid.nz,
-      mgrid.δx, mgrid.δz, 
+this subroutine interpolates or sprays bilinearly [one is adjoint of another]
+interpolation returns y using y1, y2
+spraying returns y1, y2 using y
  
+                        +                      
+                        |                      
+    y1= f(x1)           |      y2= f(x2)   
+      +-----------------x--------+             
+                 y=f(x) |                      
+                        +                      
+
+bilinear interpolation
+Reference: http://www.ajdesigner.com/phpinterpolation/bilinear_interpolation_equation.php
+"""
+function interp_B1_1D{T1<:Real,T2<:Real}(xV::Vector{T1}, yV::Vector{T2}, x::T1)
+	denom = (xV[2] - xV[1])
+	return ((yV[1]*(xV[2]-x) + yV[2]*(x-xV[1])) / denom)
+end # interpolate_spray_B1_1D
+
+function spray_B1_1D{T1<:Real,T2<:Real}(xV::Vector{T1}, x::T1, y::T2)
+	denom = (xV[2] - xV[1])
+	yV = zeros(T2,length(xV))
+	if((xV[2]-x) == zero(T1)) 
+	else
+		yV[1] = (y * (xV[2]-x)/denom)
+	end
+	if((x-xV[1]) == zero(T1))
+		yV[2] = (zero(T2));
+	else
+		yV[2] = (y * (x-xV[1])/denom)
+	end
+	return yV
+end # interpolate_spray_B1_1D
+
+
+"""
+this subroutine interpolates or sprays 
+using cubic bspline
+interpolation returns y using y1, y2, y3, y4
+spraying returns y1, y2, y3, y4 using y
+
+                       +                      
+                       |                      
+   y1      y2          |    y3       y4
+     +-------+---------x----+--------+             
+                y=f(x) |                      
+                       +                      
+"""
+function interp_B2_1D{T1<:Real,T2<:Real}(xV::Vector{T1}, yV::Vector{T2}, x::T1)
+	
+	"some constants"
+	h = (xV[2] - xV[1]);
+	hcube = h*h*h;
+	hcubeI = hcube^(-1.0)
+
+	if(h == zero(T1)) then
+		return (T(0.25) * (yV[1] + yV[2] + yV[3] + yV[4]))
+	else
+		
+		if((((x-xV[1])*(x-xV[2])) < zero(T1)) | (x==xV[1])) 
+			"left edge interpolate"
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (xV[1]-h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((xV[4]-h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[2]-h) - x)^2.0 * (2.0 * h - (x - (xV[2]-h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[3]-h) - x)^2.0 * (2.0 * h + (x - (xV[3]-h))) ) )) * hcubeI
+			return (yV[1] * (c2 + 2.0*c1) + yV[2] * (c3 - c1) + yV[3] * c4)
+		elseif((((x-xV[3])*(x-xV[4])) < zero(T1)) | (x==xV[4])) 
+			"right edge interpolate"
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (xV[1]+h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((xV[4]+h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[2]+h) - x)^2.0 * (2.0 * h - (x - (xV[2]+h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[3]+h) - x)^2.0 * (2.0 * h + (x - (xV[3]+h))) ) )) * hcubeI
+			return (yV[2] * c1 + yV[3] * (c2 - c4) + yV[4] * (c3 + 2.0*c4))
+		else
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - xV[1]))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - (xV[4] - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * (xV[2] - x)^2.0 * (2.0 * h - (x - xV[2])) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * (xV[3] - x)^2.0 * (2.0 * h + (x - xV[3])) ) )) * hcubeI
+			"center interpolate"
+			return ((yV[1] * c1 + yV[2] * c2 + yV[3] * c3 + yV[4] * c4))
+		end
+	end
+
+end # interp_B2_1D
+
+function spray_B2_1D{T1<:Real,T2<:Real}(xV::Vector{T1}, x::T1, y::T2)
+
+	"some constants"
+	h = (xV[2] - xV[1]);
+	hcube = h*h*h;
+	hcubeI = hcube^(-1.0)
+
+	yV = zeros(T2,length(xV))
+	if(h == zero(T1)) then
+		yV[1] = copy(y)
+		yV[2] = copy(y) 
+		yV[3] = copy(y) 
+		yV[4] = copy(y) 
+		return yV
+	else
+		if((((x-xV[1])*(x-xV[2])) < zero(T1)) | (x==xV[1])) 
+			"left edge spray"
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (xV[1]-h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((xV[4]-h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[2]-h) - x)^2.0 * (2.0 * h - (x - (xV[2]-h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[3]-h) - x)^2.0 * (2.0 * h + (x - (xV[3]-h))) ) )) * hcubeI
+
+			yV[1] = copy(y * (c2 + 2.0*c1))
+			yV[2] = copy(y * (c3 - c1))
+			yV[3] = copy(y * c4)
+			return yV
+		elseif((((x-xV[3])*(x-xV[4])) < zero(T1)) | (x==xV[4])) 
+			"right edge spray"        
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (xV[1]+h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((xV[4]+h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[2]+h) - x)^2.0 * (2.0 * h - (x - (xV[2]+h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[3]+h) - x)^2.0 * (2.0 * h + (x - (xV[3]+h))) ) )) * hcubeI
+
+			yV[2] = y * c1 
+			yV[3] = y * (c2 - c4) 
+			yV[4] = y * (c3+ 2.0 * c4) 
+			return yV
+		else
+			"center spray"
+     			c1 = (1.0 / 6.0 * (2.0 * h - (x - xV[1]))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - (xV[4] - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * (xV[2] - x)^2.0 * (2.0 * h - (x - xV[2])) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * (xV[3] - x)^2.0 * (2.0 * h + (x - xV[3])) ) )) * hcubeI
+			yV[1] = copy(y * c1)
+			yV[2] = copy(y * c2)
+			yV[3] = copy(y * c3) 
+			yV[4] = copy(y * c4) 
+			return yV
+		end
+	end
+end # interpolate_spray_B3_1D
+
 
 
 end # module

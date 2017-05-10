@@ -3,7 +3,7 @@ module Models
 
 import SIT.Grid
 import SIT.IO
-using Interpolations
+import SIT.Interpolation
 
 """
 Data type fo represent a seismic model.
@@ -343,35 +343,14 @@ function to resample in the model domain
 """
 function Seismic_interp_spray!(mod::Seismic, mod_out::Seismic, attrib::Symbol)
 
-	itpvp = interpolate((mod.mgrid.z, mod.mgrid.x),
-		     mod.χvp, 
-		     Gridded(Linear()))
-	itpvs = interpolate((mod.mgrid.z, mod.mgrid.x),
-		     mod.χvs, 
-		     Gridded(Linear()))
+	"loop over fields in `Seismic`"
+	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χvp,
+		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvp, attrib, :B2)
+	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χvs,
+		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvs, attrib, :B2)
+	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χρ,
+		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χρ, attrib, :B2)
 
-	itpρ = interpolate((mod.mgrid.z, mod.mgrid.x),
-		     mod.χρ, 
-		     Gridded(Linear()))
-
-	if(attrib == :interp) 
-		mod_out.χvp = copy(itpvp[mod_out.mgrid.z, mod_out.mgrid.x])
-		mod_out.χρ = copy(itpρ[mod_out.mgrid.z, mod_out.mgrid.x])
-		mod_out.χvs = copy(itpvs[mod_out.mgrid.z, mod_out.mgrid.x])
-
-	elseif(attrib == :spray)
-
-
-		mod_out.χvp = copy(itpvp[mod_out.mgrid.z, mod_out.mgrid.x])
-		mod_out.χρ = copy(itpρ[mod_out.mgrid.z, mod_out.mgrid.x])
-		mod_out.χvs = copy(itpvs[mod_out.mgrid.z, mod_out.mgrid.x])
-		#mod_out.χvp = copy(gradient(itpvp, mod_out.mgrid.z, mod_out.mgrid.x))
-		#mod_out.χρ = copy(gradient(itpρ, mod_out.mgrid.z, mod_out.mgrid.x))
-		#mod_out.χvs = copy(gradient(itpvs, mod_out.mgrid.z, mod_out.mgrid.x))
-
-	else
-		error("invalid attrib")
-	end
 	mod_out.vp0 = copy(mod.vp0); mod_out.vs0 = copy(mod.vs0); 
 	mod_out.ρ0 = copy(mod.ρ0);
 end
