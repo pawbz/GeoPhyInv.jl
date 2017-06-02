@@ -88,19 +88,19 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 	vs = χ(mod.χvs, mod.vs0, -1)
 	ρ = χ(mod.χρ, mod.ρ0, -1)
 	if(attrib == :ρI)
-		return ρ.^(-1.0)
+		return ρ.^(-1.0);
 	elseif(attrib == :ρ)
-		return ρ
+		return ρ;
 	elseif(attrib == :vp)
-		return vp
+		return vp;
 	elseif(attrib == :ρ0I)
-		return mod.ρ0.^(-1.0)
+		return mod.ρ0.^(-1.0);
 	elseif(attrib == :χρI)
-		return χ(ρ.^(-1.0), mod.ρ0^(-1.0))
+		return χ(ρ.^(-1.0), mod.ρ0^(-1.0));
 	elseif(attrib == :χK)
-		return χ(vp .* vp .* ρ, K0) 
+		return χ(vp .* vp .* ρ, K0);
 	elseif(attrib == :χμ)
-		return χ(vs .* vs .* ρ, μ0) 
+		return χ(vs .* vs .* ρ, μ0);
 	elseif(attrib == :K0)
 		return K0
 	elseif(attrib == :μ0)
@@ -108,13 +108,13 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 	elseif(attrib == :K0I)
 		return K0I
 	elseif(attrib == :χKI)
-		return χ((vp .* vp .* ρ).^(-1), K0I) 
+		return χ((vp .* vp .* ρ).^(-1), K0I); 
 	elseif(attrib == :KI)
-		return (vp .* vp .* ρ).^(-1)
+		return (vp .* vp .* ρ).^(-1);
 	elseif(attrib == :K)
-		return (vp .* vp .* ρ)
+		return (vp .* vp .* ρ);
 	elseif(attrib == :Zp)
-		return (vp .* ρ)
+		return (vp .* ρ);
 	else
 		error("invalid attrib")
 	end
@@ -139,16 +139,19 @@ function Seismic_reparameterize!(
 		      x2::Array{Float64,2},
 		      attribs::Vector{Symbol}=[:χKI, :χρI]
 		      )
-	Seismic_iszero(mod) ? error("mod cannot be zero") :
+	Seismic_iszero(mod) ? error("mod cannot be zero") : nothing
+	size(x1) == (mod.mgrid.nz, mod.mgrid.nx) ? nothing : error("size x1")
+	size(x2) == (mod.mgrid.nz, mod.mgrid.nx) ? nothing : error("size x2")
 	if(attribs == [:χKI, :χρI]) 
-		ρ = (χ(x2, Seismic_get(mod, :ρ0I), -1)).^(-1)
-		K = (χ(x1, Seismic_get(mod, :K0I), -1)).^(-1)
-		vp = broadcast(sqrt, (K .* (χ(x2, Seismic_get(mod, :ρ0I), -1))))
-		mod.χvp = copy(χ(vp, mod.vp0, 1))
-		mod.χρ = copy(χ(ρ, mod.ρ0, 1))
+		ρ = (χ(x2, Seismic_get(mod, :ρ0I), -1)).^(-1);
+		K = (χ(x1, Seismic_get(mod, :K0I), -1)).^(-1);
+		vp = sqrt((K ./ ρ));
+		mod.χvp = copy(χ(vp, mod.vp0, 1));
+		mod.χρ = copy(χ(ρ, mod.ρ0, 1));
 	else
 		error("invalid attribs")
 	end
+	return mod
 end
 
 """
@@ -157,9 +160,11 @@ respect to χvp and χρ from  gradients
 with respect to KI and ρI.
 
 # Arguments
+* `gmod::Seismic` : gradient model
 * `mod::Seismic` : model required for chain rule
-* `gKI` : gradient of an objective function with respect to KI
-* `gρI` : gradient of an objective function with respect to ρI
+* `g1` : gradient of an objective function with respect `attribs[1]`
+* `g1` : gradient of an objective function with respect `attribs[2]`
+* `attribs::Vector{Symbol}=[:χKI, :χρI]` :  
 * `flag::Int64=1` :
   * `=1` updates `gmod` using `g1` and `g2`
   * `=-1` updates `g1` and `g2` using `gmod`
@@ -262,14 +267,15 @@ Add features to a model.
 * `circ_pert::Float64=0.1` : perturbation inside a circle
 * `rect_loc::Array{Float64}=nothing` : rectangle location
 * `rect_pert::Float64=0.1` : perturbation in a rectangle
-
+* `randn_pert::Float64=0.0` : percentage of reference values for additive random noise
 """
-function Seismic_addon(mod::Seismic; 
+function Seismic_addon!(mod::Seismic; 
 		       circ_loc::Vector{Float64}=[0., 0.,],
 		       circ_rad::Float64=0.0,
 		       circ_pert::Float64=0.1,
 		       rect_loc::Vector{Float64}=[0., 0., 0., 0.,],
 		       rect_pert::Float64=0.1,
+		       randn_perc::Real=0.0,
 		       fields::Vector{Symbol}=[:χvp,:χρ,:χvs]
 		       )
 
@@ -287,11 +293,15 @@ function Seismic_addon(mod::Seismic;
 			iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx ]
 	end
 
-	mod_out = deepcopy(mod)
 	for field in fields
-		setfield!(mod_out, field, (getfield(mod, field)+temp))
+		setfield!(mod, field, (getfield(mod, field)+temp))
 	end
-	return mod_out
+	# random noise (in future change to fields)
+	mod.χvp += randn(size(mod.χvp)) .* randn_perc .* 1e-2 .* mod.vp0; 
+	mod.χvs += randn(size(mod.χvs)) .* randn_perc .* 1e-2 .* mod.vs0; 
+	mod.χρ += randn(size(mod.χρ)) .* randn_perc .* 1e-2 .* mod.ρ0; 
+
+	return mod
 end
 
 """

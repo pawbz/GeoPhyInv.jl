@@ -104,6 +104,7 @@ function xfwi(
 		gmodi = Models.Seismic_zeros(pa.igrid); 
 		gmodm = Models.Seismic_zeros(pa.mgrid); 
 		Seismic_gx!(gmodm,model_init,gmodi,modi,Optim.trace(res)[1].metadata["g(x)"],pa,-1)
+		println("maximfgjfnjf",  maximum(Optim.trace(res)[1].metadata["g(x)"]))
 
 		return gmodi, dobs
 	elseif(pa.attrib_inv == :migr_finite_difference)
@@ -115,6 +116,8 @@ function xfwi(
 		gmodi = Models.Seismic_zeros(pa.igrid); 
 		gmodm = Models.Seismic_zeros(pa.mgrid); 
 		Seismic_gx!(gmodm,model_init,gmodi,modi,gx,pa,-1)
+
+		println("maximfgjigggggggfnjf",  maximum(gx))
 
 		return gmodi, dobs
 
@@ -164,7 +167,7 @@ function update_buffer!(
 		elseif(pa.attrib_mod == :fdtd_born)
 			global buffer = Fdtd.mod(npropwav=2, model=pa.model0, model_pert=model, 
 			      acqgeom=[pa.acqgeom,pa.acqgeom], acqsrc=[pa.acqsrc,pa.acqsrc], 
-			      src_flags=[2.0, 0.0], recv_flags = [0.0, 2.0], 
+			      src_flags=[-2.0, 0.0], recv_flags = [0.0, 2.0], 
 			  tgridmod=pa.tgrid, verbose=false, boundary_save_flag=true, born_flag=true);
 		elseif(pa.attrib_mod == :fdtd_hborn)
 			# storing boundary values 
@@ -182,7 +185,7 @@ function update_buffer!(
 			global buffer = Fdtd.mod(boundary_in=hbuffer[2],
 			      npropwav=2,model=pa.model0, model_pert=model, 
 			       acqgeom=[pa.acqgeom,pa.acqgeom], 
-			       acqsrc=[acqsrcsink,pa.acqsrc], src_flags=[2.0, 0.0], 
+			       acqsrc=[acqsrcsink,pa.acqsrc], src_flags=[-2.0, 0.0], 
 			       recv_flags=[0.0, 2.0],
 			   tgridmod=pa.tgrid, verbose=false, boundary_save_flag=true, born_flag=true);
 		else
@@ -248,7 +251,7 @@ function grad!(x::Vector{Float64}, storage::Vector{Float64},
 		
 		# adjoint simulation
 		adj = Fdtd.mod(npropwav=2, model=modm,
-		     acqgeom=[pa.acqgeom,adjacq], acqsrc=[acqsrcsink, adjsrc], src_flags=[2.0, -2.0], 
+		     acqgeom=[pa.acqgeom,adjacq], acqsrc=[acqsrcsink, adjsrc], src_flags=[-2.0, -2.0], 
 		     tgridmod=dobs.tgrid, grad_out_flag=true, boundary_in=buffer[2], verbose=false)
 
 	elseif(pa.attrib_mod == :fdtd_born)
@@ -260,13 +263,13 @@ function grad!(x::Vector{Float64}, storage::Vector{Float64},
 		
 		# adjoint simulation
 		adj = Fdtd.mod(npropwav=2, model=pa.model0,  
-		     acqgeom=[pa.acqgeom,adjacq], acqsrc=[acqsrcsink, adjsrc], src_flags=[2.0, -2.0], 
+		     acqgeom=[pa.acqgeom,adjacq], acqsrc=[acqsrcsink, adjsrc], src_flags=[-2.0, -2.0], 
 		     tgridmod=dobs.tgrid, grad_out_flag=true, boundary_in=buffer[2], verbose=false)
 
 	elseif(pa.attrib_mod == :fdtd_hborn)
 		# adjoint simulation
 		adj = Fdtd.mod(npropwav=2, model=pa.model0, 
-		     acqgeom=[pa.acqgeom,adjacq], acqsrc=[pa.acqsrc, adjsrc], src_flags=[2.0, -2.0], 
+		     acqgeom=[pa.acqgeom,adjacq], acqsrc=[pa.acqsrc, adjsrc], src_flags=[-2.0, -2.0], 
 		     tgridmod=dobs.tgrid, grad_out_flag=true, verbose=false)
 	else
 		error("invalid pa.attrib_mod")
@@ -476,7 +479,6 @@ function finite_difference!{S <: Number, T <: Number}(f::Function,
 		end
 	elseif dtype == :central
 		@sync @parallel for i = 1:n
-			println("ffff\t", i)
 			@centralrule xpar[i] epsilon
 			oldx = xpar[i]
 			xpar[i] = oldx + epsilon

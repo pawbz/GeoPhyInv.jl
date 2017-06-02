@@ -67,10 +67,17 @@ function TD_zeros(nfield::Int64,
 end
 
 """
-Check if zeros
+Return bool depending on if `d` in `TD` is all zero. 
 """
 function TD_iszero(data::TD)
 	return maximum(broadcast(maximum,broadcast(abs,data.d))) == 0.0 ? true : false
+end
+
+"""
+Time reverse the records of each receiver in `TD` 
+"""
+function TD_tr!(data::TD)
+	data.d = copy([flipdim(data.d[i,j],1) for i in 1:data.acqgeom.nss, j in 1:data.nfield]);
 end
 
 """

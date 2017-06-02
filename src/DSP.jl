@@ -203,7 +203,7 @@ function nlag_npow2_pad_truncate!{T<:Number}(
 		end
 		return xpow2
 	elseif(flag == -1)
-		x[nnlags+1] =  copy(xpow2[1]); # zero lag
+		x[nnlags+1] =  copy(real(xpow2[1])); # zero lag
 		if(nplags != 0) 
 			for i=1:nplags
 				x[nnlags+1+i] = copy(real(xpow2[1+i]));
