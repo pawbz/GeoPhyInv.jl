@@ -4,13 +4,13 @@ using Base.Test
 # some model
 mgrid = SIT.Grid.M2D(0.0, 10., 0., 10., 5,5,2);
 model = SIT.Models.Seismic_zeros(mgrid);
-model.vp0=2000.; model.vs0=-1.; model.ρ0=2000.
+model.vp0=[2100.,2200.]; model.vs0=[-1., -1.]; model.ρ0=[2100., 2300.]
 SIT.Models.Seismic_addon!(model, randn_perc=1e-3)
 
 # allocation of model0
 model0 = SIT.Models.Seismic_zeros(model.mgrid);
 model0.vp0 = model.vp0; model0.ρ0 = model.ρ0; model0.mgrid = deepcopy(model.mgrid);
-model0.vs0 = -1.0;
+model0.vs0 = [-1.0, -1.0];
 
 # reparameterize twice to see conversion formulae are correct
 SIT.Models.Seismic_reparameterize!(model0, SIT.Models.Seismic_get(model,:χKI), 

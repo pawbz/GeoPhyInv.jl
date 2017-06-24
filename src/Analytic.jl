@@ -2,6 +2,7 @@ module Analytic
 
 import SIT.Grid
 import SIT.Acquisition
+import SIT.Models
 import SIT.Data
 import SIT.DSP
 import SIT.Gallery
@@ -10,26 +11,24 @@ import SIT.Gallery
 """
 k = wavenumber = 2pif/v0
 """
-function G0_homo_acou{T<:AbstractFloat}(x::T, z::T, k::T)
+function G0_homo_acou{T<:AbstractFloat}(x::T, z::T, k::T, ρ0::T)
 	sqrt(x*x + z*z) == 0.0 ? error("distance cannot be zero") : nothing
 	k == 0.0 ? error("wavenumber cannot be zero") : nothing
-	G0 = complex(T(0.0),T(0.25)) * hankelh1(0,k*sqrt(x*x + z*z))
-	G0z = (complex(T(0.0),T(-0.25))*complex(k*z,T(0.0))*hankelh1(1,(k*sqrt(x*x + z*z)))
-			/complex(sqrt(x*x + z*z),T(0.0)))
-	G0x = (complex(T(0.0),T(-0.25))*complex(k*x,T(0.0))*hankelh1(1, (k*sqrt(x*x + z*z)))
-			/complex(sqrt(x*x + z*z),T(0.0)))
+	G0 = -0.25 * ρ0 * im * complex(besselj0(k*sqrt(x*x + z*z)), -bessely0(k*sqrt(x*x + z*z)))
 	return G0
 end
 
 
 function mod(;
 	     vp0::Float64=2000.0,
-	     ρ0::Float64=1000.0,
+	     ρ0::Float64=2000.0,
+	     model_pert::Models.Seismic = Gallery.Seismic(:acou_homo1),
+             born_flag::Bool=false,
 	     tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
 	     tgrid::Grid.M1D = tgridmod,
 	     acqgeom::Acquisition.Geom=Gallery.Geom(:acou_homo1),
 	     acqsrc::Acquisition.Src=Gallery.Src(:acou_homo1),
-	     src_flags::Float64=2.0,
+	     src_flag::Int64=2,
 		  )
 	(getfield(acqgeom,:nss) != getfield(acqsrc,:nss))  ? error("different supersources") : nothing
 	(getfield(acqgeom,:ns) != getfield(acqsrc,:ns))  ? error("different sources") : nothing
@@ -38,9 +37,18 @@ function mod(;
 	nt = (length(tgridmod.x) == length(acqsrc.tgrid.x)) ? tgrid.nx : error("acqsrc tgrid")
 	np2 = nextpow2(2*nt);	
 		
-	wpow2=complex(zeros(np2), zeros(np2)); 
-	dpow2all=complex(zeros(np2), zeros(np2));
-	dtemp=zeros(nt)
+
+	if(born_flag)
+		mesh_x=model_pert.mgrid.x
+		mesh_z=model_pert.mgrid.z
+		nz=model_pert.mgrid.nz
+		nx=model_pert.mgrid.nx
+		δx = model_pert.mgrid.δx
+		δz = model_pert.mgrid.δz
+
+		δmodtt = Models.Seismic_get(model_pert, :KI) - (vp0 * vp0 * ρ0)^(-1)
+		δmodrr = Models.Seismic_get(model_pert, :ρI) - (ρ0)^(-1)
+	end
 
 	# npow2 grid for time
 	tnpow2grid = Grid.M1D_npow2(np2, tgridmod.δx);
@@ -49,24 +57,60 @@ function mod(;
 
 	nss = acqgeom.nss
 	nr = acqgeom.nr
+	ns = acqgeom.ns
 	data = Data.TD(
 	      [zeros(nt,nr[iss]) for iss=1:nss, ifield=1:1],
 	      1,tgridmod,acqgeom)
 
-	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
+	for ifield = 1:data.nfield, iss = 1:nss
+		sx = acqgeom.sx[iss][:]
+		rx = acqgeom.rx[iss][:]
+		sz = acqgeom.sz[iss][:]
+		rz = acqgeom.rz[iss][:]
+
+		for ir = 1:nr[iss]
+
+		dtemp=zeros(nt)
+		dpow2all=complex(zeros(np2), zeros(np2));
+		wpow2=complex(zeros(np2), zeros(np2)); 
 		
-		dpow2 = complex(zeros(np2), zeros(np2)); 
 		for is=1:acqgeom.ns[iss]
 			# zero pad wavelet
 			DSP.nlag_npow2_pad_truncate!(acqsrc.wav[iss,ifield][:,is], wpow2, nt-1, 0, np2, 1)
 			fft!(wpow2) # source wavelet in the frequency domain
 
-			x = acqgeom.sx[iss][is] - acqgeom.rx[iss][ir]
-			z = acqgeom.sz[iss][is] - acqgeom.rz[iss][ir]
-			for iω in 1:np2
-				k = 2. * pi * fnpow2grid.x[iω] / vp0
-				G0 = G0_homo_acou(x, z, k)
-				dpow2[iω] = G0[1]
+			x = sx[is] - rx[ir]
+			z = sz[is] - rz[ir]
+			# analytical expression for every frequency, except zero
+			dpow2 = complex(zeros(np2), zeros(np2)); 
+			dpow2[1] = complex(0.0, 0.0)
+			for iω in 2:np2
+				ω = 2. * pi * abs(fnpow2grid.x[iω])
+				k = ω / vp0
+
+				if(born_flag)
+					for ix=1:nx
+						for iz=1:nz
+							if(δmodtt[iz,ix] ≠ 0.0)
+								dpow2[iω]+=G0_homo_acou(sx[is]-mesh_x[ix], sz[is]-mesh_z[iz], k, ρ0) * G0_homo_acou(rx[ir]-mesh_x[ix], rz[ir]-mesh_z[iz], k, ρ0) .* ω .* ω .* δmodtt[iz,ix] #* δx * δz
+							end
+						end
+					end
+				else
+					if(fnpow2grid.x[iω] > 0) 
+						term = G0_homo_acou(x, z, k, ρ0);
+					elseif(fnpow2grid.x[iω] < 0)
+						term = conj(G0_homo_acou(x, z, k, ρ0));
+					end
+
+					if(src_flag == 2)
+						dpow2[iω] = term 
+					elseif(src_flag == 1)
+						dpow2[iω] = term * im * abs(fnpow2grid.x[iω])
+					else
+						error("invalid src_flag")
+					end
+				end
 			end
 			# convolution and stack over simultaneous sources
 			dpow2all += dpow2 .* wpow2;
@@ -78,10 +122,10 @@ function mod(;
 		# truncate
 		DSP.nlag_npow2_pad_truncate!(dtemp, dpow2all, nt-1, 0, np2, -1)
 		data.d[iss,ifield][:,ir] = dtemp
+		end
 	end
 	return Data.TD_resamp(data, tgrid) 
 end
 
-	#
 
 end # module 

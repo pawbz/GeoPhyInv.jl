@@ -8,18 +8,18 @@ import SIT.Interpolation
 """
 Data type fo represent a seismic model.
 # Fields
-* `vp0` :
-* `vs0` :
-* `ρ0` :
-* `χvp` :
-* `χvs` :
-* `χρ` :
-* `mgrid` :
+* `vp0::Vector{Float64}` : [vpmin, vpmax]
+* `vs0::Vector{Float64}` : [vsmin, vsmax]
+* `ρ0::Vector{Float64}` : [ρmin, ρmax]
+* `χvp::Array{Float64}` :
+* `χvs::Array{Float64}` :
+* `χρ::Array{Float64}` :
+* `mgrid::Grid.M2D` :
 """
 type Seismic
-	vp0::Float64
-	vs0::Float64
-	ρ0::Float64
+	vp0::Vector{Float64}
+	vs0::Vector{Float64}
+	ρ0::Vector{Float64}
 	χvp::Array{Float64}
 	χvs::Array{Float64}
 	χρ::Array{Float64}
@@ -27,12 +27,18 @@ type Seismic
 	"adding conditions that are to be false while construction"
 	Seismic(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid) = 
 		any([
-       	 	     vp0<0.0, 
-		     vs0<0.0,
-		     ρ0<0.0,
-		     size(χvp) != (length(mgrid.z), length(mgrid.x)),
-		     size(χvs) != (length(mgrid.z), length(mgrid.x)),
-		     size(χρ) != (length(mgrid.z), length(mgrid.x))
+		     any(vp0.<0.0), 
+		     any(vs0.<0.0),
+		     any(ρ0.<0.0),
+		     all([all(vp0 .≠ 0.0), any(χ(χvp,vp0,-1) .< vp0[1])]), # check vp bounds
+		     all([all(vp0 .≠ 0.0), any(χ(χvp,vp0,-1) .> vp0[2])]), # check vp bounds
+		     all([all(vs0 .≠ 0.0), any(χ(χvs,vs0,-1) .< vs0[1])]), # check vs bounds
+		     all([all(vs0 .≠ 0.0), any(χ(χvs,vs0,-1) .> vs0[2])]), # check vs bounds
+		     all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .< ρ0[1])]), # check ρ bounds
+		     all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .> ρ0[2])]), # check ρ bounds
+		     size(χvp) != (length(mgrid.z), length(mgrid.x)), # dimension check
+		     size(χvs) != (length(mgrid.z), length(mgrid.x)), # dimension check
+		     size(χρ) != (length(mgrid.z), length(mgrid.x)) # dimension check
 		    ]) ? 
 		       error("Seismic construct") : new(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid)
 end
@@ -42,15 +48,16 @@ Return `Seismic` with zeros everywhere;
 this method is used for preallocation.
 
 # Arguments
-* `mgrid::Grid.M2D` : 
+* `mgrid::Grid.M2D` : used for sizes of χ fields 
 """
 function Seismic_zeros(mgrid::Grid.M2D)
-	return Seismic(0.0, 0.0, 0.0, zeros(mgrid.nz, mgrid.nx), zeros(mgrid.nz, mgrid.nx),
+	return Seismic(fill(0.0,2), fill(0.0,2), fill(0.0,2), 
+		zeros(mgrid.nz, mgrid.nx), zeros(mgrid.nz, mgrid.nx),
 		zeros(mgrid.nz, mgrid.nx), mgrid)
 end
 
 function Seismic_iszero(mod::Seismic)
-	return mod.vp0 * mod.ρ0 == 0.0 ? true : false
+	return any((mod.vp0 .* mod.ρ0) .== 0.0) ? true : false
 end
 
 "Logical operation for `Seismic`"
@@ -82,8 +89,11 @@ that are not present in `Seismic`.
 * `:Zp` : P-wave impedance
 """
 function Seismic_get(mod::Seismic, attrib::Symbol)
-	K0 = mod.vp0 * mod.vp0 * mod.ρ0; K0I = K0^(-1.0);
-	μ0 = mod.vs0 * mod.vs0 * mod.ρ0;
+	K0 = mod.vp0 .* mod.vp0 .* mod.ρ0; 
+	KI0 = flipdim(K0.^(-1.0),1);
+	"note that: mean(K0) ≠ 1/mean(KI0)"
+	ρ0 = mod.ρ0; ρI0 = flipdim(ρ0.^(-1.0),1);
+	μ0 = mod.vs0 .* mod.vs0 .* mod.ρ0;
 	vp = χ(mod.χvp, mod.vp0, -1)
 	vs = χ(mod.χvs, mod.vs0, -1)
 	ρ = χ(mod.χρ, mod.ρ0, -1)
@@ -93,10 +103,10 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 		return ρ;
 	elseif(attrib == :vp)
 		return vp;
-	elseif(attrib == :ρ0I)
-		return mod.ρ0.^(-1.0);
+	elseif(attrib == :ρI0)
+		return ρI0
 	elseif(attrib == :χρI)
-		return χ(ρ.^(-1.0), mod.ρ0^(-1.0));
+		return χ(ρ.^(-1.0), ρI0);
 	elseif(attrib == :χK)
 		return χ(vp .* vp .* ρ, K0);
 	elseif(attrib == :χμ)
@@ -105,10 +115,10 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 		return K0
 	elseif(attrib == :μ0)
 		return μ0
-	elseif(attrib == :K0I)
-		return K0I
+	elseif(attrib == :KI0)
+		return KI0
 	elseif(attrib == :χKI)
-		return χ((vp .* vp .* ρ).^(-1), K0I); 
+		return χ((vp .* vp .* ρ).^(-1), KI0); 
 	elseif(attrib == :KI)
 		return (vp .* vp .* ρ).^(-1);
 	elseif(attrib == :K)
@@ -143,8 +153,8 @@ function Seismic_reparameterize!(
 	size(x1) == (mod.mgrid.nz, mod.mgrid.nx) ? nothing : error("size x1")
 	size(x2) == (mod.mgrid.nz, mod.mgrid.nx) ? nothing : error("size x2")
 	if(attribs == [:χKI, :χρI]) 
-		ρ = (χ(x2, Seismic_get(mod, :ρ0I), -1)).^(-1);
-		K = (χ(x1, Seismic_get(mod, :K0I), -1)).^(-1);
+		ρ = (χ(x2, Seismic_get(mod, :ρI0), -1)).^(-1);
+		K = (χ(x1, Seismic_get(mod, :KI0), -1)).^(-1);
 		vp = sqrt((K ./ ρ));
 		mod.χvp = copy(χ(vp, mod.vp0, 1));
 		mod.χρ = copy(χ(ρ, mod.ρ0, 1));
@@ -163,7 +173,7 @@ with respect to KI and ρI.
 * `gmod::Seismic` : gradient model
 * `mod::Seismic` : model required for chain rule
 * `g1` : gradient of an objective function with respect `attribs[1]`
-* `g1` : gradient of an objective function with respect `attribs[2]`
+* `g2` : gradient of an objective function with respect `attribs[2]`
 * `attribs::Vector{Symbol}=[:χKI, :χρI]` :  
 * `flag::Int64=1` :
   * `=1` updates `gmod` using `g1` and `g2`
@@ -184,8 +194,8 @@ function Seismic_chainrule!(
 			ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
 			Zp = Seismic_get(mod,:Zp)
 
-			gKI = χg(reshape(g1, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:K0I), -1)
-			gρI = χg(reshape(g2, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:ρ0I), -1)
+			gKI = χg(reshape(g1, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:KI0), -1)
+			gρI = χg(reshape(g2, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:ρI0), -1)
 
 			# gradient w.r.t  χρ
 			gmod.χρ = copy(χg((-1. .* ρI.^2 .* gρI - (Zp).^(-2) .* gKI), ρ0, 1))
@@ -200,18 +210,21 @@ function Seismic_chainrule!(
 	elseif(flag == -1)
 		gvp = vec(χg(gmod.χvp, mod.vp0, -1))
 		gρ = vec(χg(gmod.χρ, mod.ρ0, -1))
-		K0 = Seismic_get(mod, :K0)
+		K0 = mean(Seismic_get(mod, :K0))
+		KI0 = mean(Seismic_get(mod, :KI0))
+		ρ0 = mean(mod.ρ0)
+		ρI0 = mean(Seismic_get(mod, :ρI0))
 		ρI = vec(Seismic_get(mod,:ρI));	vp = vec(Seismic_get(mod,:vp))
-		ρ = vec(Seismic_get(mod,:ρ)); ρ0 = mod.ρ0 
+		ρ = vec(Seismic_get(mod,:ρ)); ρ0 = mean(mod.ρ0)
 
 		nznx = mod.mgrid.nz * mod.mgrid.nx;
 		if(attribs == [:χK, :χρ])
 			g1[1:nznx] = copy(0.5 .* K0 * gvp .* ρI .* vp.^(-1))
 			g2[1:nznx] = copy((gρ .* ρ0) - (0.5 .* ρ0 .* (gvp) .* (vp) ./ (ρ) ))
 		elseif(attribs == [:χKI, :χρI])
-			g1[1:nznx] =  copy(-0.5 .* K0^(-1) .* gvp .* ρ .*  vp.^(3.))
-			g2[1:nznx] = copy((gρ .* ρ0^(-1) .* (-1.) .*  (ρ.^(2))) +
-			    (0.5 * ρ0^(-1.) .* (gvp) .*  (vp) .* (ρ)))
+			g1[1:nznx] =  copy(-0.5 .* KI0 .* gvp .* ρ .*  vp.^(3.))
+			g2[1:nznx] = copy((gρ .* ρI0 .* (-1.) .*  (ρ.^(2))) +
+			    (0.5 * ρI0 .* (gvp) .*  (vp) .* (ρ)))
 		else
 			error("invalid attribs")
 		end
@@ -228,15 +241,16 @@ reference value.
 
 # Arguments
 * `mod::Array{Float64}` : subsurface parameter
-* `mod0::Float64` : reference value
+* `mod0::Vector{Float64}` : reference value is mean of this vector
 * `flag::Int64=1` : 
 """
-function χ(mod::Array{Float64}, mod0::Float64, flag::Int64=1)
-	(mod0 == 0) ? error("mod0 cannot be zero") : nothing
+function χ(mod::Array{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+	m0 = mean(mod0)
 	if(flag == 1)
-		return	((mod - mod0) * mod0^(-1.0))
+		# return zero when m0 is zero
+		return	(m0 == 0.0) ? 0.0 : ((mod - m0) * m0^(-1.0))
 	elseif(flag == -1)
-		return  (mod .* mod0 + mod0)
+		return  (mod .* m0 + m0)
 	end
 end
 
@@ -245,12 +259,13 @@ Gradients
 Return contrast model parameter using the
 reference value.
 """
-function χg(mod::Array{Float64}, mod0::Float64, flag::Int64=1)
-	(mod0 == 0) ? error("mod0 cannot be zero") : nothing
+function χg(mod::Array{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+	m0 = mean(mod0)
 	if(flag == 1)
-		return  mod * mod0
+		return  mod * m0
 	elseif(flag == -1)
-		return	mod * mod0^(-1.0)
+		# return zero when m0 is zero
+		return	(m0 == 0.0) ? 0.0 : mod * m0^(-1.0)
 	end
 end
 
@@ -297,9 +312,9 @@ function Seismic_addon!(mod::Seismic;
 		setfield!(mod, field, (getfield(mod, field)+temp))
 	end
 	# random noise (in future change to fields)
-	mod.χvp += randn(size(mod.χvp)) .* randn_perc .* 1e-2 .* mod.vp0; 
-	mod.χvs += randn(size(mod.χvs)) .* randn_perc .* 1e-2 .* mod.vs0; 
-	mod.χρ += randn(size(mod.χρ)) .* randn_perc .* 1e-2 .* mod.ρ0; 
+	mod.χvp += randn(size(mod.χvp)) .* randn_perc .* 1e-2 .* mean(mod.vp0); 
+	mod.χvs += randn(size(mod.χvs)) .* randn_perc .* 1e-2 .* mean(mod.vs0); 
+	mod.χρ += randn(size(mod.χρ)) .* randn_perc .* 1e-2 .* mean(mod.ρ0); 
 
 	return mod
 end

@@ -10,13 +10,13 @@ for Battrib in [:B1, :B2]
 
 	## 1D
 	ny=randn(length(nx));
-	# interpolate
+	# interpolate (my=f(ny))
 	my=zeros(length(mx));
 	SIT.Interpolation.interp_spray!(nx, ny, mx, my, :interp, Battrib)
 
 	myp = randn(length(my));
 
-	# spray
+	# spray (nyp=fˣ(myp))
 	nyp=zeros(length(nx));
 	SIT.Interpolation.interp_spray!(mx, myp, nx, nyp, :spray, Battrib)
 

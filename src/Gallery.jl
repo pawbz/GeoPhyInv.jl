@@ -4,6 +4,7 @@ import SIT.Grid
 import SIT.Models
 import SIT.Acquisition
 import SIT.Wavelets
+using Distributions
 
 """
 Gallery of `M2D` grids.
@@ -38,11 +39,14 @@ Gallery of `M1D` grids.
 
 # Outputs
 * `attrib=:acou_homo1` : a time grid for with 1000 samples; maximum time is 2 s
+* `attrib=:acou_homo1_long` : a time grid for with 1000 samples; maximum time is 4 s
 * `attrib=:npow2samp1` : a sample npow2 grid with 16 samples
 """
 function M1D(attrib::Symbol)
 	if(attrib == :acou_homo1)
 		return Grid.M1D(0.0,2.0,1000)
+	elseif(attrib == :acou_homo1_long)
+		return Grid.M1D(0.0,4.0,2000)
 	elseif(attrib == :acou_homo2)
 		return Grid.M1D(0.0,2.0,250)
 	elseif(attrib == :npow2samp)
@@ -61,6 +65,7 @@ Gallery of `Seismic` models.
 
 # Outputs
 * `attrib=:acou_homo1` : an homogeneous acoustic model with `vp0=2000` and `ρ0=2000`
+* `attrib=:acou_homo2` : same as above, but with spatial sampling as 40 m (faster testing)
 * `attrib=:seismic_marmousi2` : marmousi model with lower resolution; ideal for surface seismic experiments
 * `attrib=:seismic_marmousi2_high_res` : marmousi model high resolution; slower to load
 * `attrib=:seismic_marmousi2_box1` : 1x1 kilometer box of marmousi model; ideal for crosswell, borehole seismic studies
@@ -68,9 +73,9 @@ Gallery of `Seismic` models.
 
 function Seismic(attrib::Symbol)
 	if((attrib == :acou_homo1) | (attrib == :acou_homo2))
-		vp0 = 2000.0;
-		vs0 = 1.0;
-		ρ0 = 2000.0;
+		vp0 = [1700., 2300.] # bounds for vp
+		vs0 = [1.0, 1.0] # dummy
+		ρ0 = [1700., 2300.] # density bounds
 		mgrid = M2D(attrib)
 		return Models.Seismic(vp0, vs0, ρ0,
 		      fill(0.0, (mgrid.nz, mgrid.nx)),
@@ -81,7 +86,9 @@ function Seismic(attrib::Symbol)
 		vp, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/vp_marmousi-ii_0.1.su")
 		vs, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/vs_marmousi-ii_0.1.su")
 		ρ, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/density_marmousi-ii_0.1.su")
-		vp0 = 1000. * mean(vp); vs0 = 1000. * mean(vs); ρ0 = mean(ρ)
+		vp0 = 10^3.*[minimum(vp)-0.1*mean(vp), maximum(vp)+0.1*mean(vp)]; 
+		vs0 = 10^3.*[minimum(vs)-0.1*mean(vs), maximum(vs)+0.1*mean(vs)]; 
+		ρ0 = [minimum(ρ)-0.1*mean(ρ), maximum(ρ)+0.1*mean(ρ)]; 
 		mgrid = Grid.M2D(0., 17000., 0., 3500.,nx,nz,40)
 		return Models.Seismic(vp0, vs0, ρ0, 1000.*vp, 1000.*vs, ρ,
 		      mgrid)
@@ -89,7 +96,9 @@ function Seismic(attrib::Symbol)
 		vp, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/vp_marmousi-ii.su")
 		vs, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/vs_marmousi-ii.su")
 		ρ, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/density_marmousi-ii.su")
-		vp0 = 1000. * mean(vp); vs0 = 1000. * mean(vs); ρ0 = mean(ρ)
+		vp0 = 10^3.*[minimum(vp)-0.1*mean(vp), maximum(vp)+0.1*mean(vp)]; 
+		vs0 = 10^3.*[minimum(vs)-0.1*mean(vs), maximum(vs)+0.1*mean(vs)]; 
+		ρ0 = [minimum(ρ)-0.1*mean(ρ), maximum(ρ)+0.1*mean(ρ)]; 
 		mgrid = Grid.M2D(0., 17000., 0., 3500.,nx,nz,40)
 		return Models.Seismic(vp0, vs0, ρ0, 1000.*vp, 1000.*vs, ρ,
 		      mgrid)
@@ -134,13 +143,15 @@ Gallery of acquisition geometries `Geom` based on input `M2D`.
 function Geom(mgrid::Grid.M2D,
 	      attrib::Symbol
 	     )
+	otx=(0.9*mgrid.x[1]+0.1*mgrid.x[end]); ntx=(0.1*mgrid.x[1]+0.9*mgrid.x[end]);
+	otz=(0.9*mgrid.z[1]+0.1*mgrid.z[end]); ntz=(0.1*mgrid.z[1]+0.9*mgrid.z[end]);
 	quatx = (0.75*mgrid.x[1]+0.25*mgrid.x[end]); quatz = (0.75*mgrid.z[1]+0.25*mgrid.z[end]) 
 	tquatx = (0.25*mgrid.x[1]+0.75*mgrid.x[end]); tquatz = (0.25*mgrid.z[1]+0.75*mgrid.z[end]) 
 	halfx = 0.5*(mgrid.x[1]+mgrid.x[end]);	halfz = 0.5*(mgrid.z[1]+mgrid.z[end]);
 	if(attrib == :oneonev)
 		return Acquisition.Geom_fixed(
-		      maximum(mgrid.z), maximum(mgrid.z), mean(mgrid.x),
-		      minimum(mgrid.z), minimum(mgrid.z), mean(mgrid.x),
+				quatz, quatz, halfx,
+				tquatz, tquatz, halfx,
 		      1,1,:vertical,:vertical
 				)
 	elseif(attrib == :twotwov)
@@ -160,7 +171,7 @@ function Geom(mgrid::Grid.M2D,
 				)
 	elseif(attrib == :tentenv)
 		return Acquisition.Geom_fixed(
-		quatz, tquatz, mgrid.x[1], quatz, tquatz, mgrid.x[end],
+		quatz, tquatz, otx, quatz, tquatz, ntx,
 		      10,10,:vertical,:vertical
 				)
 	elseif(attrib == :onefiftyv)
@@ -168,6 +179,17 @@ function Geom(mgrid::Grid.M2D,
 	      mgrid.z[round(Int,0.5*mgrid.nz)], mgrid.z[round(Int,0.5*mgrid.nz)], mgrid.x[1],
 	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
 		      1,50,:vertical,:vertical
+				)
+	elseif(attrib == :onetwov)
+		return Acquisition.Geom_fixed(halfz, halfz, halfx, quatz, tquatz,  halfx,
+		      1,2,:vertical,:vertical
+				)
+	elseif(attrib == :onetworandv)
+		return Acquisition.Geom_fixed(halfz, halfz, halfx, 
+				rand(Uniform(mgrid.z[1], mgrid.z[end])), 
+				rand(Uniform(mgrid.z[1], mgrid.z[end])), 
+				halfx,
+			        1,2,:vertical,:vertical
 				)
 	elseif(attrib == :onefiftys)
 		return Acquisition.Geom_fixed(

@@ -2,7 +2,6 @@ module Interpolation
 """
 ## TODO:
 * add dimension checks to interp_spray!
-* implement cubic 
 Reference: https://www.ibiblio.org/e-notes/Splines/bezier.html
 
 Return n indices in order

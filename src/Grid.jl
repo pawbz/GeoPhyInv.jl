@@ -84,9 +84,13 @@ function M2D_pad_trun(mgrid::M2D; flag::Int64=1)
 end
 
 """
-Return the X and Z positions of the border of mgrid
+Return the X and Z positions of the boundary of mgrid
+attrib
+** :inner
+** :outer
+** onlycount
 """
-function M2D_border(mgrid::M2D, nlayer::Int64, attrib::Symbol)
+function M2D_boundary(mgrid::M2D, nlayer::Int64, attrib::Symbol; onlycount::Bool=false)
 	if(attrib == :inner)
 		x = mgrid.x; z = mgrid.z;
 	elseif(attrib == :outer)
@@ -124,7 +128,11 @@ function M2D_border(mgrid::M2D, nlayer::Int64, attrib::Symbol)
 		  )
 	end
 	isequal(length(bz), length(bx)) ? nothing : error("unequal dimensions")
-	return bz, bx, length(bz)
+	if(onlycount)
+		return length(bz)
+	else
+		return bz, bx, length(bz)
+	end
 end
 
 
@@ -162,6 +170,18 @@ end
 function M1D(xbeg::Float64, xend::Float64, δx::Float64)
 	x = [tt for tt in xbeg:δx:xend]
 	δx = length(x)==1 ? 0. : x[2]-x[1]
+	return M1D(x, size(x,1), δx)
+end
+
+"""
+Grid with both positive and negative samples for a given lag.
+Make sure that the number so samples is odd
+"""
+function M1D_lag(xlag::Float64, δx::Float64)
+	x1=[tt for tt in 0.0:-δx:-xlag]
+	x = vcat(flipdim(x1,1), -1.0.*x1[2:end])
+	δx = length(x)==1 ? 0. : x[2]-x[1]
+	isodd(length(x)) ? nothing : error("error in creating lag grid")
 	return M1D(x, size(x,1), δx)
 end
 

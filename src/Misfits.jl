@@ -28,6 +28,7 @@ end
 """
 Input the obeserved and modelled data to output the misfit
 and the adjoint sources
+TODO: 
 """
 function TD(x::Data.TD, y::Data.TD
 	   )
@@ -44,7 +45,8 @@ function TD(x::Data.TD, y::Data.TD
 	f = 0.0;
 	for ifield=1:x.nfield, iss=1:acq.nss, ir=1:acq.nr[iss]
 		ft, δx.d[iss, ifield][:,ir] = fg_cls(x.d[iss, ifield][:,ir], y.d[iss, ifield][:,ir]);
-		f += ft;
+		"multiplication with time sampling due to integration ?"
+		f += ft #* tgrid.δx;
 	end
 	f == 0.0 ? warn("misfit is zero") : nothing
 

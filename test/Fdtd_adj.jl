@@ -14,24 +14,16 @@ acqsrc = SIT.Gallery.Src(:acou_homo2);
 # Generate Born Data
 buffer = SIT.Fdtd.mod(npropwav=2, model=model0, model_pert=model_pert, 
 	acqgeom=[acqgeom,acqgeom], acqsrc=[acqsrc,acqsrc], 
-	src_flags=[2.0, 0.0], recv_flags = [0.0, 2.0], 
+	src_flags=[2, 0], recv_flags = [0, 2], 
 	tgridmod=tgrid, verbose=true, boundary_save_flag=true, born_flag=true);
 
-#rec1 = SIT.Fdtd.fdtd_born_mod();
 
-
-	# source sinks
-		acqsrcsink = deepcopy(acqsrc); 
-		acqsrcsink.wav = [-1.0.*flipdim(acqsrc.wav[i,j],1) for 
-			   i in 1:acqsrc.nss, j in 1:acqsrc.nfield];
-
-		
 # adjoint simulation
 	adjsrc = SIT.Inversion.AdjSrc(buffer[1][1])
 	adjacq = SIT.Inversion.AdjGeom(acqgeom);
 # migrate Born data
 		adj = SIT.Fdtd.mod(npropwav=2, model=model0,  
-		     acqgeom=[acqgeom,adjacq], acqsrc=[acqsrcsink, adjsrc], src_flags=[2.0, -2.0], 
+		     acqgeom=[acqgeom,adjacq], acqsrc=[acqsrc, adjsrc], src_flags=[3, 2], 
 		     tgridmod=tgrid, grad_out_flag=true, boundary_in=buffer[2], verbose=true)
 
 
@@ -49,6 +41,10 @@ gvec=vcat(g1, g2)
 mvec=vcat(m1, m2)
 
 # dot product test
-@test_approx_eq SIT.Data.TD_dot(buffer[1][1], buffer[1][1]) dot(gvec, mvec) 
+lhs = SIT.Data.TD_dot(buffer[1][1], buffer[1][1]);
+rhs = dot(gvec, mvec)
+
+println(lhs, "\t", rhs)
+@test_approx_eq lhs/rhs 1.0 
 
 

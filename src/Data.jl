@@ -3,6 +3,7 @@ module Data
 import SIT.Acquisition
 import SIT.Grid
 import SIT.Coupling
+import SIT.DSP
 using Interpolations
 
 """
@@ -46,6 +47,7 @@ function TD_resamp(data::TD,
 	dataout = TD(
 	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:data.nfield],
 	      data.nfield,tgrid,data.acqgeom)
+	TD_resamp!(data, dataout)
 	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
 		itp = interpolate((data.tgrid.x,),
 		    data.d[iss, ifield][:, ir], 
@@ -54,6 +56,19 @@ function TD_resamp(data::TD,
 	end
 	return dataout
 end
+
+function TD_resamp!(data::TD, dataout::TD)
+	nss = data.acqgeom.nss
+	nr = data.acqgeom.nr
+	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
+		itp = interpolate((data.tgrid.x,),
+		    data.d[iss, ifield][:, ir], 
+			     Gridded(Linear()))
+		dataout.d[iss, ifield][:,ir] = copy(itp[dataout.tgrid.x])
+	end
+	return dataout
+end
+
 
 """
 Return zeros
@@ -133,7 +148,7 @@ function TD_urpos(d::Array{Float64},
 		irr=find([[urpos[1][i]-acq.rz[iss][ir],
 		       urpos[2][i]-acq.rx[iss][ir]] == [0., 0.,] for i in 1:nur])
 
-		dout[iss, ifield][:,ir] = d[:,irr[1],iss,ifield] 
+		dout[iss, ifield][:,ir] = d[:,irr[1],ifield, iss] 
 	end
 
 	return TD(dout, nfield, tgrid, acq)
@@ -141,21 +156,34 @@ function TD_urpos(d::Array{Float64},
 end
 
 """
-Apply SR to TD
+Apply coupling functions to TD
+
+* :s means s is returned in the place of rs
+* :w means 
 """
-function TDcoup(
+function TDcoup!(
+               s::TD,
 	       r::TD,
 	       w::Coupling.TD,
+	       attrib::Symbol
 	       )
 	nr = r.acqgeom.nr;	nss = r.acqgeom.nss;	nt = r.tgrid.nx;
-	s =  deepcopy(r)
-	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
+	nfield = (w.nfield == r.nfield == s.nfield) ? w.nfield : error("different nfields")
+	sv=zeros(s.tgrid.nx)
+	rv=zeros(r.tgrid.nx)
+	wv=zeros(w.tgridssf.nx)
+	for ifield = 1:nfield, iss = 1:nss, ir = 1:nr[iss]
 		# receiver coupling
 	#	DSP.fast_filt!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],
 #		 w.rf[iss, ifield][:,ir],:s)
 		# source coupling
-		DSP.fast_filt!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],
-		 w.ssf[iss, ifield][:],:s)
+		sv=s.d[iss, ifield][:, ir]
+		rv=r.d[iss, ifield][:, ir]
+		wv=w.ssf[iss, ifield]
+		DSP.fast_filt!(sv,rv,wv,attrib)
+		s.d[iss, ifield][:, ir]=copy(sv)
+		r.d[iss, ifield][:, ir]=copy(rv)
+		w.ssf[iss, ifield][:]=copy(wv)
 	end
 end # TDcoup
 

@@ -18,7 +18,7 @@ record waves.
 * `rx::Vector{Vector{Float64,1},1}` : ``x`` positions of receivers
 * `rz::Vector{Vector{Float64,1},1}` : ``z`` positions of receivers
 * `nss::Int64` : number of supersources
-* `ns::Vector{Int64,1}` : number of sources for every supersources
+* `ns::Vector{Int64,1}` : number of sources for every supersource
 * `nr::Vector{Int64,1}` : number of receivers for every supersource 
 """
 type Geom

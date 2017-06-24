@@ -32,3 +32,34 @@ SIT.DSP.fast_filt!(sa,ra,wa,:s)
 @test_approx_eq sa s
 
 
+
+## dot product test for fast filt
+
+nrs=1000;
+nw=101; # filter 
+
+r=randn(nrs)
+s=similar(r)
+w=randn(nw)
+SIT.DSP.fast_filt!(s,r,w,:s)
+
+sa=randn(nrs);
+ra=similar(r)
+SIT.DSP.fast_filt!(sa,ra,w,:r)
+
+# dot product test
+@test_approx_eq dot(s, sa) dot(ra, r) 
+
+
+r=randn(nrs)
+s=randn(nrs)
+w=zeros(nw)
+SIT.DSP.fast_filt!(s,r,w,:w)
+
+
+wa=randn(nw);
+ra=similar(r);
+SIT.DSP.fast_filt!(s,ra,wa,:r)
+
+# dot product test
+@test_approx_eq dot(r, ra) dot(wa, w) 

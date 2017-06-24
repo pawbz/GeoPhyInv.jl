@@ -2,7 +2,7 @@ module DSP
 
 import SIT.Grid
 using Distributions
-using DSP
+using DSP # from julia
 
 """
 generate random signals in the frequency domain 

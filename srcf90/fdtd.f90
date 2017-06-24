@@ -364,8 +364,8 @@ integer                                                 :: nx
 integer                                                 :: nz
 
 ! size of a grid cell
-real                                                    :: deltax, deltax24I 
-real                                                    :: deltaz, deltaz24I
+real                                                    :: deltax, deltax24I, deltaxI 
+real                                                    :: deltaz, deltaz24I, deltazI
 real                                                    :: tim_delI 
 
 integer                                                 :: ix, iz, it, ixx, izz, irec, issmul, isseq, ipropwav
@@ -379,7 +379,8 @@ integer                                                 :: issmulxtemp1, issmulx
                                                                 issmultemp
 real, allocatable, dimension(:,:)                       :: denomsrcI
 real, allocatable, dimension(:,:,:)                     :: src_spray_weights
-real                                                    :: svalue, src_xtemp, src_ztemp
+real                                                    :: src_xtemp, src_ztemp
+real, allocatable, dimension(:,:)                       :: born_svalue_stack
 ! receiver position variables           
 integer, allocatable, dimension(:,:)                    :: irecx1, irecx2, irecz1, irecz2
 integer                                                 :: irecxtemp1, irecxtemp2, irecztemp1, irecztemp2, irectemp
@@ -475,16 +476,9 @@ do ipropwav = 1, npropwav
         do isseq = 1, src_nseq
                 do issmul = 1, src_nsmul
                         source_term = rzero_de
-                        do it = 1, src_nt-1
-                              !  if(index(ctofstr(src_flags),'[TIME_REVERSE]') .ne. 0) then
-                              !          source_term = &
-                              !          src_wavelets(src_nt - it  &
-                              !                  + (issmul-1)*src_nt &
-                              !                  + (isseq-1)*src_nsmul*src_nt &
-                              !                  + (ifield-1)*src_nseq*src_nsmul*src_nt &
-                              !                  + (ipropwav-1)*src_nfield*src_nseq*src_nsmul*src_nt &
-                              !                          ) 
-                              !  else
+                        if(src_flags(ipropwav) .gt. rzero_de) then
+                                do it = 1, src_nt
+                                        ! reordering for speed
                                         source_term = &
                                         src_wavelets(it &
                                                 + (issmul-1)*src_nt &
@@ -492,14 +486,29 @@ do ipropwav = 1, npropwav
                                                 + (ifield-1)*src_nseq*src_nsmul*src_nt &
                                                 + (ipropwav-1)*src_nseq*src_nfield*src_nsmul*src_nt &
                                                 )
-                              !  endif
-                                if(src_flags(ipropwav) .lt. rzero_de) then
-                                        src_wav_mat(issmul, ifield, ipropwav, it + 1, isseq) = 2.0 * source_term + &
-                                                src_wav_mat(issmul, ifield, ipropwav, it - 1, isseq)
-                                else
+
                                         src_wav_mat(issmul, ifield, ipropwav, it, isseq) = source_term
-                                endif
-                        enddo
+                                enddo
+                        elseif(src_flags(ipropwav) .lt. rzero_de) then
+                                 do it = 2, src_nt
+                                        ! reordering for speed
+                                        ! use src_wav_mat at [it], i.e., sum of source terms
+                                        ! until [it-1]
+                                        source_term = &
+                                        src_wavelets(it-1 &
+                                                + (issmul-1)*src_nt &
+                                                + (isseq-1)*src_nsmul*src_nt &
+                                                + (ifield-1)*src_nseq*src_nsmul*src_nt &
+                                                + (ipropwav-1)*src_nseq*src_nfield*src_nsmul*src_nt &
+                                                )
+
+                                        src_wav_mat(issmul, ifield, ipropwav, it, isseq) = &
+                                                src_wav_mat(issmul, ifield, ipropwav, it-1, isseq) + &
+                                                tim_del * source_term
+                                enddo
+
+
+                        endif
                 enddo
         enddo
         enddo
@@ -523,8 +532,10 @@ nz    = mesh_nz
 ! assign variables
 deltax=mesh_dx
 deltax24I = (deltax * 24.e0)**(-1.e0)
+deltaxI = (deltax)**(-1.e0)
 deltaz=mesh_dz
 deltaz24I = (deltaz * 24.e0)**(-1.e0)
+deltazI = (deltaz)**(-1.e0)
 tim_delI= (tim_del)**(-1.e0)
 
 ! minimum and maximum velocities
@@ -586,36 +597,36 @@ if(index(ctofstr(mesh_abs_trbl),"[L]") .eq. 0) USE_PML_XMIN = .false.
 if(index(ctofstr(mesh_abs_trbl),"[B]") .eq. 0) USE_PML_ZMAX = .false.
 
 
-! free surface boundary conditions on sides of the model.
-if(ctofstr(mesh_abs_trbl) .eq. "0") then
-        boundary_p(1:mesh_na_pml+1,:) = rzero_de
-        !boundary_vz(1:mesh_na_pml,:) = rzero_de
-!        boundary_vx(1:mesh_na_pml,:) = rzero_de
-!        USE_PML_ZMIN = .false.
-endif
-if(ctofstr(mesh_abs_trbl) .eq. "0") then
-        boundary_p(1:nz,mesh_na_pml+mesh_nx:nx) = rzero_de
-        USE_PML_XMAX = .false.
-endif
-if(ctofstr(mesh_abs_trbl(3:3)) .eq. "0") then 
-        boundary_p(mesh_na_pml+mesh_nz,1:nx) = rzero_de
-        USE_PML_ZMAX = .false.
-endif
-if(ctofstr(mesh_abs_trbl(4:4)) .eq. "0") then
-        boundary_p(1:nz,mesh_na_pml+1) = rzero_de
-        USE_PML_XMIN = .false.
-endif
+!! free surface boundary conditions on sides of the model.
+!if(.not.(USE_PML_ZMIN)) then
+!        boundary_p(1:mesh_na_pml+1,:) = rzero_de
+!        !boundary_vz(1:mesh_na_pml,:) = rzero_de
+!!        boundary_vx(1:mesh_na_pml,:) = rzero_de
+!!        USE_PML_ZMIN = .false.
+!endif
+!if(.not.(USE_PML_XMAX)) then
+!        boundary_p(1:nz,mesh_na_pml+mesh_nx:nx) = rzero_de
+!        USE_PML_XMAX = .false.
+!endif
+!if(ctofstr(mesh_abs_trbl(3:3)) .eq. "0") then 
+!        boundary_p(mesh_na_pml+mesh_nz,1:nx) = rzero_de
+!        USE_PML_ZMAX = .false.
+!endif
+!if(ctofstr(mesh_abs_trbl(4:4)) .eq. "0") then
+!        boundary_p(1:nz,mesh_na_pml+1) = rzero_de
+!        USE_PML_XMIN = .false.
+!endif
 
 
 ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
-boundary_vx(1,:) = rzero_de
-boundary_vx(nz,:) = rzero_de
-boundary_vx(:,1) = rzero_de
-boundary_vx(:,nx) = rzero_de
-boundary_vz(1,:) = rzero_de
-boundary_vz(nz,:) = rzero_de
-boundary_vz(:,1) = rzero_de
-boundary_vz(:,nx) = rzero_de
+!boundary_vx(1,:) = rzero_de
+!boundary_vx(nz,:) = rzero_de
+!boundary_vx(:,1) = rzero_de
+!boundary_vx(:,nx) = rzero_de
+!boundary_vz(1,:) = rzero_de
+!boundary_vz(nz,:) = rzero_de
+!boundary_vz(:,1) = rzero_de
+!boundary_vz(:,nx) = rzero_de
 
 
 ! %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -831,9 +842,9 @@ enddo
 
 
 !$OMP PARALLEL NUM_THREADS(OMP_GET_MAX_THREADS()) DEFAULT(NONE) &
-!$OMP PRIVATE(ipropwav, isseq, it, issmul, ixx, izz, maskX, maskZ, denomsrcI, denomrecI, svalue, &
+!$OMP PRIVATE(ipropwav, isseq, it, issmul, ixx, izz, maskX, maskZ, denomsrcI, denomrecI, source_term, &
 !$OMP issmulxtemp1,issmulxtemp2,issmulztemp1,issmulztemp2,issmulx1,issmulz1,issmulx2,issmulz2,src_spray_weights, &
-!$OMP issmultemp, src_ztemp, src_xtemp, &
+!$OMP issmultemp, src_ztemp, src_xtemp, born_svalue_stack, &
 !$OMP irecxtemp1,irecxtemp2,irecztemp1,irecztemp2,irecx1,irecz1,irecx2,irecz2,rec_interpolate_weights, &
 !$OMP irectemp, recv_xtemp, recv_ztemp, iborder, &
 !$OMP pp,ppp,dpdx,dpdz,dvxdx,dvzdz,gradis_modrrvx,gradis_modrrvz, gradis_modtt,&
@@ -847,7 +858,7 @@ enddo
 !$OMP saved_snap, rec_mat) &
 !$OMP SHARED(npropwav,src_nseq,src_nfield,src_wav_mat,src_flags, mesh_nz, mesh_nx, nz, nx, border_in, border_in_flag,&
 !$OMP border_out_flag, mesh_x, mesh_z, p_in, p_out, grad_modtt, grad_modrr, &
-!$OMP border_out, grad_out_flag, tim_nt, src_nt, src_nsmul, deltax, deltaz, deltax24I, deltaz24I, tim_del, tim_delI, & 
+!$OMP border_out, grad_out_flag, tim_nt, src_nt, src_nsmul, deltax, deltaz, deltax24I, deltaz24I, deltaxI, deltazI, tim_del, tim_delI, & 
 !$OMP src_x, src_z, recv_n, recv_z, recv_x, recv_out, recv_flags, recv_nfield, &
 !$OMP iborderx, iborderz, border_n, born_flag,&
 !$OMP jobname, modttI, modrrvx,modrrvz, &
@@ -860,35 +871,11 @@ enddo
 !$OMP DO 
 src_par_loop: do isseq = 1, src_nseq
 
-        allocate (p(0:nz+1,0:nx+1,3,npropwav), pp(0:nz+1,0:nx+1,3,npropwav), &
-                ppp(0:nz+1,0:nx+1,3,npropwav))
-        allocate (dpdx(0:nz+1,0:nx+1,npropwav), dpdz(0:nz+1,0:nx+1,npropwav))
-        allocate (dvxdx(0:nz+1,0:nx+1,npropwav), dvzdz(0:nz+1,0:nx+1,npropwav))
-
-        allocate (memory_dvx_dx(0:nz+1,0:nx+1,npropwav), &
-                memory_dvx_dz(0:nz+1,0:nx+1,npropwav), &
-                memory_dvz_dx(0:nz+1,0:nx+1,npropwav), &
-                memory_dvz_dz(0:nz+1,0:nx+1,npropwav), &
-                memory_dp_dx(0:nz+1,0:nx+1,npropwav), &
-                memory_dp_dz(0:nz+1,0:nx+1,npropwav))
-
-        ! initialize main arrays
-        p = rzero_de; pp = rzero_de; ppp =rzero_de
-        ! initial conditions for propagating field 1
-        p(:,:,:,1) = p_in(:,:,:,isseq,1); pp(:,:,:,1) = p_in(:,:,:,isseq,2); ppp=rzero_de;
-        dpdx = rzero_de; dpdz = rzero_de;
-        dvxdx = rzero_de; dvzdz = rzero_de;
-
+        ! born secondary source 
+        allocate(born_svalue_stack(0:nz+1,0:nx+1)); born_svalue_stack = rzero_de
         ! temp array per thread to store recv_out
-        allocate   (rec_mat(recv_n, recv_nfield, npropwav, tim_nt)); rec_mat = rzero_de
+        allocate(rec_mat(recv_n, recv_nfield, npropwav, tim_nt)); rec_mat = rzero_de
 
-        ! initialize PML arrays
-        memory_dp_dx  = rzero_de
-        memory_dp_dz  = rzero_de
-        memory_dvx_dx = rzero_de
-        memory_dvx_dz = rzero_de
-        memory_dvz_dx = rzero_de
-        memory_dvz_dz = rzero_de
 
         if(grad_out_flag) then
                 allocate(gradis_modrrvx(0:nz+1, 0:nx+1), gradis_modrrvz(0:nz+1, 0:nx+1))
@@ -1091,17 +1078,117 @@ src_par_loop: do isseq = 1, src_nseq
                 enddo
         enddo
 
+        allocate (p(0:nz+1,0:nx+1,3,npropwav), pp(0:nz+1,0:nx+1,3,npropwav), &
+                ppp(0:nz+1,0:nx+1,3,npropwav))
+        allocate (dpdx(0:nz+1,0:nx+1,npropwav), dpdz(0:nz+1,0:nx+1,npropwav))
+        allocate (dvxdx(0:nz+1,0:nx+1,npropwav), dvzdz(0:nz+1,0:nx+1,npropwav))
+
+        allocate (memory_dvx_dx(0:nz+1,0:nx+1,npropwav), &
+                memory_dvx_dz(0:nz+1,0:nx+1,npropwav), &
+                memory_dvz_dx(0:nz+1,0:nx+1,npropwav), &
+                memory_dvz_dz(0:nz+1,0:nx+1,npropwav), &
+                memory_dp_dx(0:nz+1,0:nx+1,npropwav), &
+                memory_dp_dz(0:nz+1,0:nx+1,npropwav))
+
+        ! initialize main arrays
+        ! initial values of pp and ppp are not used later in time loop
+        p = rzero_de; pp = rzero_de; ppp =rzero_de
+
+        ! initial conditions for propagating field 1
+        ! need pressure at [it-1] and velocities at [it-3/2]
+        p(:,:,1,1) = p_in(:,:,1,isseq,1); ! pressure at [it-1]
+        p(:,:,2:3,1) = p_in(:,:,2:3,isseq,1); ! velocities at [it-3/2]
+
+        dpdx = rzero_de; dpdz = rzero_de;
+        dvxdx = rzero_de; dvzdz = rzero_de;
+
+        ! initialize PML arrays
+        memory_dp_dx  = rzero_de
+        memory_dp_dz  = rzero_de
+        memory_dvx_dx = rzero_de
+        memory_dvx_dz = rzero_de
+        memory_dvz_dx = rzero_de
+        memory_dvz_dz = rzero_de
+
 
         time_loop: do it = 1, tim_nt
-!                if((wtd .eq. "[MODELING]") .and. (mod(it, nint(tim_nt/10.0)) .eq. 0)) then
-!                        write(*,*) "MODELING: ",nint((it*100.0)/tim_nt), &
-!                        " % complete"
-!                endif
 
+                ! vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+                ! compute dpdx and dpdz at [it-1] for all propagating fields
+                do ipropwav = 1, npropwav
+                do ix=1,nx-1
+                do iz=1,nz-1
+                        dpdx(iz,ix,ipropwav) = &
+                                (27.e0*p(iz,ix+1,1,ipropwav)-&
+                                27.e0*p(iz,ix,1,ipropwav)-&
+                                    p(iz,ix+2,1,ipropwav)+&
+                                    p(iz,ix-1,1,ipropwav)) * (deltax24I)
+!                        memory_dp_dx(iz,ix,ipropwav) = b_x_half(ix) * memory_dp_dx(iz,ix,ipropwav) + &
+!                                                    a_x_half(ix) * dpdx(iz,ix,ipropwav) ! pml
+!                        dpdx(iz,ix,ipropwav) = dpdx(iz,ix,ipropwav) * K_x_halfI(ix) + &
+!                                            memory_dp_dx(iz,ix,ipropwav) ! pml
+                enddo
+                enddo
+
+                do ix=1,nx-1
+                do iz=1,nz-1
+                        dpdz(iz,ix,ipropwav) = &
+                                (27.e0*p(iz+1,ix,1,ipropwav)-&
+                                27.e0*p(iz,ix,1,ipropwav)-&
+                                    p(iz+2,ix,1,ipropwav)+&
+                                    p(iz-1,ix,1,ipropwav)) * (deltaz24I)
+!                        memory_dp_dz(iz,ix,ipropwav) = b_z_half(iz) * memory_dp_dz(iz,ix,ipropwav) + &
+!                                                    a_z_half(iz) * dpdz(iz,ix,ipropwav) !pml
+!                        dpdz(iz,ix,ipropwav) = dpdz(iz,ix,ipropwav) * K_z_halfI(iz) + &
+!                                            memory_dp_dz(iz,ix,ipropwav) !pml
+                enddo
+                enddo
+                enddo
+                ! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+                ! vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+                ! going to update velocity
+                ! save p at [it-3/2] to pp and [it-5/2] to ppp
+                do ipropwav = 1,npropwav
+                        ppp[:,:,2:3,ipropwav] = pp[:,:,2:3,ipropwav]
+                        pp[:,:,2:3,ipropwav] = p[:,:,2:3,ipropwav]
+                enddo
+                ! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+                ! vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+                ! update velocity at [it-1/2] using 
+                ! velocity at [it-3/2] and dpdx and dpdz at [it-1] 
+                do ipropwav = 1, npropwav
+                do ix=1,nx-1
+                do iz=1,nz-1
+                        p(iz,ix,2,ipropwav) = p(iz,ix,2,ipropwav) + &
+                                (dpdx(iz,ix,ipropwav)) * tim_del * &
+                                modrrvx(iz,ix) !* boundary_vx(iz,ix)
+                enddo
+                enddo
+
+                do ix=1,nx-1
+                do iz=1,nz-1
+                        p(iz,ix,3,ipropwav) = p(iz,ix,3,ipropwav) + & 
+                                (dpdz(iz,ix,ipropwav)) * tim_del * &
+                                modrrvz(iz,ix) !* boundary_vz(iz,ix)
+                enddo
+                enddo
+                enddo
+                ! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+                ! vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+                ! going to update pressure 
                 ! save p at [it-1] to pp and [it-2] to ppp
-                ppp = pp
-                pp = p
+                do ipropwav = 1,npropwav
+                        ppp[:,:,1,ipropwav] = pp[:,:,1,ipropwav]
+                        pp[:,:,1,ipropwav] = p[:,:,1,ipropwav]
+                enddo
+                ! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+                ! vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+                ! compute p[it] using p[it-1] and velocity [it-1/2]
                 !$OMK PARALLEL NUM_THREADS(OMP_GET_MAX_THREADS()) DEFAULT(NONE) &
                 !$OMK PRIVATE(ix,iz) &
                 !$OMK SHARED(dvxdx, dvzdz, p,deltax24I,deltaz24I,a_x,a_z,memory_dvz_dz,modttI,&
@@ -1121,21 +1208,21 @@ src_par_loop: do isseq = 1, src_nseq
                         27.e0*p(iz-1,ix,3,ipropwav)-&
                             p(iz+1,ix,3,ipropwav)+&
                             p(iz-2,ix,3,ipropwav)) * (deltaz24I)
-                        memory_dvx_dx(iz,ix,ipropwav) = b_x(ix) * memory_dvx_dx(iz,ix,ipropwav) + &
-                                                        a_x(ix) * dvxdx(iz,ix,ipropwav) ! pml 
-                        memory_dvz_dz(iz,ix,ipropwav) = b_z(iz) * memory_dvz_dz(iz,ix,ipropwav) + &
-                                                        a_z(iz) * dvzdz(iz,ix,ipropwav) ! pml
-                        dvxdx(iz,ix,ipropwav) = dvxdx(iz,ix,ipropwav) * k_xI(ix) + &
-                                                memory_dvx_dx(iz,ix,ipropwav) !pml
-                        dvzdz(iz,ix,ipropwav) = dvzdz(iz,ix,ipropwav) * k_zI(iz) + &
-                                                memory_dvz_dz(iz,ix,ipropwav) !pml
+!                        memory_dvx_dx(iz,ix,ipropwav) = b_x(ix) * memory_dvx_dx(iz,ix,ipropwav) + &
+!                                                        a_x(ix) * dvxdx(iz,ix,ipropwav) ! pml 
+!                        memory_dvz_dz(iz,ix,ipropwav) = b_z(iz) * memory_dvz_dz(iz,ix,ipropwav) + &
+!                                                        a_z(iz) * dvzdz(iz,ix,ipropwav) ! pml
+!                        dvxdx(iz,ix,ipropwav) = dvxdx(iz,ix,ipropwav) * k_xI(ix) + &
+!                                                memory_dvx_dx(iz,ix,ipropwav) !pml
+!                        dvzdz(iz,ix,ipropwav) = dvzdz(iz,ix,ipropwav) * k_zI(iz) + &
+!                                                memory_dvz_dz(iz,ix,ipropwav) !pml
 
                         ! compute pressure at [it] using p at [it-1] and dvxdx
                         ! and dvzdz at [it-1/2]
                         p(iz,ix,1,ipropwav) = p(iz,ix,1,ipropwav) + &
                                 (modttI(iz,ix) * (dvxdx(iz,ix,ipropwav) + &
                                                 dvzdz(iz,ix,ipropwav))) * &
-                                                        tim_del * boundary_p(iz,ix)
+                                                        tim_del !* boundary_p(iz,ix)
                 enddo
                 enddo
                 enddo
@@ -1143,155 +1230,105 @@ src_par_loop: do isseq = 1, src_nseq
                 !$OMK ENDDO
                 !$OMK END PARALLEL
                 !$OMK END PARALLEL
+                ! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
                 ! adding source to pressure at [it] 
                 do ipropwav = 1,npropwav
                 do ifield = 1, src_nfield
                 do issmul = 1, src_nsmul
-                        ! compute source wavelet at [it-1/2] by simple
-                        ! interpolation
+                        ! use src_wav_mat at [it], i.e., sum of source terms
+                        ! until [it-1]
                         ! division of source term with deltax and deltaz (see Jan's fdelmodc manual)
-                        svalue  = 0.5e0 * (src_wav_mat(issmul,ifield,ipropwav,it, isseq) + &
-                                src_wav_mat(issmul,ifield,ipropwav,it-1,isseq)) * tim_del &
-                                        * deltax24I * deltaz24I
-
-
+                        source_term = src_wav_mat(issmul, ifield, ipropwav, it, isseq) * &
+                                        tim_del * deltaxI * deltazI
+                        
+                        ! multiplication with modttI
                                 p(issmulz1(issmul,ipropwav), issmulx1(issmul,ipropwav),ifield, ipropwav) = &
                         p(issmulz1(issmul,ipropwav),issmulx1(issmul,ipropwav),ifield, ipropwav) &
-                                + svalue * src_spray_weights(1,issmul,ipropwav) * &
+                                + source_term * &
+                                src_spray_weights(1,issmul,ipropwav) * &
                                 modttI(issmulz1(issmul,ipropwav), issmulx1(issmul,ipropwav))  
                         p(issmulz1(issmul,ipropwav), issmulx2(issmul,ipropwav),ifield, ipropwav) = &
                                 p(issmulz1(issmul,ipropwav),issmulx2(issmul,ipropwav),ifield, ipropwav) &
-                                + svalue * src_spray_weights(2,issmul,ipropwav) * &
+                                + source_term * &
+                                src_spray_weights(2,issmul,ipropwav) * &
                                 modttI(issmulz1(issmul,ipropwav), issmulx2(issmul,ipropwav))
                         p(issmulz2(issmul,ipropwav), issmulx1(issmul,ipropwav),ifield, ipropwav) = &
                                 p(issmulz2(issmul,ipropwav),issmulx1(issmul,ipropwav),ifield, ipropwav) &
-                                + svalue * src_spray_weights(3,issmul,ipropwav) * &
+                                + source_term * &
+                                src_spray_weights(3,issmul,ipropwav) * &
                                 modttI(issmulz2(issmul,ipropwav), issmulx1(issmul,ipropwav))
                         p(issmulz2(issmul,ipropwav), issmulx2(issmul,ipropwav),ifield, ipropwav) = &
                                 p(issmulz2(issmul,ipropwav),issmulx2(issmul,ipropwav),ifield, ipropwav) &
-                                + svalue * src_spray_weights(4,issmul,ipropwav) * &
+                                + source_term * &
+                                src_spray_weights(4,issmul,ipropwav) * &
                                 modttI(issmulz2(issmul,ipropwav), issmulx2(issmul,ipropwav))
                 enddo
                 enddo
                 enddo
 
-                ! force p[1] on borders
-                if(border_in_flag) then
-                do iborder = 1, border_n
-                        p(iborderz(iborder), iborderx(iborder),1,1) = &
-                        border_in(iborder,it,isseq) 
-                enddo
-                endif
-
-                ! compute dpdx and dpdz at [it] only for the first propagating field, to use for born modeling
-                !forall(ix=1:nx-1,iz=1:nz-1)
-                ipropwav = 1
-                do ix=1,nx-1
-                do iz=1,nz-1
-                        dpdx(iz,ix,ipropwav) = &
-                                (27.e0*p(iz,ix+1,1,ipropwav)-&
-                                27.e0*p(iz,ix,1,ipropwav)-&
-                                    p(iz,ix+2,1,ipropwav)+&
-                                    p(iz,ix-1,1,ipropwav)) * (deltax24I)
-                        memory_dp_dx(iz,ix,ipropwav) = b_x_half(ix) * memory_dp_dx(iz,ix,ipropwav) + &
-                                                    a_x_half(ix) * dpdx(iz,ix,ipropwav) ! pml
-                        dpdx(iz,ix,ipropwav) = dpdx(iz,ix,ipropwav) * K_x_halfI(ix) + &
-                                            memory_dp_dx(iz,ix,ipropwav) ! pml
-                enddo
-                enddo
-                !endforall
-
-                !forall(ix=1:nx-1,iz=1:nz-1)
-                do ix=1,nx-1
-                do iz=1,nz-1
-                        dpdz(iz,ix,ipropwav) = &
-                                (27.e0*p(iz+1,ix,1,ipropwav)-&
-                                27.e0*p(iz,ix,1,ipropwav)-&
-                                    p(iz+2,ix,1,ipropwav)+&
-                                    p(iz-1,ix,1,ipropwav)) * (deltaz24I)
-                        memory_dp_dz(iz,ix,ipropwav) = b_z_half(iz) * memory_dp_dz(iz,ix,ipropwav) + &
-                                                    a_z_half(iz) * dpdz(iz,ix,ipropwav) !pml
-                        dpdz(iz,ix,ipropwav) = dpdz(iz,ix,ipropwav) * K_z_halfI(iz) + &
-                                            memory_dp_dz(iz,ix,ipropwav) !pml
-                enddo
-                enddo
-
-
+                ! BORN SOURCES
                 if(born_flag) then
                 ! adding born sources from pressure(:,:,1) to pressure(:,:,2)
                 do ix=3,nx-2
                 do iz=3,nz-2
-                        !p(iz,ix,2) = p(iz,ix,1);
-                        p(iz,ix,1,2) = p(iz,ix,1,2) + & 
-                                ! lambdaI scatterrer
+                        born_svalue_stack(iz,ix) = &
+                                born_svalue_stack(iz,ix) + & ! upto until [it-2]
+                                tim_del * ( &
+                                ! lambdaI scatterrer source term at [it-1]
+                                ! p is at [it], pp is at [it-1], ppp is at [it-2]
                                 (-1.0 * &
                                 (ppp(iz, ix, 1,1) + p(iz, ix,  1,1) - 2.0 * pp(iz, ix,  1,1)) &
                                                  * deltamodtt(iz, ix) * tim_delI * tim_delI) + &
-                                ! modrrvx scatterrer
+                                ! dpdx is at [it-1] and dpdz is at [it-1]
+                                ! modrrvx scatterrer source term at [it-1]
                                 (27.e0*dpdx(iz,ix,1) * deltamodrrvx(iz,ix) &
                                         -27.e0*dpdx(iz,ix-1,1) * deltamodrrvx(iz,ix-1) &
                                         -dpdx(iz,ix+1,1) * deltamodrrvx(iz,ix+1) &
                                         +dpdx(iz,ix-2,1) * deltamodrrvx(iz,ix-2) &
                                         ) * (deltax24I) + &
-                                ! modrrvz scatterrer
+                                ! modrrvz scatterrer source term at [it-1]
                                 (27.e0*dpdz(iz,ix,1) * deltamodrrvz(iz,ix) &
                                         -27.e0*dpdz(iz-1,ix,1) * deltamodrrvz(iz-1,ix) &
                                         -dpdz(iz+1,ix,1) * deltamodrrvz(iz+1,ix) &
                                         +dpdz(iz-2,ix,1) * deltamodrrvz(iz-2,ix) &
-                                        ) * (deltaz24I)
+                                        ) * (deltaz24I) &
+                                )
         
+                        p(iz,ix,1,2) = p(iz,ix,1,2) + & 
+                                born_svalue_stack(iz,ix) * &
+                                tim_del * deltaxI * deltazI * modttI(iz,ix)  
                 enddo
                 enddo
                 endif
 
+                ! from here on
+                ! p is at pressure[it] velocity[it-1/2]
+                ! pp is at pressure[it-1] velocity[it-3/2]
+                ! ppp is at pressure[it-2] velocity[it-5/2]
 
-                ! compute dpdx and dpdz at [it] for all other propagating fields
-                !forall(ix=1:nx-1,iz=1:nz-1)
-                if(npropwav .eq. 2) then
-                        ipropwav=2;
-                do ix=1,nx-1
-                do iz=1,nz-1
-                        dpdx(iz,ix,ipropwav) = &
-                                (27.e0*p(iz,ix+1,1,ipropwav)-&
-                                27.e0*p(iz,ix,1,ipropwav)-&
-                                    p(iz,ix+2,1,ipropwav)+&
-                                    p(iz,ix-1,1,ipropwav)) * (deltax24I)
-                        memory_dp_dx(iz,ix,ipropwav) = b_x_half(ix) * memory_dp_dx(iz,ix,ipropwav) + &
-                                                    a_x_half(ix) * dpdx(iz,ix,ipropwav) ! pml
-                        dpdx(iz,ix,ipropwav) = dpdx(iz,ix,ipropwav) * K_x_halfI(ix) + &
-                                            memory_dp_dx(iz,ix,ipropwav) ! pml
-                enddo
-                enddo
-                !endforall
-
-                !forall(ix=1:nx-1,iz=1:nz-1)
-                do ix=1,nx-1
-                do iz=1,nz-1
-                        dpdz(iz,ix,ipropwav) = &
-                                (27.e0*p(iz+1,ix,1,ipropwav)-&
-                                27.e0*p(iz,ix,1,ipropwav)-&
-                                    p(iz+2,ix,1,ipropwav)+&
-                                    p(iz-1,ix,1,ipropwav)) * (deltaz24I)
-                        memory_dp_dz(iz,ix,ipropwav) = b_z_half(iz) * memory_dp_dz(iz,ix,ipropwav) + &
-                                                    a_z_half(iz) * dpdz(iz,ix,ipropwav) !pml
-                        dpdz(iz,ix,ipropwav) = dpdz(iz,ix,ipropwav) * K_z_halfI(iz) + &
-                                            memory_dp_dz(iz,ix,ipropwav) !pml
-                enddo
-                enddo
-                endif
-                !endforall
+                ! force p[1] on borders
+                !if(border_in_flag) then
+                !do iborder = 1, border_n
+                !        p(iborderz(iborder), iborderx(iborder),1,1) = &
+                !        border_in(iborder,it,isseq) 
+                !enddo
+                !endif
 
 
-
+                
                 ! gradient calculation
                 if(grad_out_flag) then
 
                         ! p at [it], pp at [it-1]
                         ! dpdx and dpdz at [it]
-                        ! gradients w.r.t inverse of modttI, i.e., 1/rho/c^2 
-                        gradis_modtt = gradis_modtt + (p(:,:,1,1) - pp(:,:,1,1)) * tim_delI * &
-                                        (p(:,:,1,2) - pp(:,:,1,2)) * tim_delI
+                        ! gradients w.r.t inverse of modtt, i.e., 1/rho/c^2 
+                        gradis_modtt = gradis_modtt +&
+                                (-1.0 * &
+                                (ppp(:, :, 1,1) + p(:, :,  1,1) - 2.0 * pp(:, :,  1,1)) * &
+                                                 tim_delI * tim_delI) *  pp(:,:,1,2)
+                                !(p(:,:,1,1) - pp(:,:,1,1)) * tim_delI * &
+                                !        (p(:,:,1,2) - pp(:,:,1,2)) * tim_delI
                         
 
                         ! gradient w.r.t. inverse of rho on vx and vz grids
@@ -1307,31 +1344,10 @@ src_par_loop: do isseq = 1, src_nseq
                 !        endif
                 !endif
 
-                ! update velocity at [it+1/2] using 
-                ! velcity at [it-1/2] and dpdx and dpdz at [it] 
-                !forall(ix=1:nx-1,iz=1:nz-1)
-                do ipropwav = 1, npropwav
-                do ix=1,nx-1
-                do iz=1,nz-1
-                        p(iz,ix,2,ipropwav) = p(iz,ix,2,ipropwav) + &
-                                (dpdx(iz,ix,ipropwav)) * tim_del * &
-                                modrrvx(iz,ix) * boundary_vx(iz,ix)
-                enddo
-                enddo
-                !endforall
-
-                !forall(ix=1:nx-1,iz=1:nz-1)
-                do ix=1,nx-1
-                do iz=1,nz-1
-                        p(iz,ix,3,ipropwav) = p(iz,ix,3,ipropwav) + & 
-                                (dpdz(iz,ix,ipropwav)) * tim_del * &
-                                modrrvz(iz,ix) * boundary_vz(iz,ix)
-                enddo
-                enddo
-                enddo
-                !endforall
-
+                
                 ! store pressure seismograms to rec_mat 
+                ! p is at pressure[it] 
+                ! vz and vz's are at [it-1/2]
                 do ipropwav = 1, npropwav
                 do ifield = 1, recv_nfield
                 do irec = 1, recv_n
@@ -1354,16 +1370,22 @@ src_par_loop: do isseq = 1, src_nseq
 
 
                 ! record borders
-                if(border_out_flag) then
-                !do ipropwav = 1, npropwav
-                !do ifield = 1, 3
-                do iborder = 1, border_n
-                        border_out(iborder,it,isseq) = &
-                        p(iborderz(iborder),iborderx(iborder),1,1)
-                enddo
-                !enddo
-                !enddo
-                endif
+!                if(border_out_flag) then
+!                !do ipropwav = 1, npropwav
+!                !do ifield = 1, 3
+!                do iborder = 1, border_n
+!                        border_out(iborder,it,isseq) = &
+!                        p(iborderz(iborder),iborderx(iborder),1,1)
+!                enddo
+!                !enddo
+!                !enddo
+!                endif
+
+!                if((wtd .eq. "[MODELING]") .and. (mod(it, nint(tim_nt/10.0)) .eq. 0)) then
+!                        write(*,*) "MODELING: ",nint((it*100.0)/tim_nt), &
+!                        " % complete"
+!                endif
+
 
         enddo time_loop
 
@@ -1385,8 +1407,13 @@ src_par_loop: do isseq = 1, src_nseq
         enddo
 
         ! output p_out of the first propagating field
-        p_out(:,:,:,isseq,1) = p(:,:,:,1) 
-        p_out(:,:,:,isseq,2) = pp(:,:,:,1)
+        ! pressure is at [tim_nt]
+        ! velocities are at [tim_nt+1/2]
+        ! pp pressure is at [tim_nt - 1]
+        ! pp velocities are at [tim_nt-1/2]
+        p_out(:,:,1,isseq,1) = pp(:,:,1,1) ! pressure at [tim_nt-1]
+        p_out(:,:,2:3,isseq,1) = p(:,:,2:3,1) ! velocity at [tim_nt-1/2] 
+        p_out(:,:,:,isseq,2) = ppp(:,:,:,1) ! dummy
 
 
         ! edges of the gradient zero
@@ -1436,6 +1463,7 @@ src_par_loop: do isseq = 1, src_nseq
         deallocate(irecx1, irecx2, irecz1, irecz2)
         deallocate(denomrecI, rec_interpolate_weights)
 
+        if(allocated(born_svalue_stack)) deallocate  (born_svalue_stack)
         if(allocated(rec_mat)) deallocate  (rec_mat)
         if(allocated(gradis_modrrvx)) deallocate(gradis_modrrvx)
         if(allocated(gradis_modrrvz)) deallocate(gradis_modrrvz)
