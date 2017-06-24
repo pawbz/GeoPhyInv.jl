@@ -1,10 +1,13 @@
 module Gallery
 
+import SIT.IO
 import SIT.Grid
 import SIT.Models
 import SIT.Acquisition
 import SIT.Wavelets
 using Distributions
+
+global marmousi_folder="/math/home/pawbz/marmousi2/"
 
 """
 Gallery of `M2D` grids.
@@ -83,29 +86,41 @@ function Seismic(attrib::Symbol)
 		      fill(0.0, (mgrid.nz, mgrid.nx)),
 		      mgrid)
 	elseif(attrib == :seismic_marmousi2)
-		vp, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/vp_marmousi-ii_0.1.su")
-		vs, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/vs_marmousi-ii_0.1.su")
-		ρ, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/density_marmousi-ii_0.1.su")
-		vp0 = 10^3.*[minimum(vp)-0.1*mean(vp), maximum(vp)+0.1*mean(vp)]; 
-		vs0 = 10^3.*[minimum(vs)-0.1*mean(vs), maximum(vs)+0.1*mean(vs)]; 
-		ρ0 = [minimum(ρ)-0.1*mean(ρ), maximum(ρ)+0.1*mean(ρ)]; 
+		vp, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vp_marmousi-ii_0.1.su"))
+		vs, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vs_marmousi-ii_0.1.su"))
+		ρ, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"density_marmousi-ii_0.1.su"))
+		bound=0.01; vp0=zeros(2); vs0=zeros(2); ρ0=zeros(2);
+		boundvp=bound*mean(vp); boundvs=bound*mean(vs); boundρ=bound*mean(ρ);
+		vp0[1] = (minimum(vp) - boundvp<0.0) ? 0.0 : (minimum(vp) - boundvp<0.0)
+		vp0[2] = maximum(vp)+boundvp
+		vs0[1] = (minimum(vs) - boundvs<0.0) ? 0.0 : (minimum(vs) - boundvs<0.0)
+		vs0[2] = maximum(vs)+boundvs
+		ρ0[1] = (minimum(ρ) - boundρ<0.0) ? 0.0 : (minimum(ρ) - boundρ<0.0)
+		ρ0[2] = maximum(ρ)+boundρ
 		mgrid = Grid.M2D(0., 17000., 0., 3500.,nx,nz,40)
 		return Models.Seismic(vp0, vs0, ρ0, 1000.*vp, 1000.*vs, ρ,
 		      mgrid)
 	elseif(attrib == :seismic_marmousi2_high_res)
-		vp, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/vp_marmousi-ii.su")
-		vs, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/vs_marmousi-ii.su")
-		ρ, nz, nx = IO.readsu_data(fname="/home/pawbz/marmousi2/density_marmousi-ii.su")
-		vp0 = 10^3.*[minimum(vp)-0.1*mean(vp), maximum(vp)+0.1*mean(vp)]; 
-		vs0 = 10^3.*[minimum(vs)-0.1*mean(vs), maximum(vs)+0.1*mean(vs)]; 
-		ρ0 = [minimum(ρ)-0.1*mean(ρ), maximum(ρ)+0.1*mean(ρ)]; 
+		vp, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vp_marmousi-ii.su"))
+		vs, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vs_marmousi-ii.su"))
+		ρ, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"density_marmousi-ii.su"))
+		bound=0.01; vp0=zeros(2); vs0=zeros(2); ρ0=zeros(2);
+		boundvp=bound*mean(vp); boundvs=bound*mean(vs); boundρ=bound*mean(ρ);
+		vp0[1] = (minimum(vp) - boundvp<0.0) ? 0.0 : (minimum(vp) - boundvp<0.0)
+		vp0[2] = maximum(vp)+boundvp
+		vs0[1] = (minimum(vs) - boundvs<0.0) ? 0.0 : (minimum(vs) - boundvs<0.0)
+		vs0[2] = maximum(vs)+boundvs
+		ρ0[1] = (minimum(ρ) - boundρ<0.0) ? 0.0 : (minimum(ρ) - boundρ<0.0)
+		ρ0[2] = maximum(ρ)+boundρ
 		mgrid = Grid.M2D(0., 17000., 0., 3500.,nx,nz,40)
 		return Models.Seismic(vp0, vs0, ρ0, 1000.*vp, 1000.*vs, ρ,
 		      mgrid)
 
 	elseif(attrib == :seismic_marmousi2_box1)
 		mgrid=Grid.M2D(8500.,9500., 1000., 2000.,5.,5.,40)
-		return Models.Seismic_resamp(Seismic(:gallery_marmousi2), mgrid)
+		marm_box1=Models.Seismic_zeros(mgrid)
+		Models.Seismic_interp_spray!(Seismic(:seismic_marmousi2), marm_box1, :interp)
+		return marm_box1
 	else
 		error("invalid attrib")
 	end

@@ -13,6 +13,7 @@ TODO: conversion to `TD`, currently the ouput is just a data matrix.
 function readsu_data(;
 		     fname::AbstractString=""
 		     )
+	isfile(fname) ? nothing : error("file does not exist")
 
 	nt = [0]; nrecords = [0];
 	# read number of time samples and number of records first 

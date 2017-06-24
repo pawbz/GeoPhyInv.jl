@@ -53,7 +53,7 @@ julia> records, boundary_save  = mod();
 ```
 Credits: Pawan Bharadwaj, 2017
 """
-function mod!(;
+@fastmath function mod!(;
 	jobname::AbstractString = "Hello",
 	npropwav::Int64=1, 
 	model::Models.Seismic = Gallery.Seismic(:acou_homo1),
@@ -402,10 +402,8 @@ function mod!(;
 
 		# time_loop
 		for it=1:tim_nt
-			
-
-			ppp[:,:,:,:] = pp[:,:,:,:]
-			pp[:,:,:,:] = p[:,:,:,:]
+			ppp .= pp
+			pp .=  p
 
 			advance!(p, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
 				   modttI, modrrvx, modrrvz, 
@@ -420,41 +418,11 @@ function mod!(;
 				end
 			end
 	 
-			"""
-			adding source to pressure field at [it] 
-			"""
-			for ipropwav = 1:npropwav
-			for ifield = 1:src_nfield
-			for issmul = 1:src_nsmul
-				"""
-				use src_wav_mat at [it], i.e., sum of source terms
-				until [it-1]
-				division of source term with δx and δz (see Jan's fdelmodc manual)
-				"""
-				source_term = src_wav_mat[issmul, ifield, ipropwav, it, isseq] * δt * δxI * δzI
-				
-				"""
-				multiplication with modttI
-				"""
-				p[issmulz1[issmul,ipropwav], issmulx1[issmul,ipropwav],ifield, ipropwav] += 
-					source_term * 
-					src_spray_weights[1,issmul,ipropwav] * 
-					modttI[issmulz1[issmul,ipropwav], issmulx1[issmul,ipropwav]]  
-				p[issmulz1[issmul,ipropwav], issmulx2[issmul,ipropwav],ifield, ipropwav] += 
-					source_term * 
-					src_spray_weights[2,issmul,ipropwav] * 
-					modttI[issmulz1[issmul,ipropwav], issmulx2[issmul,ipropwav]]
-				p[issmulz2[issmul,ipropwav], issmulx1[issmul,ipropwav],ifield, ipropwav] += 
-					source_term * 
-					src_spray_weights[3,issmul,ipropwav] * 
-					modttI[issmulz2[issmul,ipropwav], issmulx1[issmul,ipropwav]]
-				p[issmulz2[issmul,ipropwav], issmulx2[issmul,ipropwav],ifield, ipropwav] += 
-					source_term * 
-					src_spray_weights[4,issmul,ipropwav] * 
-					modttI[issmulz2[issmul,ipropwav], issmulx2[issmul,ipropwav]]
-			end
-			end
-			end
+			add_source!(it, isseq, p, src_wav_mat, src_spray_weights,
+				modttI, issmulx1, issmulx2, issmulz1, issmulz2, npropwav, src_nfield, src_nsmul,
+				δt::Float64, δxI::Float64, δzI::Float64
+				)
+
 
 			# secondary sources for Born modeling
 			if(born_flag)
@@ -484,24 +452,7 @@ function mod!(;
 				end
 			end
 
-
-			for ipropwav = 1:npropwav
-			for ifield = 1:recv_nfield
-			for irec = 1:recv_n
-					rec_mat[irec,ifield,ipropwav, it] = 
-					(
-					p[irecz1[irec,ipropwav],irecx1[irec,ipropwav],ifield,ipropwav]*
-					rec_interpolate_weights[1,irec,ipropwav]+
-					p[irecz1[irec,ipropwav],irecx2[irec,ipropwav],ifield,ipropwav]*
-					rec_interpolate_weights[2,irec,ipropwav]+
-					p[irecz2[irec,ipropwav],irecx1[irec,ipropwav],ifield,ipropwav]*
-					rec_interpolate_weights[3,irec,ipropwav]+
-					p[irecz2[irec,ipropwav],irecx2[irec,ipropwav],ifield,ipropwav]*
-					rec_interpolate_weights[4,irec,ipropwav]
-					)
-			end
-			end
-			end
+			record!(it,rec_mat, p, rec_interpolate_weights, irecx1, irecx2, irecz1, irecz2, npropwav, recv_nfield, recv_n)
 
 			if(gmodel_flag)
 				compute_gradient!(p, pp, ppp, dpdx, dpdz,
@@ -536,7 +487,7 @@ function mod!(;
 			for ifield=1:recv_nfield
 				for irec=1:recv_n
 					for it=1:tim_nt
-						recv_out[it,irec,ifield,ipropwav,isseq]=rec_mat[irec,ifield,ipropwav,it]
+						@inbounds recv_out[it,irec,ifield,ipropwav,isseq]=rec_mat[irec,ifield,ipropwav,it]
 					end
 				end
 			end
@@ -547,9 +498,9 @@ function mod!(;
 			"gradient is formed by intergration over time, hence multiply with δt, but why not?"
 			"I don't completely understand where the factors δx and δz are coming from..."
 			"probably the source term should not be multiplied by δxI and δzI during adjoint propagation"
-			gradis_modtt = gradis_modtt  .* δx .* δz
-			gradis_modrrvx = gradis_modrrvx  .* δx .* δz
-			gradis_modrrvz = gradis_modrrvz  .* δx .* δz
+			gradis_modtt .*=  (δx * δz)
+			gradis_modrrvx .*= (δx * δz)
+			gradis_modrrvz .*= (δx * δz)
 
 
 			grad_modtt[:,:,isseq] = gradis_modtt
@@ -557,11 +508,21 @@ function mod!(;
 			for ix=2:nx-2
 				for iz=2:nz-2
 					@inbounds grad_modrr[iz,ix, isseq] += 0.5e0 * gradis_modrrvx[iz,ix] 
-					@inbounds grad_modrr[iz,ix+1, isseq] +=  0.5e0 * gradis_modrrvx[iz,ix]
 					@inbounds grad_modrr[iz,ix, isseq] +=  0.5e0 * gradis_modrrvz[iz,ix]
+				end
+			end
+			for ix=2:nx-2
+				for iz=2:nz-2
+					@inbounds grad_modrr[iz,ix+1, isseq] +=  0.5e0 * gradis_modrrvx[iz,ix]
+				end
+			end
+			for ix=2:nx-2
+				for iz=2:nz-2
 					@inbounds grad_modrr[iz+1,ix, isseq] +=  0.5e0 * gradis_modrrvz[iz,ix]
 				end
 			end
+
+
 		end
 
 	end # source_loop
@@ -615,8 +576,83 @@ function mod!(;
 	#		       tgridmod, acqgeom[1]) for iprop in 1:npropwav]
 end
 
+@inbounds @fastmath function add_source!(it::Int64, isseq::Int64, 
+				p::Array{Float64}, src_wav_mat::Array{Float64},
+				src_spray_weights::Array{Float64},
+				modttI::Array{Float64},
+				issmulx1::Array{Int64}, issmulx2::Array{Int64},
+				issmulz1::Array{Int64}, issmulz2::Array{Int64},
+				npropwav::Int64, src_nfield::Int64, src_nsmul::Int64,
+				δt::Float64, δxI::Float64, δzI::Float64
+				)
+	"""
+	adding source to pressure field at [it] 
+	"""
+	for ipropwav = 1:npropwav
+	for ifield = 1:src_nfield
+	@simd for issmul = 1:src_nsmul
+		"""
+		use src_wav_mat at [it], i.e., sum of source terms
+		until [it-1]
+		division of source term with δx and δz (see Jan's fdelmodc manual)
+		"""
+		source_term = src_wav_mat[issmul, ifield, ipropwav, it, isseq] * δt * δxI * δzI
+		
+		"""
+		multiplication with modttI
+		"""
+		p[issmulz1[issmul,ipropwav], issmulx1[issmul,ipropwav],ifield, ipropwav] += 
+			source_term * 
+			src_spray_weights[1,issmul,ipropwav] * 
+			modttI[issmulz1[issmul,ipropwav], issmulx1[issmul,ipropwav]]  
+		p[issmulz1[issmul,ipropwav], issmulx2[issmul,ipropwav],ifield, ipropwav] += 
+			source_term * 
+			src_spray_weights[2,issmul,ipropwav] * 
+			modttI[issmulz1[issmul,ipropwav], issmulx2[issmul,ipropwav]]
+		p[issmulz2[issmul,ipropwav], issmulx1[issmul,ipropwav],ifield, ipropwav] += 
+			source_term * 
+			src_spray_weights[3,issmul,ipropwav] * 
+			modttI[issmulz2[issmul,ipropwav], issmulx1[issmul,ipropwav]]
+		p[issmulz2[issmul,ipropwav], issmulx2[issmul,ipropwav],ifield, ipropwav] += 
+			source_term * 
+			src_spray_weights[4,issmul,ipropwav] * 
+			modttI[issmulz2[issmul,ipropwav], issmulx2[issmul,ipropwav]]
+	end
+	end
+	end
+end
 
-function compute_gradient!(p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64},
+
+@inbounds @fastmath function record!(it::Int64,
+		 rec_mat::Array{Float64}, 
+		 p::Array{Float64}, 
+		 rec_interpolate_weights::Array{Float64},
+		 irecx1::Array{Int64}, irecx2::Array{Int64},
+		 irecz1::Array{Int64}, irecz2::Array{Int64},
+		 npropwav::Int64, recv_nfield::Int64, 
+		 recv_n::Int64)
+
+	for ipropwav = 1:npropwav
+	for ifield = 1:recv_nfield
+	@simd for irec = 1:recv_n
+			rec_mat[irec,ifield,ipropwav, it] = 
+			(
+			p[irecz1[irec,ipropwav],irecx1[irec,ipropwav],ifield,ipropwav]*
+			rec_interpolate_weights[1,irec,ipropwav]+
+			p[irecz1[irec,ipropwav],irecx2[irec,ipropwav],ifield,ipropwav]*
+			rec_interpolate_weights[2,irec,ipropwav]+
+			p[irecz2[irec,ipropwav],irecx1[irec,ipropwav],ifield,ipropwav]*
+			rec_interpolate_weights[3,irec,ipropwav]+
+			p[irecz2[irec,ipropwav],irecx2[irec,ipropwav],ifield,ipropwav]*
+			rec_interpolate_weights[4,irec,ipropwav]
+			)
+	end
+	end
+	end
+
+end
+
+@inbounds @fastmath function compute_gradient!(p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64},
 			   dpdx::Array{Float64}, dpdz::Array{Float64},
 			   gradis_modtt::Array{Float64}, gradis_modrrvx::Array{Float64},
 			   gradis_modrrvz::Array{Float64},
@@ -640,7 +676,7 @@ function compute_gradient!(p::Array{Float64}, pp::Array{Float64}, ppp::Array{Flo
 end
 
 
-function advance!(
+@inbounds @fastmath function advance!(
 		  p::Array{Float64},  dpdx::Array{Float64}, dpdz::Array{Float64},  
 		  memory_dp_dx::Array{Float64}, memory_dp_dz::Array{Float64}, memory_dvx_dx::Array{Float64}, memory_dvz_dz::Array{Float64},
 		  modttI::Array{Float64}, modrrvx::Array{Float64}, modrrvz::Array{Float64},
@@ -712,7 +748,7 @@ function advance!(
 end
 
 """
-
+Output vectors related to PML boundaries.
 """
 function pml_variables(
 		nx::Int64, 
