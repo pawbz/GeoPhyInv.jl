@@ -1,3 +1,5 @@
+__precompile__()
+
 module Gallery
 
 import SIT.IO
@@ -5,7 +7,6 @@ import SIT.Grid
 import SIT.Models
 import SIT.Acquisition
 import SIT.Wavelets
-using Distributions
 
 global marmousi_folder="/math/home/pawbz/marmousi2/"
 
@@ -68,150 +69,107 @@ Gallery of `Seismic` models.
 
 # Outputs
 * `attrib=:acou_homo1` : an homogeneous acoustic model with `vp0=2000` and `ρ0=2000`
-* `attrib=:acou_homo2` : same as above, but with spatial sampling as 40 m (faster testing)
-* `attrib=:seismic_marmousi2` : marmousi model with lower resolution; ideal for surface seismic experiments
-* `attrib=:seismic_marmousi2_high_res` : marmousi model high resolution; slower to load
-* `attrib=:seismic_marmousi2_box1` : 1x1 kilometer box of marmousi model; ideal for crosswell, borehole seismic studies
+  * `attrib=:acou_homo2` : same as above, but with spatial sampling as 40 m (faster testing)
+  * `attrib=:seismic_marmousi2` : marmousi model with lower resolution; ideal for surface seismic experiments
+  * `attrib=:seismic_marmousi2_high_res` : marmousi model high resolution; slower to load
+  * `attrib=:seismic_marmousi2_box1` : 1x1 kilometer box of marmousi model; ideal for crosswell, borehole seismic studies
 """
-
-function Seismic(attrib::Symbol)
+function Seismic(attrib::Symbol, δ::Float64=0.0)
 	if((attrib == :acou_homo1) | (attrib == :acou_homo2))
 		vp0 = [1700., 2300.] # bounds for vp
 		vs0 = [1.0, 1.0] # dummy
 		ρ0 = [1700., 2300.] # density bounds
 		mgrid = M2D(attrib)
-		return Models.Seismic(vp0, vs0, ρ0,
+		model= Models.Seismic(vp0, vs0, ρ0,
 		      fill(0.0, (mgrid.nz, mgrid.nx)),
 		      fill(0.0, (mgrid.nz, mgrid.nx)),
 		      fill(0.0, (mgrid.nz, mgrid.nx)),
 		      mgrid)
+
 	elseif(attrib == :seismic_marmousi2)
 		vp, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vp_marmousi-ii_0.1.su"))
 		vs, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vs_marmousi-ii_0.1.su"))
 		ρ, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"density_marmousi-ii_0.1.su"))
-		bound=0.01; vp0=zeros(2); vs0=zeros(2); ρ0=zeros(2);
+		vp .*= 1000.; vs .*= 1000.; #ρ .*=1000
+		bound=0.1; vp0=zeros(2); vs0=zeros(2); ρ0=zeros(2);
 		boundvp=bound*mean(vp); boundvs=bound*mean(vs); boundρ=bound*mean(ρ);
-		vp0[1] = (minimum(vp) - boundvp<0.0) ? 0.0 : (minimum(vp) - boundvp<0.0)
+		vp0[1] = ((minimum(vp) - boundvp)<0.0) ? 0.0 : (minimum(vp) - boundvp)
 		vp0[2] = maximum(vp)+boundvp
-		vs0[1] = (minimum(vs) - boundvs<0.0) ? 0.0 : (minimum(vs) - boundvs<0.0)
+		vs0[1] = ((minimum(vs) - boundvs)<0.0) ? 0.0 : (minimum(vs) - boundvs)
 		vs0[2] = maximum(vs)+boundvs
-		ρ0[1] = (minimum(ρ) - boundρ<0.0) ? 0.0 : (minimum(ρ) - boundρ<0.0)
+		ρ0[1] = ((minimum(ρ) - boundρ)<0.0) ? 0.0 : (minimum(ρ) - boundρ)
 		ρ0[2] = maximum(ρ)+boundρ
 		mgrid = Grid.M2D(0., 17000., 0., 3500.,nx,nz,40)
-		return Models.Seismic(vp0, vs0, ρ0, 1000.*vp, 1000.*vs, ρ,
-		      mgrid)
+		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
 	elseif(attrib == :seismic_marmousi2_high_res)
 		vp, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vp_marmousi-ii.su"))
 		vs, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vs_marmousi-ii.su"))
 		ρ, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"density_marmousi-ii.su"))
-		bound=0.01; vp0=zeros(2); vs0=zeros(2); ρ0=zeros(2);
+		vp .*= 1000.; vs .*= 1000.; #ρ .*=1000
+		bound=0.1; vp0=zeros(2); vs0=zeros(2); ρ0=zeros(2);
 		boundvp=bound*mean(vp); boundvs=bound*mean(vs); boundρ=bound*mean(ρ);
-		vp0[1] = (minimum(vp) - boundvp<0.0) ? 0.0 : (minimum(vp) - boundvp<0.0)
+		vp0[1] = ((minimum(vp) - boundvp)<0.0) ? 0.0 : (minimum(vp) - boundvp)
 		vp0[2] = maximum(vp)+boundvp
-		vs0[1] = (minimum(vs) - boundvs<0.0) ? 0.0 : (minimum(vs) - boundvs<0.0)
+		vs0[1] = ((minimum(vs) - boundvs)<0.0) ? 0.0 : (minimum(vs) - boundvs)
 		vs0[2] = maximum(vs)+boundvs
-		ρ0[1] = (minimum(ρ) - boundρ<0.0) ? 0.0 : (minimum(ρ) - boundρ<0.0)
+		ρ0[1] = ((minimum(ρ) - boundρ)<0.0) ? 0.0 : (minimum(ρ) - boundρ)
 		ρ0[2] = maximum(ρ)+boundρ
 		mgrid = Grid.M2D(0., 17000., 0., 3500.,nx,nz,40)
-		return Models.Seismic(vp0, vs0, ρ0, 1000.*vp, 1000.*vs, ρ,
-		      mgrid)
+		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
 
 	elseif(attrib == :seismic_marmousi2_box1)
 		mgrid=Grid.M2D(8500.,9500., 1000., 2000.,5.,5.,40)
 		marm_box1=Models.Seismic_zeros(mgrid)
 		Models.Seismic_interp_spray!(Seismic(:seismic_marmousi2), marm_box1, :interp)
-		return marm_box1
+		model= marm_box1
 	else
 		error("invalid attrib")
 	end
-end
-
-
-"""
-Gallery of acquisition geometries `Geom`.
-
-# Arguments 
-* `attrib::Symbol` : 
-
-# Outputs
-* `attrib=:acou_homo1` : a simple one source and one receiver configuration
-"""
-function Geom(attrib::Symbol)
-	if((attrib == :acou_homo1) | (attrib == :acou_homo2))
-		return Acquisition.Geom_fixed(-300.0,-300.0,-300.0,300.0,300.0,300.0,1,1)
+	if(δ==0.0)
+		return model
+	elseif(δ > 0.0)
+		mgrid_out=Grid.M2D_resamp(model.mgrid,δ,δ,)
+		model_out=Models.Seismic_zeros(mgrid_out)
+		Models.Seismic_interp_spray!(model, model_out, :interp)
+		return model_out
 	else
-		error("invalid attrib")
+		error("invalid δ")
 	end
+
+
 end
 
 """
-Gallery of acquisition geometries `Geom` based on input `M2D`.
+Gallery of acquisition geometries `Geom` using an input mesh `M2D`.
+The sources and receivers are not placed anywhere on the edges of the mesh.
 
 # Arguments 
-* `attrib::Symbol` : 
+* `mgrid::Grid.M2D` : a 2-D mesh
+* `attrib::Symbol` : attribute decides output
+  * `=:xwell` cross-well acquisition
+  * `=:surf` cross-well; but sources and receivers at unequal depths
+  * `=:vsp` vertical seismic profiling
+  * `=:rvsp`  reverse vertical seismic profiling
+  * `=:downhole` downhole sources and receivers 
 
-# Outputs
-* `attrib=:oneonev` : one source at (xmin, mean(z)) and one receiver at (xmax, mean(z))
-* `attrib=:twotwov` : two vertical wells, two sources at xmin and two receivers at xmax
-* `attrib=:tentenv` : two vertical wells, two sources at xmin and two receivers at xmax
+* `rand_flags::Vector{Bool}=[false, false]` : randomly or equally spaced?
 """
-function Geom(mgrid::Grid.M2D,
-	      attrib::Symbol
-	     )
+function Geom(mgrid::Grid.M2D, attrib::Symbol; nss=2, nr=2, rand_flags=[false, false])
 	otx=(0.9*mgrid.x[1]+0.1*mgrid.x[end]); ntx=(0.1*mgrid.x[1]+0.9*mgrid.x[end]);
 	otz=(0.9*mgrid.z[1]+0.1*mgrid.z[end]); ntz=(0.1*mgrid.z[1]+0.9*mgrid.z[end]);
 	quatx = (0.75*mgrid.x[1]+0.25*mgrid.x[end]); quatz = (0.75*mgrid.z[1]+0.25*mgrid.z[end]) 
 	tquatx = (0.25*mgrid.x[1]+0.75*mgrid.x[end]); tquatz = (0.25*mgrid.z[1]+0.75*mgrid.z[end]) 
 	halfx = 0.5*(mgrid.x[1]+mgrid.x[end]);	halfz = 0.5*(mgrid.z[1]+mgrid.z[end]);
-	if(attrib == :oneonev)
-		return Acquisition.Geom_fixed(
-				quatz, quatz, halfx,
-				tquatz, tquatz, halfx,
-		      1,1,:vertical,:vertical
-				)
-	elseif(attrib == :twotwov)
-		return Acquisition.Geom_fixed(
-		quatz, tquatz, quatx, quatz, tquatz, tquatx,
-		      2,2,:vertical,:vertical
-				)
-	elseif(attrib == :twotwodv)
-		return Acquisition.Geom_fixed(
-		quatz, halfz, quatx, halfz, tquatz, tquatx,
-		      2,2,:vertical,:vertical
-				)
-	elseif(attrib == :twotenv)
-		return Acquisition.Geom_fixed(
-		quatz, tquatz, quatx, quatz, tquatz, tquatx,
-		      2,10,:vertical,:vertical
-				)
-	elseif(attrib == :tentenv)
-		return Acquisition.Geom_fixed(
-		quatz, tquatz, otx, quatz, tquatz, ntx,
-		      10,10,:vertical,:vertical
-				)
-	elseif(attrib == :onefiftyv)
-		return Acquisition.Geom_fixed(
-	      mgrid.z[round(Int,0.5*mgrid.nz)], mgrid.z[round(Int,0.5*mgrid.nz)], mgrid.x[1],
-	      mgrid.z[round(Int,0.25*mgrid.nz)], mgrid.z[round(Int,0.75*mgrid.nz)], mgrid.x[end],
-		      1,50,:vertical,:vertical
-				)
-	elseif(attrib == :onetwov)
-		return Acquisition.Geom_fixed(halfz, halfz, halfx, quatz, tquatz,  halfx,
-		      1,2,:vertical,:vertical
-				)
-	elseif(attrib == :onetworandv)
-		return Acquisition.Geom_fixed(halfz, halfz, halfx, 
-				rand(Uniform(mgrid.z[1], mgrid.z[end])), 
-				rand(Uniform(mgrid.z[1], mgrid.z[end])), 
-				halfx,
-			        1,2,:vertical,:vertical
-				)
-	elseif(attrib == :onefiftys)
-		return Acquisition.Geom_fixed(
-	      mgrid.x[round(Int,0.5*mgrid.nx)], mgrid.x[round(Int,0.5*mgrid.nx)], mgrid.z[1],
-	      mgrid.x[round(Int,0.25*mgrid.nx)], mgrid.x[round(Int,0.75*mgrid.nx)], mgrid.z[1],
-		      1,50,:horizontal,:horizontal
-				)
+	if(attrib == :xwell)
+		return Acquisition.Geom_fixed(otz, ntz, otx, otz, ntz, ntx, nss, nr, :vertical, :vertical, rand_flags)
+	elseif(attrib == :surf)
+		return Acquisition.Geom_fixed(otx, ntx, otz, otx, ntx, otz, nss, nr, :horizontal, :horizontal, rand_flags)
+	elseif(attrib == :vsp)
+		return Acquisition.Geom_fixed(otx, ntx, otz, otz, ntz, otx, nss, nr, :horizontal, :vertical, rand_flags)
+	elseif(attrib == :rvsp)
+		return Acquisition.Geom_fixed(otz, ntz, otx, otx, ntx, otz, nss, nr, :vertical, :horizontal, rand_flags)
+	elseif(attrib == :downhole)
+		return Acquisition.Geom_fixed(quatz, otz, quatx, quatz, otz, quatx, nss, nr, :vertical, :vertical, rand_flags)
 	else
 		error("invalid attrib")
 	end

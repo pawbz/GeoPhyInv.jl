@@ -1,3 +1,5 @@
+__precompile__()
+
 module Fdtd
 
 import SIT.Grid
@@ -8,7 +10,6 @@ import SIT.Acquisition
 import SIT.Data
 import SIT.Gallery
 import SIT.DSP
-
 
 #function mod_alloc(;
 #	nrecwav::Int64=1, 
@@ -44,7 +45,7 @@ Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used
 * `boundary_in::Any=[0]` : input final state variables and boundary
 * `abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left]` : PML boundary conditions 
 * `born_flag::Bool=false` : Born modeling flag
-* `grad_out_flag=false` : output gradient or not
+* `gmodel_flag=false` : output gradient or not
 * `verbose::Bool=false` : verbose flag
 
 # Example
@@ -93,24 +94,24 @@ Credits: Pawan Bharadwaj, 2017
 	freqmax = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
 
 	# minimum and maximum velocities
-	vpmin = minimum(broadcast(minimum,[Models.Seismic_get(model,:vp), Models.Seismic_get(model_pert,:vp)]))
-	vpmax = maximum(broadcast(maximum,[Models.Seismic_get(model,:vp), Models.Seismic_get(model_pert,:vp)]))
+	vpmin = minimum(broadcast(minimum,[model.vp0, model_pert.vp0]))
+	vpmax = maximum(broadcast(maximum,[model.vp0, model_pert.vp0]))
 	verbose ? println("minimum and maximum velocities:\t",vpmin,"\t",vpmax) : nothing
 
 
 	# check spatial sampling
 	ds_temp=Models.χ([minimum(model.χvp)],model.vp0,-1)[1]/5.0/freqmax;
 	ds_max = maximum([model.mgrid.δx, model.mgrid.δz])
-#	all(ds_max .> ds_temp) ? 
-#			error(string("spatial sampling\t",ds_max,"\ndecrease spatial sampling below:\t",ds_temp)) :
-#			verbose ? println("spatial sampling\t",ds_max,"\tcan be as high as:\t",ds_temp) : nothing 
+	all(ds_max .> ds_temp) ? 
+			warn(string("spatial sampling\t",ds_max,"\ndecrease spatial sampling below:\t",ds_temp)) :
+			verbose ? println("spatial sampling\t",ds_max,"\tcan be as high as:\t",ds_temp) : nothing 
 
 	# check time sampling
 	ds_min = minimum([model.mgrid.δx, model.mgrid.δz])
 	dt_temp=0.5*ds_min/Models.χ([(maximum(model.χvp))],model.vp0,-1)[1]
-#	all(tgridmod.δx .> dt_temp) ? 
-#			error(string("time sampling\t",tgridmod.δx,"\ndecrease time sampling below:\t",dt_temp)) :
-#			verbose ? println("time sampling\t",tgridmod.δx,"\tcan be as high as:\t",dt_temp) : nothing
+	all(tgridmod.δx .> dt_temp) ? 
+			warn(string("time sampling\t",tgridmod.δx,"\ndecrease time sampling below:\t",dt_temp)) :
+			verbose ? println("time sampling\t",tgridmod.δx,"\tcan be as high as:\t",dt_temp) : nothing
 
 
 
@@ -383,6 +384,7 @@ Credits: Pawan Bharadwaj, 2017
 		"""
 		p=zeros(nz,nx,3,npropwav); pp=zeros(p); ppp=zeros(p)
 		dpdx=zeros(p); dpdz=zeros(p)
+
 		memory_dvx_dx=zeros(nz,nx,npropwav)
 		memory_dvx_dz=zeros(memory_dvx_dx)
 		memory_dvz_dx=zeros(memory_dvx_dx)
@@ -390,6 +392,12 @@ Credits: Pawan Bharadwaj, 2017
 		memory_dp_dx=zeros(memory_dvx_dx)
 		memory_dp_dz=zeros(memory_dvx_dx)
 
+		"calling first time will be slow -- dummy advance with all zeros"
+		advance!(p, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
+				   modttI, modrrvx, modrrvz, 
+				   δx24I, δz24I, δt, nx, nz,
+				   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
+				   a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI)
 
 		gradis_modtt=zeros(nz,nx)
 		gradis_modrrvx=zeros(gradis_modtt)
@@ -397,7 +405,7 @@ Credits: Pawan Bharadwaj, 2017
 
 		"initial conditions from initp for first propagating field only"
 		if(backprop_flag==-1)
-			p[:,:,:,1]=initp[:,:,:,isseq]
+			p[:,:,:,1].=initp[:,:,:,isseq]
 		end
 
 		# time_loop
@@ -560,12 +568,12 @@ Credits: Pawan Bharadwaj, 2017
 
 	# update boundary after time reversal
 	if(backprop_flag ==1)
-		boundary[:,:,:] = Array(flipdim(boundary_out,2))
+		boundary .= Array(flipdim(boundary_out,2))
 	end
 
 	# update initp
 	if(backprop_flag==1)
-		initp[:,:,:,:] = Array(p_out) 
+		initp .= Array(p_out) 
 	end
 
 	# return data depending on the receiver flags

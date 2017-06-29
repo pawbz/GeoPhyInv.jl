@@ -74,10 +74,8 @@ end
 """
 Plot acqsrc
 """
-function Src(acqsrc::Acquisition.Src, attrib::Symbol)
-	
-	plot(acqsrc.tgrid.x, acqsrc.wav[1,1][:,1])
-
+function Src(acqsrc::Acquisition.Src)
+	plot(acqsrc.tgrid.x, acqsrc.wav[1,1][:])
 end
 
 

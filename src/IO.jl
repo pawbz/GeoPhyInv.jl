@@ -1,3 +1,5 @@
+__precompile__()
+
 module IO
 
 import SIT.F90libs

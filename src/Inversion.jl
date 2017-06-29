@@ -1,3 +1,5 @@
+__precompile__()
+
 module Inversion
 
 import SIT.Models
@@ -145,7 +147,7 @@ FWI using Optim, updates pa.modm and pa.dcal
 * `model:Models.Seismic` : initial model and it is updated
 * `dobs::Data.TD=Data.TD_zeros(1,pa.dcal.tgrid,pa.acqgeom)` : input observed data
 """
-function xfwi!(pa::Param)
+function xfwi!(pa::Param, extended_trace::Bool=true, time_limit=Float64=2.0*60.)
 
 	# convert initial model to the inversion variable
 	x = zeros(xfwi_ninv(pa));
@@ -181,14 +183,16 @@ function xfwi!(pa::Param)
 		res = optimize(df, x, 
 			       lower_x,
 			       upper_x,
-			       Fminbox(); optimizer=LBFGS,
+			       Fminbox(); optimizer=LBFGS, iterations=1, # barrier function iterations
 			     optimizer_o=Optim.Options(g_tol = 1e-12,
-		 			iterations = 10, store_trace = true,
-					extended_trace=true, show_trace = true))
+		 			iterations = 2, store_trace = true, time_limit=time_limit,
+					extended_trace=extended_trace, show_trace = true))
 		pa.verbose ? println(res) : nothing
 		# convert gradient vector to model
-		gmodi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
-		gmodm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)] 
+		if(extended_trace)
+			gmodi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
+			gmodm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)] 
+		end
 		modi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
 		modm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)]
 		for itr=1:Optim.iterations(res)
@@ -206,7 +210,11 @@ function xfwi!(pa::Param)
 		# update dcal
 		pa.dcal.d = buffer1[1].d
 
-		return modm, modi, gmodm, gmodi, res
+		if(extended_trace)
+			return modm, modi, gmodm, gmodi, res
+		else
+			return modm, modi, res
+		end
 	elseif(pa.attrib_inv == :migr)
 		df = OnceDifferentiable(x -> func_xfwi(x, last_x, buffer1, buffer2, buffer3, pa),
 			  (x, storage) -> grad_xfwi!(x, storage, last_x, buffer1, buffer2, buffer3, pa))
@@ -425,7 +433,6 @@ function wfwi!(pa::Param)
 	"""
 	Unbounded LBFGS inversion, only for testing
 	"""
-	"There is a bug in gradient computation"
 	res = optimize(df, x, 
 		       LBFGS(),
 		       Optim.Options(g_tol = 1e-12,

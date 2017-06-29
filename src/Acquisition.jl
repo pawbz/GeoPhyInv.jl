@@ -1,7 +1,11 @@
+__precompile__()
+
 module Acquisition
 
 import SIT.Grid
+import SIT.Models
 import SIT.Wavelets
+using Distributions
 
 """
 Acquisiton of supersources, sources and receivers.
@@ -155,6 +159,8 @@ end
 Return fixed spread acquisition geometry depending 
 on either horizontal or vertical array
 It has only one source for every supersource
+
+* `rand_flags::Vector{Bool}=[false, false]` : randomly or equally spaced supersources and receivers?
 """
 function Geom_fixed(
 	      smin::Float64,
@@ -166,24 +172,27 @@ function Geom_fixed(
 	      nss::Int64,
 	      nr::Int64,
 	      sattrib::Symbol=:horizontal,
-	      rattrib::Symbol=:horizontal
+	      rattrib::Symbol=:horizontal,
+ 	      rand_flags::Vector{Bool}=[false, false]
 	     )
+
+
+	sarray = isequal(nss,1) ? fill(smin,1) : (rand_flags[1] ? 
+					   rand(Uniform(minimum([smin,smax]),maximum([smin,smax])),nss) : linspace(smin,smax,nss))
 	if(sattrib==:horizontal)
-		sz = fill(s0,nss)
-		isequal(nss,1) ? sx = fill(smin,1) : sx = linspace(smin,smax,nss)
+		sz = fill(s0,nss); sx=sarray
 	elseif(sattrib==:vertical)
-		sx = fill(s0,nss)
-		isequal(nss,1) ? sz = fill(smin,1) : sz = linspace(smin,smax,nss)
+		sx = fill(s0,nss); sz=sarray
 	else
 		error("invalid sattrib")
 	end
 
+	rarray = isequal(nr,1) ? fill(rmin,1) : (rand_flags[2] ? 
+				        rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : linspace(rmin,rmax,nr))
 	if(rattrib==:horizontal)
-		rz = fill(r0,nr)
-		isequal(nr,1) ? rx = fill(rmin,1) : rx = linspace(rmin,rmax,nr)
+		rz = fill(r0,nr); rx = rarray
 	elseif(rattrib==:vertical)
-		rx = fill(r0,nr)
-		isequal(nr,1) ? rz = fill(rmin,1) : rz = linspace(rmin,rmax,nr)
+		rx = fill(r0,nr); rz = rarray
 	else
 		error("invalid rattrib")
 	end
@@ -233,6 +242,58 @@ function Geom_circ(;
 	return Geom(sxall, szall, rxall, rzall, nss, fill(1,nss), fill(nr,nss))
 end
 
+"""
+Appends the input a vector of acquisition geometries.
+"""
+function Geom_add!(geom1::Geom, geomv::Vector{Geom})
+	for igeom=1:length(geomv)
+		append!(geom1.sx, geomv[igeom].sx)
+		append!(geom1.sz, geomv[igeom].sz)
+		append!(geom1.rx, geomv[igeom].rx)
+		append!(geom1.rz, geomv[igeom].rz)
+		append!(geom1.ns, geomv[igeom].ns)
+		append!(geom1.nr, geomv[igeom].nr)
+		geom1.nss += geomv[igeom].nss
+	end
+	return geom1
+end
+
+
+"""
+Adds input positions as either sources or receivers of every supershot.
+"""
+function Geom_add!(geom::Geom, zpos::Vector{Float64}, xpos::Vector{Float64}, attrib::Symbol)
+	length(xpos) == length(zpos) ? nothing : error("same length vectors needed")
+	for iss=1:geom.nss
+		if(attrib == :receivers)
+			geom.rx[iss] = vcat(geom.rx[iss][:], xpos)
+			geom.rz[iss] = vcat(geom.rz[iss][:], zpos)
+			geom.nr[iss] += length(xpos)
+		elseif(attrib == :sources)
+			geom.sx[iss] = vcat(geom.sx[iss][:], xpos)
+			geom.sz[iss] = vcat(geom.sz[iss][:], zpos)
+			geom.ns[iss] += length(xpos)
+		end
+	end
+end
+
+"""
+Advance either source or receiver array in an acquisition geometry in horizontal or vertical directions.
+
+# Arguments
+* `geom::Geom` : acquisition geometry that is updated
+* `advances::Vector{Float64}=[[0.,0.], [0.,0.,]]` : source and receiver advancements
+"""
+function Geom_advance(geom::Geom, advances::Vector{Vector{Float64}}=[[0.,0.], [0.,0.]]) 
+	geom_out=deepcopy(geom)
+	for iss=1:geom.nss
+		geom_out.sx[iss][:] += advances[1][2]
+		geom_out.sz[iss][:] += advances[1][1]
+		geom_out.rx[iss][:] += advances[2][2]
+		geom_out.rz[iss][:] += advances[2][1]
+	end
+	return geom_out
+end
 
 """
 return a vector of the order 
@@ -283,6 +344,38 @@ function Src_fixed(nss::Int64,
 	return Src(nss, fill(ns, nss), nfield, wavsrc, tgrid)
 end
 
+"""
+Constructor of `Src`, which is typical for a input model such that 
+the model has `nwav` wavelengths.
+
+* `nwav::Int64=10` : number of wavelenghts in the model
+nwav
+"""
+function Src_fixed_mod(nss::Int64, ns::Int64, nfield::Int64, model::Models.Seismic, nwav::Int64=10)
+
+	x=model.mgrid.x; z=model.mgrid.z
+	# dominant wavelength using model dimensions
+	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nwav)
+	# average P velocity
+	vavg=Models.χ([mean(model.χvp)], model.vp0, -1)[1]
+
+	fqdom = vavg/λdom
+	println("\t choosing dominant frequency of Ricker as:\t",fqdom)
+
+	# maximum distance the wave travels
+	d = sqrt((x[1]-x[end]).^2+(z[1]-z[end]).^2)
+	
+	# use two-way maximum distance to get tmax
+	tmax=2.*d/vavg
+	δt=0.1*minimum([model.mgrid.δx, model.mgrid.δz])/Models.χ([(maximum(model.χvp))],model.vp0,-1)[1]
+	# choose sampling interval to obey max freq of source wavelet
+	tgrid=Grid.M1D(0.0, tmax, δt)
+	wav = Wavelets.ricker(fqdom=fqdom, tgrid=tgrid);
+	println("\t maximum modelling time is:\t",tmax," sec (",tgrid.nx," samples)")
+
+	# choose ricker waveletes of fdom
+	return Src_fixed(nss, ns, nfield, wav, tgrid)
+end
 
 """
 Function that returns Src after time reversal

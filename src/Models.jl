@@ -1,9 +1,12 @@
+__precompile__()
+
 module Models
 
 
 import SIT.Grid
 import SIT.IO
 import SIT.Interpolation
+import SIT.Smooth
 
 """
 Data type fo represent a seismic model.
@@ -30,12 +33,12 @@ type Seismic
 		     any(vp0.<0.0), 
 		     any(vs0.<0.0),
 		     any(ρ0.<0.0),
-		     all([all(vp0 .≠ 0.0), any(χ(χvp,vp0,-1) .< vp0[1])]), # check vp bounds
-		     all([all(vp0 .≠ 0.0), any(χ(χvp,vp0,-1) .> vp0[2])]), # check vp bounds
-		     all([all(vs0 .≠ 0.0), any(χ(χvs,vs0,-1) .< vs0[1])]), # check vs bounds
-		     all([all(vs0 .≠ 0.0), any(χ(χvs,vs0,-1) .> vs0[2])]), # check vs bounds
-		     all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .< ρ0[1])]), # check ρ bounds
-		     all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .> ρ0[2])]), # check ρ bounds
+		     #all([all(vp0 .≠ 0.0), any(χ(χvp,vp0,-1) .< vp0[1])]), # check vp bounds
+		     #all([all(vp0 .≠ 0.0), any(χ(χvp,vp0,-1) .> vp0[2])]), # check vp bounds
+		     #all([all(vs0 .≠ 0.0), any(χ(χvs,vs0,-1) .< vs0[1])]), # check vs bounds
+		     #all([all(vs0 .≠ 0.0), any(χ(χvs,vs0,-1) .> vs0[2])]), # check vs bounds
+		     #all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .< ρ0[1])]), # check ρ bounds
+		     #all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .> ρ0[2])]), # check ρ bounds
 		     size(χvp) != (length(mgrid.z), length(mgrid.x)), # dimension check
 		     size(χvs) != (length(mgrid.z), length(mgrid.x)), # dimension check
 		     size(χρ) != (length(mgrid.z), length(mgrid.x)) # dimension check
@@ -318,6 +321,25 @@ function Seismic_addon!(mod::Seismic;
 
 	return mod
 end
+
+"""
+Apply smoothing to `Seismic` using a Gaussian filter of zwidth and xwidth
+"""
+function Seismic_smooth!(mod::Seismic, zwidth::Float64, xwidth::Float64=zwidth)
+	xnwin=Int(div(xwidth,mod.mgrid.δx*2.))
+	znwin=Int(div(zwidth,mod.mgrid.δz*2.))
+
+	# calculate means
+	mχvp = mean(mod.χvp);	mχvs = mean(mod.χvs);	mχρ = mean(mod.χρ)
+	# remove means before Gaussian filtering
+	mod.χvp -= mχvp; mod.χvs -= mχvs; mod.χρ -= mχρ
+	Smooth.gaussian!(mod.χvp,[znwin,xnwin])
+	Smooth.gaussian!(mod.χvs,[znwin,xnwin])
+	Smooth.gaussian!(mod.χρ,[znwin,xnwin])
+	# add mean back
+	mod.χvp += mχvp; mod.χvs += mχvs; mod.χρ += mχρ
+end
+
 
 """
 Extend a seismic model into PML layers

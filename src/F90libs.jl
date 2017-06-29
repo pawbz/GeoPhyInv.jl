@@ -1,4 +1,6 @@
 
+__precompile__()
+
 module F90libs
 
 # macro to return the absolute path of the library

@@ -1,3 +1,5 @@
+__precompile__()
+
 module DSP
 
 import SIT.Grid
@@ -122,9 +124,9 @@ end
 * `RW` :  the first time series which is causal
 """
 function fast_filt!{T<:Real}(
-		   s::Vector{T}, 
-		   r::Vector{T},
-		   w::Vector{T},
+		   s::AbstractArray{T}, 
+		   r::AbstractArray{T},
+		   w::AbstractArray{T},
 		   attrib::Symbol
 		  ) 
 
@@ -179,8 +181,8 @@ end
 	   = -1 means x is returned using xpow2
 """
 function nlag_npow2_pad_truncate!{T<:Number}(
-				  x::Vector{T}, 
-				  xpow2::Vector{Complex{T}}, 
+				  x::AbstractVector{T}, 
+				  xpow2::AbstractVector{Complex{T}}, 
 				  nplags::Integer, 
 				  nnlags::Integer, 
 				  npow2::Integer, 

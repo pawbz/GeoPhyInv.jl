@@ -1,3 +1,5 @@
+__precompile__()
+
 module Fdtd_f90
 
 import SIT.Grid

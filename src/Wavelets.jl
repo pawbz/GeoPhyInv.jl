@@ -1,9 +1,12 @@
+__precompile__()
+
 module Wavelets
 
 import SIT.Grid
 
 """
 Generate a Ricker Wavelet
+Frequencies of the Ricker wavelet, Yanghua Wang, GEOPHYSICS, VOL. 80, NO. 2
 
 # Arguments
 * `fqdom`: dominant frequency
@@ -14,45 +17,47 @@ Generate a Ricker Wavelet
 function ricker(;
 		fqdom::Float64=nothing,
 		tgrid::Grid.M1D=nothing,
-		tpeak::Float64=nothing,
+		tpeak::Float64=tgrid.x[1]+1.5/fqdom, # using approximate half width of ricker
 		attrib::AbstractString="",
 		trim_tol::Float64=0.0
 		)
+	(tpeak < tgrid.x[1]+1.5/fqdom) ? error("cannot output Ricker for given tgrid and tpeak") : nothing
+	(tpeak > tgrid.x[end]-1.5/fqdom) ? error("cannot output Ricker for given tgrid and tpeak")  : nothing
 
-isapprox(fqdom,0.0) && error("dominant frequency cannot be zero")
+	isapprox(fqdom,0.0) && error("dominant frequency cannot be zero")
 
-#! some constants
-pf = (π*π)*(fqdom^2.0)
-nt = tgrid.nx
-δt = tgrid.δx
+	#! some constants
+	pf = (π*π)*(fqdom^2.0)
+	nt = tgrid.nx
+	δt = tgrid.δx
 
-# a vector is odd number of samples (nt + 1 corresponds to time zero)
-wav = zeros(tgrid.x);
-# k = (1 - 2* pf * t^2) * Exp[-pf *t^2]
-# Simplify[D[k,t]]
-# FortranForm[Simplify[D[k,t]]]
-if(contains(attrib,"[DIFF]"))
-                # ricker after a time derivative
-                for it = 1:nt
+	# a vector is odd number of samples (nt + 1 corresponds to time zero)
+	wav = zeros(tgrid.x);
+	# k = (1 - 2* pf * t^2) * Exp[-pf *t^2]
+	# Simplify[D[k,t]]
+	# FortranForm[Simplify[D[k,t]]]
+	if(contains(attrib,"[DIFF]"))
+			# ricker after a time derivative
+			for it = 1:nt
+				tsquare = (tgrid.x[it]-tpeak) * (tgrid.x[it]-tpeak)
+				t       = -1.0 * (tgrid.x[it]-tpeak)
+				wav[it] = (2.0 * pf * t * (-3.0 + 2.0 * pf * tsquare)) * exp(-1.0 * pf * tsquare)
+			end
+	else
+	#! ricker wavelet
+		for it = 1:nt
 			tsquare = (tgrid.x[it]-tpeak) * (tgrid.x[it]-tpeak)
-			t       = -1.0 * (tgrid.x[it]-tpeak)
-                        wav[it] = (2.0 * pf * t * (-3.0 + 2.0 * pf * tsquare)) * exp(-1.0 * pf * tsquare)
-                end
-else
-#! ricker wavelet
-        for it = 1:nt
-		tsquare = (tgrid.x[it]-tpeak) * (tgrid.x[it]-tpeak)
-                wav[it] = (1.0 - 2.0 * pf * tsquare) * exp(-1.0e0 * pf * tsquare)
-        end
-end
+			wav[it] = (1.0 - 2.0 * pf * tsquare) * exp(-1.0e0 * pf * tsquare)
+		end
+	end
 
-isapprox(maximum(abs(wav)),0.0) && warn("wavelet is zeros")
+	isapprox(maximum(abs(wav)),0.0) && warn("wavelet is zeros")
 
-if(trim_tol != 0.0)
-	return wav[abs(wav).>=trim_tol]
-else
-	return wav
-end
+	if(trim_tol != 0.0)
+		return wav[abs(wav).>=trim_tol]
+	else
+		return wav
+	end
 end
 
 

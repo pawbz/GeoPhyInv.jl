@@ -1,3 +1,5 @@
+__precompile__()
+
 module Coupling
 
 
@@ -25,7 +27,7 @@ subsection{Keywords}
 The keywords to input paramters related 
 to the source and receiver filters contain \kword{[SF]} and are explained
 below.
-If the input is \kwordi{0}, then the filter is a spike at $\tim=0$,
+If the input is \kwordi{0}, then the filter is a spike at \tim=0,
 with unknown amplitude.  
 Which means, the filter only applies a scalar to the modelled data.
 """
