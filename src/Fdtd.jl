@@ -287,47 +287,13 @@ Credits: Pawan Bharadwaj, 2017
 		issmulz1 = fill(0,src_nsmul,npropwav); issmulz2=fill(0,src_nsmul,npropwav);
 		for ipropwav=1:npropwav
 			for issmul=1:src_nsmul
-				src_xtemp = acqgeom_uspos[ipropwav].sx[isseq][issmul];
-				src_ztemp = acqgeom_uspos[ipropwav].sz[isseq][issmul]; 
-				issmulx1[issmul,ipropwav], issmulx2[issmul,ipropwav]=
-				Interpolation.indminn(abs(mesh_x-src_xtemp),2)
-				issmulz1[issmul,ipropwav], issmulz2[issmul,ipropwav]=
-				Interpolation.indminn(abs(mesh_z-src_ztemp),2)
-				
-				denomsrcI[issmul,ipropwav] = ((mesh_x[issmulx2[issmul,ipropwav]] - 
-							    mesh_x[issmulx1[issmul,ipropwav]])*
-							    (mesh_z[issmulz2[issmul,ipropwav]]
-							    - mesh_z[issmulz1[issmul,ipropwav]]))^(-1.e0)
-					"for issmulz1, issmulx1"
-					src_spray_weights[1,issmul,ipropwav] = 
-					(mesh_x[issmulx2[issmul,ipropwav]]-
-					src_xtemp)*
-					(mesh_z[issmulz2[issmul,ipropwav]]-
-					src_ztemp)*
-					denomsrcI[issmul,ipropwav] 
-					"for issmulz1, issmulx2"
-					src_spray_weights[2,issmul,ipropwav] = 
-					(src_xtemp-
-					mesh_x[issmulx1[issmul,ipropwav]])*
-					(mesh_z[issmulz2[issmul,ipropwav]]-
-					src_ztemp)*
-					denomsrcI[issmul,ipropwav]
-					"for issmulz2, issmulx1"
-					src_spray_weights[3,issmul,ipropwav] = 
-					(mesh_x[issmulx2[issmul,ipropwav]]-
-					src_xtemp)*
-					(src_ztemp-
-					mesh_z[issmulz1[issmul,ipropwav]])*
-					denomsrcI[issmul,ipropwav]
-					"for issmulz2, issmulx2" 
-					src_spray_weights[4,issmul,ipropwav] = 
-					(src_xtemp-
-					mesh_x[issmulx1[issmul,ipropwav]])*
-					(src_ztemp-
-					mesh_z[issmulz1[issmul,ipropwav]])*
-					denomsrcI[issmul,ipropwav]
+				Interpolation.get_spray_weights!(view(src_spray_weights, :,issmul,ipropwav), view(denomsrcI,issmul,ipropwav), 
+				    view(issmulx1,issmul,ipropwav), view(issmulx2,issmul,ipropwav),
+				    view(issmulz1,issmul,ipropwav), view(issmulz2,issmul,ipropwav),
+				    mesh_x, mesh_z, acqgeom_uspos[ipropwav].sx[isseq][issmul], acqgeom_uspos[ipropwav].sz[isseq][issmul])
 			end
 		end
+
 		
 		rec_interpolate_weights = zeros(4,recv_n,npropwav)
 		denomrecI = zeros(recv_n,npropwav)
@@ -335,46 +301,10 @@ Credits: Pawan Bharadwaj, 2017
 		irecz1 = fill(0,recv_n,npropwav); irecz2=fill(0,recv_n,npropwav);
 		for ipropwav=1:npropwav
 			for irec=1:recv_n
-				recv_xtemp = acqgeom_urpos[ipropwav].rx[isseq][irec];
-				recv_ztemp = acqgeom_urpos[ipropwav].rz[isseq][irec]; 
-				irecx1[irec,ipropwav], irecx2[irec,ipropwav]=
-				Interpolation.indminn(abs(mesh_x-recv_xtemp),2)
-				irecz1[irec,ipropwav], irecz2[irec,ipropwav]=
-				Interpolation.indminn(abs(mesh_z-recv_ztemp),2)
-
-				denomrecI[irec,ipropwav] = ((mesh_x[irecx2[irec,ipropwav]] - 
-						mesh_x[irecx1[irec,ipropwav]])*(mesh_z[irecz2[irec,ipropwav]] 
-							- mesh_z[irecz1[irec,ipropwav]]))^(-1.e0)
-
-					"irecz1, irecx1"
-					rec_interpolate_weights[1,irec,ipropwav] = 
-						((mesh_x[irecx2[irec,ipropwav]]-
-						recv_xtemp)*
-						(mesh_z[irecz2[irec,ipropwav]]-
-						recv_ztemp))*
-						denomrecI[irec,ipropwav]
-					"irecz1, irecx2"
-					rec_interpolate_weights[2,irec,ipropwav] = 
-						((recv_xtemp-
-						mesh_x[irecx1[irec,ipropwav]])*
-						(mesh_z[irecz2[irec,ipropwav]]-
-						recv_ztemp))*
-						denomrecI[irec,ipropwav]
-					"recz2, irecx1"
-					rec_interpolate_weights[3,irec,ipropwav] = 
-						((mesh_x[irecx2[irec,ipropwav]]-
-						recv_xtemp)*
-						(recv_ztemp-
-						mesh_z[irecz1[irec,ipropwav]]))*
-						denomrecI[irec,ipropwav]
-					"irecz2, irecx2"
-					rec_interpolate_weights[4,irec,ipropwav] = 
-						((recv_xtemp-
-						mesh_x[irecx1[irec,ipropwav]])*
-						(recv_ztemp-
-						mesh_z[irecz1[irec,ipropwav]]))*
-						denomrecI[irec,ipropwav]
-
+				Interpolation.get_interpolate_weights!(view(rec_interpolate_weights, :,irec,ipropwav), view(denomrecI,irec,ipropwav), 
+				    view(irecx1,irec,ipropwav), view(irecx2,irec,ipropwav),
+				    view(irecz1,irec,ipropwav), view(irecz2,irec,ipropwav),
+				    mesh_x, mesh_z, acqgeom_urpos[ipropwav].rx[isseq][irec], acqgeom_urpos[ipropwav].rz[isseq][irec])
 			end
 		end
 		

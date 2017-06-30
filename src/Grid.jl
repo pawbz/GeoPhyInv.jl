@@ -56,6 +56,7 @@ function M2D(xmin::Float64, xmax::Float64,
 	return M2D(x, z, nx, nz, npml, x[2]-x[1], z[2]-z[1])
 end
 
+
 """
 2-D grid with a different sampling interval
 """
