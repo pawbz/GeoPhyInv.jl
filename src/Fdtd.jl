@@ -181,9 +181,11 @@ Credits: Pawan Bharadwaj, 2017
 
 	# gradient outputs
 	grad_modtt = SharedArray(Float64, (nz, nx, src_nseq))
-	grad_modtt[:,:,:] = 0.0
-	grad_modrr = SharedArray(Float64, (nz, nx, src_nseq))
-	grad_modrr[:,:,:] = 0.0
+	grad_modtt .= 0.0
+	grad_modrrvx = SharedArray(Float64, (nz, nx, src_nseq))
+	grad_modrrvx .= 0.0
+	grad_modrrvz = SharedArray(Float64, (nz, nx, src_nseq))
+	grad_modrrvz .= 0.0
 
 
 	# pml_variables
@@ -197,9 +199,9 @@ Credits: Pawan Bharadwaj, 2017
 	iboundary_x = broadcast(x->indmin(abs(mesh_x-x)), boundary_x)
 	iboundary_z = broadcast(x->indmin(abs(mesh_z-x)), boundary_z)
 
-	"saving boundary values"
+	"saving boundary values per issseq"
 	if(backprop_flag == 1)
-		boundary_out = SharedArray(Float64,size(boundary))
+		boundary_out = SharedArray(Float64, size(boundary))
 	end
 
 	"p_out will save final snapshots that can be used for time reversal"
@@ -280,7 +282,7 @@ Credits: Pawan Bharadwaj, 2017
 		rec_mat=zeros(recv_n, recv_nfield, npropwav, tim_nt)
 
 
-		# source_spray_weights
+		"source_spray_weights per sequential source"
 		src_spray_weights = zeros(4,src_nsmul,npropwav)
 		denomsrcI = zeros(src_nsmul,npropwav)
 		issmulx1 = fill(0,src_nsmul,npropwav); issmulx2=fill(0,src_nsmul,npropwav);
@@ -294,7 +296,7 @@ Credits: Pawan Bharadwaj, 2017
 			end
 		end
 
-		
+		"receiver interpolation weights per sequential source"
 		rec_interpolate_weights = zeros(4,recv_n,npropwav)
 		denomrecI = zeros(recv_n,npropwav)
 		irecx1 = fill(0,recv_n,npropwav); irecx2=fill(0,recv_n,npropwav);
@@ -310,7 +312,7 @@ Credits: Pawan Bharadwaj, 2017
 		
 
 		"""
-		allocations
+		allocation of private variables
 		"""
 		p=zeros(nz,nx,3,npropwav); pp=zeros(p); ppp=zeros(p)
 		dpdx=zeros(p); dpdz=zeros(p)
@@ -323,15 +325,20 @@ Credits: Pawan Bharadwaj, 2017
 		memory_dp_dz=zeros(memory_dvx_dx)
 
 		"calling first time will be slow -- dummy advance with all zeros"
-		advance!(p, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
+		advance!(p, pp, ppp, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
 				   modttI, modrrvx, modrrvz, 
 				   δx24I, δz24I, δt, nx, nz,
 				   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
 				   a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI)
 
-		gradis_modtt=zeros(nz,nx)
-		gradis_modrrvx=zeros(gradis_modtt)
-		gradis_modrrvz=zeros(gradis_modtt)
+		gradisseq_modtt=zeros(nz,nx)
+		gradisseq_modrrvx=zeros(gradisseq_modtt)
+		gradisseq_modrrvz=zeros(gradisseq_modtt)
+
+		"saving boundary values per issseq"
+		if(backprop_flag == 1)
+			boundaryisseq = zeros(size(boundary,1),size(boundary,2))
+		end
 
 		"initial conditions from initp for first propagating field only"
 		if(backprop_flag==-1)
@@ -339,11 +346,12 @@ Credits: Pawan Bharadwaj, 2017
 		end
 
 		# time_loop
+		"""
+		* don't use shared arrays inside this time loop, for speed when using multiple procs
+		"""
 		for it=1:tim_nt
-			ppp .= pp
-			pp .=  p
 
-			advance!(p, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
+			advance!(p, pp, ppp, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
 				   modttI, modrrvx, modrrvz, 
 				   δx24I, δz24I, δt, nx, nz,
 				   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
@@ -352,7 +360,7 @@ Credits: Pawan Bharadwaj, 2017
 			# force p[1] on boundarys
 			if(backprop_flag==-1) 
 				for iboundary = 1:boundary_n
-					@inbounds p[iboundary_z[iboundary], iboundary_x[iboundary],1,1] = boundary[iboundary,it,isseq] 
+					@inbounds p[iboundary_z[iboundary], iboundary_x[iboundary],1,1] = boundary[iboundary,it, isseq] 
 				end
 			end
 	 
@@ -362,31 +370,10 @@ Credits: Pawan Bharadwaj, 2017
 				)
 
 
-			# secondary sources for Born modeling
-			if(born_flag)
-			# adding born sources from pressure(:,:,1) to pressure(:,:,2)
-			for ix=3:nx-2
-			for iz=3:nz-2
-
-				# upto until [it-2]
-				# lambdaI scatterrer source term at [it-1]
-				# p is at [it], pp is at [it-1], ppp is at [it-2]
-				# dpdx is at [it-1] and dpdz is at [it-1]
-				# modrrvx scatterrer source term at [it-1]
-				# modrrvz scatterrer source term at [it-1]
-				born_svalue_stack[iz,ix] += δt * ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δmodtt[iz, ix] * δtI * δtI) )#+ (
-	#							  (27.e0*dpdx[iz,ix,1,1] * δmodrrvx[iz,ix] -27.e0*dpdx[iz,ix-1,1,1] * δmodrrvx[iz,ix-1] -dpdx[iz,ix+1,1,1] * δmodrrvx[iz,ix+1] +dpdx[iz,ix-2,1,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) + (
-	#							  (27.e0*dpdz[iz,ix,1,1] * δmodrrvz[iz,ix] -27.e0*dpdz[iz-1,ix,1,1] * δmodrrvz[iz-1,ix] -dpdz[iz+1,ix,1,1] * δmodrrvz[iz+1,ix] +dpdz[iz-2,ix,1,1] * δmodrrvz[iz-2,ix] ) * (δz24I)) ) 
-		
-				p[iz,ix,1,2] += born_svalue_stack[iz,ix] * δt * δxI * δzI * modttI[iz,ix]  
-			end
-			end
-			end
-
 			# record boundarys
 			if(backprop_flag==1)
 				for iboundary = 1:boundary_n
-				       @inbounds boundary_out[iboundary,it,isseq] = p[iboundary_z[iboundary],iboundary_x[iboundary],1,1]
+				       @inbounds boundaryisseq[iboundary,it] = p[iboundary_z[iboundary],iboundary_x[iboundary],1,1]
 				end
 			end
 
@@ -394,16 +381,14 @@ Credits: Pawan Bharadwaj, 2017
 
 			if(gmodel_flag)
 				compute_gradient!(p, pp, ppp, dpdx, dpdz,
-		      			gradis_modtt, gradis_modrrvx, gradis_modrrvz,nx,nz,δtI)
+		      			gradisseq_modtt, gradisseq_modrrvx, gradisseq_modrrvz,nx,nz,δtI)
 			end
-
-
 
 		end # time_loop
 		"now pressure is at [tim_nt], velocities are at [tim_nt-1/2]"	
 
 		"one more propagating step to save pressure at [tim_nt+1] -- for time revarsal"
-		advance!(p, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
+		advance!(p, pp, ppp, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
 			   modttI, modrrvx, modrrvz, 
 			   δx24I, δz24I, δt, nx, nz,
 			   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
@@ -412,13 +397,13 @@ Credits: Pawan Bharadwaj, 2017
 		p_out[:,:,1,isseq] = p[:,:,1,1]
 
 		"one more propagating step to save velocities at [tim_nt+3/2] -- for time reversal"
-		advance!(p, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
+		advance!(p, pp, ppp, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
 			   modttI, modrrvx, modrrvz, 
 			   δx24I, δz24I, δt, nx, nz,
 			   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
 			   a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI)
 		"save last snapshot of velocity fields with opposite sign for adjoint propagation"
-		p_out[:,:,2:3,isseq] = -1.0 * p[:,:,2:3,1]
+		p_out[:,:,2:3,isseq] .= -1.0 * p[:,:,2:3,1]
 
 		"rec_mat to recv_out"
 		for ipropwav=1:npropwav
@@ -436,32 +421,15 @@ Credits: Pawan Bharadwaj, 2017
 			"gradient is formed by intergration over time, hence multiply with δt, but why not?"
 			"I don't completely understand where the factors δx and δz are coming from..."
 			"probably the source term should not be multiplied by δxI and δzI during adjoint propagation"
-			gradis_modtt .*=  (δx * δz)
-			gradis_modrrvx .*= (δx * δz)
-			gradis_modrrvz .*= (δx * δz)
-
-
-			grad_modtt[:,:,isseq] = gradis_modtt
-
-			for ix=2:nx-2
-				for iz=2:nz-2
-					@inbounds grad_modrr[iz,ix, isseq] += 0.5e0 * gradis_modrrvx[iz,ix] 
-					@inbounds grad_modrr[iz,ix, isseq] +=  0.5e0 * gradis_modrrvz[iz,ix]
-				end
-			end
-			for ix=2:nx-2
-				for iz=2:nz-2
-					@inbounds grad_modrr[iz,ix+1, isseq] +=  0.5e0 * gradis_modrrvx[iz,ix]
-				end
-			end
-			for ix=2:nx-2
-				for iz=2:nz-2
-					@inbounds grad_modrr[iz+1,ix, isseq] +=  0.5e0 * gradis_modrrvz[iz,ix]
-				end
-			end
-
-
+			grad_modtt[:,:,isseq] .= gradisseq_modtt .* (δx * δz)
+			grad_modrrvx[:,:,isseq] .= gradisseq_modrrvx .* (δx * δz)
+			grad_modrrvz[:,:,isseq] .= gradisseq_modrrvz .* (δx * δz)
 		end
+		# update boundary_out after time reversal
+		if(backprop_flag ==1)
+			boundary_out[:,:, isseq] .= Array(flipdim(boundaryisseq,2))
+		end
+
 
 	end # source_loop
 
@@ -470,7 +438,17 @@ Credits: Pawan Bharadwaj, 2017
 
 	"summing gradient over all the sources after truncation in PML"
 	grad_modtt_stack = Models.pad_trun(squeeze(sum(Array(grad_modtt),3),3),model.mgrid.npml,-1);
-	grad_modrr_stack = Models.pad_trun(squeeze(sum(Array(grad_modrr),3),3),model.mgrid.npml,-1);
+	grad_modrrvx_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvx),3),3),model.mgrid.npml,-1);
+	grad_modrrvz_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvz),3),3),model.mgrid.npml,-1);
+
+	grad_modrr_stack = 0.5 .* (grad_modrrvx_stack .+ grad_modrrvz_stack)
+
+	for ix=2:size(grad_modrr_stack,2)-1
+		for iz=2:size(grad_modrr_stack,1)-1
+			@inbounds grad_modrr_stack[iz,ix+1] +=  0.5e0 * grad_modrrvx_stack[iz,ix]
+			@inbounds grad_modrr_stack[iz+1,ix] +=  0.5e0 * grad_modrrvz_stack[iz,ix]
+		end
+	end
 
 
 	# update gradient model using grad_modtt_stack, grad_modrr_stack
@@ -496,13 +474,10 @@ Credits: Pawan Bharadwaj, 2017
 		end
 	end
 
-	# update boundary after time reversal
-	if(backprop_flag ==1)
-		boundary .= Array(flipdim(boundary_out,2))
-	end
-
-	# update initp
+	
+	# update initp and boundary outputs
 	if(backprop_flag==1)
+		boundary .= Array(boundary_out)
 		initp .= Array(p_out) 
 	end
 
@@ -592,8 +567,8 @@ end
 
 @inbounds @fastmath function compute_gradient!(p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64},
 			   dpdx::Array{Float64}, dpdz::Array{Float64},
-			   gradis_modtt::Array{Float64}, gradis_modrrvx::Array{Float64},
-			   gradis_modrrvz::Array{Float64},
+			   gradisseq_modtt::Array{Float64}, gradisseq_modrrvx::Array{Float64},
+			   gradisseq_modrrvz::Array{Float64},
 			   nx::Int64, nz::Int64, δtI::Float64 
 			  )
 
@@ -602,20 +577,20 @@ end
 			# p at [it], pp at [it-1]
 			# dpdx and dpdz at [it]
 			# gradients w.r.t inverse of modtt, i.e., 1/rho/c^2 
-			@inbounds gradis_modtt[iz,ix] += ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δtI * δtI) *  pp[iz,ix,1,2])
+			@inbounds gradisseq_modtt[iz,ix] += ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δtI * δtI) *  pp[iz,ix,1,2])
 			       #(p(:,:,1,1) - pp(:,:,1,1)) * δtI * &
 			       #        (p(:,:,1,2) - pp(:,:,1,2)) * δtI
 			
 			# gradient w.r.t. inverse of rho on vx and vz grids
-			@inbounds gradis_modrrvx[iz,ix] += (- dpdx[iz,ix,1,2]*dpdx[iz,ix,1,1])
-			@inbounds gradis_modrrvz[iz,ix] += (- dpdz[iz,ix,1,2]*dpdz[iz,ix,1,1])
+			@inbounds gradisseq_modrrvx[iz,ix] += (- dpdx[iz,ix,1,2]*dpdx[iz,ix,1,1])
+			@inbounds gradisseq_modrrvz[iz,ix] += (- dpdz[iz,ix,1,2]*dpdz[iz,ix,1,1])
 		end
 	end
 end
 
 
 @inbounds @fastmath function advance!(
-		  p::Array{Float64},  dpdx::Array{Float64}, dpdz::Array{Float64},  
+		  p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64},  dpdx::Array{Float64}, dpdz::Array{Float64},  
 		  memory_dp_dx::Array{Float64}, memory_dp_dz::Array{Float64}, memory_dvx_dx::Array{Float64}, memory_dvz_dz::Array{Float64},
 		  modttI::Array{Float64}, modrrvx::Array{Float64}, modrrvz::Array{Float64},
 		  δx24I::Float64, δz24I::Float64, δt::Float64,
@@ -624,6 +599,10 @@ end
 		  a_z::Vector{Float64}, b_z::Vector{Float64}, k_zI::Vector{Float64}, a_z_half::Vector{Float64}, b_z_half::Vector{Float64}, k_z_halfI::Vector{Float64}
 		 )
 
+
+
+	ppp .= pp
+	pp .=  p
 
 	"""
 	compute dpdx and dpdz at [it-1] for all propagating fields
@@ -684,6 +663,30 @@ end
 		end
 	end
 end
+
+function born_sources()
+	# secondary sources for Born modeling
+	if(born_flag)
+	# adding born sources from pressure(:,:,1) to pressure(:,:,2)
+	for ix=3:nx-2
+	for iz=3:nz-2
+
+		# upto until [it-2]
+		# lambdaI scatterrer source term at [it-1]
+		# p is at [it], pp is at [it-1], ppp is at [it-2]
+		# dpdx is at [it-1] and dpdz is at [it-1]
+		# modrrvx scatterrer source term at [it-1]
+		# modrrvz scatterrer source term at [it-1]
+		born_svalue_stack[iz,ix] += δt * ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δmodtt[iz, ix] * δtI * δtI) )#+ (
+#							  (27.e0*dpdx[iz,ix,1,1] * δmodrrvx[iz,ix] -27.e0*dpdx[iz,ix-1,1,1] * δmodrrvx[iz,ix-1] -dpdx[iz,ix+1,1,1] * δmodrrvx[iz,ix+1] +dpdx[iz,ix-2,1,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) + (
+#							  (27.e0*dpdz[iz,ix,1,1] * δmodrrvz[iz,ix] -27.e0*dpdz[iz-1,ix,1,1] * δmodrrvz[iz-1,ix] -dpdz[iz+1,ix,1,1] * δmodrrvz[iz+1,ix] +dpdz[iz-2,ix,1,1] * δmodrrvz[iz-2,ix] ) * (δz24I)) ) 
+
+		p[iz,ix,1,2] += born_svalue_stack[iz,ix] * δt * δxI * δzI * modttI[iz,ix]  
+	end
+	end
+	end
+end
+
 
 """
 Output vectors related to PML boundaries.

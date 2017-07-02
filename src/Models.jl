@@ -366,7 +366,7 @@ function pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
 		nz = size(mod,1); nx = size(mod,2)
 		modex = zeros(nz + 2*np, nx + 2*np)
 
-		modex[np+1:np+nz,np+1:np+nx] = mod 
+		modex[np+1:np+nz,np+1:np+nx] .= mod 
 		modex[1:np,:] = repeat(modex[np+1,:], inner=np);
 		modex[nz+1+np:end,:] = repeat(modex[nz+np,:],inner=np);
 		modex[:,1:np] = repeat(modex[:,np+1], outer=np);
