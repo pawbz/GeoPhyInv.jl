@@ -1,5 +1,12 @@
 __precompile__()
 
+"""
+This module defines the following data types:
+* `Geom` : acquisition aeometry, i.e., positions of sources and receivers
+* `Src` : source related acquisition parameters, e.g., source wavelet
+It also provides methods that either does operations on these data type or 
+help their construction.
+"""
 module Acquisition
 
 import SIT.Grid
@@ -10,7 +17,7 @@ using Distributions
 """
 Acquisiton of supersources, sources and receivers.
 Each supersource has multiple sources that are 
-injected (active) simultaneously.
+injected (or active) simultaneously.
 Each supersource 
 has a set of receivers that 
 record waves. 
@@ -326,12 +333,13 @@ end
 
 """
 Constructor for `Src` data type.
-Repeat same source wavelet for all sources and supersources
+Uses same source wavelet, i.e., `wav` for all sources and supersources
 
 # Arguments
 
 * `nss::Int64` : number of supersources
 * `ns::Int64` : number of sources
+* `nfield::Int64` : number of fields the sources are exciting
 * `wav::Array{Float64}` : a source wavelet that is used for all sources and supersources
 * `tgrid::Grid.M1D` : time grid for the wavelet
 """
