@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <meta name="author" content="pawbz">
+  <link rel="shortcut icon" href="../img/favicon.ico">
+  <title>Home - SeismicInversionToolbox.jl</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="../css/highlight.css">
+  <link href="../assets/Documenter.css" rel="stylesheet">
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Home";
+    var mkdocs_page_input_path = "home.md";
+    var mkdocs_page_url = "/home/";
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js"></script>
+  <script src="../js/modernizr-2.8.3.min.js"></script>
+  <script type="text/javascript" src="../js/highlight.pack.js"></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="./" class="icon icon-home"> SeismicInversionToolbox.jl</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1 current">
+		
+    <a class="current" href="./">Home</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l2"><a href="#seismicinversiontoolbox">SeismicInversionToolbox</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l3" href="#coding-conventions">Coding Conventions</a></li>
+        
+            <li><a class="toctree-l3" href="#installation">Installation</a></li>
+        
+            <li><a class="toctree-l3" href="#input-and-output-data-format">Input and Output Data Format</a></li>
+        
+            <li><a class="toctree-l3" href="#demos">Demos</a></li>
+        
+        </ul>
+    
+
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="..">Reference</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Tutorial</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../tutorials/page1/">Title 1</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Another Section</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../modeling/page1/">Title 1</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="./">SeismicInversionToolbox.jl</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="./">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>Home</li>
+    <li class="wy-breadcrumbs-aside">
+      
+        <a href="https://github.com/pawbz/SIT.jl/edit/master/docs/home.md"
+          class="icon icon-github"> Edit on GitHub</a>
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <p><a id='SeismicInversionToolbox-1'></a></p>
+<h1 id="seismicinversiontoolbox">SeismicInversionToolbox</h1>
+<p>The main tasks of this software are:</p>
+<ul>
+<li>Forward problem, where the seismic data are generated</li>
+</ul>
+<p>using synthetic Earth models and the acquisition parameters  corresponding to a seismic experiment. Forward modeling consists of a finite-difference simulation, followed by convolutions in the time domain using the source and receiver filters. The details about our finite-difference  scheme are given in XXX.  And the filters corresponding to  sources and receivers are described in XXX.</p>
+<ul>
+<li>Can perform inversion of synthetic scenarios.</li>
+</ul>
+<p>First, the seismic data are modeled as in the forward problem. Then the  data are used to perform full waveform inversion (FWI). The inverse  problem estimates the Earth models and the source and receiver filters  that resulted from the data. This task is necessary to test the performance of the inversion algorithm  in various geological scenarios using different acquisition parameters.</p>
+<ul>
+<li>Read</li>
+</ul>
+<p>the measured seismic field data and parameters from a seismic experiment  to perform inversion like in the previous task.  The data measured in the field are not in a suitable format  yet for this software.  Pre-processing is necessary before it can be used as described. Also, the acquisition parameters from the field should be  converted to suitable 2-D coordinates as described.</p>
+<p><a id='Coding-Conventions-1'></a></p>
+<h2 id="coding-conventions">Coding Conventions</h2>
+<ul>
+<li>This software is organised into various modules.</li>
+</ul>
+<p>Each module has various type definitions and methods declared. Commenting is  done inside each module file to describe the purpose of the module and its usage. Most of the comments in the code are inline with the text in this documentation.  Within each module, variable naming is done  to reduce the effort needed to understand the source code. For example,  \code{distance = velocity * time} is prefered over using  \code{a = b * c} in most parts of the software. The code inside each method is properly intended using spaces to facilitate  redability. We followed this documentation <a href="http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/"><img alt="guide" src="http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/" /></a></p>
+<p><a id='Installation-1'></a></p>
+<h2 id="installation">Installation</h2>
+<p><a id='Input-and-Output-Data-Format-1'></a></p>
+<h2 id="input-and-output-data-format">Input and Output Data Format</h2>
+<p>It is recomended that the  input seismic data is  in the Seismic Unix (SU) format. The SU file should contain all the necessary headers  related to acquisition geometry that will be discussed in Section~\ref{sec:acq_geom}. Most of the seismic data pre-processing softwares  generate a SEGY file with headers.  We can use the following command to  convert an example SEGY file, \fname{exp.sgy}, to SU format. </p>
+<p><a id='Demos-1'></a></p>
+<h2 id="demos">Demos</h2>
+<p>Demos preforming some of the tasks are provided along with the software in \fname{workdir/xfwi/demos/}. An example parameter file is also provided in Section~\ref{sec:para_file} of this manual.</p>
+<p><a href="https://travis-ci.org/pawbz/SIT.jl"><img alt="Build Status" src="https://travis-ci.org/pawbz/SIT.jl.svg?branch=master" /></a></p>
+<p><a href="https://coveralls.io/github/pawbz/SIT.jl?branch=master"><img alt="Coverage Status" src="https://coveralls.io/repos/pawbz/SIT.jl/badge.svg?branch=master&amp;service=github" /></a></p>
+<p><a href="http://codecov.io/github/pawbz/SIT.jl?branch=master"><img alt="codecov.io" src="http://codecov.io/github/pawbz/SIT.jl/coverage.svg?branch=master" /></a></p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href=".." class="btn btn-neutral float-right" title="Reference">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+	  
+        </div>
+      </div>
+
+    </section>
+    
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+          <a href="https://github.com/pawbz/SIT.jl" class="fa fa-github" style="float: left; color: #fcfcfc"> GitHub</a>
+      
+      
+      
+        <span style="margin-left: 15px"><a href=".." style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script src="../js/theme.js"></script>
+      <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML - assets/mathjaxhelper.js"></script>
+
+</body>
+</html>
