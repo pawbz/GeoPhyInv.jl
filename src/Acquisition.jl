@@ -2,7 +2,7 @@ __precompile__()
 
 """
 This module defines the following data types:
-* `Geom` : acquisition aeometry, i.e., positions of sources and receivers
+* `Geom` : acquisition geometry, i.e., positions of supersources, sources and receivers
 * `Src` : source related acquisition parameters, e.g., source wavelet
 It also provides methods that either does operations on these data type or 
 help their construction.
@@ -15,12 +15,12 @@ import SIT.Wavelets
 using Distributions
 
 """
-Acquisiton of supersources, sources and receivers.
-Each supersource has multiple sources that are 
+Acquisiton has supersources, sources and receivers.
+Each supersource has `ns` multiple sources that are 
 injected (or active) simultaneously.
-Each supersource 
-has a set of receivers that 
-record waves. 
+For each supersource,
+a set of `nr` receivers are 
+recording waves.
 
 # Fields
 
@@ -58,11 +58,16 @@ end # type
 """
 Return some derived fields of `Geom`
 
-# Outputs
-`attrib=:uspos` : a tuple of x and z positions of unique sources
-`attrib=:urpos` : a tuple of x and z position of unique receivers
-`attrib=:nus` : number of unique source positions
-`attrib=:nur` : number of unique source positions
+# Arguments 
+
+* `acq::Vector{Geom}` : a vector of `Geom`
+* `attrib::Symbol` : attribute to determine the return object 
+  * `=:nus` number of unique source positions in acquisition
+  * `=:nur` number of unique receiver positions in acquisition
+  * `=:uspos` a tuple of x and z positions of all the unique sources
+  * `=:urpos` a tuple of x and z position of all the unique receivers
+  * `=:geomurpos` a `Geom` vector as if all the unique receiver positions are used for each supersource
+  * `=:geomuspos` a `Geom` vector as if all the unique source positions are used for each supersource
 """
 function Geom_get(acq::Vector{Geom}, attrib::Symbol)
 	ngeom = length(acq)
@@ -127,14 +132,17 @@ function Geom_find(acq::Geom; rpos::Array{Float64,1}=nothing, rpos0::Array{Float
 end
 
 """
-Modify input `Geom` such that the output has
+Modify input `Geom` such that the output `Geom` has
 either sources or receivers on the boundary of 
 `mgrid`.
 
 # Arguments
+
 * `acqgeom::Geom` : input geometry
-* `mgrid::Grid.M2D` : to determine the boundary
-* `attrib::Symbol` : either `:srcborder` or `:recborder` 
+* `mgrid::Grid.M2D` : grid to determine the boundary
+* `attrib::Symbol` : decide return
+  * `=:srcborder` sources on boundary (useful for back propagation)
+  * `=:recborder` receivers on boundary
 """
 function Geom_boundary(acqgeom::Geom,
 	      mgrid::Grid.M2D,
@@ -163,11 +171,37 @@ end
 
 
 """
-Return fixed spread acquisition geometry depending 
-on either horizontal or vertical array
-It has only one source for every supersource
-* ``
-* `rand_flags::Vector{Bool}=[false, false]` : randomly or equally spaced supersources and receivers?
+A fixed spread acquisition has same set of sources and 
+receivers for each supersource.
+This method constructs a 
+fixed spread acquisition geometry using either a
+horizontal or vertical array of supersources/ receivers.
+Current implementation has only one source for every supersource.
+
+# Arguments 
+
+* `smin::Float64` : minimum coordinate for sources
+* `smax::Float64` : maximum coordinate for sources
+* `s0::Float64` : consant coordinate for sources
+* `rmin::Float64` : minimum coordinate for receivers
+* `rmax::Float64` : maximum coordinate for receivers
+* `r0::Float64` : consant coordinate for receivers
+* `nss::Int64` : number of supersources
+* `nr::Int64` : number of receivers
+* `sattrib::Symbol=:horizontal` : supersource array kind
+  `=:vertical` : vertical array of supersources
+  `=:horizontal` horizontal array of supersources
+* `rattrib::Symbol=:horizontal` : receiver array kind
+  `=:vertical` : vertical array of receivers
+  `=:horizontal` horizontal array of receivers
+* `rand_flags::Vector{Bool}=[false, false]` : decide placement of supersources and receivers 
+  `=[true, false]` : randomly place supersources for regularly spaced receivers
+  `=[true, true]` : randomly place supersources and receivers
+  `=[false, false]` : regularly spaced supersources and receivers
+  `=[false, true]` : randomly place receivers for regularly spaced supersources 
+
+# Return
+* a fixed spread acquisition geometry `Geom`
 """
 function Geom_fixed(
 	      smin::Float64,
@@ -218,12 +252,16 @@ Receivers are placed such that the limits
 of the angular offset are given by `θlim`
 
 # Arguments
+
 * `nss::Int64=10` : number of supersources
 * `nr::Int64=10` : number receivers for each super source
 * `loc::Vector{Float64}=[0.,0.]` : location of origin
 * `rad::Float64=100.` : radius
 * `θlim::Vector{Float64}=[0.,2*pi]` : range of angular offset between source and receiver
 
+
+# Return
+* a circular acquisition geometry `Geom`
 """
 function Geom_circ(;
 		   nss::Int64=10,
@@ -313,7 +351,7 @@ end
 
 
 """
-Data type for the sources used.
+Data type for the source related parameters during acquisiton.
 
 # Fields
 * `nss::Int64` : number of supersources

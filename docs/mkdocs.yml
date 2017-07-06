@@ -16,6 +16,7 @@ markdown_extensions:
           - extra
           - tables
           - fenced_code
+          - mdx_math
 
 
 extra_css:
@@ -24,7 +25,8 @@ extra_css:
 docs_dir: 'build'
 
 pages:
-          - Home: index.md
+          - Home: home.md
+          - Reference: index.md
           - Tutorial:
               - Title 1: tutorials/page1.md
           - Another Section:

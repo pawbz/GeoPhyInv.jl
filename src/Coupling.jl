@@ -1,11 +1,5 @@
 __precompile__()
 
-module Coupling
-
-
-import SIT.Acquisition
-import SIT.Grid
-
 """
 The data recorded at the receiver during a seismic experiment 
 is a convolution of the Green's function,
@@ -31,6 +25,12 @@ If the input is \kwordi{0}, then the filter is a spike at \tim=0,
 with unknown amplitude.  
 Which means, the filter only applies a scalar to the modelled data.
 """
+module Coupling
+
+
+import SIT.Acquisition
+import SIT.Grid
+
 type TD
 	ssf::Array{Array{Float64,1},2}
 	rf::Array{Array{Float64,2},2}

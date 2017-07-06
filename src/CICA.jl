@@ -1,5 +1,9 @@
 __precompile__()
 
+
+"""
+Independent Component Analysis for Convolutive Mixtures
+"""
 module CICA
 
 using MultivariateStats

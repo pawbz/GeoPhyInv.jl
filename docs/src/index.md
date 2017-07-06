@@ -3,94 +3,94 @@ Most of the times, each module has
 a type variable definition and methods 
 that either modify the type variable or construct them.
 
-# Grids
+# Grid
 ```@autodocs
 Modules = [SIT.Grid]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
-# Source Wavelets
+# Wavelets
 ```@autodocs
 Modules = [SIT.Wavelets]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
-# Source and Receiver Coupling 
+# Coupling 
 ```@autodocs
 Modules = [SIT.Coupling]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
 # Acquisition
 ```@autodocs
 Modules = [SIT.Acquisition]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
-# Spline Representations 
+# Interpolation
 ```@autodocs
 Modules = [SIT.Interpolation]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
 # Models
 ```@autodocs
 Modules = [SIT.Models]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
 # Data
 ```@autodocs
 Modules = [SIT.Data]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
-# Data Misfits
+# Misfits
 ```@autodocs
 Modules = [SIT.Misfits]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
 
 # Gallery
 ```@autodocs
 Modules = [SIT.Gallery]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
 
-# Finite-difference Time-domain Modelling
+# Fdtd
 
 ```@autodocs
 Modules = [SIT.Fdtd]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
  
 # Inversion
 
 ```@autodocs
 Modules = [SIT.Inversion]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
 # Interferometry
 
 ```@autodocs
 Modules = [SIT.Interferometry]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
 
-# Independent Component Analysis for Convolutive Mixtures
+# CICA 
 
 ```@autodocs
 Modules = [SIT.CICA]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
 # Plots
 ```@autodocs
 Modules = [SIT.Plots]
-Order   = [:type, :function]
+Order   = [:module, :type, :function]
 ```
 
  

@@ -1,5 +1,12 @@
 __precompile__()
 
+"""
+This module defines the data types related to seismic data:
+* `TD` : time domain representation
+
+It also provides methods that apply source and receiver filters onto 
+seismic data.
+"""
 module Data
 
 import SIT.Acquisition
@@ -10,13 +17,13 @@ using Interpolations
 
 """
 Time domain representation of Seismic Data.
-TODO: Also include acqsrc?
 
 # Fields
+
 * `d::Array{Array{Float64,2},2}` : data 
-* `nfield::Int64` : number of components at each receiver
+* `nfield::Int64` : number of components recorded at each receiver
 * `tgrid::Grid.M1D` : grid to represent time
-* `acqgeom::Acquisition.Geom` : geometry used to generate the data
+* `acqgeom::Acquisition.Geom` : acquisition geometry used to generate the data
 """
 type TD
 	d::Array{Array{Float64,2},2}
@@ -35,11 +42,16 @@ end
 
 
 """
-function to resample data in time domain
+Method to resample data in time.
 
 # Arguments
-* `data` : input data of type `TD`
-* `tgrid` : resampling in time according to this time grid
+
+* `data::TD` : input data of type `TD`
+* `tgrid::Grid.M1D` : resampling in time according to this time grid
+
+# Return
+
+* data after resampling as `TD`
 """
 function TD_resamp(data::TD,
 		tgrid::Grid.M1D
@@ -59,6 +71,16 @@ function TD_resamp(data::TD,
 	return dataout
 end
 
+
+"""
+Method to resample data in time.
+
+# Arguments
+
+* `data::TD` : input data of type `TD`
+* `dataout::TD` : preallocated data of type `TD` that is modified
+"""
+
 function TD_resamp!(data::TD, dataout::TD)
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
@@ -73,7 +95,17 @@ end
 
 
 """
-Return zeros
+Method used to preallocate `TD` with zeros.
+
+# Arguments
+
+* `nfield::Int64` : number of components
+* `tgrid::Grid.M1D` : time domain grid
+* `acqgeom::Acquisition.Geom` : acquisition geometry
+
+# Return
+
+* data with zeros as `TD`
 """
 function TD_zeros(nfield::Int64,
 		 tgrid::Grid.M1D,
@@ -84,7 +116,7 @@ function TD_zeros(nfield::Int64,
 end
 
 """
-Return bool depending on if `d` in `TD` is all zero. 
+Returns bool depending on if input `data::TD` has all zeros or not.
 """
 function TD_iszero(data::TD)
 	return maximum(broadcast(maximum,broadcast(abs,data.d))) == 0.0 ? true : false
@@ -92,13 +124,26 @@ end
 
 """
 Time reverse the records of each receiver in `TD` 
+
+# Arguments
+
+* `data::TD` : input data that is modified
 """
 function TD_tr!(data::TD)
 	data.d = copy([flipdim(data.d[i,j],1) for i in 1:data.acqgeom.nss, j in 1:data.nfield]);
 end
 
 """
-Returns dot product of the data
+Returns dot product of data.
+
+# Arguments 
+
+* `data1::TD` : data 1
+* `data2::TD` : data 2
+
+# Return
+
+* dot product as `Float64`
 """
 function TD_dot(data1::TD, data2::TD)
 	dotd = 0.0;
@@ -110,7 +155,18 @@ end
 
 
 """
-normalize time-domain seismic data
+Normalize time-domain seismic data.
+
+# Arguments 
+
+* `data::TD` : input data
+* `attrib::Symbol` : decide kind of normalization
+  * `=:recrms` the record at every receiver is normalized with its RMS value
+  * `=:recmax` the record at every receiver is normalized with its maximum value
+
+# Return
+
+* normalized data as `TD`
 """
 function TD_normalize(data::TD, attrib::Symbol)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
@@ -158,10 +214,18 @@ function TD_urpos(d::Array{Float64},
 end
 
 """
-Apply coupling functions to TD
+Apply source and receiver coupling functions to TD.
+Currently, only source filters are applied.
 
-* :s means s is returned in the place of rs
-* :w means 
+# Arguments
+
+* `s::TD` : input data
+* `r::TD` : input data
+* `w::Coupling.TD` : input source and receiver filters
+* `attrib::Symbol` : attribute to 
+  * `=:s` to apply `w` to `r` and modify `s`
+  * `=:r` to apply adjoint of `w` to `s` and modify `r`
+  * `=:w` modify `w` using `r` and `s`
 """
 function TDcoup!(
                s::TD,
