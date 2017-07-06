@@ -286,6 +286,15 @@
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/f046618353405e7f22857741c56c6067c32be0ae/src/Coupling.jl#L43-L45' class='documenter-source'>source</a><br></p>
 <p><a id='Acquisition-1'></a></p>
 <h1 id="acquisition">Acquisition</h1>
+<p><a id='SIT.Acquisition' href='#SIT.Acquisition'>#</a>
+<strong><code>SIT.Acquisition</code></strong> &mdash; <em>Module</em>.</p>
+<p>This module defines the following data types:</p>
+<ul>
+<li><code>Geom</code> : acquisition aeometry, i.e., positions of sources and receivers</li>
+<li><code>Src</code> : source related acquisition parameters, e.g., source wavelet</li>
+</ul>
+<p>It also provides methods that either does operations on these data type or  help their construction.</p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/f046618353405e7f22857741c56c6067c32be0ae/src/Acquisition.jl#L3-L9' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Acquisition.Geom' href='#SIT.Acquisition.Geom'>#</a>
 <strong><code>SIT.Acquisition.Geom</code></strong> &mdash; <em>Type</em>.</p>
 <p>Acquisiton of supersources, sources and receivers. Each supersource has multiple sources that are  injected (or active) simultaneously. Each supersource  has a set of receivers that  record waves. </p>
@@ -1046,16 +1055,17 @@ ight)
 <p><a id='Index-1'></a></p>
 <h1 id="index">Index</h1>
 <ul>
+<li><a href=".#SIT.Acquisition"><code>SIT.Acquisition</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Src"><code>SIT.Acquisition.Src</code></a></li>
 <li><a href=".#SIT.Coupling.TD"><code>SIT.Coupling.TD</code></a></li>
 <li><a href=".#SIT.Data.TD"><code>SIT.Data.TD</code></a></li>
-<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Float64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
+<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Float64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M2D"><code>SIT.Grid.M2D</code></a></li>
-<li><a href=".#SIT.Inversion.Param-Tuple{SIT.Acquisition.Src,SIT.Acquisition.Geom,SIT.Grid.M1D,Symbol,Symbol,SIT.Models.Seismic}"><code>SIT.Inversion.Param</code></a></li>
 <li><a href=".#SIT.Inversion.Param"><code>SIT.Inversion.Param</code></a></li>
+<li><a href=".#SIT.Inversion.Param-Tuple{SIT.Acquisition.Src,SIT.Acquisition.Geom,SIT.Grid.M1D,Symbol,Symbol,SIT.Models.Seismic}"><code>SIT.Inversion.Param</code></a></li>
 <li><a href=".#SIT.Models.Seismic"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom_add!-Tuple{SIT.Acquisition.Geom,Array{Float64,1},Array{Float64,1},Symbol}"><code>SIT.Acquisition.Geom_add!</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom_add!-Tuple{SIT.Acquisition.Geom,Array{SIT.Acquisition.Geom,1}}"><code>SIT.Acquisition.Geom_add!</code></a></li>
@@ -1129,8 +1139,8 @@ ight)
 <li><a href=".#SIT.Models.Seismic_get-Tuple{SIT.Models.Seismic,Symbol}"><code>SIT.Models.Seismic_get</code></a></li>
 <li><a href=".#SIT.Models.Seismic_interp_spray!-Tuple{SIT.Models.Seismic,SIT.Models.Seismic,Symbol}"><code>SIT.Models.Seismic_interp_spray!</code></a></li>
 <li><a href=".#SIT.Models.Seismic_isequal-Tuple{SIT.Models.Seismic,SIT.Models.Seismic}"><code>SIT.Models.Seismic_isequal</code></a></li>
-<li><a href=".#SIT.Models.Seismic_issimilar-Tuple{SIT.Models.Seismic,SIT.Models.Seismic}"><code>SIT.Models.Seismic_issimilar</code></a></li>
 <li><a href=".#SIT.Models.Seismic_issimilar-Tuple{SIT.Models.Seismic,SIT.Grid.M2D}"><code>SIT.Models.Seismic_issimilar</code></a></li>
+<li><a href=".#SIT.Models.Seismic_issimilar-Tuple{SIT.Models.Seismic,SIT.Models.Seismic}"><code>SIT.Models.Seismic_issimilar</code></a></li>
 <li><a href=".#SIT.Models.Seismic_pad_trun-Tuple{SIT.Models.Seismic}"><code>SIT.Models.Seismic_pad_trun</code></a></li>
 <li><a href=".#SIT.Models.Seismic_reparameterize!"><code>SIT.Models.Seismic_reparameterize!</code></a></li>
 <li><a href=".#SIT.Models.Seismic_smooth!"><code>SIT.Models.Seismic_smooth!</code></a></li>
@@ -1199,5 +1209,5 @@ ight)
 
 <!--
 MkDocs version : 0.16.3
-Build Date UTC : 2017-07-06 20:32:27
+Build Date UTC : 2017-07-06 20:33:29
 -->
