@@ -97,7 +97,7 @@ function M2D_boundary(mgrid::M2D, nlayer::Int64, attrib::Symbol; onlycount::Bool
 	if(attrib == :inner)
 		x = mgrid.x; z = mgrid.z;
 	elseif(attrib == :outer)
-		# extending x and z
+		# extending x and z and then choosing inner layers
 		x = vcat(
 	   		[mgrid.x[1]-(ilayer)*mgrid.δx for ilayer=1:nlayer:-1],
 	   		mgrid.x,
@@ -162,7 +162,13 @@ function M1D_isequal(grid1::M1D, grid2::M1D)
 end
 
 """
-Construct 1-D grid based on nx or δx
+Construct 1-D grid based on number of samples.
+
+# Arguments
+
+* `xbeg::Float64` : first value
+* `xend::Float64` : last value
+* `nx::Int64` : number of samples
 """
 function M1D(xbeg::Float64, xend::Float64, nx::Int64)
 	x = Array(linspace(xbeg, xend, nx))
@@ -170,6 +176,15 @@ function M1D(xbeg::Float64, xend::Float64, nx::Int64)
 	return M1D(x, nx, δx)
 end
 
+"""
+Construct 1-D grid based on sampling interval.
+
+# Arguments
+
+* `xbeg::Float64` : first value
+* `xend::Float64` : last value
+* `δx::Float64` : number of samples
+"""
 function M1D(xbeg::Float64, xend::Float64, δx::Float64)
 	x = [tt for tt in xbeg:δx:xend]
 	δx = length(x)==1 ? 0. : x[2]-x[1]

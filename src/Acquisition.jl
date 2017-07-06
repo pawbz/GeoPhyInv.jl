@@ -159,7 +159,7 @@ end
 Return fixed spread acquisition geometry depending 
 on either horizontal or vertical array
 It has only one source for every supersource
-
+* ``
 * `rand_flags::Vector{Bool}=[false, false]` : randomly or equally spaced supersources and receivers?
 """
 function Geom_fixed(
@@ -211,11 +211,11 @@ Receivers are placed such that the limits
 of the angular offset are given by `θlim`
 
 # Arguments
-`nss::Int64=10` : number of supersources
-`nr::Int64=10` : number receivers for each super source
-`loc::Vector{Float64}=[0.,0.]` : location of origin
-`rad::Float64=100.` : radius
-`θlim::Vector{Float64}=[0.,2*pi]` : range of angular offset between source and receiver
+* `nss::Int64=10` : number of supersources
+* `nr::Int64=10` : number receivers for each super source
+* `loc::Vector{Float64}=[0.,0.]` : location of origin
+* `rad::Float64=100.` : radius
+* `θlim::Vector{Float64}=[0.,2*pi]` : range of angular offset between source and receiver
 
 """
 function Geom_circ(;
@@ -326,12 +326,14 @@ end
 
 """
 Constructor for `Src` data type.
-repeat same source wavelet for all sources and supersources
+Repeat same source wavelet for all sources and supersources
 
 # Arguments
+
 * `nss::Int64` : number of supersources
 * `ns::Int64` : number of sources
-* `wav::Array{Float64}`
+* `wav::Array{Float64}` : a source wavelet that is used for all sources and supersources
+* `tgrid::Grid.M1D` : time grid for the wavelet
 """
 function Src_fixed(nss::Int64, 
 	     ns::Int64, 

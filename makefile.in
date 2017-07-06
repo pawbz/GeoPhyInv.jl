@@ -13,7 +13,7 @@ no=no
 
 
 ###------------------ Choosing a compiler -----------------------
-compflag = 1
+compflag = 2
 # complier flag is 1 for ifort 
 # 		   2 for gfortran-4.8
 # 		   3 for pgf95 (PGI compiler)

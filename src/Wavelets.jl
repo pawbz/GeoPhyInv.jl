@@ -5,14 +5,14 @@ module Wavelets
 import SIT.Grid
 
 """
-Generate a Ricker Wavelet
+Generate a Ricker Wavelet. Reference:
 Frequencies of the Ricker wavelet, Yanghua Wang, GEOPHYSICS, VOL. 80, NO. 2
 
-# Arguments
-* `fqdom`: dominant frequency
-* `tgrid`: time-domain grid
-* `tpeak`: the peak of the ricker in time
-* ``
+# Keyword Arguments
+
+* `fqdom::Float64`: dominant frequency 
+* `tgrid::Grid.M1D`: time-domain grid
+* `tpeak::Float64=tgrid.x[1]+1.5/fqdom`: the peak of the ricker in time (has a default)
 """
 function ricker(;
 		fqdom::Float64=nothing,

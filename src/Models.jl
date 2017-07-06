@@ -173,6 +173,7 @@ respect to χvp and χρ from  gradients
 with respect to KI and ρI.
 
 # Arguments
+
 * `gmod::Seismic` : gradient model
 * `mod::Seismic` : model required for chain rule
 * `g1` : gradient of an objective function with respect `attribs[1]`

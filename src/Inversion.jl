@@ -2,6 +2,7 @@ __precompile__()
 
 module Inversion
 
+import SIT.Interpolation
 import SIT.Models
 import SIT.Grid
 import SIT.Acquisition
@@ -27,7 +28,7 @@ are fixed throughout the inversion
 * `model_obs` : model used for generating observed data
 * `model0` : background velocity model (only used during Born modeling and inversion)
 * `parameterization` : a vector of Symbols specifying parameterization of the inversion vector
-* `verbose` : print level
+* `verbose` : print level on STOUT
 * `attrib` : synthetic or real
 
 TODO: add an extra attribute for coupling functions inversion and modelling
@@ -49,6 +50,8 @@ type Param
 	modi::Models.Seismic
 	"parameterization"
 	parameterization::Vector{Symbol}
+	"model preconditioning"
+	mprecon::AbstractArray{Float64,2}
 	"calculated data"
 	dcal::Data.TD
 	"observed data"
@@ -63,13 +66,30 @@ end
 """
 Constructor for `Param`
 
-* `model` : initial model, the reference values are used from this
+# Arguments
 
-"Seismic model used to generate 'observed' synthetic data"
-modm_obs::Models.Seismic
+* `acqsrc::Acquisition.Src` : source time functions
+* `acqgeom::Acquisition.Geom` : acquisition geometry
+* `tgrid::Grid.M1D` : modelling time grid
+* `attrib_mod::Symbol` : modelling attribute
+* `attrib_inv::Symbol` : inversion attribute
+* `modm::Models.Seismic` : seismic model on modelling mesh 
 
-"source wavelet used to generate 'observed' synthetic data"
-acqsrc_obs::Acquisition.Src
+# Optional Arguments
+
+* `igrid::Grid.M2D=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
+* `mprecon_flag::Bool=false` : flag to use a model preconditioner
+* `dobs::Data.TD` : observed data
+* `tlagssf::Float64=0.0` : maximum lagtime of unknown source filter
+* `tlagrf::Float64=0.0` : maximum lagtime of unknown receiver filter
+* `acqsrc_obs::Acquisition.Src=acqsrc` : source wavelets to generate *observed data*; can be different from `acqsrc`
+* `modm_obs::Models.Seismic=modm` : actual seismic model to generate *observed data*
+* `modm0::Models.Seismic=modm` : background seismic model for Born modelling and inversion (still being tested)
+* `mod_inv_parameterization::Vector{Symbol}=[:χKI, :χρI]` : subsurface parameterization
+* `verbose::Bool=false` : print level on STDOUT during inversion 
+* `attrib::Symbol=:synthetic` : an attribute to control class
+  * `=:synthetic` synthetic data inversion
+  * `=:field` field data inversion
 """
 function Param(
 	       acqsrc::Acquisition.Src,
@@ -80,6 +100,7 @@ function Param(
 	       modm::Models.Seismic;
 	       # other optional 
 	       igrid::Grid.M2D=modm.mgrid,
+	       mprecon_flag::Bool=false,
 	       dobs::Data.TD=Data.TD_zeros(1,tgrid,acqgeom),
 	       tlagssf::Float64=0.0,
 	       tlagrf::Float64=0.0,
@@ -100,6 +121,7 @@ function Param(
 
 	pa = Param(acqsrc, acqgeom, attrib_mod, attrib_inv, 
 	      modm, modm0, modi, mod_inv_parameterization,
+	      zeros(2,2), # dummy, update mprecon later
 	      Data.TD_zeros(nfield,tgrid,acqgeom), dobs, 
 	      Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, nfield, acqgeom), verbose, attrib)
 
@@ -109,8 +131,9 @@ function Param(
 	last_x = rand(size(x)) # dummy last_x
 
 	# intial modelling dcal
-	update_buffer!(buffer1, buffer2, buffer3, x, last_x, pa, pa.modm) # x is dummy here
+	pa.mprecon = update_buffer!(buffer1, buffer2, buffer3, x, last_x, pa, pa.modm, mprecon_flag=mprecon_flag) # x is dummy here, since actually using pa.modm
 	pa.dcal = deepcopy(buffer1[1])
+
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic) & Data.TD_iszero(pa.dobs))
@@ -130,24 +153,50 @@ function Param(
 	return pa
 end
 
-"Return the number of inversion variables `Param`"
+"""
+Return the number of inversion variables for FWI corresponding to `Param`.
+This number of inversion variables depend on the size of inversion mesh.
+"""
 function xfwi_ninv(pa::Param)
 	return 2*pa.modi.mgrid.nz*pa.modi.mgrid.nx
 end
 
-"Return the number of inversion variables `Param`"
+"""
+Return the number of inversion variables for source and receiver filter inversion 
+corresponding to `Param`.
+This number depends on the maximum lagtimes of the filters. 
+"""
 function wfwi_ninv(pa::Param)
 	return  pa.w.tgridssf.nx
 end
 
 """
-FWI using Optim, updates pa.modm and pa.dcal
+Full Waveform Inversion using `Optim`.
+This method updates `pa.modm` and `pa.dcal`. More details about the
+optional parameters can be found in the documentation of the `Optim` 
+package.
 
-# Arguments
-* `model:Models.Seismic` : initial model and it is updated
-* `dobs::Data.TD=Data.TD_zeros(1,pa.dcal.tgrid,pa.acqgeom)` : input observed data
+# Arguments that are modified
+
+* `pa::Param` : inversion parameters
+
+# Optional Arguments
+
+* `extended_trace::Bool=true` : save extended trace
+* `time_limit=Float64=2.0*60.` : time limit for inversion (testing)
+* `iterations::Int64=5` : maximum number of iterations
+* `f_tol::Float64=1e-3` : functional tolerance
+* `g_tol::Float64=1e-3` : gradient tolerance
+* `x_tol::Float64=1e-3` : model tolerance
+
+# Outputs
+
+* depending on  `pa.attrib_inv`
+  * `=:cls` classic least-squares inversion using adjoint state method
+  * `=:migr` return gradient at the first iteration, i.e., a migration image
+  * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
 """
-function xfwi!(pa::Param, extended_trace::Bool=true, time_limit=Float64=2.0*60.)
+function xfwi!(pa::Param; extended_trace::Bool=true, time_limit=Float64=2.0*60., iterations::Int64=5, f_tol::Float64=1e-3, g_tol::Float64=1e-3, x_tol::Float64=1e-3)
 
 	# convert initial model to the inversion variable
 	x = zeros(xfwi_ninv(pa));
@@ -183,8 +232,10 @@ function xfwi!(pa::Param, extended_trace::Bool=true, time_limit=Float64=2.0*60.)
 		res = optimize(df, x, 
 			       lower_x,
 			       upper_x,
-			       Fminbox(); optimizer=LBFGS, iterations=1, # barrier function iterations
-			     optimizer_o=Optim.Options(g_tol = 1e-12,
+			       Fminbox(); optimizer=LBFGS, iterations=iterations, # barrier function iterations
+				  #linesearch = Optim.LineSearches.morethuente!,
+					P=pa.mprecon,
+			     optimizer_o=Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
 		 			iterations = 2, store_trace = true, time_limit=time_limit,
 					extended_trace=extended_trace, show_trace = true))
 		pa.verbose ? println(res) : nothing
@@ -241,7 +292,6 @@ function xfwi!(pa::Param, extended_trace::Bool=true, time_limit=Float64=2.0*60.)
 		println("maximum value of g(x):\t",  maximum(gx))
 
 		return gmodi
-
 	else
 		error("invalid pa.attrib_inv")
 	end
@@ -254,7 +304,10 @@ function update_buffer_zeros(pa::Param)
 
 	# allocate buffer
 	return ([Data.TD_zeros(1, pa.dcal.tgrid, pa.acqgeom)],
-	 zeros(Grid.M2D_boundary(pa.modm.mgrid, 3, :outer, onlycount=true), pa.dcal.tgrid.nx,pa.acqgeom.nss),
+						[zeros(3,pa.modm.mgrid.nx+6,pa.dcal.tgrid.nx,pa.acqgeom.nss),
+						zeros(pa.modm.mgrid.nz+6,3,pa.dcal.tgrid.nx,pa.acqgeom.nss),
+						zeros(3,pa.modm.mgrid.nx+6,pa.dcal.tgrid.nx,pa.acqgeom.nss),
+						zeros(pa.modm.mgrid.nz+6,3,pa.dcal.tgrid.nx,pa.acqgeom.nss)],
 		   zeros(nz,nx,3,pa.acqgeom.nss)) 
 end
 
@@ -272,12 +325,13 @@ and boundary values for adjoint calculation.
 """
 function update_buffer!(
 			buffer1::Array{Data.TD,1},
-			buffer2::Array{Float64,3},
+			buffer2::Array{Array{Float64,4},1},
 			buffer3::Array{Float64,4},
 			x::Vector{Float64},
 			last_x::Vector{Float64}, 
 			pa::Param,
-			modm::Models.Seismic=Models.Seismic_zeros(pa.modm.mgrid)
+			modm::Models.Seismic=Models.Seismic_zeros(pa.modm.mgrid);
+			mprecon_flag::Bool=false
 			   )
 	if(x!=last_x)
 		pa.verbose ? println("updating buffer") : nothing
@@ -292,11 +346,12 @@ function update_buffer!(
 			model = deepcopy(modm)
 		end
 
+		illum=zeros(pa.modm.mgrid.nz, pa.modm.mgrid.nx)
 		# generate modelled data, border values, etc.
 		if(pa.attrib_mod == :fdtd)
 			Fdtd.mod!(model=model, acqgeom=[pa.acqgeom], 
 			    acqsrc=[pa.acqsrc],src_flags=[2], 
-			    TDout=buffer1,
+			    TDout=buffer1,illum_out=illum, illum_flag=mprecon_flag,
 			    backprop_flag=1,
 			    boundary=buffer2, initp=buffer3,
 			    tgridmod=pa.dcal.tgrid) 
@@ -323,7 +378,17 @@ function update_buffer!(
 			error("invalid pa.attrib_mod")
 		end
 
-		return buffer1[1]
+		illumi = zeros(pa.modi.mgrid.nz, pa.modi.mgrid.nx)
+		if(mprecon_flag)
+			Interpolation.interp_spray!(pa.modm.mgrid.x, pa.modm.mgrid.z, illum,
+			      pa.modi.mgrid.x, pa.modi.mgrid.z, illumi, :spray, :B2)
+			illumi = vcat(vec(illumi), vec(illumi))
+			length(illumi) == xfwi_ninv(pa) ? nothing : error("something went wrong with creating mprecon")
+			precon = spdiagm(illumi,(0),xfwi_ninv(pa), xfwi_ninv(pa))
+		else
+			precon = spdiagm(ones(xfwi_ninv(pa)),(0),xfwi_ninv(pa),xfwi_ninv(pa))
+		end
+		return precon
 	end
 end
 
@@ -332,7 +397,7 @@ Return functional and gradient of the CLS objective
 """
 function func_xfwi(x::Vector{Float64},  last_x::Vector{Float64},
 	      buffer1::Array{Data.TD,1},
-	      buffer2::Array{Float64,3},
+	      buffer2::Array{Array{Float64,4},1},
 	      buffer3::Array{Float64,4},
 	      pa::Param)
 	pa.verbose ? println("computing functional...") : nothing
@@ -350,7 +415,7 @@ end
 function grad_xfwi!(x::Vector{Float64}, storage::Vector{Float64}, 
 	       last_x::Vector{Float64}, 
 	       buffer1::Array{Data.TD,1},
-	       buffer2::Array{Float64,3},
+	       buffer2::Array{Array{Float64,4},1},
 	       buffer3::Array{Float64,4},
 	       pa::Param)
 
@@ -427,7 +492,6 @@ function wfwi!(pa::Param)
 
 	(Data.TD_iszero(pa.dcal)) ? error("dcal zero wfwi") : buffer1=deepcopy(pa.dcal)
 
-#	if(pa.attrib_inv == :cls)
 	df = OnceDifferentiable(x -> func_Coupling(x, last_x, buffer1, pa),
 		  (x, storage) -> grad_Coupling!(x, storage, last_x, buffer1, pa))
 	"""

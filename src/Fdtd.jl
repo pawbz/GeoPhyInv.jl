@@ -11,28 +11,21 @@ import SIT.Data
 import SIT.Gallery
 import SIT.DSP
 
-#function mod_alloc(;
-#	nrecwav::Int64=1, 
-#	model::Models.Seismic=Gallery.Seismic(:acou_homo1),
-#	tgridmod::Grid.M1D=Gallery.M1D(:acou_homo1),
-#	tgrid::Grid.M1D=tgridmod,
-#	acqgeom::Array{Acquisition.Geom}=fill(Gallery.Geom(:acou_homo1),npropwav),
-#	recv_nfield::Int64=1, 
-#	)
-#
-#	initp=zeros(model.mgrid.nz+2*model.mgrid.npml,model.mgrid.nx+2*model.mgrid.npml,3,acqgeom[1].nss)
-#	TDout=[Data.TD_zeros(recv_nfield,tgrid,acqgeom[ip]) for ip in 1:nrecwav]
-#	boundary=zeros(Grid.M2D_boundary(model.mgrid, 3, :outer, onlycount=true),tgridmod.nx,acqgeom[1].nss)
-#	gmodel=Models.Seismic_zeros(model.mgrid)
-#
-#	return TDout, boundary, initp, gmodel
-#end
-
 """
 As forward modeling method, the 
 finite-difference method is employed. 
 It uses a discrete version of the two-dimensional isotropic acoustic wave equation.
 As shown in  
+
+```math
+\pp[\tzero] - \pp[\tmo] = \dt \mB \left({\partial_x\vx}[\tmh]
+ + \partial_z \vz[\tmh]  + \dt\sum_{0}^{\tmo}\sfo\right)
+ ```
+ ```math
+\pp[\tpo] - \pp[\tzero] = \dt \mB \left(\partial_x \vx[\tph]
+ + {\partial_z \vz}[\tph]  + \dt\sum_{0}^{\tzero}\sfo\right)
+ ```
+
 Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used 
 # Keyword Arguments
 * `npropwav::Int64=1` : number of independently propagating wavefields in `model`
@@ -41,16 +34,18 @@ Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used
 * `tgridmod::Grid.M1D` : modelling time vector
 * `tgrid::Grid.M1D` : output records are interpolated on this time vector
 * `recv_nfield::Int64=1` : number of fields that receivers record 
-* `boundary_save_flag::Bool=Int64` : save final state variables and the boundary conditions for later use
+* `backprop_flag::Bool=Int64` : save final state variables and the boundary conditions for later use
 * `boundary_in::Any=[0]` : input final state variables and boundary
 * `abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left]` : PML boundary conditions 
 * `born_flag::Bool=false` : Born modeling flag
 * `gmodel_flag=false` : output gradient or not
+* `illum_flag::Bool=false` : output wavefield energy or source illumination to use as preconditioner later
+* `illum_out::Array{Float64}` : source energy with same dimensions as model.mgrid
 * `verbose::Bool=false` : verbose flag
 
 # Example
 ```julia
-julia> records, boundary_save  = mod();
+julia> records,   = mod();
 ```
 Credits: Pawan Bharadwaj, 2017
 """
@@ -69,12 +64,19 @@ Credits: Pawan Bharadwaj, 2017
 	recv_nfield::Int64=1, 
 	TDout::Vector{Data.TD}=[Data.TD_zeros(recv_nfield,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags)) ],
 	backprop_flag::Int64=0,  
-	boundary::Array{Float64}=
-	        zeros(Grid.M2D_boundary(model.mgrid, 3, :outer, onlycount=true),tgridmod.nx,acqgeom[1].nss),
+	boundary::Array{Array{Float64,4},1}=[
+						zeros(3,model.mgrid.nx+6,tgridmod.nx,acqgeom[1].nss),
+						zeros(model.mgrid.nz+6,3,tgridmod.nx,acqgeom[1].nss),
+						zeros(3,model.mgrid.nx+6,tgridmod.nx,acqgeom[1].nss),
+						zeros(model.mgrid.nz+6,3,tgridmod.nx,acqgeom[1].nss)],
 	initp::Array{Float64}=
 	        zeros(model.mgrid.nz+2*model.mgrid.npml,model.mgrid.nx+2*model.mgrid.npml,3,acqgeom[1].nss),
 	gmodel_flag=false,
 	gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid),
+	illum_flag::Bool=false,
+	illum_out=zeros(model.mgrid.nz, model.mgrid.nx),
+	tsnapshot::Float64=tgridmod.x[end],
+	snapshot::Array{Float64}=zeros(model.mgrid.nz,model.mgrid.nx),
 	verbose::Bool=false
 	)
 	
@@ -179,6 +181,9 @@ Credits: Pawan Bharadwaj, 2017
 	# records_output, shared array among different procs
 	recv_out = SharedArray(Float64, (tim_nt,recv_n,recv_nfield,npropwav,src_nseq))
 
+	# snapshot save
+	itsnapshot = indmin(abs(tgridmod.x-tsnapshot)) 
+
 	# gradient outputs
 	grad_modtt = SharedArray(Float64, (nz, nx, src_nseq))
 	grad_modtt .= 0.0
@@ -195,18 +200,26 @@ Credits: Pawan Bharadwaj, 2017
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
 	# boundary coordinates
-	boundary_z, boundary_x, boundary_n = Grid.M2D_boundary(model.mgrid, 3, :outer)
-	iboundary_x = broadcast(x->indmin(abs(mesh_x-x)), boundary_x)
-	iboundary_z = broadcast(x->indmin(abs(mesh_z-x)), boundary_z)
+	ibx0=model.mgrid.npml-2; ibx1=model.mgrid.nx+model.mgrid.npml+3
+	ibz0=model.mgrid.npml-2; ibz1=model.mgrid.nz+model.mgrid.npml+3
 
-	"saving boundary values per issseq"
+	"saving boundary values for all super sources"
 	if(backprop_flag == 1)
-		boundary_out = SharedArray(Float64, size(boundary))
+		btout = SharedArray(Float64,3,ibx1-ibx0+1,tim_nt,src_nseq)
+		brout = SharedArray(Float64,ibz1-ibz0+1,3,tim_nt,src_nseq)
+		bbout = SharedArray(Float64,3,ibx1-ibx0+1,tim_nt,src_nseq)
+		blout = SharedArray(Float64,ibz1-ibz0+1,3,tim_nt,src_nseq)
 	end
 
 	"p_out will save final snapshots that can be used for time reversal"
 	p_out = SharedArray(Float64, size(initp))
 
+
+	if(illum_flag)
+		"saving illum"
+		illum_all = SharedArray(Float64, (nz, nx, src_nseq))
+		illum_all .= 0.0
+	end
 
 	"density values on vx and vz stagerred grids"
 	modrrvx = get_rhovxI(Models.Seismic_get(exmodel, :ρI))
@@ -335,14 +348,24 @@ Credits: Pawan Bharadwaj, 2017
 		gradisseq_modrrvx=zeros(gradisseq_modtt)
 		gradisseq_modrrvz=zeros(gradisseq_modtt)
 
-		"saving boundary values per issseq"
-		if(backprop_flag == 1)
-			boundaryisseq = zeros(size(boundary,1),size(boundary,2))
+		if(illum_flag)
+			illumisseq_out=zeros(nz,nx)
 		end
 
-		"initial conditions from initp for first propagating field only"
-		if(backprop_flag==-1)
+
+		if(backprop_flag == 1)
+			"saving boundary values per issseq"
+			brisseq = zeros(ibz1-ibz0+1,3,tim_nt)
+			btisseq = zeros(3,ibx1-ibx0+1,tim_nt)
+			bbisseq = zeros(3,ibx1-ibx0+1,tim_nt)
+			blisseq = zeros(ibz1-ibz0+1,3,tim_nt)
+		elseif(backprop_flag==-1)
+			"initial conditions from initp for first propagating field only"
 			p[:,:,:,1].=initp[:,:,:,isseq]
+			btisseq = view(view(boundary,1)[1],:,:,:,isseq)
+			brisseq = view(view(boundary,2)[1],:,:,:,isseq)
+			bbisseq = view(view(boundary,3)[1],:,:,:,isseq)
+			blisseq = view(view(boundary,4)[1],:,:,:,isseq)
 		end
 
 		# time_loop
@@ -357,31 +380,41 @@ Credits: Pawan Bharadwaj, 2017
 				   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
 				   a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI)
 		
-			# force p[1] on boundarys
+			# force p[1] on boundaries
 			if(backprop_flag==-1) 
-				for iboundary = 1:boundary_n
-					@inbounds p[iboundary_z[iboundary], iboundary_x[iboundary],1,1] = boundary[iboundary,it, isseq] 
-				end
+				boundary_force(view(p,:,:,1,1),
+				   view(blisseq,:,:,it), view(brisseq,:,:,it),
+				   view(btisseq,:,:,it), view(bbisseq,:,:,it),
+		                        ibx0::Int64, ibz0::Int64, ibx1::Int64, ibz1::Int64)
 			end
 	 
-			add_source!(it, isseq, p, src_wav_mat, src_spray_weights,
+			add_source!(p, view(src_wav_mat,:,:,:,it,isseq), src_spray_weights,
 				modttI, issmulx1, issmulx2, issmulz1, issmulz2, npropwav, src_nfield, src_nsmul,
 				δt::Float64, δxI::Float64, δzI::Float64
 				)
 
 
-			# record boundarys
+			# record boundaries
 			if(backprop_flag==1)
-				for iboundary = 1:boundary_n
-				       @inbounds boundaryisseq[iboundary,it] = p[iboundary_z[iboundary],iboundary_x[iboundary],1,1]
-				end
+				boundary_save(view(p,:,:,1,1),
+				   view(blisseq,:,:,it), view(brisseq,:,:,it),
+				   view(btisseq,:,:,it), view(bbisseq,:,:,it),
+		                        ibx0::Int64, ibz0::Int64, ibx1::Int64, ibz1::Int64)
 			end
 
-			record!(it,rec_mat, p, rec_interpolate_weights, irecx1, irecx2, irecz1, irecz2, npropwav, recv_nfield, recv_n)
+			record!(view(rec_mat, :, :, :, it), p, rec_interpolate_weights, irecx1, irecx2, irecz1, irecz2, npropwav, recv_nfield, recv_n)
 
 			if(gmodel_flag)
 				compute_gradient!(p, pp, ppp, dpdx, dpdz,
 		      			gradisseq_modtt, gradisseq_modrrvx, gradisseq_modrrvz,nx,nz,δtI)
+			end
+
+			if(illum_flag)
+				compute_illum!(p, illumisseq_out)
+			end
+
+			if((it == itsnapshot) & (isseq ==1))
+				snapshot[:,:] .= p[n,:,1,1]
 			end
 
 		end # time_loop
@@ -394,7 +427,7 @@ Credits: Pawan Bharadwaj, 2017
 			   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
 			   a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI)
 		"save last snapshot of pressure field"
-		p_out[:,:,1,isseq] = p[:,:,1,1]
+		p_out[:,:,1,isseq] .= p[:,:,1,1]
 
 		"one more propagating step to save velocities at [tim_nt+3/2] -- for time reversal"
 		advance!(p, pp, ppp, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
@@ -421,15 +454,23 @@ Credits: Pawan Bharadwaj, 2017
 			"gradient is formed by intergration over time, hence multiply with δt, but why not?"
 			"I don't completely understand where the factors δx and δz are coming from..."
 			"probably the source term should not be multiplied by δxI and δzI during adjoint propagation"
-			grad_modtt[:,:,isseq] .= gradisseq_modtt .* (δx * δz)
-			grad_modrrvx[:,:,isseq] .= gradisseq_modrrvx .* (δx * δz)
+			grad_modtt[:,:,isseq] .=  gradisseq_modtt .* (δx * δz)
+			grad_modrrvx[:,:,isseq] .=  gradisseq_modrrvx .* (δx * δz)
 			grad_modrrvz[:,:,isseq] .= gradisseq_modrrvz .* (δx * δz)
 		end
 		# update boundary_out after time reversal
 		if(backprop_flag ==1)
-			boundary_out[:,:, isseq] .= Array(flipdim(boundaryisseq,2))
+			btout[:,:,:,isseq] .= flipdim(btisseq,3)
+			brout[:,:,:,isseq] .= flipdim(brisseq,3)
+			bbout[:,:,:,isseq] .= flipdim(bbisseq,3)
+			blout[:,:,:,isseq] .= flipdim(blisseq,3)
 		end
 
+
+		if(illum_flag)
+			# output illum_out
+			illum_all[:,:,isseq] .= illumisseq_out
+		end
 
 	end # source_loop
 
@@ -441,7 +482,7 @@ Credits: Pawan Bharadwaj, 2017
 	grad_modrrvx_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvx),3),3),model.mgrid.npml,-1);
 	grad_modrrvz_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvz),3),3),model.mgrid.npml,-1);
 
-	grad_modrr_stack = 0.5 .* (grad_modrrvx_stack .+ grad_modrrvz_stack)
+	grad_modrr_stack = (grad_modrrvx_stack .+ grad_modrrvz_stack) .* (0.5)
 
 	for ix=2:size(grad_modrr_stack,2)-1
 		for iz=2:size(grad_modrr_stack,1)-1
@@ -457,6 +498,11 @@ Credits: Pawan Bharadwaj, 2017
 				     vec(Models.χg(grad_modrr_stack, Models.Seismic_get(model,:ρI0),1)),
 				     [:χKI, :χρI], 1
 				     )
+	if(illum_flag)
+		# output illum_out
+		illum_out[:,:] = Models.pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)
+	end
+
 
 	# update TDout after forming a vector and resampling
 	ipropout=0;
@@ -477,9 +523,10 @@ Credits: Pawan Bharadwaj, 2017
 	
 	# update initp and boundary outputs
 	if(backprop_flag==1)
-		boundary .= Array(boundary_out)
 		initp .= Array(p_out) 
+		boundary[:]=[Array(btout), Array(brout), Array(bbout), Array(blout)]
 	end
+
 
 	# return data depending on the receiver flags
 	return TDout, boundary, initp, gmodel
@@ -489,8 +536,8 @@ Credits: Pawan Bharadwaj, 2017
 	#		       tgridmod, acqgeom[1]) for iprop in 1:npropwav]
 end
 
-@inbounds @fastmath function add_source!(it::Int64, isseq::Int64, 
-				p::Array{Float64}, src_wav_mat::Array{Float64},
+@inline @inbounds @fastmath function add_source!( 
+				p::Array{Float64}, src_wav_mat::AbstractArray{Float64},
 				src_spray_weights::Array{Float64},
 				modttI::Array{Float64},
 				issmulx1::Array{Int64}, issmulx2::Array{Int64},
@@ -509,7 +556,7 @@ end
 		until [it-1]
 		division of source term with δx and δz (see Jan's fdelmodc manual)
 		"""
-		source_term = src_wav_mat[issmul, ifield, ipropwav, it, isseq] * δt * δxI * δzI
+		source_term = src_wav_mat[issmul, ifield, ipropwav] * δt * δxI * δzI
 		
 		"""
 		multiplication with modttI
@@ -536,8 +583,8 @@ end
 end
 
 
-@inbounds @fastmath function record!(it::Int64,
-		 rec_mat::Array{Float64}, 
+@inline @inbounds @fastmath function record!(
+		 rec_mat::AbstractArray{Float64}, 
 		 p::Array{Float64}, 
 		 rec_interpolate_weights::Array{Float64},
 		 irecx1::Array{Int64}, irecx2::Array{Int64},
@@ -548,7 +595,7 @@ end
 	for ipropwav = 1:npropwav
 	for ifield = 1:recv_nfield
 	@simd for irec = 1:recv_n
-			rec_mat[irec,ifield,ipropwav, it] = 
+			rec_mat[irec,ifield,ipropwav] = 
 			(
 			p[irecz1[irec,ipropwav],irecx1[irec,ipropwav],ifield,ipropwav]*
 			rec_interpolate_weights[1,irec,ipropwav]+
@@ -565,7 +612,7 @@ end
 
 end
 
-@inbounds @fastmath function compute_gradient!(p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64},
+@inline @inbounds @fastmath function compute_gradient!(p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64},
 			   dpdx::Array{Float64}, dpdz::Array{Float64},
 			   gradisseq_modtt::Array{Float64}, gradisseq_modrrvx::Array{Float64},
 			   gradisseq_modrrvz::Array{Float64},
@@ -589,7 +636,7 @@ end
 end
 
 
-@inbounds @fastmath function advance!(
+@inline @inbounds @fastmath function advance!(
 		  p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64},  dpdx::Array{Float64}, dpdz::Array{Float64},  
 		  memory_dp_dx::Array{Float64}, memory_dp_dz::Array{Float64}, memory_dvx_dx::Array{Float64}, memory_dvz_dz::Array{Float64},
 		  modttI::Array{Float64}, modrrvx::Array{Float64}, modrrvz::Array{Float64},
@@ -660,6 +707,19 @@ end
 			"""
 			@inbounds p[iz,ix,1,ipropwav] += (modttI[iz,ix] * (dpdx[iz,ix,2,ipropwav] + dpdz[iz,ix,3,ipropwav])) * δt #* boundary_p(iz,ix)
 		end
+		end
+	end
+end
+
+
+"""
+Need illumination to estimate the approximate diagonal of Hessian
+"""
+@inline function compute_illum!(p::Array{Float64}, illumisseq_out::Array{Float64})
+	for ix=1:size(illumisseq_out,2)
+		@simd for iz=1:size(illumisseq_out,1)
+			# saving illumination to be used as preconditioner 
+			illumisseq_out[iz,ix] += (p[iz,ix,1,1] * p[iz,ix,1,1])
 		end
 	end
 end
@@ -827,5 +887,52 @@ function get_rhovzI(rhoI::Array{Float64})
 	end
 	return rhovzI
 end # get_rhovzI
+
+
+@inbounds function boundary_force(p::AbstractArray{Float64}, 
+		     bl::AbstractArray{Float64}, br::AbstractArray{Float64},
+		     bt::AbstractArray{Float64}, bb::AbstractArray{Float64},
+		     ibx0::Int64, ibz0::Int64, ibx1::Int64, ibz1::Int64)
+
+	nlayer=3
+	for ix=1:nlayer
+		@simd for iz=1:ibz1-ibz0+1
+			p[ibz0+iz-1, ibx0+ix-1] = bl[iz,ix]
+			p[ibz0+iz-1, ibx1-ix+1] = br[iz,ix]
+		end
+	end
+
+	@simd for ix=1:ibx1-ibx0+1
+		for iz=1:nlayer
+			p[ibz0+iz-1,ibx0+ix-1] = bt[iz,ix]
+			p[ibz1-iz+1,ibx0+ix-1] = bb[iz,ix]
+		end
+	end
+
+end
+
+@inbounds function boundary_save(p::AbstractArray{Float64}, 
+		     bl::AbstractArray{Float64}, br::AbstractArray{Float64},
+		     bt::AbstractArray{Float64}, bb::AbstractArray{Float64},
+		     ibx0::Int64, ibz0::Int64, ibx1::Int64, ibz1::Int64)
+
+	nlayer=3
+	for ix=1:nlayer
+		@simd for iz=1:ibz1-ibz0+1
+			bl[iz,ix] = p[ibz0+iz-1, ibx0+ix-1] 
+			br[iz,ix] = p[ibz0+iz-1, ibx1-ix+1]
+		end
+	end
+
+	@simd for ix=1:ibx1-ibx0+1
+		for iz=1:nlayer
+			bt[iz,ix] = p[ibz0+iz-1,ibx0+ix-1]
+			bb[iz,ix] = p[ibz1-iz+1,ibx0+ix-1]
+		end
+	end
+
+end
+
+
 
 end # module
