@@ -276,10 +276,10 @@
 <p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/f046618353405e7f22857741c56c6067c32be0ae/src/Wavelets.jl#L7-L16' class='documenter-source'>source</a><br></p>
 <p><a id='Source-and-Receiver-Coupling-1'></a></p>
 <h1 id="source-and-receiver-coupling">Source and Receiver Coupling</h1>
-<p><a id='SIT.Coupling.TD' href='#SIT.Coupling.TD'>#</a>
-<strong><code>SIT.Coupling.TD</code></strong> &mdash; <em>Type</em>.</p>
+<p><a id='SIT.Coupling' href='#SIT.Coupling'>#</a>
+<strong><code>SIT.Coupling</code></strong> &mdash; <em>Module</em>.</p>
 <p>The data recorded at the receiver during a seismic experiment  is a convolution of the Green's function, the source signature and the receiver instrument response as explained in the Section~ ef{sec:sdata}. The source filter, srcf, takes into account  the effective wavelet present in the data.  Similarly, the receiver filter,  ecf, takes the receiver coupling into account. wi can estimate both srcf and  ecf during the inversion. The base source wavelet, sfo, is always used to model the data  before applying the convolutional filters.  wi considers the source filter  only if the input to kword{WTD} contains  kwordi{[SRCF]}, as explained in Sub-section~ ef{subsec:tasks}. Similarly, for the receiver filter, kword{WTD} should contain kwordi{[RECF]}. subsection{Keywords} The keywords to input paramters related  to the source and receiver filters contain kword{[SF]} and are explained below. If the input is kwordi{0}, then the filter is a spike at    im=0, with unknown amplitude.   Which means, the filter only applies a scalar to the modelled data.</p>
-<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/f046618353405e7f22857741c56c6067c32be0ae/src/Coupling.jl#L9-L33' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/pawbz/SIT.jl/tree/f046618353405e7f22857741c56c6067c32be0ae/src/Coupling.jl#L3-L27' class='documenter-source'>source</a><br></p>
 <p><a id='SIT.Coupling.TD_delta-Tuple{T<:Real,T<:Real,Float64,Int64,SIT.Acquisition.Geom}' href='#SIT.Coupling.TD_delta-Tuple{T<:Real,T<:Real,Float64,Int64,SIT.Acquisition.Geom}'>#</a>
 <strong><code>SIT.Coupling.TD_delta</code></strong> &mdash; <em>Method</em>.</p>
 <p>Return delta functions</p>
@@ -290,7 +290,7 @@
 <strong><code>SIT.Acquisition</code></strong> &mdash; <em>Module</em>.</p>
 <p>This module defines the following data types:</p>
 <ul>
-<li><code>Geom</code> : acquisition aeometry, i.e., positions of sources and receivers</li>
+<li><code>Geom</code> : acquisition aeometry, i.e., positions of supersources, sources and receivers</li>
 <li><code>Src</code> : source related acquisition parameters, e.g., source wavelet</li>
 </ul>
 <p>It also provides methods that either does operations on these data type or  help their construction.</p>
@@ -1056,16 +1056,16 @@ ight)
 <h1 id="index">Index</h1>
 <ul>
 <li><a href=".#SIT.Acquisition"><code>SIT.Acquisition</code></a></li>
+<li><a href=".#SIT.Coupling"><code>SIT.Coupling</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom"><code>SIT.Acquisition.Geom</code></a></li>
 <li><a href=".#SIT.Acquisition.Src"><code>SIT.Acquisition.Src</code></a></li>
-<li><a href=".#SIT.Coupling.TD"><code>SIT.Coupling.TD</code></a></li>
 <li><a href=".#SIT.Data.TD"><code>SIT.Data.TD</code></a></li>
-<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Float64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M1D"><code>SIT.Grid.M1D</code></a></li>
+<li><a href=".#SIT.Grid.M1D-Tuple{Float64,Float64,Int64}"><code>SIT.Grid.M1D</code></a></li>
 <li><a href=".#SIT.Grid.M2D"><code>SIT.Grid.M2D</code></a></li>
-<li><a href=".#SIT.Inversion.Param"><code>SIT.Inversion.Param</code></a></li>
 <li><a href=".#SIT.Inversion.Param-Tuple{SIT.Acquisition.Src,SIT.Acquisition.Geom,SIT.Grid.M1D,Symbol,Symbol,SIT.Models.Seismic}"><code>SIT.Inversion.Param</code></a></li>
+<li><a href=".#SIT.Inversion.Param"><code>SIT.Inversion.Param</code></a></li>
 <li><a href=".#SIT.Models.Seismic"><code>SIT.Models.Seismic</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom_add!-Tuple{SIT.Acquisition.Geom,Array{SIT.Acquisition.Geom,1}}"><code>SIT.Acquisition.Geom_add!</code></a></li>
 <li><a href=".#SIT.Acquisition.Geom_add!-Tuple{SIT.Acquisition.Geom,Array{Float64,1},Array{Float64,1},Symbol}"><code>SIT.Acquisition.Geom_add!</code></a></li>
@@ -1139,8 +1139,8 @@ ight)
 <li><a href=".#SIT.Models.Seismic_get-Tuple{SIT.Models.Seismic,Symbol}"><code>SIT.Models.Seismic_get</code></a></li>
 <li><a href=".#SIT.Models.Seismic_interp_spray!-Tuple{SIT.Models.Seismic,SIT.Models.Seismic,Symbol}"><code>SIT.Models.Seismic_interp_spray!</code></a></li>
 <li><a href=".#SIT.Models.Seismic_isequal-Tuple{SIT.Models.Seismic,SIT.Models.Seismic}"><code>SIT.Models.Seismic_isequal</code></a></li>
-<li><a href=".#SIT.Models.Seismic_issimilar-Tuple{SIT.Models.Seismic,SIT.Models.Seismic}"><code>SIT.Models.Seismic_issimilar</code></a></li>
 <li><a href=".#SIT.Models.Seismic_issimilar-Tuple{SIT.Models.Seismic,SIT.Grid.M2D}"><code>SIT.Models.Seismic_issimilar</code></a></li>
+<li><a href=".#SIT.Models.Seismic_issimilar-Tuple{SIT.Models.Seismic,SIT.Models.Seismic}"><code>SIT.Models.Seismic_issimilar</code></a></li>
 <li><a href=".#SIT.Models.Seismic_pad_trun-Tuple{SIT.Models.Seismic}"><code>SIT.Models.Seismic_pad_trun</code></a></li>
 <li><a href=".#SIT.Models.Seismic_reparameterize!"><code>SIT.Models.Seismic_reparameterize!</code></a></li>
 <li><a href=".#SIT.Models.Seismic_smooth!"><code>SIT.Models.Seismic_smooth!</code></a></li>
@@ -1209,5 +1209,5 @@ ight)
 
 <!--
 MkDocs version : 0.16.3
-Build Date UTC : 2017-07-06 20:33:52
+Build Date UTC : 2017-07-06 20:55:47
 -->
