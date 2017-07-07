@@ -101,21 +101,7 @@ Credits: Pawan Bharadwaj, 2017
 	verbose ? println("minimum and maximum velocities:\t",vpmin,"\t",vpmax) : nothing
 
 
-	# check spatial sampling
-	ds_temp=Models.χ([minimum(model.χvp)],model.vp0,-1)[1]/5.0/freqmax;
-	ds_max = maximum([model.mgrid.δx, model.mgrid.δz])
-	all(ds_max .> ds_temp) ? 
-			warn(string("spatial sampling\t",ds_max,"\ndecrease spatial sampling below:\t",ds_temp)) :
-			verbose ? println("spatial sampling\t",ds_max,"\tcan be as high as:\t",ds_temp) : nothing 
-
-	# check time sampling
-	ds_min = minimum([model.mgrid.δx, model.mgrid.δz])
-	dt_temp=0.5*ds_min/Models.χ([(maximum(model.χvp))],model.vp0,-1)[1]
-	all(tgridmod.δx .> dt_temp) ? 
-			warn(string("time sampling\t",tgridmod.δx,"\ndecrease time sampling below:\t",dt_temp)) :
-			verbose ? println("time sampling\t",tgridmod.δx,"\tcan be as high as:\t",dt_temp) : nothing
-
-
+	check_fd_stability(vpmin, vpmax, model.mgrid.δx, model.mgrid.δz, freqmin, freqmax, tgridmod.δx, verbose)
 
 	#! no modeling if source wavelet is zero
 	#if(maxval(abs(src_wavelets)) .lt. tiny(rzero_de)) 
@@ -239,50 +225,7 @@ Credits: Pawan Bharadwaj, 2017
 
 	# source wavelets
 	src_wav_mat = zeros(src_nsmul,src_nfield,npropwav,tim_nt,src_nseq)
-	for ipropwav=1:npropwav
-		for ifield=1:src_nfield
-			for isseq=1:src_nseq
-				for issmul=1:src_nsmul
-					src_tim_nt = acqsrc_uspos[ipropwav].tgrid.nx;
-					if(src_flags[ipropwav] == 0)
-						nothing # just put zeros, no sources added
-					elseif(src_flags[ipropwav] == 1)
-						"ϕ[t] = s[t]"
-						for it=1:src_tim_nt
-							source_term = acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul]
-							src_wav_mat[issmul,ifield,ipropwav,it,isseq] = source_term
-						end
-					elseif(src_flags[ipropwav] == 2)
-						"ϕ[t] = ∑₁ᵗ⁻¹ s[t]"
-						source_term_stack = 0.0;
-						for it=1:src_tim_nt-1
-							source_term_stack += (acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt)
-							src_wav_mat[issmul,ifield,ipropwav,it+1,isseq] = source_term_stack
-						end
-						if(tim_nt > src_tim_nt)
-							src_wav_mat[issmul,ifield,ipropwav,src_tim_nt+1:end,isseq] = src_wav_mat[issmul,ifield,ipropwav,src_tim_nt,isseq]
-						end
-					elseif(src_flags[ipropwav] == 3)
-						"use this to add source sink: need during adjoint propagation from boundary"
-						"multiplication with -1 for subtraction"
-						"time reversal"
-						"as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
-						"ϕ[t] = "
-						source_term_stack = 0.0;
-						for it=1:src_tim_nt-1
-							source_term_stack += (acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt)
-							src_wav_mat[issmul,ifield,ipropwav,tim_nt-it+1,isseq] = -1.0 * source_term_stack
-						end
-						if(tim_nt > src_tim_nt)
-							tim_nt_diff = tim_nt-src_tim_nt
-							src_wav_mat[issmul,ifield,ipropwav,1:tim_nt_diff+1,isseq] = src_wav_mat[issmul,ifield,ipropwav,tim_nt_diff+2,isseq]
-						end
-					end
-
-				end
-			end
-		end
-	end
+	fill_src_wav_mat!(src_wav_mat, acqsrc_uspos, src_flags)
 
 	# source_loop
 	@sync @parallel for isseq = 1:src_nseq
@@ -413,9 +356,9 @@ Credits: Pawan Bharadwaj, 2017
 				compute_illum!(p, illumisseq_out)
 			end
 
-			if((it == itsnapshot) & (isseq ==1))
-				snapshot[:,:] .= p[n,:,1,1]
-			end
+			#if((it == itsnapshot) & (isseq ==1))
+				#snapshot[:,:] .= p[n,:,1,1]
+			#end
 
 		end # time_loop
 		"now pressure is at [tim_nt], velocities are at [tim_nt-1/2]"	
@@ -535,6 +478,8 @@ Credits: Pawan Bharadwaj, 2017
 	#return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),
 	#		       tgridmod, acqgeom[1]) for iprop in 1:npropwav]
 end
+
+
 
 @inline @inbounds @fastmath function add_source!( 
 				p::Array{Float64}, src_wav_mat::AbstractArray{Float64},
@@ -673,9 +618,8 @@ end
 
 
 		"""
-		! vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-		! update velocity at [it-1/2] using 
-		! velocity at [it-3/2] and dpdx and dpdz at [it-1] 
+		update velocity at [it-1/2] using 
+		velocity at [it-3/2] and dpdx and dpdz at [it-1] 
 		"""
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
@@ -690,7 +634,7 @@ end
 		end
 
 		"""
-		! compute p[it] using p[it-1] and velocity [it-1/2]
+		compute p[it] using p[it-1] and velocity [it-1/2]
 		"""
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
@@ -702,8 +646,8 @@ end
 			@inbounds dpdz[iz,ix,3,ipropwav] = dpdz[iz,ix,3,ipropwav] * k_zI[iz] + memory_dvz_dz[iz,ix,ipropwav] # pml
 
 			"""
-			! compute pressure at [it] using p at [it-1] and dvxdx
-			! and dvzdz at [it-1/2]
+			compute pressure at [it] using p at [it-1] and dvxdx
+			and dvzdz at [it-1/2]
 			"""
 			@inbounds p[iz,ix,1,ipropwav] += (modttI[iz,ix] * (dpdx[iz,ix,2,ipropwav] + dpdz[iz,ix,3,ipropwav])) * δt #* boundary_p(iz,ix)
 		end
@@ -934,5 +878,66 @@ end
 end
 
 
+function fill_src_wav_mat!(src_wav_mat::Array{Float64}, acqsrc_uspos::Array{Acquisition.Src},src_flags::Vector{Int64})
+
+	src_nsmul, src_nfield, npropwav, tim_nt, src_nseq = size(src_wav_mat)
+	δt = acqsrc_uspos[1].tgrid.δx
+	for ipropwav=1:npropwav, ifield=1:src_nfield, isseq=1:src_nseq, issmul=1:src_nsmul
+		src_tim_nt = acqsrc_uspos[ipropwav].tgrid.nx;
+		if(src_flags[ipropwav] == 0)
+			nothing # just put zeros, no sources added
+		elseif(src_flags[ipropwav] == 1)
+			"ϕ[t] = s[t]"
+			for it=1:src_tim_nt
+				source_term = acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul]
+				src_wav_mat[issmul,ifield,ipropwav,it,isseq] = source_term
+			end
+		elseif(src_flags[ipropwav] == 2)
+			"ϕ[t] = ∑₁ᵗ⁻¹ s[t]"
+			source_term_stack = 0.0;
+			for it=1:src_tim_nt-1
+				source_term_stack += (acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt)
+				src_wav_mat[issmul,ifield,ipropwav,it+1,isseq] = source_term_stack
+			end
+			if(tim_nt > src_tim_nt)
+				src_wav_mat[issmul,ifield,ipropwav,src_tim_nt+1:end,isseq] = src_wav_mat[issmul,ifield,ipropwav,src_tim_nt,isseq]
+			end
+		elseif(src_flags[ipropwav] == 3)
+			"use this to add source sink: need during adjoint propagation from boundary"
+			"multiplication with -1 for subtraction"
+			"time reversal"
+			"as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
+			"ϕ[t] = "
+			source_term_stack = 0.0;
+			for it=1:src_tim_nt-1
+				source_term_stack += (acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt)
+				src_wav_mat[issmul,ifield,ipropwav,tim_nt-it+1,isseq] = -1.0 * source_term_stack
+			end
+			if(tim_nt > src_tim_nt)
+				tim_nt_diff = tim_nt-src_tim_nt
+				src_wav_mat[issmul,ifield,ipropwav,1:tim_nt_diff+1,isseq] = src_wav_mat[issmul,ifield,ipropwav,tim_nt_diff+2,isseq]
+			end
+		end
+	end
+end
+
+
+function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::Float64, freqmin::Float64, freqmax::Float64, δt::Float64, verbose::Bool)
+
+	# check spatial sampling
+	δs_temp=vpmin/5.0/freqmax;
+	δs_max = maximum([δx, δz])
+	all(δs_max .> δs_temp) ? 
+			warn(string("spatial sampling\t",δs_max,"\ndecrease spatial sampling below:\t",δs_temp)) :
+			verbose ? println("spatial sampling\t",δs_max,"\tcan be as high as:\t",δs_temp) : nothing 
+
+	# check time sampling
+	δs_min = minimum([δx, δz])
+	δt_temp=0.5*δs_min/vpmax
+	all(δt .> δt_temp) ? 
+			warn(string("time sampling\t",tgridmod.δx,"\ndecrease time sampling below:\t",δt_temp)) :
+			verbose ? println("time sampling\t",tgridmod.δx,"\tcan be as high as:\t",δt_temp) : nothing
+
+end
 
 end # module
