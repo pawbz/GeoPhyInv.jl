@@ -26,7 +26,7 @@ type M2D
        		  δx < 0.0, length(x) != nx,
        		  δz < 0.0, length(z) != nz
 		  ]) ? 
-		error("M2D construct") : new(x, z, nx, nz, npml, δx, δz)
+		error("error in M2D construction") : new(x, z, nx, nz, npml, δx, δz)
 end
 
 "Logical operation for `M2D`"
@@ -196,7 +196,7 @@ type M1D
 	"adding conditions that are to be false while construction"
 	M1D(x, nx, δx) = 
 		any([δx < 0.0, length(x) != nx]) ? 
-			error("M1D construct") : new(x, nx, δx)
+			error("error in M1D construction") : new(x, nx, δx)
 end
 
 "Logical operation for `M1D`"

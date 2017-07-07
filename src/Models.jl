@@ -46,7 +46,7 @@ type Seismic
 		     size(χvs) != (length(mgrid.z), length(mgrid.x)), # dimension check
 		     size(χρ) != (length(mgrid.z), length(mgrid.x)) # dimension check
 		    ]) ? 
-		       error("Seismic construction") : new(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid)
+		       error("error in Seismic construction") : new(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid)
 end
 
 """

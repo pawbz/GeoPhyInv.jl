@@ -72,7 +72,11 @@ end
 
 
 """
-Plot acqsrc
+Plot the source wavelet used for acquisition.
+
+# Arguments
+
+* `acqsrc::Acquisition.Src` : source acquisition parameters
 """
 function Src(acqsrc::Acquisition.Src)
 	plot(acqsrc.tgrid.x, acqsrc.wav[1,1][:])
@@ -85,7 +89,7 @@ end
 Plot time-domain data of type `Data.TD`
 
 # Arguments
-* `td::Data.TD` : 
+* `td::Data.TD` : time-domain data 
 
 # Keyword Arguments
 * `ssvec::Vector{Int64}=[1]` : supersource vector to be plotted
@@ -126,13 +130,17 @@ end
 
 
 """
-Plot seismic model
+Plot the velocity and density seismic models.
 
 # Arguments
-* `model::Models.Seismic` = 
+
+* `model::Models.Seismic` : model that should be plotted
+
 # Keyword Arguments
-* `xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]]` : 
-* `zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]]` : 
+
+* `xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]]` : minimum and maximum limits of the second dimension while plotting
+* `zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]]` : minimum and maximum limits of the first dimension while plotting
+
 """
 function Seismic(model::Models.Seismic; 
 		 xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]],
@@ -148,6 +156,7 @@ function Seismic(model::Models.Seismic;
 		  model.mgrid.x[ixmax], model.mgrid.z[izmax], model.mgrid.z[izmin],]);
 		 xlabel(L"$x$ (m)");
 		 ylabel(L"$z$ (m)");
+		 title(L"$v_p$")
 		 colorbar();
 	subplot(122)
 	ax = imshow(Models.χ(model.χρ[izmin:izmax,ixmin:ixmax],model.ρ0,-1), 
@@ -156,6 +165,7 @@ function Seismic(model::Models.Seismic;
 		  model.mgrid.x[ixmax], model.mgrid.z[izmax], model.mgrid.z[izmin],]);
 		 xlabel(L"$x$ (m)");
 		 ylabel(L"$z$ (m)");
+		 title(L"$\rho$")
 		 colorbar();
 	 tight_layout()
 

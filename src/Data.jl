@@ -36,7 +36,7 @@ type TD
        		  nfield < 0.0,
 		  broadcast(size,d) != [(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield]
 		  ]) ? 
-		error("TD construct") : new(d, nfield, tgrid, acqgeom)
+		error("error in TD construction") : new(d, nfield, tgrid, acqgeom)
 
 end
 

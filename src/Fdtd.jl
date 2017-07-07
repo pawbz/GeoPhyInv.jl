@@ -11,56 +11,100 @@ import SIT.Data
 import SIT.Gallery
 import SIT.DSP
 
+#As forward modeling method, the 
+#finite-difference method is employed. 
+#It uses a discrete version of the two-dimensional isotropic acoustic wave equation.
+#As shown in  
+#
+#```math
+#\pp[\tzero] - \pp[\tmo] = \dt \mB \left({\partial_x\vx}[\tmh]
+# + \partial_z \vz[\tmh]  + \dt\sum_{0}^{\tmo}\sfo\right)
+# ```
+# ```math
+#\pp[\tpo] - \pp[\tzero] = \dt \mB \left(\partial_x \vx[\tph]
+# + {\partial_z \vz}[\tph]  + \dt\sum_{0}^{\tzero}\sfo\right)
+# ```
+
 """
-As forward modeling method, the 
-finite-difference method is employed. 
-It uses a discrete version of the two-dimensional isotropic acoustic wave equation.
-As shown in  
-
 ```math
-\pp[\tzero] - \pp[\tmo] = \dt \mB \left({\partial_x\vx}[\tmh]
- + \partial_z \vz[\tmh]  + \dt\sum_{0}^{\tmo}\sfo\right)
- ```
- ```math
-\pp[\tpo] - \pp[\tzero] = \dt \mB \left(\partial_x \vx[\tph]
- + {\partial_z \vz}[\tph]  + \dt\sum_{0}^{\tzero}\sfo\right)
- ```
-
-Figure~ef{fdshmesh_acou}, a staggered-grid mesh is used 
+\alpha=2
+```
 # Keyword Arguments
+
 * `npropwav::Int64=1` : number of independently propagating wavefields in `model`
-* `model::Models.Seismic` : seismic medium parameters 
-* `model_pert::Models.Seismic` : perturbed model, i.e., model + δmodel, used for Born modeling 
-* `tgridmod::Grid.M1D` : modelling time vector
-* `tgrid::Grid.M1D` : output records are interpolated on this time vector
-* `recv_nfield::Int64=1` : number of fields that receivers record 
+* `model::Models.Seismic=Gallery.Seismic(:acou_homo1)` : seismic medium parameters 
+* `model_pert::Models.Seismic=model` : perturbed model, i.e., model + δmodel, used only for Born modeling 
+* `tgridmod::Grid.M1D=Gallery.M1D(:acou_homo1)` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
+* `tgrid::Grid.M1D=tgridmod` : output records are resampled on this time grid
+* `acqgeom::Vector{Acquisition.Geom}=fill(Gallery.Geom(:acou_homo1),npropwav)` :  acquisition geometry for each independently propagating wavefield
+* `acqsrc::Vector{Acquisition.Src}=fill(Gallery.Src(:acou_homo1),npropwav)` : source acquisition parameters for each independently propagating wavefield
+* `src_flags::Vector{Int64}=fill(2,npropwav)` : source related flags for each propagating wavefield
+  * `=[0]` inactive sources
+  * `=[1]` sources with injection rate
+  * `=[2]` volume injection sources
+  * `=[3]` sources input after time reversal (use only during backpropagation) 
+* `recv_flags::Vector{Int64}=fill(1,npropwav)` : receiver related flags for each propagating wavefield
+  * `=[0]` receivers do not record (or) inactive receivers
+  * `=[0,1]` receivers are active only for the second propagating wavefield
+* `recv_nfield::Int64=1` : multi-component receiver flag; types fields the receivers record (to be changed later)
 * `backprop_flag::Bool=Int64` : save final state variables and the boundary conditions for later use
-* `boundary_in::Any=[0]` : input final state variables and boundary
-* `abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left]` : PML boundary conditions 
-* `born_flag::Bool=false` : Born modeling flag
-* `gmodel_flag=false` : output gradient or not
-* `illum_flag::Bool=false` : output wavefield energy or source illumination to use as preconditioner later
-* `illum_out::Array{Float64}` : source energy with same dimensions as model.mgrid
+  * `=1` save boundary values in `boundary` and final values in `initp`
+  * `=-1` force boundary values that are in `boundary` and use initial values in `initp` for back propagation
+* `abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left]` : use absorbing PML boundary conditions or not
+  * `=[:top, :bottom]` apply PML conditions only at the top and bottom of the model 
+  * `=[:bottom, :right, :left]` top is reflecting
+* `born_flag::Bool=false` : do only Born modeling instead of full wavefield modelling (to be updated soon)
+* `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
+* `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
+* `tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1)` : store snaps at these modelling times
 * `verbose::Bool=false` : verbose flag
 
+# Keyword Arguments that are modified by the method (some of them are returned as well)
+
+* `gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
+* `TDout::Vector{Data.TD}=[Data.TD_zeros(recv_nfield,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags))]`
+* `illum_out::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx)` : source energy if `illum_flag`
+* `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
+* `initp::Array{Float64,4}` : stored final values for the first propagating wavefield
+* `snaps::Array{Float64,4}=zeros(model.mgrid.nz,model.mgrid.nx,length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
+
+# Return (in order)
+
+* modelled data for each propagating wavefield as `Vector{TD}`
+* stored boundary values of the first propagating wavefield as `Array{Array{Float64,4},1}` (use for backpropagation)
+* final conditions of the first propagating wavefield as `Array{Float64,4}` (use for back propagation)
+* gradient model as `Seismic`
+* stored snaps shots at tsnaps as Array{Float64,4} 
+
 # Example
+
 ```julia
-julia> records,   = mod();
+records, boundary, initp, gmodel, snaps = mod(acqgeom=acqgeom, acqsrc=acqsrc, model=model, tgridmod=tgridmod);
 ```
-Credits: Pawan Bharadwaj, 2017
+# Credits 
+
+Author: Pawan Bharadwaj 
+        (bharadwaj.pawan@gmail.com)
+
+* original code in FORTRAN90: March 2013
+* modified: 11 Sept 2013
+* major update: 25 July 2014
+* code optimization with help from Jan Thorbecke: Dec 2015
+* rewritten in Julia: June 2017
+* added parrallelization over supersources in Julia: July 2017
 """
 @fastmath function mod!(;
 	jobname::AbstractString = "Hello",
 	npropwav::Int64=1, 
-	model::Models.Seismic = Gallery.Seismic(:acou_homo1),
+	model::Models.Seismic=Gallery.Seismic(:acou_homo1),
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
 	born_flag::Bool=false,
 	model_pert::Models.Seismic = model,
 	tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
-	acqgeom::Array{Acquisition.Geom} = fill(Gallery.Geom(:acou_homo1),npropwav),
+	acqgeom::Vector{Acquisition.Geom} = fill(Gallery.Geom(:acou_homo1),npropwav),
 	acqsrc::Array{Acquisition.Src} = fill(Gallery.Src(:acou_homo1),npropwav),
-	src_flags::Vector{Int64}=fill(2,npropwav), # bilinear for all
-	recv_flags::Vector{Int64}=fill(1,npropwav), # bilinear for all
+	src_flags::Vector{Int64}=fill(2,npropwav), 
+	recv_flags::Vector{Int64}=fill(1,npropwav),
 	recv_nfield::Int64=1, 
 	TDout::Vector{Data.TD}=[Data.TD_zeros(recv_nfield,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags)) ],
 	backprop_flag::Int64=0,  
@@ -69,14 +113,14 @@ Credits: Pawan Bharadwaj, 2017
 						zeros(model.mgrid.nz+6,3,tgridmod.nx,acqgeom[1].nss),
 						zeros(3,model.mgrid.nx+6,tgridmod.nx,acqgeom[1].nss),
 						zeros(model.mgrid.nz+6,3,tgridmod.nx,acqgeom[1].nss)],
-	initp::Array{Float64}=
+	initp::Array{Float64,4}=
 	        zeros(model.mgrid.nz+2*model.mgrid.npml,model.mgrid.nx+2*model.mgrid.npml,3,acqgeom[1].nss),
 	gmodel_flag=false,
 	gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid),
 	illum_flag::Bool=false,
-	illum_out=zeros(model.mgrid.nz, model.mgrid.nx),
-	tsnap::Float64=0.5*(tgridmod.x[end]+tgridmod.x[1]),
-	snap::Array{Float64,3}=zeros(model.mgrid.nz,model.mgrid.nx,acqgeom[1].nss),
+	illum_out::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx),
+	tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1),
+	snaps::Array{Float64,4}=zeros(model.mgrid.nz,model.mgrid.nx,length(tsnaps),acqgeom[1].nss),
 	verbose::Bool=false
 	)
 	
@@ -170,7 +214,7 @@ Credits: Pawan Bharadwaj, 2017
 	recv_out = SharedArray(Float64, (tim_nt,recv_n,recv_nfield,npropwav,src_nseq))
 
 	# snap save
-	itsnap = indmin(abs(tgridmod.x-tsnap)) 
+	itsnaps = [indmin(abs(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
 
 	# gradient outputs
 	grad_modtt = SharedArray(Float64, (nz, nx, src_nseq))
@@ -213,7 +257,7 @@ Credits: Pawan Bharadwaj, 2017
 		illum_all .= 0.0
 	end
 
-	snapout = SharedArray(Float64, size(snap))
+	snapsout = SharedArray(Float64, size(snaps))
 
 	"density values on vx and vz stagerred grids"
 	modrrvx = get_rhovxI(Models.Seismic_get(exmodel, :ρI))
@@ -320,7 +364,7 @@ Credits: Pawan Bharadwaj, 2017
 		end
 
 		# private variable for snapshot
-		snapisseq = zeros(nzd, nxd)
+		snapsisseq = zeros(nzd, nxd, length(itsnaps))
 
 		# time_loop
 		"""
@@ -367,8 +411,8 @@ Credits: Pawan Bharadwaj, 2017
 				compute_illum!(p, illumisseq_out)
 			end
 
-			if((it == itsnap))
-				snap_save!(view(p,:,:,1,1), snapisseq, isx0, isz0)
+			if(findin(itsnaps,it)!=[])
+				snap_save!(view(p,:,:,1,1), view(snapsisseq,:,:,findin(itsnaps,it)[1]), isx0, isz0)
 			end
 
 		end # time_loop
@@ -421,7 +465,7 @@ Credits: Pawan Bharadwaj, 2017
 		end
 
 		# update snapshot
-		snapout[:,:,isseq] .= snapisseq[:,:]
+		snapsout[:,:,:,isseq] .= snapsisseq[:,:,:]
 
 		if(illum_flag)
 			# output illum_out
@@ -459,7 +503,7 @@ Credits: Pawan Bharadwaj, 2017
 		illum_out[:,:] = Models.pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)
 	end
 
-	snap[:,:,:] = Array(snapout)
+	snaps[:,:,:] = Array(snapsout)
 
 	# update TDout after forming a vector and resampling
 	ipropout=0;
@@ -486,7 +530,7 @@ Credits: Pawan Bharadwaj, 2017
 
 
 	# return data depending on the receiver flags
-	return TDout, boundary, initp, gmodel
+	return TDout, boundary, initp, gmodel, snaps
 
 	# return without resampling for testing
 	#return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),
