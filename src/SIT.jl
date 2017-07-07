@@ -1,3 +1,5 @@
+__precompile__()
+
 module SIT
 
 # include modules (note: due to dependencies, order is important!)
