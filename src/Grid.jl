@@ -12,10 +12,9 @@ Data type to represent 2D grid.
 * `δx` : sampling interval in horizontal direction
 * `δz` : sampling interval in vertical direction
 """
-
 type M2D
-	x::Array{Float64}
-	z::Array{Float64}
+	x::Array{Float64,1}
+	z::Array{Float64,1}
 	nx::Int64
 	nz::Int64
 	npml::Int64
@@ -35,6 +34,23 @@ function M2D_isequal(grid1::M2D, grid2::M2D)
 	return all([(isequal(getfield(grid1, name),getfield(grid2, name))) for name in fieldnames(M2D)])
 end
 
+"""
+Construct 2-D grid based on number of samples.
+
+# Arguments
+
+* `xmin::Float64` : first value of second dimension
+* `xmax::Float64` : last value of second dimension
+* `zmin::Float64` : first value of first dimension
+* `zmax::Float64` : firs value of first dimension
+* `nx::Int64` : size of second dimension
+* `nz::Int64` : size of first dimension
+* `npml::Int64` : number of PML layers 
+
+# Return
+
+* a `M2D` grid
+"""
 function M2D(xmin::Float64, xmax::Float64,
 	zmin::Float64, zmax::Float64,
 	nx::Int64, nz::Int64,
@@ -45,6 +61,23 @@ function M2D(xmin::Float64, xmax::Float64,
 	return M2D(x, z, nx, nz, npml, x[2]-x[1], z[2]-z[1])
 end
 
+"""
+Construct 2-D grid based on sampling intervals.
+
+# Arguments
+
+* `xmin::Float64` : first value of second dimension
+* `xmax::Float64` : last value of second dimension
+* `zmin::Float64` : first value of first dimension
+* `zmax::Float64` : firs value of first dimension
+* `δx::Float64` : second sampling interval
+* `δz::Float64` : first sampling interval
+* `npml::Int64` : number of PML layers 
+
+# Return
+
+* a `M2D` grid
+"""
 function M2D(xmin::Float64, xmax::Float64,
 	zmin::Float64, zmax::Float64,
 	δx::Float64, δz::Float64,
@@ -58,13 +91,23 @@ end
 
 
 """
-2-D grid with a different sampling interval
+Resample a 2-D grid.
+
+# Arguments
+
+* `grid::M2D` : input grid this is to be resampled
+* `δx::Float64` : new second sampling interval
+* `δz::Float64` : new first sampling interval
+
+# Return
+
+* a `M2D` resampled grid
 """
 M2D_resamp(grid::M2D, δx::Float64, δz::Float64) = M2D(grid.x[1], grid.x[end], 
 					grid.z[1], grid.z[end], δx, δz, grid.npml)
 
 """
-Extend M2D by its npml grid points on all sides
+Extend M2D by on its PML grid points on all sides.
 """
 function M2D_pad_trun(mgrid::M2D; flag::Int64=1)
 
@@ -88,10 +131,10 @@ end
 
 """
 Return the X and Z positions of the boundary of mgrid
-attrib
-** :inner
-** :outer
-** onlycount
+* `attrib::Symbol` : 
+  * `=:inner`
+  * `=:outer`
+* `onlycount::Bool=false`
 """
 function M2D_boundary(mgrid::M2D, nlayer::Int64, attrib::Symbol; onlycount::Bool=false)
 	if(attrib == :inner)

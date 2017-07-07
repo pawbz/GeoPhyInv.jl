@@ -75,8 +75,8 @@ Credits: Pawan Bharadwaj, 2017
 	gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid),
 	illum_flag::Bool=false,
 	illum_out=zeros(model.mgrid.nz, model.mgrid.nx),
-	tsnapshot::Float64=tgridmod.x[end],
-	snapshot::Array{Float64}=zeros(model.mgrid.nz,model.mgrid.nx),
+	tsnap::Float64=0.5*(tgridmod.x[end]+tgridmod.x[1]),
+	snap::Array{Float64,3}=zeros(model.mgrid.nz,model.mgrid.nx,acqgeom[1].nss),
 	verbose::Bool=false
 	)
 	
@@ -152,6 +152,8 @@ Credits: Pawan Bharadwaj, 2017
 	"""
 	nx = exmodel.mgrid.nx
 	nz = exmodel.mgrid.nz
+	nxd = model.mgrid.nx
+	nzd = model.mgrid.nz
 	δx = exmodel.mgrid.δx
 	δz = exmodel.mgrid.δz
 	δx24I = (exmodel.mgrid.δx * 24.0)^(-1.0)
@@ -167,8 +169,8 @@ Credits: Pawan Bharadwaj, 2017
 	# records_output, shared array among different procs
 	recv_out = SharedArray(Float64, (tim_nt,recv_n,recv_nfield,npropwav,src_nseq))
 
-	# snapshot save
-	itsnapshot = indmin(abs(tgridmod.x-tsnapshot)) 
+	# snap save
+	itsnap = indmin(abs(tgridmod.x-tsnap)) 
 
 	# gradient outputs
 	grad_modtt = SharedArray(Float64, (nz, nx, src_nseq))
@@ -189,6 +191,10 @@ Credits: Pawan Bharadwaj, 2017
 	ibx0=model.mgrid.npml-2; ibx1=model.mgrid.nx+model.mgrid.npml+3
 	ibz0=model.mgrid.npml-2; ibz1=model.mgrid.nz+model.mgrid.npml+3
 
+	# for snap
+	isx0=model.mgrid.npml; isz0=model.mgrid.npml
+
+
 	"saving boundary values for all super sources"
 	if(backprop_flag == 1)
 		btout = SharedArray(Float64,3,ibx1-ibx0+1,tim_nt,src_nseq)
@@ -197,7 +203,7 @@ Credits: Pawan Bharadwaj, 2017
 		blout = SharedArray(Float64,ibz1-ibz0+1,3,tim_nt,src_nseq)
 	end
 
-	"p_out will save final snapshots that can be used for time reversal"
+	"p_out will save final snaps that can be used for time reversal"
 	p_out = SharedArray(Float64, size(initp))
 
 
@@ -206,6 +212,8 @@ Credits: Pawan Bharadwaj, 2017
 		illum_all = SharedArray(Float64, (nz, nx, src_nseq))
 		illum_all .= 0.0
 	end
+
+	snapout = SharedArray(Float64, size(snap))
 
 	"density values on vx and vz stagerred grids"
 	modrrvx = get_rhovxI(Models.Seismic_get(exmodel, :ρI))
@@ -311,6 +319,9 @@ Credits: Pawan Bharadwaj, 2017
 			blisseq = view(view(boundary,4)[1],:,:,:,isseq)
 		end
 
+		# private variable for snapshot
+		snapisseq = zeros(nzd, nxd)
+
 		# time_loop
 		"""
 		* don't use shared arrays inside this time loop, for speed when using multiple procs
@@ -356,9 +367,9 @@ Credits: Pawan Bharadwaj, 2017
 				compute_illum!(p, illumisseq_out)
 			end
 
-			#if((it == itsnapshot) & (isseq ==1))
-				#snapshot[:,:] .= p[n,:,1,1]
-			#end
+			if((it == itsnap))
+				snap_save!(view(p,:,:,1,1), snapisseq, isx0, isz0)
+			end
 
 		end # time_loop
 		"now pressure is at [tim_nt], velocities are at [tim_nt-1/2]"	
@@ -369,7 +380,7 @@ Credits: Pawan Bharadwaj, 2017
 			   δx24I, δz24I, δt, nx, nz,
 			   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
 			   a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI)
-		"save last snapshot of pressure field"
+		"save last snap of pressure field"
 		p_out[:,:,1,isseq] .= p[:,:,1,1]
 
 		"one more propagating step to save velocities at [tim_nt+3/2] -- for time reversal"
@@ -378,7 +389,7 @@ Credits: Pawan Bharadwaj, 2017
 			   δx24I, δz24I, δt, nx, nz,
 			   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
 			   a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI)
-		"save last snapshot of velocity fields with opposite sign for adjoint propagation"
+		"save last snap of velocity fields with opposite sign for adjoint propagation"
 		p_out[:,:,2:3,isseq] .= -1.0 * p[:,:,2:3,1]
 
 		"rec_mat to recv_out"
@@ -409,6 +420,8 @@ Credits: Pawan Bharadwaj, 2017
 			blout[:,:,:,isseq] .= flipdim(blisseq,3)
 		end
 
+		# update snapshot
+		snapout[:,:,isseq] .= snapisseq[:,:]
 
 		if(illum_flag)
 			# output illum_out
@@ -446,6 +459,7 @@ Credits: Pawan Bharadwaj, 2017
 		illum_out[:,:] = Models.pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)
 	end
 
+	snap[:,:,:] = Array(snapout)
 
 	# update TDout after forming a vector and resampling
 	ipropout=0;
@@ -877,6 +891,14 @@ end
 
 end
 
+function snap_save!(p::AbstractArray{Float64}, snap::AbstractArray{Float64}, isx0::Int64, isz0::Int64)
+	nz, nx=size(snap)
+	for ix=1:nx
+		for iz=1:nz
+			snap[iz,ix] = p[isz0+iz, isx0+ix]
+		end
+	end
+end
 
 function fill_src_wav_mat!(src_wav_mat::Array{Float64}, acqsrc_uspos::Array{Acquisition.Src},src_flags::Vector{Int64})
 
@@ -935,8 +957,8 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 	δs_min = minimum([δx, δz])
 	δt_temp=0.5*δs_min/vpmax
 	all(δt .> δt_temp) ? 
-			warn(string("time sampling\t",tgridmod.δx,"\ndecrease time sampling below:\t",δt_temp)) :
-			verbose ? println("time sampling\t",tgridmod.δx,"\tcan be as high as:\t",δt_temp) : nothing
+			warn(string("time sampling\t",δt,"\ndecrease time sampling below:\t",δt_temp)) :
+			verbose ? println("time sampling\t",δt,"\tcan be as high as:\t",δt_temp) : nothing
 
 end
 

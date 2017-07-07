@@ -10,22 +10,25 @@ import SIT.Smooth
 
 """
 Data type fo represent a seismic model.
+A contrast function for a model m is given by ``χ(m) = \frac{m}{m0}-1``.
+
 # Fields
+
 * `vp0::Vector{Float64}` : [vpmin, vpmax]
 * `vs0::Vector{Float64}` : [vsmin, vsmax]
 * `ρ0::Vector{Float64}` : [ρmin, ρmax]
-* `χvp::Array{Float64}` :
-* `χvs::Array{Float64}` :
-* `χρ::Array{Float64}` :
-* `mgrid::Grid.M2D` :
+* `χvp::Array{Float64,2}` : two-dimensional contrast model (χ) for vp, for e.g., zeros(mgrid.nz, mgrid.nx)
+* `χvs::Array{Float64}` : two-dimensional contrast model (χ) for vs, for e.g., zeros(mgrid.nz, mgrid.nx)
+* `χρ::Array{Float64}` : two-dimensional contrast model (χ) for density, for e.g., zeros(mgrid.nz, mgrid.nx)
+* `mgrid::Grid.M2D` : two-dimensional grid to determine the dimensions of models
 """
 type Seismic
 	vp0::Vector{Float64}
 	vs0::Vector{Float64}
 	ρ0::Vector{Float64}
-	χvp::Array{Float64}
-	χvs::Array{Float64}
-	χρ::Array{Float64}
+	χvp::Array{Float64,2}
+	χvs::Array{Float64,2}
+	χρ::Array{Float64,2}
 	mgrid::Grid.M2D
 	"adding conditions that are to be false while construction"
 	Seismic(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid) = 
