@@ -26,3 +26,4 @@ SIT.Inversion.finite_difference!(x->(100.0 - x[1])^2 + (50.0 - x[2])^2, x, gx2, 
 
 
 
+

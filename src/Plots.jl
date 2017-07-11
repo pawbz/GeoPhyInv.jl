@@ -113,7 +113,7 @@ function TD(td::Data.TD; ssvec::Vector{Int64}=[1], fieldvec::Vector{Int64}=[1],
 	end
 	if(attrib == :seis)
 		imshow(dp, cmap="gray",aspect="auto", extent=extent)
-
+		title("common shot gather")
 		xlabel("receiver index");
 		ylabel(L"$t$ (s)");
 		colorbar();

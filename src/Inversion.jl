@@ -1,5 +1,18 @@
 __precompile__()
 
+"""
+This module defines a type called `Param` that is to be constructed 
+before performing 
+and kind of inversion.
+The following functionality is currently added in this module:
+* a simple RTM
+* full-waveform inversion
+* source and receiver filter inversion
+Once a `Param` object is constructed, the following routines update certain fields
+of the `Param` after performing the inversion.
+* `xfwi!` : updates the initial subsurface models in `Param` using its observed data
+* `wfwi!` : updates the source and receiver filters in `Param` using its observed data
+"""
 module Inversion
 
 import SIT.Interpolation
@@ -14,8 +27,7 @@ using Optim
 
 
 """
-Inversion Parameters, i.e., factors that 
-are fixed throughout the inversion
+Inversion Parameters
 
 # Fields
 
@@ -56,6 +68,8 @@ type Param
 	dcal::Data.TD
 	"observed data"
 	dobs::Data.TD
+	"data preconditioning"
+	dprecon::Data.TD
 	"coupling functions"
 	w::Coupling.TD
 	verbose::Bool
@@ -80,6 +94,7 @@ Constructor for `Param`
 * `igrid::Grid.M2D=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
 * `mprecon_flag::Bool=false` : flag to use a model preconditioner
 * `dobs::Data.TD` : observed data
+* `dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.acqgeom)` : data preconditioning, defaults to one 
 * `tlagssf::Float64=0.0` : maximum lagtime of unknown source filter
 * `tlagrf::Float64=0.0` : maximum lagtime of unknown receiver filter
 * `acqsrc_obs::Acquisition.Src=acqsrc` : source wavelets to generate *observed data*; can be different from `acqsrc`
@@ -102,6 +117,7 @@ function Param(
 	       igrid::Grid.M2D=modm.mgrid,
 	       mprecon_flag::Bool=false,
 	       dobs::Data.TD=Data.TD_zeros(1,tgrid,acqgeom),
+	       dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.acqgeom),
 	       tlagssf::Float64=0.0,
 	       tlagrf::Float64=0.0,
 	       acqsrc_obs::Acquisition.Src=acqsrc,
@@ -122,7 +138,7 @@ function Param(
 	pa = Param(acqsrc, acqgeom, attrib_mod, attrib_inv, 
 	      modm, modm0, modi, mod_inv_parameterization,
 	      zeros(2,2), # dummy, update mprecon later
-	      Data.TD_zeros(nfield,tgrid,acqgeom), dobs, 
+	      Data.TD_zeros(nfield,tgrid,acqgeom), dobs, dprecon, 
 	      Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, nfield, acqgeom), verbose, attrib)
 
 	# some allocations for modelling
@@ -234,7 +250,6 @@ function xfwi!(pa::Param; extended_trace::Bool=true, time_limit=Float64=2.0*60.,
 			       upper_x,
 			       Fminbox(); optimizer=LBFGS, iterations=iterations, # barrier function iterations
 				  #linesearch = Optim.LineSearches.morethuente!,
-					P=pa.mprecon,
 			     optimizer_o=Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
 		 			iterations = 2, store_trace = true, time_limit=time_limit,
 					extended_trace=extended_trace, show_trace = true))
@@ -382,7 +397,14 @@ function update_buffer!(
 		if(mprecon_flag)
 			Interpolation.interp_spray!(pa.modm.mgrid.x, pa.modm.mgrid.z, illum,
 			      pa.modi.mgrid.x, pa.modi.mgrid.z, illumi, :spray, :B2)
+
+			# use log to fix scaling of illum 
+			# (note that illum is not the exact diagonal of the Hessian matrix, so I am doing tricks here) 
+			# TODO: insert a factor here to control the amount of preconditioning
+			illumi = 1.0+log(illumi./minimum(illumi))
+
 			illumi = vcat(vec(illumi), vec(illumi))
+
 			length(illumi) == xfwi_ninv(pa) ? nothing : error("something went wrong with creating mprecon")
 			precon = spdiagm(illumi,(0),xfwi_ninv(pa), xfwi_ninv(pa))
 		else
@@ -408,7 +430,7 @@ function func_xfwi(x::Vector{Float64},  last_x::Vector{Float64},
 	Data.TDcoup!(dcalc, buffer1[1], pa.w, :s)
 
 	# compute misfit and δdcal
-	f, δdcal = Misfits.TD(dcalc, pa.dobs)
+	f, δdcal = Misfits.TD(dcalc, pa.dobs, pa.dprecon)
 	return f
 end
 
@@ -427,7 +449,7 @@ function grad_xfwi!(x::Vector{Float64}, storage::Vector{Float64},
 	Data.TDcoup!(δdcal, buffer1[1], pa.w, :s)
 
 	# compute gradient w.r.t. coupled calculated data
-	f, dcalc = Misfits.TD(δdcal, pa.dobs)
+	f, dcalc = Misfits.TD(δdcal, pa.dobs, pa.dprecon)
 
 	# compute gradient w.r.t. calculated data
 	Data.TDcoup!(dcalc, δdcal, pa.w, :r)
@@ -544,13 +566,21 @@ function Seismic_x!(
 		x[1:nznx] = copy(vec(Models.Seismic_get(modi,pa.parameterization[1])));
 		x[nznx+1:2*nznx] = copy(vec(Models.Seismic_get(modi,pa.parameterization[2])));
 
+		# apply preconditioner
+		x[:] =  copy(pa.mprecon * x)
+
 	elseif(flag == -1) # convert x to mod
+
 		nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx
 		modi.mgrid = deepcopy(pa.modi.mgrid); 
 		modi.vp0 = pa.modm.vp0; modi.vs0 = pa.modm.vs0; modi.ρ0 = pa.modm.ρ0;
+
+		# apply preconditioner 
+		Px = copy(pa.mprecon \ x)
+
 		# 1. re-parameterization on the inversion grid
-		Models.Seismic_reparameterize!(modi, reshape(x[1:nznx],pa.modi.mgrid.nz, pa.modi.mgrid.nx), 
-			     reshape(x[nznx+1:2*nznx],pa.modi.mgrid.nz,pa.modi.mgrid.nx), pa.parameterization)
+		Models.Seismic_reparameterize!(modi, reshape(Px[1:nznx],pa.modi.mgrid.nz, pa.modi.mgrid.nx), 
+			     reshape(Px[nznx+1:2*nznx],pa.modi.mgrid.nz,pa.modi.mgrid.nx), pa.parameterization)
 
 		# 2. interpolation from the inversion grid to the modelling grid
 		modm.mgrid = deepcopy(pa.modm.mgrid); 
@@ -576,6 +606,11 @@ function Seismic_xbound!(modi, lower_x, upper_x, pa)
 	lower_x[nznx+1:2*nznx] = copy(fill(χx2[1], nznx))
 	upper_x[1:nznx] = copy(fill(χx1[2], nznx))
 	upper_x[nznx+1:2*nznx] = copy(fill(χx2[2], nznx))
+
+	# apply preconditioner to the bounds as well
+	lower_x[:] =  copy(pa.mprecon * lower_x)
+	upper_x[:] =  copy(pa.mprecon * upper_x)
+
 end
 
 """
@@ -621,7 +656,18 @@ function Seismic_gx!(gmodm::Models.Seismic,
 		# 3. copy 
 		gx[1:nznx] = copy(g1);
 		gx[nznx+1:2*nznx] = copy(g2)
+
+		# modify gradient as mprecon is applied to the model vector 
+		gx[:] = copy(pa.mprecon \ gx)
+
 	elseif(flag == -1) # convert gx to mod
+		# this flag is only used while visuavalizing the gradient vector,
+		# the operations are not exact adjoint of flag==1
+
+		# apply preconditioner, commented as the gx to mod is inexact
+
+		#gx =  copy(pa.mprecon * gx)
+
 		# 1. chain rule depending on re-parameterization
 		#    and 
 		g1 = gx[1:nznx]; g2 = gx[nznx+1:2*nznx];
@@ -674,7 +720,7 @@ function func_Coupling(x::Vector{Float64}, last_x::Vector{Float64}, buffer1::Dat
 	end
 
 	# compute misfit and δdcal
-	f, δdcal = Misfits.TD(buffer1, pa.dobs)
+	f, δdcal = Misfits.TD(buffer1, pa.dobs, pa.dprecon)
 	return f
 end
 
@@ -697,7 +743,7 @@ function grad_Coupling!(x::Vector{Float64}, storage::Vector{Float64},
 		Data.TDcoup!(buffer1, pa.dcal, w, :s)
 	end
 
-	f, δdcal = Misfits.TD(buffer1, pa.dobs)
+	f, δdcal = Misfits.TD(buffer1, pa.dobs, pa.dprecon)
 
 	# allocate for w
 	gw = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.nfield, pa.w.acqgeom)
