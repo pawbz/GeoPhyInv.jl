@@ -12,45 +12,39 @@ Return n indices in order
 Cannot find a julia method which does, this.
 If a faster method is found, replace it later.
 """
-function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64=1)
-	# using enumerate to avoid indexing
-	min_i = 0
-	min_x = Inf
-	min_ip  = 0
-	min_xp = Inf
-	for (i, xi) in enumerate(x)
-		dist = abs(xi - val)
-		if dist < min_x
-			min_xp = min_x
-			min_ip = min_i
-			min_x = dist
-			min_i = i
-		end
-	end
-	if(n==2)
-		return sort([min_i, min_ip])
-	elseif(n==4)
-		i, j = sort([min_i, min_ip])
-		return [i-1, i, j, j+1]   # assumes regularly sampled array
-	else
-		return min_i
-	end
-end
-
-# slower version for large vectors
-#function indminn(x::AbstractVector{Float64}, n::Int64)
-#	((n >= 1) & (n <= length(x))) ? nothing : error("invalid n")
+#function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64=1)
+#	# using enumerate to avoid indexing
 #	ivec = [];
-#	xc = [];
-#	for i in 1:n
-#		ii = indmin(x);
-#		push!(ivec, ii)
-#		push!(xc, x[ii])
-#		x[ii] = typemax(Float64);
+#	for inn in 1:n
+#		min_i = 0
+#		min_x = Inf
+#		for (i, xi) in enumerate(x)
+#			dist = abs(xi - val)
+#			if ((dist < min_x) & (!(i in ivec)))
+#				min_x = dist
+#				min_i = i
+#			end
+#		end
+#		push!(ivec, min_i)
 #	end
-#	x[ivec] = xc
 #	return sort(ivec)
 #end
+
+# slower version for large vectors
+function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64)
+	xa =abs(x-val)
+	((n >= 1) & (n <= length(x))) ? nothing : error("invalid n")
+	ivec = [];
+	xc = [];
+	for i in 1:n
+		ii = indmin(xa);
+		push!(ivec, ii)
+		push!(xc, x[ii])
+		xa[ii] = typemax(Float64);
+	end
+	xa[ivec] = xc
+	return sort(ivec)
+end
 
 function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 					   xout::Vector{Float64}, yout::Vector{Float64},

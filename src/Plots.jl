@@ -1,8 +1,9 @@
 module Plots
 
-using PyCall, PyPlot
-import PyCall: @pyimport
-import PyPlot: pygui
+using PyCall
+using PyPlot
+#import PyCall: @pyimport
+#import PyPlot: pygui
 #@pyimport matplotlib2tikz
 import SIT.Acquisition
 import SIT.Grid
