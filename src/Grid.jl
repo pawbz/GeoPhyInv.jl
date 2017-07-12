@@ -85,7 +85,7 @@ function M2D(xmin::Float64, xmax::Float64,
 	)
 	x = [xx for xx in xmin:δx:xmax]
 	z = [zz for zz in zmin:δz:zmax]
-	nx = size(x,1); nz = size(x,1);
+	nx, nz = size(x,1), size(z,1);
 	return M2D(x, z, nx, nz, npml, x[2]-x[1], z[2]-z[1])
 end
 

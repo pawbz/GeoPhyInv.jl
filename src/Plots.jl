@@ -149,7 +149,9 @@ function Seismic(model::Models.Seismic;
 	#indices
 	ixmin = findfirst(model.mgrid.x, xlim[1]); ixmax = findfirst(model.mgrid.x, xlim[2])
 	izmin = findfirst(model.mgrid.z, zlim[1]); izmax = findfirst(model.mgrid.z, zlim[2])
-	subplot(121)
+	nrow = (model.mgrid.nx > model.mgrid.nz) ? 2 : 1
+	ncol = (model.mgrid.nx > model.mgrid.nz) ? 1 : 2
+	subplot(nrow,ncol,1)
 	ax = imshow(Models.χ(model.χvp[izmin:izmax,ixmin:ixmax],model.vp0,-1), 
 	     cmap="gray",
 	         extent=[model.mgrid.x[ixmin], 
@@ -158,7 +160,7 @@ function Seismic(model::Models.Seismic;
 		 ylabel(L"$z$ (m)");
 		 title(L"$v_p$")
 		 colorbar();
-	subplot(122)
+	subplot(nrow,ncol,2)
 	ax = imshow(Models.χ(model.χρ[izmin:izmax,ixmin:ixmax],model.ρ0,-1), 
 	     cmap="gray",
 	         extent=[model.mgrid.x[ixmin], 

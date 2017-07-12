@@ -13,7 +13,7 @@ the time-domain data as `Data.TD`.
 TODO: conversion to `TD`, currently the ouput is just a data matrix.
 """
 function readsu_data(;
-		     fname::AbstractString=""
+		     fname::AbstractString="", verbose::Bool=false
 		     )
 	isfile(fname) ? nothing : error("file does not exist")
 
@@ -24,8 +24,8 @@ function readsu_data(;
 	      fname, nt, nrecords); 
 	nt = nt[1]; nrecords = nrecords[1];
 
-	println("readsu_data: nt = ", string(nt))
-	println("readsu_data: nrecords = ", string(nrecords))
+	verbose ? println("readsu_data: nt = ", string(nt)) : nothing
+	verbose ? println("readsu_data: nrecords = ", string(nrecords)) : nothing
 	data = zeros(nt, nrecords);
 
 	# read data now 

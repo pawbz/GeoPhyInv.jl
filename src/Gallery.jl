@@ -34,7 +34,6 @@ function M2D(attrib::Symbol)
 end
 
 
-
 """
 Gallery of `M1D` grids.
 
@@ -120,17 +119,19 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 	elseif(attrib == :seismic_marmousi2_box1)
 		mgrid=Grid.M2D(8500.,9500., 1000., 2000.,5.,5.,40)
 		marm_box1=Models.Seismic_zeros(mgrid)
-		Models.Seismic_interp_spray!(Seismic(:seismic_marmousi2), marm_box1, :interp)
+		Models.Seismic_interp_spray!(Seismic(:seismic_marmousi2), marm_box1, :interp, :B1)
 		model= marm_box1
 	else
 		error("invalid attrib")
 	end
 	if(δ==0.0)
+		Models.print(model,string(attrib))
 		return model
 	elseif(δ > 0.0)
 		mgrid_out=Grid.M2D_resamp(model.mgrid,δ,δ,)
 		model_out=Models.Seismic_zeros(mgrid_out)
-		Models.Seismic_interp_spray!(model, model_out, :interp)
+		Models.Seismic_interp_spray!(model, model_out, :interp, :B1)
+		Models.print(model_out,string(attrib))
 		return model_out
 	else
 		error("invalid δ")
@@ -161,18 +162,20 @@ function Geom(mgrid::Grid.M2D, attrib::Symbol; nss=2, nr=2, rand_flags=[false, f
 	tquatx = (0.25*mgrid.x[1]+0.75*mgrid.x[end]); tquatz = (0.25*mgrid.z[1]+0.75*mgrid.z[end]) 
 	halfx = 0.5*(mgrid.x[1]+mgrid.x[end]);	halfz = 0.5*(mgrid.z[1]+mgrid.z[end]);
 	if(attrib == :xwell)
-		return Acquisition.Geom_fixed(otz, ntz, otx, otz, ntz, ntx, nss, nr, :vertical, :vertical, rand_flags)
+		geom=Acquisition.Geom_fixed(otz, ntz, otx, otz, ntz, ntx, nss, nr, :vertical, :vertical, rand_flags)
 	elseif(attrib == :surf)
-		return Acquisition.Geom_fixed(otx, ntx, otz, otx, ntx, otz, nss, nr, :horizontal, :horizontal, rand_flags)
+		geom=Acquisition.Geom_fixed(otx, ntx, otz, otx, ntx, otz, nss, nr, :horizontal, :horizontal, rand_flags)
 	elseif(attrib == :vsp)
-		return Acquisition.Geom_fixed(otx, ntx, otz, otz, ntz, otx, nss, nr, :horizontal, :vertical, rand_flags)
+		geom=Acquisition.Geom_fixed(otx, ntx, otz, otz, ntz, otx, nss, nr, :horizontal, :vertical, rand_flags)
 	elseif(attrib == :rvsp)
-		return Acquisition.Geom_fixed(otz, ntz, otx, otx, ntx, otz, nss, nr, :vertical, :horizontal, rand_flags)
+		geom=Acquisition.Geom_fixed(otz, ntz, otx, otx, ntx, otz, nss, nr, :vertical, :horizontal, rand_flags)
 	elseif(attrib == :downhole)
-		return Acquisition.Geom_fixed(quatz, otz, quatx, quatz, otz, quatx, nss, nr, :vertical, :vertical, rand_flags)
+		geom=Acquisition.Geom_fixed(quatz, otz, quatx, quatz, otz, quatx, nss, nr, :vertical, :vertical, rand_flags)
 	else
 		error("invalid attrib")
 	end
+	Acquisition.print(geom, string(attrib))
+	return geom
 end
 
 """

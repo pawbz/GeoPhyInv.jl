@@ -50,6 +50,28 @@ type Seismic
 end
 
 """
+Print information about `Seismic`
+"""
+function print(mod::Seismic, name::String="")
+	println("\tSeismic Model:\t",name)
+	println("\t> number of samples:\t","x\t",mod.mgrid.nx,"\tz\t",mod.mgrid.nz)
+	println("\t> vp bounds:\t","min\t",mod.vp0[1],"\tmax\t",mod.vp0[2])
+	println("\t> ρ bounds:\t","min\t",mod.ρ0[1],"\tmax\t",mod.ρ0[2])
+end
+
+function Seismic_adjust_bounds!(mod::Seismic)
+	for f in [:χvp, :χρ, :χvs]
+		f0 = Symbol((replace("$(f)", "χ", "")),0)
+		m = getfield(mod, f)
+		m0 = getfield(mod, f0)
+		mavg, mmin, mmax = mean(m), minimum(m), maximum(m)
+		b=χ([mmin-0.05, mmax+0.05], m0, -1) 
+		
+		setfield!(mod, f0, b)
+	end
+end
+
+"""
 Return `Seismic` with zeros everywhere;
 this method is used for preallocation.
 
@@ -392,15 +414,15 @@ function to resample in the model domain
 * `mod::Seismic` : model
 * `modi::Seismic` : model after interpolation
 """
-function Seismic_interp_spray!(mod::Seismic, mod_out::Seismic, attrib::Symbol)
+function Seismic_interp_spray!(mod::Seismic, mod_out::Seismic, attrib::Symbol, Battrib::Symbol=:B2 )
 
 	"loop over fields in `Seismic`"
 	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χvp,
-		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvp, attrib, :B2)
+		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvp, attrib)
 	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χvs,
-		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvs, attrib, :B2)
+		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvs, attrib)
 	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χρ,
-		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χρ, attrib, :B2)
+		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χρ, attrib)
 
 	mod_out.vp0 = copy(mod.vp0); mod_out.vs0 = copy(mod.vs0); 
 	mod_out.ρ0 = copy(mod.ρ0);

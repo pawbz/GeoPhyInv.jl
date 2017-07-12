@@ -12,6 +12,7 @@ module Acquisition
 import SIT.Grid
 import SIT.Models
 import SIT.Wavelets
+import SIT.DSP
 using Distributions
 
 """
@@ -54,6 +55,16 @@ type Geom
 		  ]) ? 
 		error("Geom construct") : new(sx, sz, rx, rz, nss, ns, nr)
 end # type
+
+"""
+Print information about `Geom`
+"""
+function print(geom::Geom, name::String="")
+	println("\tAcquisition Geometry:\t",name)
+	println("\t> number of supersources:\t",geom.nss)
+	println("\t> sources per supersource:\t","min\t",minimum(geom.ns[:]), "\tmax\t", maximum(geom.ns[:]))
+	println("\t> receivers per supersource:\t","min\t",minimum(geom.nr[:]), "\tmax\t", maximum(geom.nr[:]))
+end
 
 """
 Return some derived fields of `Geom`
@@ -256,7 +267,8 @@ of the angular offset are given by `θlim`
 * `nss::Int64=10` : number of supersources
 * `nr::Int64=10` : number receivers for each super source
 * `loc::Vector{Float64}=[0.,0.]` : location of origin
-* `rad::Float64=100.` : radius
+* `rad::Vector{Float64}=[100.,100.]` : radius for source and receiver circles
+  * `[0.,100.]` for sources at the center of circle
 * `θlim::Vector{Float64}=[0.,2*pi]` : range of angular offset between source and receiver
 
 
@@ -267,7 +279,7 @@ function Geom_circ(;
 		   nss::Int64=10,
 		   nr::Int64=10,
 		   loc::Vector{Float64}=[0.,0.],
-		   rad::Float64=100.,
+		   rad::Vector{Float64}=[100.,100.],
 		   θlim::Vector{Float64}=[0.,2*pi]
 	       )
 	rxall = fill(zeros(nr),nss)
@@ -277,10 +289,10 @@ function Geom_circ(;
 	δθr = abs((θlim[2] - θlim[1])) / nr;
 	for iss =1:nss
 		θs = (iss)*2.*pi / (nss);
-		sx[iss] = rad*cos(θs) + loc[2]
-		sz[iss] = rad*sin(θs) + loc[1]
-		rxall[iss] = [rad * cos(θs + θlim[1] + (ir-1)*δθr) + loc[2] for ir in 1:nr]
-		rzall[iss] = [rad * sin(θs + θlim[1] + (ir-1)*δθr) + loc[1] for ir in 1:nr]
+		sx[iss] = rad[1]*cos(θs) + loc[2]
+		sz[iss] = rad[1]*sin(θs) + loc[1]
+		rxall[iss] = [rad[2] * cos(θs + θlim[1] + (ir-1)*δθr) + loc[2] for ir in 1:nr]
+		rzall[iss] = [rad[2] * sin(θs + θlim[1] + (ir-1)*δθr) + loc[1] for ir in 1:nr]
 	end
 	sxall = [[sx[iss]] for iss=1:nss];
 	szall = [[sz[iss]] for iss=1:nss];
@@ -368,6 +380,21 @@ type Src
 	tgrid::Grid.M1D
 end
 
+"""
+Print information about `Src`
+"""
+function print(src::Src, name::String="")
+	println("\tSource Acquisition:\t",name)
+	println("\t> number of supersources:\t",src.nss)
+	println("\t> sources per supersource:\t","min\t",minimum(src.ns[:]), "\tmax\t", maximum(src.ns[:]))
+	freqmin = minimum([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:min) for i in 1:src.nss, j in 1:src.nfield])
+	freqmax = maximum([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:max) for i in 1:src.nss, j in 1:src.nfield])
+	freqpeak = mean([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:peak) for i in 1:src.nss, j in 1:src.nfield])
+	println("\t> frequency:\t","min\t",freqmin, "\tmax\t",freqmax,"\tpeak\t",freqpeak)
+	println("\t> time:\t","min\t",src.tgrid.x[1], "\tmax\t", src.tgrid.x[end])
+	println("\t> samples:\t",src.tgrid.nx)
+end
+
 
 """
 Constructor for `Src` data type.
@@ -396,6 +423,7 @@ end
 Constructor of `Src`, which is typical for a input model such that 
 the model has `nwav` wavelengths.
 
+# Arguments
 * `nwav::Int64=10` : number of wavelenghts in the model
 nwav
 """
@@ -408,21 +436,28 @@ function Src_fixed_mod(nss::Int64, ns::Int64, nfield::Int64, model::Models.Seism
 	vavg=Models.χ([mean(model.χvp)], model.vp0, -1)[1]
 
 	fqdom = vavg/λdom
-	println("\t choosing dominant frequency of Ricker as:\t",fqdom)
 
 	# maximum distance the wave travels
 	d = sqrt((x[1]-x[end]).^2+(z[1]-z[end]).^2)
 	
 	# use two-way maximum distance to get tmax
 	tmax=2.*d/vavg
-	δt=0.1*minimum([model.mgrid.δx, model.mgrid.δz])/Models.χ([(maximum(model.χvp))],model.vp0,-1)[1]
+
 	# choose sampling interval to obey max freq of source wavelet
+	δmin = minimum([model.mgrid.δx, model.mgrid.δz])
+	vpmax = model.vp0[2]
+	δt=0.5*δmin/vpmax
+
+	# check if δt is reasonable
+	#(δt > 0.1/fqdom) : error("decrease spatial sampling or nwav")
+
 	tgrid=Grid.M1D(0.0, tmax, δt)
 	wav = Wavelets.ricker(fqdom=fqdom, tgrid=tgrid);
-	println("\t maximum modelling time is:\t",tmax," sec (",tgrid.nx," samples)")
 
+	src=Src_fixed(nss, ns, nfield, wav, tgrid)
+	print(src)
 	# choose ricker waveletes of fdom
-	return Src_fixed(nss, ns, nfield, wav, tgrid)
+	return src
 end
 
 """
