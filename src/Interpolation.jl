@@ -1,28 +1,56 @@
 __precompile__()
 
-module Interpolation
 """
 ## TODO:
 * add dimension checks to interp_spray!
 Reference: https://www.ibiblio.org/e-notes/Splines/bezier.html
+"""
+module Interpolation
 
+"""
 Return n indices in order
 Cannot find a julia method which does, this.
 If a faster method is found, replace it later.
 """
-function indminn(x::Vector{Float64}, n::Int64)
-	((n >= 1) & (n <= length(x))) ? nothing : error("invalid n")
-	ivec = [];
-	xc = [];
-	for i in 1:n
-		ii = indmin(x);
-		push!(ivec, ii)
-		push!(xc, x[ii])
-		x[ii] = typemax(Float64);
+function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64=1)
+	# using enumerate to avoid indexing
+	min_i = 0
+	min_x = Inf
+	min_ip  = 0
+	min_xp = Inf
+	for (i, xi) in enumerate(x)
+		dist = abs(xi - val)
+		if dist < min_x
+			min_xp = min_x
+			min_ip = min_i
+			min_x = dist
+			min_i = i
+		end
 	end
-	x[ivec] = xc
-	return sort(ivec)
+	if(n==2)
+		return sort([min_i, min_ip])
+	elseif(n==4)
+		i, j = sort([min_i, min_ip])
+		return [i-1, i, j, j+1]   # assumes regularly sampled array
+	else
+		return min_i
+	end
 end
+
+# slower version for large vectors
+#function indminn(x::AbstractVector{Float64}, n::Int64)
+#	((n >= 1) & (n <= length(x))) ? nothing : error("invalid n")
+#	ivec = [];
+#	xc = [];
+#	for i in 1:n
+#		ii = indmin(x);
+#		push!(ivec, ii)
+#		push!(xc, x[ii])
+#		x[ii] = typemax(Float64);
+#	end
+#	x[ivec] = xc
+#	return sort(ivec)
+#end
 
 function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 					   xout::Vector{Float64}, yout::Vector{Float64},
@@ -45,12 +73,12 @@ function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 	yout[:] = zero(Float64);
 	if(attrib == :interp)
 		for i in eachindex(xout)
-			ivec=indminn(abs(xin-xout[i]), np);
+			ivec=indminn(xin,xout[i], np);
 			interp_func(view(xin, ivec), view(yin, ivec), view(xout, i), view(yout,i))
 		end
 	elseif(attrib == :spray)
 		for i in eachindex(xin)
-			ivec=indminn(abs(xout-xin[i]), np);
+			ivec=indminn(xout,xin[i], np);
 			spray_func(view(xout, ivec), view(yout,ivec),view(xin, i), view(yin, i))
 		end
 	end
@@ -79,14 +107,14 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 		# first along x
 		for iz in eachindex(zin)
 			for ix in eachindex(xout)
-				ivec=indminn(abs(xin-xout[ix]), np);
+				ivec=indminn(xin,xout[ix], np);
 				interp_func(view(xin, ivec), view(yin, iz,ivec), view(xout,ix), view(y_x,iz,ix))
 			end
 		end
 		# then along z
 		for ix in eachindex(xout)
 			for iz in eachindex(zout)
-				ivec=indminn(abs(zin-zout[iz]), np);
+				ivec=indminn(zin,zout[iz], np);
 				interp_func(view(zin, ivec), view(y_x, ivec,ix), view(zout,iz), view(yout,iz,ix))
 			end
 		end
@@ -95,14 +123,14 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 		# first along z
 		for ix in eachindex(xin)
 			for iz in eachindex(zin)
-				ivec=indminn(abs(zout-zin[iz]), np);
+				ivec=indminn(zout,zin[iz], np);
 				spray_func(view(zout, ivec), view(y_z,ivec,ix), view(zin ,iz), view(yin, iz,ix))
 			end
 		end
 		# then along x
 		for iz in eachindex(zout)
 			for ix in eachindex(xin)
-				ivec=indminn(abs(xout-xin[ix]), np);
+				ivec=indminn(xout,xin[ix], np);
 				spray_func(view(xout, ivec), view(yout,iz,ivec), view(xin, ix), view(y_z, iz,ix))
 			end
 		end
@@ -254,8 +282,8 @@ function get_spray_weights!(weights::AbstractArray{Float64}, denomI::AbstractArr
 			   mesh_x::Vector{Float64}, mesh_z::Vector{Float64}, xval::Float64, zval::Float64)
 
 
-	ix1[1], ix2[1] = indminn(abs(mesh_x-xval),2)
-	iz1[1], iz2[1] = indminn(abs(mesh_z-zval),2)
+	ix1[1], ix2[1] = indminn(mesh_x,xval,2)
+	iz1[1], iz2[1] = indminn(mesh_z,zval,2)
 	
 	denomI[1] = ((mesh_x[ix2[1]] - mesh_x[ix1[1]])*(mesh_z[iz2[1]] - mesh_z[iz1[1]]))^(-1.e0)
 	"for iz1, ix1"
@@ -277,8 +305,8 @@ function get_interpolate_weights!(weights::AbstractArray{Float64}, denomI::Abstr
 			   ix1::AbstractArray{Int64}, ix2::AbstractArray{Int64}, iz1::AbstractArray{Int64}, iz2::AbstractArray{Int64}, 
 			   mesh_x::Vector{Float64}, mesh_z::Vector{Float64}, xval::Float64, zval::Float64)
 
-	ix1[1], ix2[1]=indminn(abs(mesh_x-xval),2)
-	iz1[1], iz2[1]=indminn(abs(mesh_z-zval),2)
+	ix1[1], ix2[1] = indminn(mesh_x,xval,2)
+	iz1[1], iz2[1] = indminn(mesh_z,zval,2)
 
 	denomI[1] = ((mesh_x[ix2[1]] -mesh_x[ix1[1]])*(mesh_z[iz2[1]] - mesh_z[iz1[1]]))^(-1.e0)
 
