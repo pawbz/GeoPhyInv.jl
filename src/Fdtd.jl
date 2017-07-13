@@ -25,6 +25,10 @@ import SIT.DSP
 # + {\partial_z \vz}[\tph]  + \dt\sum_{0}^{\tzero}\sfo\right)
 # ```
 
+function initialize_boundary()
+
+end
+
 """
 ```math
 \alpha=2
@@ -108,11 +112,11 @@ Author: Pawan Bharadwaj
 	recv_nfield::Int64=1, 
 	TDout::Vector{Data.TD}=[Data.TD_zeros(recv_nfield,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags)) ],
 	backprop_flag::Int64=0,  
-	boundary::Array{Array{Float64,4},1}=[
-						zeros(3,model.mgrid.nx+6,tgridmod.nx,acqgeom[1].nss),
-						zeros(model.mgrid.nz+6,3,tgridmod.nx,acqgeom[1].nss),
-						zeros(3,model.mgrid.nx+6,tgridmod.nx,acqgeom[1].nss),
-						zeros(model.mgrid.nz+6,3,tgridmod.nx,acqgeom[1].nss)],
+	boundary::Array{DArray{Float64}}=[
+				      dzeros((3,model.mgrid.nx+6,tgridmod.nx,acqgeom[1].nss),[1,1,1,nworkers()]),
+				      dzeros((model.mgrid.nz+6,3,tgridmod.nx,acqgeom[1].nss),[1,1,1,nworkers()]),
+				      dzeros((3,model.mgrid.nx+6,tgridmod.nx,acqgeom[1].nss),[1,1,1,nworkers()]),
+				      dzeros((model.mgrid.nz+6,3,tgridmod.nx,acqgeom[1].nss),[1,1,1,nworkers()])],
 	initp::Array{Float64,4}=
 	        zeros(model.mgrid.nz+2*model.mgrid.npml,model.mgrid.nx+2*model.mgrid.npml,3,acqgeom[1].nss),
 	gmodel_flag=false,
@@ -194,30 +198,19 @@ Author: Pawan Bharadwaj
 	exmodel = Models.Seismic_pad_trun(model);
 	exmodel_pert = Models.Seismic_pad_trun(model_pert);
 
-	"""
-	create some aliases
-	"""
-	nx = exmodel.mgrid.nx
-	nz = exmodel.mgrid.nz
-	nxd = model.mgrid.nx
-	nzd = model.mgrid.nz
-	δx = exmodel.mgrid.δx
-	δz = exmodel.mgrid.δz
-	δx24I = (exmodel.mgrid.δx * 24.0)^(-1.0)
-	δxI = (exmodel.mgrid.δx)^(-1.0)
-	δz24I = (exmodel.mgrid.δz * 24.0)^(-1.0)
-	δzI = (exmodel.mgrid.δz)^(-1.0)
+	
+	#create some aliases
+	nx, nz = exmodel.mgrid.nx, exmodel.mgrid.nz
+	nxd, nzd = model.mgrid.nx, model.mgrid.nz
+	δx, δz = exmodel.mgrid.δx, exmodel.mgrid.δz
 	δt = tgridmod.δx 
-	δtI = (tgridmod.δx)^(-1.0)
 	tim_nt=tgridmod.nx
-	mesh_x=exmodel.mgrid.x
-	mesh_z=exmodel.mgrid.z
+	ibx0=model.mgrid.npml-2; ibx1=model.mgrid.nx+model.mgrid.npml+3
+	ibz0=model.mgrid.npml-2; ibz1=model.mgrid.nz+model.mgrid.npml+3
 
 	# records_output, shared array among different procs
 	recv_out = SharedArray(Float64, (tim_nt,recv_n,recv_nfield,npropwav,src_nseq))
 
-	# snap save
-	itsnaps = [indmin(abs(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
 
 	# gradient outputs
 	grad_modtt = SharedArray(Float64, (nz, nx, src_nseq))
@@ -228,26 +221,15 @@ Author: Pawan Bharadwaj
 	grad_modrrvz .= 0.0
 
 
-	# pml_variables
-	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax, 
-							       [any(abs_trbl .== :left), any(abs_trbl .== :right)])
-	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax,
-							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
-
-	# boundary coordinates
-	ibx0=model.mgrid.npml-2; ibx1=model.mgrid.nx+model.mgrid.npml+3
-	ibz0=model.mgrid.npml-2; ibz1=model.mgrid.nz+model.mgrid.npml+3
-
-	# for snap
-	isx0=model.mgrid.npml; isz0=model.mgrid.npml
-
-
+	
 	"saving boundary values for all super sources"
 	if(backprop_flag == 1)
 		btout = SharedArray(Float64,3,ibx1-ibx0+1,tim_nt,src_nseq)
 		brout = SharedArray(Float64,ibz1-ibz0+1,3,tim_nt,src_nseq)
 		bbout = SharedArray(Float64,3,ibx1-ibx0+1,tim_nt,src_nseq)
 		blout = SharedArray(Float64,ibz1-ibz0+1,3,tim_nt,src_nseq)
+	else # create some dummy to save memory
+		btout, brout, bbout, blout = SharedArray(Float64,1), SharedArray(Float64,1), SharedArray(Float64,1), SharedArray(Float64,1)
 	end
 
 	"p_out will save final snaps that can be used for time reversal"
@@ -258,6 +240,9 @@ Author: Pawan Bharadwaj
 		"saving illum"
 		illum_all = SharedArray(Float64, (nz, nx, src_nseq))
 		illum_all .= 0.0
+	else
+		# dummy to save memory
+		illum_all = SharedArray(Float64, 1)
 	end
 
 	snapsout = SharedArray(Float64, size(snaps))
@@ -282,8 +267,135 @@ Author: Pawan Bharadwaj
 	src_wav_mat = zeros(src_nsmul,src_nfield,npropwav,tim_nt,src_nseq)
 	fill_src_wav_mat!(src_wav_mat, acqsrc_uspos, src_flags)
 
+	# create ranges for each processor
+	chunks = procs(recv_out)
+	nchunk = length(chunks)
+	sseqvec = [round(Int, s) for s in linspace(0,src_nseq,nchunk+1)]
+
+	# all SharedArrays are input to this method
+	@sync begin
+		for (ip, p) in enumerate(chunks)
+			@async remotecall_wait(
+			  mod_per_proc!, p, sseqvec[ip]+1:sseqvec[ip+1], initp, boundary, p_out, 
+					       grad_modtt, grad_modrrvx, grad_modrrvz,
+					       recv_out, btout, brout, bbout, blout, 
+					       snapsout, illum_all,
+					       illum_flag, backprop_flag, gmodel_flag, verbose, recv_n, recv_nfield, npropwav, src_nsmul, 
+					       exmodel, model, tgridmod,
+					       acqgeom_uspos, acqgeom_urpos,
+					       modttI, modrrvx, modrrvz,
+				               vpmax, vpmin, freqmin, freqmax, 
+					       abs_trbl, tsnaps, src_wav_mat, src_nfield)
+		end
+	end
+
+	"check if recv_out is zeros"
+	isapprox(maximum(abs(recv_out)),0.0) && warn("recv_out are zeros")
+
+	"summing gradient over all the sources after truncation in PML"
+	grad_modtt_stack = Models.pad_trun(squeeze(sum(Array(grad_modtt),3),3),model.mgrid.npml,-1);
+	grad_modrrvx_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvx),3),3),model.mgrid.npml,-1);
+	grad_modrrvz_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvz),3),3),model.mgrid.npml,-1);
+
+	grad_modrr_stack = (grad_modrrvx_stack .+ grad_modrrvz_stack) .* (0.5)
+
+	for ix=2:size(grad_modrr_stack,2)-1
+		for iz=2:size(grad_modrr_stack,1)-1
+			@inbounds grad_modrr_stack[iz,ix+1] +=  0.5e0 * grad_modrrvx_stack[iz,ix]
+			@inbounds grad_modrr_stack[iz+1,ix] +=  0.5e0 * grad_modrrvz_stack[iz,ix]
+		end
+	end
+
+
+	# update gradient model using grad_modtt_stack, grad_modrr_stack
+	Models.Seismic_chainrule!(gmodel, model, 
+				     vec(Models.χg(grad_modtt_stack, Models.Seismic_get(model,:KI0),1)),
+				     vec(Models.χg(grad_modrr_stack, Models.Seismic_get(model,:ρI0),1)),
+				     [:χKI, :χρI], 1
+				     )
+	if(illum_flag)
+		# output illum_out
+		illum_out[:,:] = Models.pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)
+	end
+
+	snaps[:,:,:] = Array(snapsout)
+
+	# update TDout after forming a vector and resampling
+	ipropout=0;
+	for iprop in 1:npropwav
+		if(recv_flags[iprop] ≠ 0)
+			ipropout += 1
+			Data.TD_resamp!(
+			       Data.TD_urpos(
+			       recv_out[:,:,:,iprop,:],
+				recv_nfield,
+				tgridmod, acqgeom[iprop],
+				acqgeom_urpos[1].nr[1],
+				(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
+				), TDout[ipropout]) 
+		end
+	end
+
+	
+	# update initp and boundary outputs
+	if(backprop_flag==1)
+		initp .= Array(p_out) 
+		boundary[:]=[Array(btout), Array(brout), Array(bbout), Array(blout)]
+	end
+
+
+	# return data depending on the receiver flags
+	return TDout, boundary, initp, gmodel, snaps
+
+	# return without resampling for testing
+	#return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),
+	#		       tgridmod, acqgeom[1]) for iprop in 1:npropwav]
+end
+
+# modelling for each processor
+function mod_per_proc!(sseqvec::UnitRange{Int64}, initp::Array{Float64}, boundary::Array{Array{Float64,4},1}, p_out::SharedArray{Float64}, 
+		       grad_modtt::SharedArray{Float64}, grad_modrrvx::SharedArray{Float64}, grad_modrrvz::SharedArray{Float64},
+		       recv_out::SharedArray{Float64}, 
+		       btout::SharedArray{Float64}, brout::SharedArray{Float64}, bbout::SharedArray{Float64}, blout::SharedArray{Float64},
+		       snapsout::SharedArray{Float64}, illum_all::SharedArray{Float64},
+		       illum_flag::Bool, backprop_flag::Int64, gmodel_flag::Bool, verbose::Bool, 
+		       recv_n::Int64, recv_nfield::Int64, npropwav::Int64, src_nsmul::Int64, 
+		       exmodel::Models.Seismic, model::Models.Seismic, tgridmod::Grid.M1D, 
+		       acqgeom_uspos::Array{Acquisition.Geom}, acqgeom_urpos::Array{Acquisition.Geom}, 
+		       modttI::Array{Float64}, modrrvx::Array{Float64}, modrrvz::Array{Float64},
+		       vpmax::Float64, vpmin::Float64, freqmin::Float64, freqmax::Float64, 
+		       abs_trbl::Vector{Symbol}, tsnaps::Vector{Float64}, src_wav_mat::Array{Float64}, src_nfield::Int64
+		       )
+
+	#create some aliases
+	nx, nz = exmodel.mgrid.nx, exmodel.mgrid.nz
+	nxd, nzd = model.mgrid.nx, model.mgrid.nz
+	δx, δz = exmodel.mgrid.δx, exmodel.mgrid.δz
+	δx24I, δz24I = (δx * 24.0)^(-1.0), (δz * 24.0)^(-1.0)
+	δxI, δzI = (δx)^(-1.0), (δz)^(-1.0)
+	δt = tgridmod.δx 
+	δtI = (δt)^(-1.0)
+	tim_nt=tgridmod.nx
+	ibx0, ibz0=model.mgrid.npml-2, model.mgrid.npml-2 
+	ibx1, ibz1=model.mgrid.nx+model.mgrid.npml+3, model.mgrid.nz+model.mgrid.npml+3
+	mesh_x, mesh_z = exmodel.mgrid.x, exmodel.mgrid.z
+
+	# snap save
+	itsnaps = [indmin(abs(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
+
+	# pml_variables
+	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax, 
+							       [any(abs_trbl .== :left), any(abs_trbl .== :right)])
+	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax,
+							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
+
+
+	# for snap
+	isx0, isz0 =model.mgrid.npml, model.mgrid.npml
+
+
 	# source_loop
-	@sync @parallel for isseq = 1:src_nseq
+	for isseq in sseqvec
 
 		if(verbose)
 			println("modelling supershot:\t", isseq)
@@ -476,70 +588,7 @@ Author: Pawan Bharadwaj
 		end
 
 	end # source_loop
-
-	"check if recv_out is zeros"
-	isapprox(maximum(abs(recv_out)),0.0) && warn("recv_out are zeros")
-
-	"summing gradient over all the sources after truncation in PML"
-	grad_modtt_stack = Models.pad_trun(squeeze(sum(Array(grad_modtt),3),3),model.mgrid.npml,-1);
-	grad_modrrvx_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvx),3),3),model.mgrid.npml,-1);
-	grad_modrrvz_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvz),3),3),model.mgrid.npml,-1);
-
-	grad_modrr_stack = (grad_modrrvx_stack .+ grad_modrrvz_stack) .* (0.5)
-
-	for ix=2:size(grad_modrr_stack,2)-1
-		for iz=2:size(grad_modrr_stack,1)-1
-			@inbounds grad_modrr_stack[iz,ix+1] +=  0.5e0 * grad_modrrvx_stack[iz,ix]
-			@inbounds grad_modrr_stack[iz+1,ix] +=  0.5e0 * grad_modrrvz_stack[iz,ix]
-		end
-	end
-
-
-	# update gradient model using grad_modtt_stack, grad_modrr_stack
-	Models.Seismic_chainrule!(gmodel, model, 
-				     vec(Models.χg(grad_modtt_stack, Models.Seismic_get(model,:KI0),1)),
-				     vec(Models.χg(grad_modrr_stack, Models.Seismic_get(model,:ρI0),1)),
-				     [:χKI, :χρI], 1
-				     )
-	if(illum_flag)
-		# output illum_out
-		illum_out[:,:] = Models.pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)
-	end
-
-	snaps[:,:,:] = Array(snapsout)
-
-	# update TDout after forming a vector and resampling
-	ipropout=0;
-	for iprop in 1:npropwav
-		if(recv_flags[iprop] ≠ 0)
-			ipropout += 1
-			Data.TD_resamp!(
-			       Data.TD_urpos(
-			       recv_out[:,:,:,iprop,:],
-				recv_nfield,
-				tgridmod, acqgeom[iprop],
-				acqgeom_urpos[1].nr[1],
-				(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
-				), TDout[ipropout]) 
-		end
-	end
-
-	
-	# update initp and boundary outputs
-	if(backprop_flag==1)
-		initp .= Array(p_out) 
-		boundary[:]=[Array(btout), Array(brout), Array(bbout), Array(blout)]
-	end
-
-
-	# return data depending on the receiver flags
-	return TDout, boundary, initp, gmodel, snaps
-
-	# return without resampling for testing
-	#return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),
-	#		       tgridmod, acqgeom[1]) for iprop in 1:npropwav]
-end
-
+end # mod_per_shot
 
 
 @inline @inbounds @fastmath function add_source!( 
