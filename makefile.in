@@ -38,7 +38,7 @@ speedupflag=yes
 # use compiler optimizations
 #
 #
-blasflag=yes
+blasflag=no
 
 sacflag=no
 
@@ -47,7 +47,8 @@ staticflag=no
 doubleflag=yes
 
 #fftlib = -L/scratch/intelics/mkl/lib/intel64 -lfftw3_threads -lfftw3
-fftlib = -lfftw3 -lfftw3_threads
+#fftlib = -lfftw3 -lfftw3_threads
+fftlib = 
 #fftlib = -L/math/home/pawbz/fftw-3.3.5/lib -lfftw3_threads -lfftw3
 #fftlib = -L/math/home/pawbz/fftw-3.3.5/lib  -lfftw3
 ifeq ($(strip $(sacflag)),$(strip $(yes)))

@@ -152,11 +152,14 @@ Author: Pawan Bharadwaj
 	#        return
 	#endif
 
-	# all the propagating wavefield should have same sources, receivers, ? check that?
+	# all the propagating wavefields should have same supersources? check that?
 
 	# check dimension of model and model_pert
 
 	# check if all sources are receivers are inside model
+	any(![Acquisition.Geom_check(acqgeom[ip], model.mgrid) for ip=1:npropwav]) ? error("sources or receivers not inside model") : nothing
+
+
 
 	length(acqgeom) != npropwav ? error("acqgeom size") : nothing
 	length(acqsrc) != npropwav ? error("acqsrc size") : nothing

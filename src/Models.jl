@@ -418,11 +418,11 @@ function Seismic_interp_spray!(mod::Seismic, mod_out::Seismic, attrib::Symbol, B
 
 	"loop over fields in `Seismic`"
 	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χvp,
-		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvp, attrib)
+		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvp, attrib, Battrib)
 	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χvs,
-		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvs, attrib)
+		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvs, attrib, Battrib)
 	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χρ,
-		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χρ, attrib)
+		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χρ, attrib, Battrib)
 
 	mod_out.vp0 = copy(mod.vp0); mod_out.vs0 = copy(mod.vs0); 
 	mod_out.ρ0 = copy(mod.ρ0);

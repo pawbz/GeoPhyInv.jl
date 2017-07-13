@@ -12,39 +12,44 @@ Return n indices in order
 Cannot find a julia method which does, this.
 If a faster method is found, replace it later.
 """
-#function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64=1)
-#	# using enumerate to avoid indexing
-#	ivec = [];
-#	for inn in 1:n
-#		min_i = 0
-#		min_x = Inf
-#		for (i, xi) in enumerate(x)
-#			dist = abs(xi - val)
-#			if ((dist < min_x) & (!(i in ivec)))
-#				min_x = dist
-#				min_i = i
-#			end
-#		end
-#		push!(ivec, min_i)
-#	end
-#	return sort(ivec)
-#end
-
-# slower version for large vectors
-function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64)
-	xa =abs(x-val)
-	((n >= 1) & (n <= length(x))) ? nothing : error("invalid n")
-	ivec = [];
-	xc = [];
-	for i in 1:n
-		ii = indmin(xa);
-		push!(ivec, ii)
-		push!(xc, x[ii])
-		xa[ii] = typemax(Float64);
+function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64=1)
+	# using enumerate to avoid indexing
+	ivec = fill(0,n);
+	xc = zeros(n);
+	for inn in 1:n
+		min_i = 0
+		min_x = Inf
+		for (i, xi) in enumerate(x)
+			dist = abs(xi - val)
+			if ((dist < min_x))
+				min_x = dist
+				min_i = i
+				xc[]
+			end
+		end
+		xc[inn] = x[min_i]
+		x[min_i] = typemax(Float64)
+		ivec[inn] = min_i
 	end
-	xa[ivec] = xc
+	x[ivec] = xc
 	return sort(ivec)
 end
+
+## slower version for large vectors
+#function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64)
+#	xa =abs(x-val)
+#	((n >= 1) & (n <= length(x))) ? nothing : error("invalid n")
+#	ivec = [];
+#	xc = [];
+#	for i in 1:n
+#		ii = indmin(xa);
+#		push!(ivec, ii)
+#		push!(xc, x[ii])
+#		xa[ii] = typemax(Float64);
+#	end
+#	xa[ivec] = xc
+#	return sort(ivec)
+#end
 
 function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 					   xout::Vector{Float64}, yout::Vector{Float64},
@@ -66,12 +71,12 @@ function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 
 	yout[:] = zero(Float64);
 	if(attrib == :interp)
-		for i in eachindex(xout)
+		@simd for i in eachindex(xout)
 			ivec=indminn(xin,xout[i], np);
 			interp_func(view(xin, ivec), view(yin, ivec), view(xout, i), view(yout,i))
 		end
 	elseif(attrib == :spray)
-		for i in eachindex(xin)
+		@simd for i in eachindex(xin)
 			ivec=indminn(xout,xin[i], np);
 			spray_func(view(xout, ivec), view(yout,ivec),view(xin, i), view(yin, i))
 		end
@@ -99,15 +104,15 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 	if(attrib == :interp)
 		y_x=zeros(Float64, length(zin), length(xout))
 		# first along x
-		for iz in eachindex(zin)
-			for ix in eachindex(xout)
+		for ix in eachindex(xout)
+			@simd for iz in eachindex(zin)
 				ivec=indminn(xin,xout[ix], np);
 				interp_func(view(xin, ivec), view(yin, iz,ivec), view(xout,ix), view(y_x,iz,ix))
 			end
 		end
 		# then along z
 		for ix in eachindex(xout)
-			for iz in eachindex(zout)
+			@simd for iz in eachindex(zout)
 				ivec=indminn(zin,zout[iz], np);
 				interp_func(view(zin, ivec), view(y_x, ivec,ix), view(zout,iz), view(yout,iz,ix))
 			end
@@ -116,14 +121,14 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 		y_z = zeros(Float64, length(zout), length(xin))
 		# first along z
 		for ix in eachindex(xin)
-			for iz in eachindex(zin)
+			@simd for iz in eachindex(zin)
 				ivec=indminn(zout,zin[iz], np);
 				spray_func(view(zout, ivec), view(y_z,ivec,ix), view(zin ,iz), view(yin, iz,ix))
 			end
 		end
 		# then along x
-		for iz in eachindex(zout)
-			for ix in eachindex(xin)
+		for ix in eachindex(xin)
+			@simd for iz in eachindex(zout)
 				ivec=indminn(xout,xin[ix], np);
 				spray_func(view(xout, ivec), view(yout,iz,ivec), view(xin, ix), view(y_z, iz,ix))
 			end

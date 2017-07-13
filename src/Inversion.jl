@@ -680,6 +680,9 @@ function Seismic_gx!(gmodm::Models.Seismic,
 	end
 end
 
+"""
+Convert the data `TD` to `Src` after time reversal.
+"""
 function AdjSrc(δdat::Data.TD,
 	       )
 	adjacq = AdjGeom(δdat.acqgeom);
@@ -698,6 +701,9 @@ function AdjGeom(geomin::Acquisition.Geom)
 	geomout = deepcopy(geomin);
 	geomout.sx = geomin.rx; geomout.sz = geomin.rz;
 	geomout.ns = geomin.nr; 
+
+	geomout.rx = geomin.sx; geomout.rz = geomin.sz;
+	geomout.nr = geomin.ns; 
 
 	return geomout
 end

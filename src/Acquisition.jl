@@ -182,6 +182,30 @@ end
 
 
 """
+Check if all the sources and receivers in `Geom` are within the model 
+
+# Return
+
+* `true` if all the positions within the model, `false` otherwise
+"""
+function Geom_check(geom::Geom, mgrid::Grid.M2D)
+	xmin, zmin, xmax, zmax = mgrid.x[1], mgrid.z[1], mgrid.x[end], mgrid.z[end]
+
+
+	checkvec=fill(false, geom.nss)
+	for iss=1:geom.nss
+		checkvec[iss] = any(
+		      vcat(
+		     (((geom.sx[iss]-xmin).*(xmax-geom.sx[iss])) .< 0.0),
+		     (((geom.sz[iss]-zmin).*(zmax-geom.sz[iss])) .< 0.0),
+		     (((geom.rx[iss]-xmin).*(xmax-geom.rx[iss])) .< 0.0),
+		     (((geom.rz[iss]-zmin).*(zmax-geom.rz[iss])) .< 0.0),
+		     ) )
+	end
+	return !(any(checkvec))
+end
+
+"""
 A fixed spread acquisition has same set of sources and 
 receivers for each supersource.
 This method constructs a 
