@@ -1,6 +1,7 @@
 # Julia Modeling and Inversion Toolbox
 
 ## Installation
+* `Pkg.clone("https://github.com/pawbz/SIT.jl.git")` 
 
 
 [![Build Status](https://travis-ci.org/pawbz/SIT.jl.svg?branch=master)](https://travis-ci.org/pawbz/SIT.jl)
