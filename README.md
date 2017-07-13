@@ -1,4 +1,4 @@
-# SeismicInversionToolbox
+# Julia Modeling and Inversion Toolbox
 
 ## Installation
 
