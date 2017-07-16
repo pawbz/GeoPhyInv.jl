@@ -94,11 +94,6 @@ function TD_resamp!(data::TD, dataout::TD)
 end
 
 
-macro TD_fill(with)
-	return :( TD([$with(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],nfield,tgrid,acqgeom) )
-end
-
-
 """
 Method used to preallocate `TD` with zeros.
 
@@ -113,11 +108,11 @@ Method used to preallocate `TD` with zeros.
 * data with zeros as `TD`
 """
 function TD_zeros(nfield::Int64, tgrid::Grid.M1D, acqgeom::Acquisition.Geom)
-	return @TD_fill(zeros)
+	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],nfield,tgrid,acqgeom) 
 end
 "Same as `TD_zeros`, except for returning ones"
 function TD_ones(nfield::Int64, tgrid::Grid.M1D, acqgeom::Acquisition.Geom) 
-	return @TD_fill(ones)
+	return TD([ones(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],nfield,tgrid,acqgeom) 
 end
 
 
@@ -125,7 +120,7 @@ end
 Returns bool depending on if input `data::TD` has all zeros or not.
 """
 function TD_iszero(data::TD)
-	return maximum(broadcast(maximum,broadcast(abs,data.d))) == 0.0 ? true : false
+	return maximum(broadcast(maximum,abs,data.d)) == 0.0 ? true : false
 end
 
 """
@@ -196,6 +191,9 @@ end
 """
 Construct TD using data at all the unique receiver positions
 for all supersources.
+
+* `d::Array{Float64}` : the data matrix ordered in order such that time-domain modelling schemes are fast, i.e., [irec,ifield,it,nss]
+
 """
 function TD_urpos(d::Array{Float64}, 
 		   nfield::Int64, 
@@ -212,7 +210,7 @@ function TD_urpos(d::Array{Float64},
 		irr=find([[urpos[1][i]-acq.rz[iss][ir],
 		       urpos[2][i]-acq.rx[iss][ir]] == [0., 0.,] for i in 1:nur])
 
-		dout[iss, ifield][:,ir] = d[:,irr[1],ifield, iss] 
+		dout[iss, ifield][:,ir] = d[irr[1],ifield, :,iss] 
 	end
 
 	return TD(dout, nfield, tgrid, acq)

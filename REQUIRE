@@ -7,3 +7,4 @@ MultivariateStats
 Distributions
 Interpolations
 DSP
+DistributedArrays

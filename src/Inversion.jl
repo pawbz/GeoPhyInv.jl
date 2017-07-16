@@ -24,6 +24,7 @@ import SIT.Coupling
 import SIT.Misfits
 import SIT.Fdtd
 using Optim
+using DistributedArrays
 
 
 """
@@ -142,12 +143,12 @@ function Param(
 	      Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, nfield, acqgeom), verbose, attrib)
 
 	# some allocations for modelling
-	buffer1, buffer2, buffer3 = update_buffer_zeros(pa)
+	buffer1, buffer2 = update_buffer_zeros(pa)
 	x = zeros(xfwi_ninv(pa)); # dummy
 	last_x = rand(size(x)) # dummy last_x
 
 	# intial modelling dcal
-	pa.mprecon = update_buffer!(buffer1, buffer2, buffer3, x, last_x, pa, pa.modm, mprecon_flag=mprecon_flag) # x is dummy here, since actually using pa.modm
+	pa.mprecon = update_buffer!(buffer1, buffer2, x, last_x, pa, pa.modm, mprecon_flag=mprecon_flag) # x is dummy here, since actually using pa.modm
 	pa.dcal = deepcopy(buffer1[1])
 
 
@@ -156,7 +157,7 @@ function Param(
 		# change source wavelets for modelling observed data
 		pa.acqsrc = deepcopy(acqsrc_obs)
 		last_x = rand(size(x)) # reset last_x
-		update_buffer!(buffer1, buffer2, buffer3, x, last_x, pa, modm_obs) # x is dummy here
+		update_buffer!(buffer1, buffer2, x, last_x, pa, modm_obs) # x is dummy here
 		pa.dobs = deepcopy(buffer1[1])
 		# change back the source wavelets
 		pa.acqsrc = deepcopy(acqsrc)
@@ -212,14 +213,14 @@ package.
   * `=:migr` return gradient at the first iteration, i.e., a migration image
   * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
 """
-function xfwi!(pa::Param; extended_trace::Bool=true, time_limit=Float64=2.0*60., iterations::Int64=5, f_tol::Float64=1e-3, g_tol::Float64=1e-3, x_tol::Float64=1e-3)
+function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60., iterations::Int64=5, f_tol::Float64=1e-3, g_tol::Float64=1e-3, x_tol::Float64=1e-3)
 
 	# convert initial model to the inversion variable
 	x = zeros(xfwi_ninv(pa));
 	last_x = similar(x)
 	pa.verbose ? println("xfwi: number of inversion variables:\t", length(x)) : nothing
 
-	buffer1, buffer2, buffer3 = update_buffer_zeros(pa)
+	buffer1, buffer2 = update_buffer_zeros(pa)
 
 	last_x = rand(size(x)) # reset last_x
 	modi = Models.Seismic_zeros(pa.modi.mgrid);
@@ -231,8 +232,8 @@ function xfwi!(pa::Param; extended_trace::Bool=true, time_limit=Float64=2.0*60.,
 	Seismic_xbound!(modi, lower_x, upper_x, pa)
 
 	if(pa.attrib_inv == :cls)
-		df = OnceDifferentiable(x -> func_xfwi(x, last_x,  buffer1, buffer2, buffer3, pa),
-			  (x, storage) -> grad_xfwi!(x, storage, last_x, buffer1, buffer2, buffer3, pa))
+		df = OnceDifferentiable(x -> func_xfwi(x, last_x,  buffer1, buffer2, pa),
+			  (x, storage) -> grad_xfwi!(x, storage, last_x, buffer1, buffer2, pa))
 		"""
 		Unbounded LBFGS inversion, only for testing
 		"""
@@ -282,8 +283,8 @@ function xfwi!(pa::Param; extended_trace::Bool=true, time_limit=Float64=2.0*60.,
 			return modm, modi, res
 		end
 	elseif(pa.attrib_inv == :migr)
-		df = OnceDifferentiable(x -> func_xfwi(x, last_x, buffer1, buffer2, buffer3, pa),
-			  (x, storage) -> grad_xfwi!(x, storage, last_x, buffer1, buffer2, buffer3, pa))
+		df = OnceDifferentiable(x -> func_xfwi(x, last_x, buffer1, buffer2, pa),
+			  (x, storage) -> grad_xfwi!(x, storage, last_x, buffer1, buffer2, pa))
 		res = optimize(df, x, ConjugateGradient(), Optim.Options(iterations = 0,
 			      extended_trace=true, store_trace = true,
 		       show_trace = false))
@@ -298,7 +299,7 @@ function xfwi!(pa::Param; extended_trace::Bool=true, time_limit=Float64=2.0*60.,
 	elseif(pa.attrib_inv == :migr_finite_difference)
 
 		gx = similar(x);
-		gx = finite_difference!(x -> func_xfwi(x, last_x, buffer1, buffer2, buffer3, pa), x, gx, :central)
+		gx = finite_difference!(x -> func_xfwi(x, last_x, buffer1, buffer2, pa), x, gx, :central)
 
 		# convert gradient vector to model
 		gmodi = Models.Seismic_zeros(pa.modi.mgrid); 
@@ -318,12 +319,17 @@ function update_buffer_zeros(pa::Param)
 	nz = pa.modm.mgrid.nz+2*pa.modm.mgrid.npml
 
 	# allocate buffer
+
 	return ([Data.TD_zeros(1, pa.dcal.tgrid, pa.acqgeom)],
-						[zeros(3,pa.modm.mgrid.nx+6,pa.dcal.tgrid.nx,pa.acqgeom.nss),
-						zeros(pa.modm.mgrid.nz+6,3,pa.dcal.tgrid.nx,pa.acqgeom.nss),
-						zeros(3,pa.modm.mgrid.nx+6,pa.dcal.tgrid.nx,pa.acqgeom.nss),
-						zeros(pa.modm.mgrid.nz+6,3,pa.dcal.tgrid.nx,pa.acqgeom.nss)],
-		   zeros(nz,nx,3,pa.acqgeom.nss)) 
+		 DArray((pa.acqgeom.nss,), workers(), [nworkers()]) do I
+					    [[ 
+	    					zeros(3,pa.modm.mgrid.nx+6,pa.dcal.tgrid.nx),
+						zeros(pa.modm.mgrid.nz+6,3,pa.dcal.tgrid.nx),
+						zeros(3,pa.modm.mgrid.nx+6,pa.dcal.tgrid.nx),
+						zeros(pa.modm.mgrid.nz+6,3,pa.dcal.tgrid.nx),
+						zeros(nz,nx,3)
+								] for iss in 1:pa.acqgeom.nss]
+					    end)
 end
 
 
@@ -340,8 +346,7 @@ and boundary values for adjoint calculation.
 """
 function update_buffer!(
 			buffer1::Array{Data.TD,1},
-			buffer2::Array{Array{Float64,4},1},
-			buffer3::Array{Float64,4},
+			buffer2,
 			x::Vector{Float64},
 			last_x::Vector{Float64}, 
 			pa::Param,
@@ -366,9 +371,9 @@ function update_buffer!(
 		if(pa.attrib_mod == :fdtd)
 			Fdtd.mod!(model=model, acqgeom=[pa.acqgeom], 
 			    acqsrc=[pa.acqsrc],src_flags=[2], 
-			    TDout=buffer1,illum_out=illum, illum_flag=mprecon_flag,
+			    TDout=buffer1,illum=illum, illum_flag=mprecon_flag,
 			    backprop_flag=1,
-			    boundary=buffer2, initp=buffer3,
+			    boundary=buffer2, 
 			    tgridmod=pa.dcal.tgrid) 
 		elseif(pa.attrib_mod == :fdtd_born)
 			buffer[1], buffer[2], buffer[3] = Fdtd.mod(npropwav=2, model=pa.modm0, model_pert=model, 
@@ -419,11 +424,10 @@ Return functional and gradient of the CLS objective
 """
 function func_xfwi(x::Vector{Float64},  last_x::Vector{Float64},
 	      buffer1::Array{Data.TD,1},
-	      buffer2::Array{Array{Float64,4},1},
-	      buffer3::Array{Float64,4},
+	      buffer2,
 	      pa::Param)
 	pa.verbose ? println("computing functional...") : nothing
-	update_buffer!(buffer1, buffer2, buffer3, x, last_x,  pa)
+	update_buffer!(buffer1, buffer2, x, last_x,  pa)
 
 	# apply coupling to the modeled data
 	dcalc = deepcopy(buffer1[1]);
@@ -437,12 +441,11 @@ end
 function grad_xfwi!(x::Vector{Float64}, storage::Vector{Float64}, 
 	       last_x::Vector{Float64}, 
 	       buffer1::Array{Data.TD,1},
-	       buffer2::Array{Array{Float64,4},1},
-	       buffer3::Array{Float64,4},
+	       buffer2,
 	       pa::Param)
 
 	pa.verbose ? println("computing gradient...") : nothing
-	update_buffer!(buffer1, buffer2, buffer3, x, last_x, pa)
+	update_buffer!(buffer1, buffer2, x, last_x, pa)
 
 	# apply coupling to the modeled data
 	δdcal = deepcopy(buffer1[1]);
@@ -473,7 +476,7 @@ function grad_xfwi!(x::Vector{Float64}, storage::Vector{Float64},
 		Fdtd.mod!(npropwav=2, model=modm,
 	        	acqgeom=[pa.acqgeom, adjacq], acqsrc=[pa.acqsrc, adjsrc], src_flags=[3, 2],
 			backprop_flag=-1, boundary=buffer2, 
-			initp=buffer3, gmodel=gmodel, 
+			gmodel=gmodel, 
 			tgridmod=pa.dobs.tgrid, gmodel_flag=true, verbose=false)
 
 	elseif(pa.attrib_mod == :fdtd_born)

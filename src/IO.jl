@@ -33,7 +33,7 @@ function readsu_data(;
 	      (Ptr{UInt8}, Ref{Int64}, Ref{Int64}, Ptr{Float64}),
 	      fname, nt, nrecords, data);
 
-	max(abs(data) == 0.0) && warn("readsu_data is zeros")
+	(maximum(abs, data) == 0.0) && warn("readsu_data is zeros")
 	return reshape(data, (nt, nrecords)), nt, nrecords
 end
 

@@ -183,7 +183,7 @@ function Seismic_reparameterize!(
 	if(attribs == [:χKI, :χρI]) 
 		ρ = (χ(x2, Seismic_get(mod, :ρI0), -1)).^(-1);
 		K = (χ(x1, Seismic_get(mod, :KI0), -1)).^(-1);
-		vp = sqrt((K ./ ρ));
+		vp = sqrt.((K ./ ρ));
 		mod.χvp = copy(χ(vp, mod.vp0, 1));
 		mod.χρ = copy(χ(ρ, mod.ρ0, 1));
 	else

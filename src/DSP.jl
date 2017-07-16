@@ -49,7 +49,7 @@ for iff in eachindex(fvec)
 	Sreal += X[iff] .* sinc(tmax.*(abs(fgrid.x - fgrid.x[ifvec[iff]])))
 end
 
-S = complex(Sreal, 0.0);
+S = complex.(Sreal, 0.0);
 
 # remove mean 
 #S[1] = 0.0; 
@@ -75,7 +75,7 @@ tnpow2grid = Grid.M1D_npow2(nfft, tgrid.δx);
 fnpow2grid = Grid.M1D_npow2_tf(tnpow2grid);
 
 cx = fill(complex(0.0,0.0),nfft);
-cx[1:tgrid.nx] = complex(x,0.0);
+cx[1:tgrid.nx] = complex.(x,0.0);
 
 cx = fft(cx);
 ax = real(cx.*conj(cx));
@@ -134,9 +134,9 @@ function fast_filt!{T<:Real}(
 	nx = (length(r) == length(s)) ? length(s) : error("x and y length")
 	np2 = nextpow2(maximum([2*length(s), 2*length(r), length(w)]));	
 		
-	rpow2=complex(zeros(T,np2), zeros(T,np2)); 
-	spow2=complex(zeros(T,np2), zeros(T,np2)); 
-	wpow2=complex(zeros(T,np2), zeros(T,np2));
+	rpow2=complex.(zeros(T,np2), zeros(T,np2)); 
+	spow2=complex.(zeros(T,np2), zeros(T,np2)); 
+	wpow2=complex.(zeros(T,np2), zeros(T,np2));
 	nlag_npow2_pad_truncate!(r, rpow2, nx-1, 0, np2, 1)
 	nlag_npow2_pad_truncate!(s, spow2, nx-1, 0, np2, 1)
 
@@ -195,12 +195,12 @@ function nlag_npow2_pad_truncate!{T<:Number}(
 		xpow2[1] = copy(x[nnlags+1]); # zero lag
 		# +ve lags
 		if (nplags > 0) 
-			xpow2[2:nplags+1] = copy(complex(x[nnlags+2:nnlags+1+nplags],T(0)))
+			xpow2[2:nplags+1] = copy(complex.(x[nnlags+2:nnlags+1+nplags],T(0)))
 		end
 		# -ve lags
 		if(nnlags != 0) 
 			for i=1:nnlags
-				xpow2[npow2-i+1] = copy(complex(x[nnlags+1-i],T(0)))
+				xpow2[npow2-i+1] = copy(complex.(x[nnlags+1-i],T(0)))
 			end
 		end
 		return xpow2

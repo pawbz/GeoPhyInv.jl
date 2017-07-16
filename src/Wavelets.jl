@@ -51,7 +51,7 @@ function ricker(;
 		end
 	end
 
-	isapprox(maximum(abs(wav)),0.0) && warn("wavelet is zeros")
+	isapprox(maximum(abs.(wav)),0.0) && warn("wavelet is zeros")
 
 	if(trim_tol != 0.0)
 		return wav[abs(wav).>=trim_tol]
