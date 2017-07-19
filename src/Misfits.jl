@@ -31,8 +31,12 @@ end
 Input the obeserved and modelled data to output the misfit
 and the adjoint sources
 TODO: 
+
+* `attrib::Symbol` : 
+  * `=:func`
+  * `=:funcgrad`
 """
-function TD(x::Data.TD, y::Data.TD, w::Data.TD=Data.TD_ones(x.nfield,x.tgrid,x.acqgeom))
+function TD!(x::Data.TD, y::Data.TD, w::Data.TD=Data.TD_ones(x.nfield,x.tgrid,x.acqgeom), attrib::Symbol=:func)
 
 	# check if x and y are similar
 	tgrid = x.tgrid;
@@ -40,31 +44,29 @@ function TD(x::Data.TD, y::Data.TD, w::Data.TD=Data.TD_ones(x.nfield,x.tgrid,x.a
 	nfield = x.nfield;
 	nss = acq.nss;
 
-	δx=Data.TD([zeros(tgrid.nx,acq.nr[iss]) for iss=1:nss, ifield=1:nfield],
-	      nfield,tgrid,acq)
-
 	f = 0.0;
 	for ifield=1:x.nfield, iss=1:acq.nss, ir=1:acq.nr[iss]
-		ft, δx.d[iss, ifield][:,ir] = fg_cls(x.d[iss, ifield][:,ir], y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir]);
+		ft = fg_cls!(view(x.d[iss, ifield],:,ir), y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir], attrib);
 		"multiplication with time sampling due to integration ?"
 		f += ft #* tgrid.δx;
 	end
 	f == 0.0 ? warn("misfit is zero") : nothing
 
 	# check for zeros
-	Data.TD_iszero(δx) ? error("δx cannot be zero") : nothing
+	(attrib==:grad) && Data.TD_iszero(x) && error("δx cannot be zero") 
 
-	return f, δx
+	return f
 end
 
 
-function fg_cls{N}(x::Array{Float64,N}, y::Array{Float64,N}, w::Array{Float64,N}=ones(x))
-	size(x) == size(y) ? nothing : error("size mismatch")
-	any(w .< 0.0) ? error("weights cannot be negative") : nothing
-	diff = x - y
-	f = sum(w .* (diff).^2)
-	δx = 2.0 .* w .* diff
-	return f, δx
+function fg_cls!{N}(x::AbstractArray{Float64,N}, y::Array{Float64,N}, w::Array{Float64,N}=ones(x), attrib::Symbol=:func)
+	(size(x) == size(y)) || error("size mismatch")
+	any(w .< 0.0) && error("weights cannot be negative") 
+	f = sum(w .* (x - y).^2)
+	if(attrib == :grad)
+		x[:] = 2.0 .* w[:] .* (x[:] - y[:])
+	end
+	return f
 end
 
 function fg_cls_conv(r, s, w)

@@ -16,7 +16,7 @@ k = wavenumber = 2pif/v0
 function G0_homo_acou{T<:AbstractFloat}(x::T, z::T, k::T, ρ0::T)
 	sqrt(x*x + z*z) == 0.0 ? error("distance cannot be zero") : nothing
 	k == 0.0 ? error("wavenumber cannot be zero") : nothing
-	G0 = -0.25 * ρ0 * im * complex(besselj0(k*sqrt(x*x + z*z)), -bessely0(k*sqrt(x*x + z*z)))
+	G0 = -0.25 * ρ0 * im * complex.(besselj0(k*sqrt(x*x + z*z)), -bessely0(k*sqrt(x*x + z*z)))
 	return G0
 end
 
@@ -73,8 +73,8 @@ function mod(;
 		for ir = 1:nr[iss]
 
 		dtemp=zeros(nt)
-		dpow2all=complex(zeros(np2), zeros(np2));
-		wpow2=complex(zeros(np2), zeros(np2)); 
+		dpow2all=complex.(zeros(np2), zeros(np2));
+		wpow2=complex.(zeros(np2), zeros(np2)); 
 		
 		for is=1:acqgeom.ns[iss]
 			# zero pad wavelet
@@ -84,35 +84,38 @@ function mod(;
 			x = sx[is] - rx[ir]
 			z = sz[is] - rz[ir]
 			# analytical expression for every frequency, except zero
-			dpow2 = complex(zeros(np2), zeros(np2)); 
-			dpow2[1] = complex(0.0, 0.0)
+			dpow2 = complex.(zeros(np2), zeros(np2)); 
+			dpow2[1] = complex.(0.0, 0.0)
 			for iω in 2:np2
 				ω = 2. * pi * abs(fnpow2grid.x[iω])
 				k = ω / vp0
 
 				if(born_flag)
+					term = complex(0., 0.)
 					for ix=1:nx
-						for iz=1:nz
+						@simd for iz=1:nz
 							if(δmodtt[iz,ix] ≠ 0.0)
-								dpow2[iω]+=G0_homo_acou(sx[is]-mesh_x[ix], sz[is]-mesh_z[iz], k, ρ0) * G0_homo_acou(rx[ir]-mesh_x[ix], rz[ir]-mesh_z[iz], k, ρ0) .* ω .* ω .* δmodtt[iz,ix] #* δx * δz
+								term += (G0_homo_acou(sx[is]-mesh_x[ix], sz[is]-mesh_z[iz], k, ρ0)[1] 
+									 * G0_homo_acou(rx[ir]-mesh_x[ix], rz[ir]-mesh_z[iz], k, ρ0)[1] .* ω .* ω .* δmodtt[iz,ix]) #* δx * δz
 							end
 						end
 					end
-				else
-					if(fnpow2grid.x[iω] > 0) 
-						term = G0_homo_acou(x, z, k, ρ0);
-					elseif(fnpow2grid.x[iω] < 0)
-						term = conj(G0_homo_acou(x, z, k, ρ0));
-					end
 
+				else
 					if(src_flag == 2)
-						dpow2[iω] = term 
+						term = G0_homo_acou(x, z, k, ρ0);
 					elseif(src_flag == 1)
-						dpow2[iω] = term * im * abs(fnpow2grid.x[iω])
+						dpow2[iω] = G0_homo_acou(x, z, k, ρ0) * im * abs(fnpow2grid.x[iω])
 					else
 						error("invalid src_flag")
 					end
 				end
+				if(fnpow2grid.x[iω] > 0) 
+					dpow2[iω] = term;
+				elseif(fnpow2grid.x[iω] < 0)
+					dpow2[iω] = conj(term);
+				end
+
 			end
 			# convolution and stack over simultaneous sources
 			dpow2all += dpow2 .* wpow2;

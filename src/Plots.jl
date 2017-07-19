@@ -80,7 +80,7 @@ Plot the source wavelet used for acquisition.
 * `acqsrc::Acquisition.Src` : source acquisition parameters
 """
 function Src(acqsrc::Acquisition.Src)
-	plot(acqsrc.tgrid.x, acqsrc.wav[1,1][:])
+	plot(acqsrc.tgrid.x, acqsrc.wav[1,1][:,:])
 end
 
 
@@ -90,43 +90,44 @@ end
 Plot time-domain data of type `Data.TD`
 
 # Arguments
-* `td::Data.TD` : time-domain data 
+* `td::Vector{Data.TD}` : time-domain data to be compared
 
 # Keyword Arguments
-* `ssvec::Vector{Int64}=[1]` : supersource vector to be plotted
+* `ssvec::Vector{Vector{Int64}}=fill([1], length(td))` : supersource vector to be plotted
 * `fieldvec::Vector{Int64}=[1]` : field vector to be plotted
 * `tr_flag::Bool=false` : plot time-reversed data when true
 * `attrib::Symbol=:wav` : specify type of plot
 """
-function TD(td::Data.TD; ssvec::Vector{Int64}=[1], fieldvec::Vector{Int64}=[1],
+function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(td)), 
+	    fieldvec::Vector{Int64}=[1],
 	    tr_flag::Bool=false, attrib::Symbol=:wav)
-	any(ssvec .> td.acqgeom.nss) ? error("invalid ssvec") : nothing	
 	nfield = length(fieldvec);
-	ns = length(ssvec);
-	nr = maximum(td.acqgeom.nr);
 
-	if(tr_flag)
-		dp = hcat(td.d[ssvec,fieldvec][end:-1:1,:]...);
-		extent=[1, nr*ns*nfield, td.tgrid.x[1],td.tgrid.x[end],]
-	else
-		dp = hcat(td.d[ssvec,fieldvec][:,:]...);
-		extent=[1, nr*ns*nfield, td.tgrid.x[end],td.tgrid.x[1],]
+	for id=1:length(td)
+		any(ssvec[id] .> td[id].acqgeom.nss) && error("invalid ssvec")
+		ns = length(ssvec[id]);
+		nr = maximum(td[id].acqgeom.nr);
+		if(tr_flag)
+			dp = hcat(td[id].d[ssvec[id],fieldvec][end:-1:1,:]...);
+			extent=[1, nr*ns*nfield, td[id].tgrid.x[1],td[id].tgrid.x[end],]
+		else
+			dp = hcat(td[id].d[ssvec[id],fieldvec][:,:]...);
+			extent=[1, nr*ns*nfield, td[id].tgrid.x[end],td[id].tgrid.x[1],]
+		end
+		if(attrib == :seis)
+			subplot(1,length(td),id)
+			imshow(dp, cmap="gray",aspect="auto", extent=extent)
+			title("common shot gather")
+			xlabel("receiver index");
+			ylabel(L"$t$ (s)");
+			colorbar();
+			tight_layout()
+		elseif(attrib == :wav)
+			plot(td[id].tgrid.x,dp)
+		else
+			error("invalid attrib")
+		end
 	end
-	if(attrib == :seis)
-		imshow(dp, cmap="gray",aspect="auto", extent=extent)
-		title("common shot gather")
-		xlabel("receiver index");
-		ylabel(L"$t$ (s)");
-		colorbar();
-		tight_layout()
-	elseif(attrib == :wav)
-		plot(td.tgrid.x,dp)
-	else
-		error("invalid attrib")
-	end
-
-
-
 end
 
 

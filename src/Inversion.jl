@@ -49,8 +49,12 @@ TODO: add an extra attribute for coupling functions inversion and modelling
 type Param
 	"base source wavelet"
 	acqsrc::Acquisition.Src
+	"adjoint source functions"
+	adjsrc::Acquisition.Src
 	"acquisition geometry"
 	acqgeom::Acquisition.Geom
+	"acquisition geometry for adjoint propagation"
+	adjacqgeom::Acquisition.Geom
 	"modeling attribute"
 	attrib_mod::Symbol
 	"inversion attribute"
@@ -61,10 +65,16 @@ type Param
 	modm0::Models.Seismic
 	"Seismic on inversion grid"
 	modi::Models.Seismic
+	"gradient Seismic model on modeling grid"
+	gmodm::Models.Seismic
+	"gradient Seismic on inversion grid"
+	gmodi::Models.Seismic
 	"parameterization"
 	parameterization::Vector{Symbol}
 	"model preconditioning"
 	mprecon::AbstractArray{Float64,2}
+	"calculated data after applying w"
+	wdcal::Data.TD
 	"calculated data"
 	dcal::Data.TD
 	"observed data"
@@ -75,6 +85,7 @@ type Param
 	w::Coupling.TD
 	verbose::Bool
 	attrib::Symbol
+	buffer::Any
 end
 
 
@@ -135,37 +146,47 @@ function Param(
 	modi = Models.Seismic_zeros(igrid);
 	Models.Seismic_interp_spray!(modm, modi, :interp)
 
+        # acqgeom geometry for adjoint propagation
+	adjacqgeom = AdjGeom(acqgeom)
 
-	pa = Param(acqsrc, acqgeom, attrib_mod, attrib_inv, 
-	      modm, modm0, modi, mod_inv_parameterization,
-	      zeros(2,2), # dummy, update mprecon later
-	      Data.TD_zeros(nfield,tgrid,acqgeom), dobs, dprecon, 
-	      Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, nfield, acqgeom), verbose, attrib)
+	pa = Param(acqsrc, 
+	     Acquisition.Src_zeros(adjacqgeom, nfield, tgrid),
+	     acqgeom, 
+	     adjacqgeom,
+	     attrib_mod, attrib_inv, 
+	     modm, modm0, modi, 
+	     Models.Seismic_zeros(modm.mgrid), 
+	     Models.Seismic_zeros(modi.mgrid), 
+	     mod_inv_parameterization,
+	     zeros(2,2), # dummy, update mprecon later
+	     Data.TD_zeros(nfield,tgrid,acqgeom), 
+	     Data.TD_zeros(nfield,tgrid,acqgeom), 
+	     dobs, dprecon, 
+	     Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, nfield, acqgeom), verbose, attrib,
+	     nothing)
 
-	# some allocations for modelling
-	buffer1, buffer2 = update_buffer_zeros(pa)
+	# buffer allocation
+	forward_simulation_allocate_buffer!(pa)
 	x = zeros(xfwi_ninv(pa)); # dummy
 	last_x = rand(size(x)) # dummy last_x
 
 	# intial modelling dcal
-	pa.mprecon = update_buffer!(buffer1, buffer2, x, last_x, pa, pa.modm, mprecon_flag=mprecon_flag) # x is dummy here, since actually using pa.modm
-	pa.dcal = deepcopy(buffer1[1])
+	illum = forward_simulation!(pa, modm=pa.modm, illum_out=mprecon_flag) # x is dummy here, since actually using pa.modm
 
+	# build precon based on illum
+	build_mprecon!(pa, illum)
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic) & Data.TD_iszero(pa.dobs))
 		# change source wavelets for modelling observed data
-		pa.acqsrc = deepcopy(acqsrc_obs)
-		last_x = rand(size(x)) # reset last_x
-		update_buffer!(buffer1, buffer2, x, last_x, pa, modm_obs) # x is dummy here
-		pa.dobs = deepcopy(buffer1[1])
-		# change back the source wavelets
-		pa.acqsrc = deepcopy(acqsrc)
+		forward_simulation!(pa, modm=modm_obs, acqsrc=acqsrc_obs, dcal=pa.dobs) # x is dummy here
 	elseif(Data.TD_iszero(pa.dobs) & (attrib == :real))
 		error("input observed data for real data inversion")
 	else
 		error("invalid attrib")
 	end
+
+
 
 	return pa
 end
@@ -220,7 +241,7 @@ function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60.
 	last_x = similar(x)
 	pa.verbose ? println("xfwi: number of inversion variables:\t", length(x)) : nothing
 
-	buffer1, buffer2 = update_buffer_zeros(pa)
+	forward_simulation_allocate_buffer!(pa)
 
 	last_x = rand(size(x)) # reset last_x
 	modi = Models.Seismic_zeros(pa.modi.mgrid);
@@ -232,8 +253,8 @@ function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60.
 	Seismic_xbound!(modi, lower_x, upper_x, pa)
 
 	if(pa.attrib_inv == :cls)
-		df = OnceDifferentiable(x -> func_xfwi(x, last_x,  buffer1, buffer2, pa),
-			  (x, storage) -> grad_xfwi!(x, storage, last_x, buffer1, buffer2, pa))
+		df = OnceDifferentiable(x -> func_xfwi(x, last_x,  pa),
+			  (storage, x) -> grad_xfwi!(storage, x, last_x, pa))
 		"""
 		Unbounded LBFGS inversion, only for testing
 		"""
@@ -274,17 +295,14 @@ function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60.
 		pa.modi.χvp[:,:] = modi[Optim.iterations(res)].χvp
 		pa.modi.χρ[:,:] = modi[Optim.iterations(res)].χρ
 	
-		# update dcal
-		pa.dcal.d = buffer1[1].d
-
 		if(extended_trace)
 			return modm, modi, gmodm, gmodi, res
 		else
 			return modm, modi, res
 		end
 	elseif(pa.attrib_inv == :migr)
-		df = OnceDifferentiable(x -> func_xfwi(x, last_x, buffer1, buffer2, pa),
-			  (x, storage) -> grad_xfwi!(x, storage, last_x, buffer1, buffer2, pa))
+		df = OnceDifferentiable(x -> func_xfwi(x, last_x,  pa),
+			  (storage, x) -> grad_xfwi!(storage, x, last_x,  pa))
 		res = optimize(df, x, ConjugateGradient(), Optim.Options(iterations = 0,
 			      extended_trace=true, store_trace = true,
 		       show_trace = false))
@@ -299,7 +317,7 @@ function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60.
 	elseif(pa.attrib_inv == :migr_finite_difference)
 
 		gx = similar(x);
-		gx = finite_difference!(x -> func_xfwi(x, last_x, buffer1, buffer2, pa), x, gx, :central)
+		gx = finite_difference!(x -> func_xfwi(x, last_x, pa), x, gx, :central)
 
 		# convert gradient vector to model
 		gmodi = Models.Seismic_zeros(pa.modi.mgrid); 
@@ -313,27 +331,21 @@ function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60.
 	end
 end
 
-"allocate buffer"
-function update_buffer_zeros(pa::Param)
-	nx = pa.modm.mgrid.nx+2*pa.modm.mgrid.npml
-	nz = pa.modm.mgrid.nz+2*pa.modm.mgrid.npml
-
-	# allocate buffer
-
-	return ([Data.TD_zeros(1, pa.dcal.tgrid, pa.acqgeom)],
-		 DArray((pa.acqgeom.nss,), workers(), [nworkers()]) do I
-					    [[ 
-	    					zeros(3,pa.modm.mgrid.nx+6,pa.dcal.tgrid.nx),
-						zeros(pa.modm.mgrid.nz+6,3,pa.dcal.tgrid.nx),
-						zeros(3,pa.modm.mgrid.nx+6,pa.dcal.tgrid.nx),
-						zeros(pa.modm.mgrid.nz+6,3,pa.dcal.tgrid.nx),
-						zeros(nz,nx,3)
-								] for iss in 1:pa.acqgeom.nss]
-					    end)
+"""
+Allocations necessary for forward simulations
+"""
+function forward_simulation_allocate_buffer!(pa::Param)
+	nx = pa.modm.mgrid.nx
+	nz = pa.modm.mgrid.nz
+	npml = pa.modm.mgrid.npml
+	pa.buffer = Fdtd.initialize_boundary(nx, nz, npml, pa.acqgeom.nss, pa.dcal.tgrid.nx) 
 end
 
 
 """
+Perform a forward simulation.
+This simulation is common for both functional and gradient calculation.
+During the computation of the gradient, we need an adjoint simulation.
 Update the buffer, which consists of the modelled data
 and boundary values for adjoint calculation.
 
@@ -344,26 +356,24 @@ and boundary values for adjoint calculation.
 * `pa::Param` : parameters that are constant during the inversion 
 * `modm::Models.Seismic` : 
 """
-function update_buffer!(
-			buffer1::Array{Data.TD,1},
-			buffer2,
-			x::Vector{Float64},
-			last_x::Vector{Float64}, 
+function forward_simulation!(
 			pa::Param,
-			modm::Models.Seismic=Models.Seismic_zeros(pa.modm.mgrid);
-			mprecon_flag::Bool=false
+			x::Vector{Float64}=zeros(xfwi_ninv(pa)),
+			last_x::Vector{Float64}=ones(xfwi_ninv(pa));
+			modm::Models.Seismic=Models.Seismic_zeros(pa.modm.mgrid),
+			acqsrc::Acquisition.Src=pa.acqsrc,
+			dcal::Data.TD=pa.dcal,
+			illum_out::Bool=false
 			   )
-	if(x!=last_x)
-		pa.verbose ? println("updating buffer") : nothing
+	if((x!=last_x) | !(Models.Seismic_iszero(modm)))
+		pa.verbose && println("updating buffer")
 		copy!(last_x, x)
 
 		if(Models.Seismic_iszero(modm))
-			# preallocate model and x --> mod;
-			model = Models.Seismic_zeros(pa.modm.mgrid); 
-			modi = Models.Seismic_zeros(pa.modi.mgrid); 
-			Seismic_x!(model, modi, x, pa, -1)		
+			Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
+			model = pa.modm
 		else
-			model = deepcopy(modm)
+			model = modm
 		end
 
 		illum=zeros(pa.modm.mgrid.nz, pa.modm.mgrid.nx)
@@ -371,15 +381,18 @@ function update_buffer!(
 		if(pa.attrib_mod == :fdtd)
 			Fdtd.mod!(model=model, acqgeom=[pa.acqgeom], 
 			    acqsrc=[pa.acqsrc],src_flags=[2], 
-			    TDout=buffer1,illum=illum, illum_flag=mprecon_flag,
+			    TDout=[dcal],illum=illum, illum_flag=illum_out,
 			    backprop_flag=1,
-			    boundary=buffer2, 
+			    boundary=pa.buffer, 
 			    tgridmod=pa.dcal.tgrid) 
 		elseif(pa.attrib_mod == :fdtd_born)
-			buffer[1], buffer[2], buffer[3] = Fdtd.mod(npropwav=2, model=pa.modm0, model_pert=model, 
-			      acqgeom=[pa.acqgeom,pa.acqgeom], acqsrc=[pa.acqsrc,pa.acqsrc], 
-			      src_flags=[2, 0], recv_flags = [0, 1], 
-			  tgridmod=pa.dcal.tgrid, verbose=false, boundary_save_flag=true, born_flag=true);
+			Fdtd.mod(born_flag=true,npropwav=2, model=pa.modm0, model_pert=model, 
+	    		    acqgeom=[pa.acqgeom,pa.acqgeom], acqsrc=[pa.acqsrc,pa.acqsrc], 
+			    TDout=buffer1, illum=illum, illum_flag=mprecon_flag,
+			    backprop_flag=1,
+			    boundary=buffer2,
+			    src_flags=[2, 0], recv_flags = [0, 1], 
+			    tgridmod=pa.dcal.tgrid);
 		elseif(pa.attrib_mod == :fdtd_hborn)
 			# storing boundary values 
 			hbuffer = Fdtd.mod(model=model, acqgeom=[pa.acqgeom], 
@@ -397,107 +410,97 @@ function update_buffer!(
 		else
 			error("invalid pa.attrib_mod")
 		end
-
-		illumi = zeros(pa.modi.mgrid.nz, pa.modi.mgrid.nx)
-		if(mprecon_flag)
-			Interpolation.interp_spray!(pa.modm.mgrid.x, pa.modm.mgrid.z, illum,
-			      pa.modi.mgrid.x, pa.modi.mgrid.z, illumi, :spray, :B2)
-
-			# use log to fix scaling of illum 
-			# (note that illum is not the exact diagonal of the Hessian matrix, so I am doing tricks here) 
-			# TODO: insert a factor here to control the amount of preconditioning
-			illumi = 1.0+log(illumi./minimum(illumi))
-
-			illumi = vcat(vec(illumi), vec(illumi))
-
-			length(illumi) == xfwi_ninv(pa) ? nothing : error("something went wrong with creating mprecon")
-			precon = spdiagm(illumi,(0),xfwi_ninv(pa), xfwi_ninv(pa))
-		else
-			precon = spdiagm(ones(xfwi_ninv(pa)),(0),xfwi_ninv(pa),xfwi_ninv(pa))
-		end
-		return precon
+		return illum
 	end
 end
+
+"build a model precon"
+function build_mprecon!(pa,illum::Array{Float64})
+
+	illumi = zeros(pa.modi.mgrid.nz, pa.modi.mgrid.nx)
+	if(maximum(abs, illum) != 0.0)
+		Interpolation.interp_spray!(pa.modm.mgrid.x, pa.modm.mgrid.z, illum,
+		      pa.modi.mgrid.x, pa.modi.mgrid.z, illumi, :spray, :B2)
+
+		# use log to fix scaling of illum 
+		# (note that illum is not the exact diagonal of the Hessian matrix, so I am doing tricks here) 
+		# TODO: insert a factor here to control the amount of preconditioning
+		illumi = 1.0+log.(illumi./minimum(illumi))
+
+		illumi = vcat(vec(illumi), vec(illumi))
+
+		length(illumi) == xfwi_ninv(pa) ? nothing : error("something went wrong with creating mprecon")
+		pa.mprecon = spdiagm(illumi,(0),xfwi_ninv(pa), xfwi_ninv(pa))
+	else
+		pa.mprecon = spdiagm(ones(xfwi_ninv(pa)),(0),xfwi_ninv(pa),xfwi_ninv(pa))
+	end
+end
+
 
 """
 Return functional and gradient of the CLS objective 
 """
-function func_xfwi(x::Vector{Float64},  last_x::Vector{Float64},
-	      buffer1::Array{Data.TD,1},
-	      buffer2,
-	      pa::Param)
-	pa.verbose ? println("computing functional...") : nothing
-	update_buffer!(buffer1, buffer2, x, last_x,  pa)
+function func_xfwi(x::Vector{Float64},  last_x::Vector{Float64}, pa::Param)
+
+	pa.verbose && println("computing functional...")
+
+	forward_simulation!(pa, x, last_x)
 
 	# apply coupling to the modeled data
-	dcalc = deepcopy(buffer1[1]);
-	Data.TDcoup!(dcalc, buffer1[1], pa.w, :s)
+	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
 
 	# compute misfit and δdcal
-	f, δdcal = Misfits.TD(dcalc, pa.dobs, pa.dprecon)
+	f = Misfits.TD!(pa.wdcal, pa.dobs, pa.dprecon, :func)
 	return f
 end
 
-function grad_xfwi!(x::Vector{Float64}, storage::Vector{Float64}, 
-	       last_x::Vector{Float64}, 
-	       buffer1::Array{Data.TD,1},
-	       buffer2,
-	       pa::Param)
+function grad_xfwi!(storage::Vector{Float64}, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 
-	pa.verbose ? println("computing gradient...") : nothing
-	update_buffer!(buffer1, buffer2, x, last_x, pa)
+	pa.verbose && println("computing gradient...")
+
+	forward_simulation!(pa, x, last_x)
 
 	# apply coupling to the modeled data
-	δdcal = deepcopy(buffer1[1]);
-	Data.TDcoup!(δdcal, buffer1[1], pa.w, :s)
+	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
 
 	# compute gradient w.r.t. coupled calculated data
-	f, dcalc = Misfits.TD(δdcal, pa.dobs, pa.dprecon)
+	f = Misfits.TD!(pa.wdcal, pa.dobs, pa.dprecon, :grad)
 
 	# compute gradient w.r.t. calculated data
-	Data.TDcoup!(dcalc, δdcal, pa.w, :r)
+	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :r)
 
-
-	# only compute if gradient necessary (saves time)
 	# adjoint sources
-	adjacq = AdjGeom(δdcal.acqgeom);
-	adjsrc = AdjSrc(δdcal)
+	update_adjsrc!(pa.dcal, pa)
 
-	# preallocate model
-	modm = Models.Seismic_zeros(pa.modm.mgrid)
-	modi = Models.Seismic_zeros(pa.modi.mgrid)
 	# x to model
-	Seismic_x!(modm, modi, x, pa, -1)		
+	Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
 
-	gmodel=Models.Seismic_zeros(pa.modm.mgrid)
 	
 	if(pa.attrib_mod == :fdtd)
 		# adjoint simulation
-		Fdtd.mod!(npropwav=2, model=modm,
-	        	acqgeom=[pa.acqgeom, adjacq], acqsrc=[pa.acqsrc, adjsrc], src_flags=[3, 2],
-			backprop_flag=-1, boundary=buffer2, 
-			gmodel=gmodel, 
-			tgridmod=pa.dobs.tgrid, gmodel_flag=true, verbose=false)
+		Fdtd.mod!(npropwav=2, model=pa.modm,
+	        	acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[3, 2],
+			backprop_flag=-1, boundary=pa.buffer, 
+			gmodel=pa.gmodm, 
+			tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
 
 	elseif(pa.attrib_mod == :fdtd_born)
 		
 		# adjoint simulation
 		adj = Fdtd.mod(npropwav=2, model=pa.modm0,  
-		     acqgeom=[pa.acqgeom,adjacq], acqsrc=[acqsrcsink, adjsrc], src_flags=[2.0, -2.0], 
+		     acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[acqsrcsink, adjsrc], src_flags=[2.0, -2.0], 
 		     tgridmod=pa.dobs.tgrid, gmodel_flag=true, boundary_in=buffer[2], verbose=false)
 
 	elseif(pa.attrib_mod == :fdtd_hborn)
 		# adjoint simulation
 		adj = Fdtd.mod(npropwav=2, model=pa.modm0, 
-		     acqgeom=[pa.acqgeom,adjacq], acqsrc=[pa.acqsrc, adjsrc], src_flags=[-2.0, -2.0], 
+		     acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, adjsrc], src_flags=[-2.0, -2.0], 
 		     tgridmod=pa.dobs.tgrid, grad_out_flag=true, verbose=false)
 	else
 		error("invalid pa.attrib_mod")
 	end
 
-	gmodi = Models.Seismic_zeros(pa.modi.mgrid);
-	# convert gradient model to gradient vector
-	Seismic_gx!(gmodel,modm,gmodi,modi,storage,pa,1) 
+	Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
 
 	return storage
 end # grad_xfwi!
@@ -515,10 +518,10 @@ function wfwi!(pa::Param)
 	# initial w to x
 	Coupling_x!(pa.w, x, pa, 1)
 
-	(Data.TD_iszero(pa.dcal)) ? error("dcal zero wfwi") : buffer1=deepcopy(pa.dcal)
+	(Data.TD_iszero(pa.dcal)) && error("dcal zero wfwi")
 
-	df = OnceDifferentiable(x -> func_Coupling(x, last_x, buffer1, pa),
-		  (x, storage) -> grad_Coupling!(x, storage, last_x, buffer1, pa))
+	df = OnceDifferentiable(x -> func_Coupling(x, last_x, pa),
+		  (storage, x) -> grad_Coupling!(storage, x, last_x, pa))
 	"""
 	Unbounded LBFGS inversion, only for testing
 	"""
@@ -686,11 +689,10 @@ end
 """
 Convert the data `TD` to `Src` after time reversal.
 """
-function AdjSrc(δdat::Data.TD,
-	       )
-	adjacq = AdjGeom(δdat.acqgeom);
-	return Acquisition.Src(adjacq.nss,adjacq.ns,δdat.nfield,
-			[(flipdim(δdat.d[i,j],1)) for i in 1:adjacq.nss, j in 1:δdat.nfield], δdat.tgrid);
+function update_adjsrc!(δdat::Data.TD, pa::Param)
+	for i in 1:pa.adjacqgeom.nss, j in 1:δdat.nfield
+		pa.adjsrc.wav[i,j] = (flipdim(δdat.d[i,j],1))
+	end
 end
 
 """
@@ -715,7 +717,7 @@ end
 """
 Return functional and gradient of the CLS objective 
 """
-function func_Coupling(x::Vector{Float64}, last_x::Vector{Float64}, buffer1::Data.TD, pa::Param)
+function func_Coupling(x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 	# allocate for w
 	w = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.nfield, pa.w.acqgeom)
 
@@ -725,18 +727,18 @@ function func_Coupling(x::Vector{Float64}, last_x::Vector{Float64}, buffer1::Dat
 	if(x!=last_x)
 		pa.verbose ? println("updating buffer") : nothing
 		copy!(last_x, x)
-		Data.TDcoup!(buffer1, pa.dcal, w, :s)
+		Data.TDcoup!(pa.wdcal, pa.dcal, w, :s)
 	end
 
 	# compute misfit and δdcal
-	f, δdcal = Misfits.TD(buffer1, pa.dobs, pa.dprecon)
+	f = Misfits.TD(pa.wdcal, pa.dobs, pa.dprecon)
 	return f
 end
 
 "There is a bug in gradient computation"
 function grad_Coupling!(x::Vector{Float64}, storage::Vector{Float64},
 			last_x::Vector{Float64}, 
-			buffer1::Data.TD, pa::Param)
+			pa::Param)
 
 	pa.verbose ? println("computing gradient...") : nothing
 
@@ -749,10 +751,10 @@ function grad_Coupling!(x::Vector{Float64}, storage::Vector{Float64},
 	if(x!=last_x)
 		pa.verbose ? println("updating buffer") : nothing
 		copy!(last_x, x)
-		Data.TDcoup!(buffer1, pa.dcal, w, :s)
+		Data.TDcoup!(pa.wdcal, pa.dcal, w, :s)
 	end
 
-	f, δdcal = Misfits.TD(buffer1, pa.dobs, pa.dprecon)
+	f = Misfits.TD(pa.wdcal, pa.dobs, pa.dprecon, :grad)
 
 	# allocate for w
 	gw = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.nfield, pa.w.acqgeom)

@@ -405,6 +405,14 @@ type Src
 end
 
 """
+Allocate `Src` with zeros depending on the acquisition geometry.
+"""
+function Src_zeros(acqgeom::Geom,  nfield::Int64, tgrid::Grid.M1D)
+	wavsrc = [zeros(tgrid.nx,acqgeom.ns[iss]) for iss=1:acqgeom.nss, ifield=1:nfield] 
+	return Src(acqgeom.nss, acqgeom.ns, nfield, wavsrc, tgrid)
+end
+
+"""
 Print information about `Src`
 """
 function print(src::Src, name::String="")

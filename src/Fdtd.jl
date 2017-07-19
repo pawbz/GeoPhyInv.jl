@@ -26,8 +26,15 @@ using DistributedArrays
 # + {\partial_z \vz}[\tph]  + \dt\sum_{0}^{\tzero}\sfo\right)
 # ```
 
-function initialize_boundary()
-
+function initialize_boundary(nx::Int64, nz::Int64, npml::Int64, nss::Int64, nt::Int64)
+	return DArray((nss,), workers(),[nworkers()]) do I
+	    			[[zeros(3,nx+6,nt),
+				  zeros(nz+6,3,nt),
+				  zeros(3,nx+6,nt),
+				  zeros(nz+6,3,nt),
+				  zeros(nz+2*npml,nx+2*npml,3)
+							    ] for is in 1:nss]
+				end
 end
 
 """
@@ -114,15 +121,7 @@ Author: Pawan Bharadwaj
 	TDout::Vector{Data.TD}=[Data.TD_zeros(recv_nfield,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags)) ],
 	backprop_flag::Int64=0,  
 	boundary::DistributedArrays.DArray{Array{Array{Float64,3},1},1,Array{Array{Array{Float64,3},1},1}}=
-			DArray((acqgeom[1].nss,), workers(),[nworkers()]) do I
-	    			[[
-				      zeros(3,model.mgrid.nx+6,tgridmod.nx),
-				      zeros(model.mgrid.nz+6,3,tgridmod.nx),
-				      zeros(3,model.mgrid.nx+6,tgridmod.nx),
-				      zeros(model.mgrid.nz+6,3,tgridmod.nx),
-				      zeros(model.mgrid.nz+2*model.mgrid.npml,model.mgrid.nx+2*model.mgrid.npml,3)
-				      					    ] for is in 1:acqgeom[1].nss]
-				end,
+			initialize_boundary(model.mgrid.nx, model.mgrid.nz, model.mgrid.npml, acqgeom[1].nss, tgridmod.nx),
 	gmodel_flag::Bool=false,
 	gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid),
 	illum_flag::Bool=false,
@@ -134,15 +133,15 @@ Author: Pawan Bharadwaj
 	)
 	
 
-	# check size TDout
-	length(TDout) == length(findn(recv_flags)) ? nothing : error("TDout dimension")
-
-	maximum(tgridmod.x) < maximum(acqsrc[1].tgrid.x) ? error("modeling time is less than source time") : nothing
-
-	any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)]) ? 
-				error("output time grid sampling finer than modeling") : nothing
-	any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod.x) for ip=1:length(TDout)]) ?
-	                        error("output time > modeling time") : nothing
+	# check sizes and errors based on input
+	(length(TDout) ≠ length(findn(recv_flags))) && error("TDout dimension")
+	(length(acqgeom) ≠ npropwav) && error("acqgeom dimension")
+	(length(acqsrc) ≠ npropwav) && error("acqsrc dimension")
+	(length(src_flags) ≠ npropwav) && error("src_flags dimension")
+	(length(recv_flags) ≠ npropwav) && error("recv_flags dimension")
+	(maximum(tgridmod.x) < maximum(acqsrc[1].tgrid.x)) && error("modeling time is less than source time")
+	(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
+	any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod.x) for ip=1:length(TDout)]) && error("output time > modeling time")
 
 	# find maximum and minimum frequencies in the source wavelets
 	freqmin = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
@@ -225,9 +224,9 @@ Author: Pawan Bharadwaj
 
 
 	"saving illum"
-	(illum_flag) ?	illum_all = dzeros((nz, nx, src_nseq), workers(), [1,1,nworkers()]) : illum_all = [0.0]
+	illum_all =  (illum_flag) ? dzeros((nz, nx, src_nseq), workers(), [1,1,nworkers()]) : [0.0]
 
-	(snaps_flag) ? snaps_out = dzeros(size(snaps), workers(), [1,1,1,nworkers()]) : snaps_out = [0.0]
+	snaps_out = (snaps_flag) ? dzeros(size(snaps), workers(), [1,1,1,nworkers()]) : [0.0]
 
 	"density values on vx and vz stagerred grids"
 	modrrvx = get_rhovxI(Models.Seismic_get(exmodel, :ρI))
@@ -235,13 +234,17 @@ Author: Pawan Bharadwaj
 
 	modttI = Models.Seismic_get(exmodel, :K) 
 	modtt = Models.Seismic_get(exmodel, :KI)
+
 	if(born_flag)
 		"inverse density contrasts for Born Modelling"
 		δmodrrvx = get_rhovxI(Models.Seismic_get(exmodel_pert, :ρI)) - get_rhovxI(Models.Seismic_get(exmodel, :ρI))
 		δmodrrvz = get_rhovzI(Models.Seismic_get(exmodel_pert, :ρI)) - get_rhovzI(Models.Seismic_get(exmodel, :ρI))
 		"inverse Bulk Modulus contrasts for Born Modelling"
 		δmodtt = Models.Seismic_get(exmodel_pert, :KI) - Models.Seismic_get(exmodel, :KI)
-		born_svalue_stack = zeros(δmodtt)
+		born_svalue_stack = dzeros((exmodel.mgrid.nz, exmodel.mgrid.nx, src_nseq), workers(), [1,1,nworkers()])
+	else
+		δmodtt, δmodrrvx, δmodrrvz = [0.0], [0.0], [0.0]
+		born_svalue_stack = [0.0]
 	end
 
 
@@ -263,7 +266,9 @@ Author: Pawan Bharadwaj
 					       acqgeom_uspos, acqgeom_urpos,
 					       modttI, modrrvx, modrrvz,
 				               vpmax, vpmin, freqmin, freqmax, 
-					       abs_trbl, tsnaps, src_wav_mat, src_nfield)
+					       abs_trbl, tsnaps, src_wav_mat, src_nfield, 
+					       born_flag,
+					       localpart(born_svalue_stack), δmodtt)
 			end
 		end
 	end
@@ -329,8 +334,9 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 		       acqgeom_uspos::Array{Acquisition.Geom}, acqgeom_urpos::Array{Acquisition.Geom}, 
 		       modttI::Array{Float64}, modrrvx::Array{Float64}, modrrvz::Array{Float64},
 		       vpmax::Float64, vpmin::Float64, freqmin::Float64, freqmax::Float64, 
-		       abs_trbl::Vector{Symbol}, tsnaps::Vector{Float64}, src_wav_mat::Array{Float64}, src_nfield::Int64
-		       )
+		       abs_trbl::Vector{Symbol}, tsnaps::Vector{Float64}, src_wav_mat::Array{Float64}, src_nfield::Int64,
+		       born_flag::Bool,
+		       born_svalue_stack::Array{Float64}, δmodtt::Array{Float64})
 
 	#create some aliases
 	nx, nz = exmodel.mgrid.nx, exmodel.mgrid.nz
@@ -408,14 +414,6 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 		memory_dp_dx=zeros(memory_dvx_dx)
 		memory_dp_dz=zeros(memory_dvx_dx)
 
-		"calling first time will be slow -- dummy advance with all zeros"
-		advance!(p, pp, ppp, dpdx, dpdz, memory_dp_dx, memory_dp_dz, memory_dvx_dx, memory_dvz_dz,
-				   modttI, modrrvx, modrrvz, 
-				   δx24I, δz24I, δt, nx, nz,
-				   a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI, 
-				   a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI)
-
-
 		# have to make a copy because using DArray inside time loop is very slow
 		if(backprop_flag ≠ 0)
 			btisseq = view(view(boundary, iisseq)[1],1)[1]
@@ -428,9 +426,6 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 			"initial conditions from boundary for first propagating field only"
 			p[:,:,:,1] = view(view(boundary, iisseq)[1],5)[1]
 		end
-
-		# private variable for snapshot
-		snapsisseq = zeros(nzd, nxd, length(itsnaps))
 
 		# time_loop
 		"""
@@ -457,6 +452,9 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 				δt::Float64, δxI::Float64, δzI::Float64
 				)
 
+			if(born_flag)
+				add_born_sources!(iisseq, p, pp, ppp, δmodtt, modttI, δtI, δt, born_svalue_stack, nx, nz, δxI, δzI)
+			end
 
 			# record boundaries
 			if(backprop_flag==1)
@@ -514,14 +512,6 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 			grad_modrrvx[:,:,iisseq] .*=  (δx * δz)
 			grad_modrrvz[:,:,iisseq] .*= (δx * δz)
 		end
-
-		# update boundary
-		#if(backprop_flag ==1)
-	#		boundary[iisseq][1] = btisseq
-#			boundary[iisseq][2] = brisseq
-#			boundary[iisseq][3] = bbisseq
-#			boundary[iisseq][4] = blisseq
-#		end
 
 	end # source_loop
 end # mod_per_shot
@@ -717,25 +707,27 @@ Need illumination to estimate the approximate diagonal of Hessian
 	end
 end
 
-function born_sources()
+function add_born_sources!(iisseq::Int64, p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64}, δmodtt::Array{Float64}, modttI::Array{Float64},
+			   δtI::Float64, δt::Float64, born_svalue_stack::Array{Float64}, 
+			   nx::Int64, nz::Int64, δxI::Float64, δzI::Float64)
 	# secondary sources for Born modeling
-	if(born_flag)
 	# adding born sources from pressure(:,:,1) to pressure(:,:,2)
+	# upto until [it-2]
+	# lambdaI scatterrer source term at [it-1]
+	# p is at [it], pp is at [it-1], ppp is at [it-2]
+	# dpdx is at [it-1] and dpdz is at [it-1]
+	# modrrvx scatterrer source term at [it-1]
+	# modrrvz scatterrer source term at [it-1]
+
 	for ix=3:nx-2
-	for iz=3:nz-2
+		@simd for iz=3:nz-2
 
-		# upto until [it-2]
-		# lambdaI scatterrer source term at [it-1]
-		# p is at [it], pp is at [it-1], ppp is at [it-2]
-		# dpdx is at [it-1] and dpdz is at [it-1]
-		# modrrvx scatterrer source term at [it-1]
-		# modrrvz scatterrer source term at [it-1]
-		born_svalue_stack[iz,ix] += δt * ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δmodtt[iz, ix] * δtI * δtI) )#+ (
-#							  (27.e0*dpdx[iz,ix,1,1] * δmodrrvx[iz,ix] -27.e0*dpdx[iz,ix-1,1,1] * δmodrrvx[iz,ix-1] -dpdx[iz,ix+1,1,1] * δmodrrvx[iz,ix+1] +dpdx[iz,ix-2,1,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) + (
-#							  (27.e0*dpdz[iz,ix,1,1] * δmodrrvz[iz,ix] -27.e0*dpdz[iz-1,ix,1,1] * δmodrrvz[iz-1,ix] -dpdz[iz+1,ix,1,1] * δmodrrvz[iz+1,ix] +dpdz[iz-2,ix,1,1] * δmodrrvz[iz-2,ix] ) * (δz24I)) ) 
+			@inbounds born_svalue_stack[iz,ix, iisseq] += 
+				δt * ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δmodtt[iz, ix] * δtI * δtI) )#+ (
+			  #(27.e0*dpdx[iz,ix,1,1] * δmodrrvx[iz,ix] -27.e0*dpdx[iz,ix-1,1,1] * δmodrrvx[iz,ix-1] -dpdx[iz,ix+1,1,1] * δmodrrvx[iz,ix+1] +dpdx[iz,ix-2,1,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) + (
+			  #(27.e0*dpdz[iz,ix,1,1] * δmodrrvz[iz,ix] -27.e0*dpdz[iz-1,ix,1,1] * δmodrrvz[iz-1,ix] -dpdz[iz+1,ix,1,1] * δmodrrvz[iz+1,ix] +dpdz[iz-2,ix,1,1] * δmodrrvz[iz-2,ix] ) * (δz24I)) ) 
 
-		p[iz,ix,1,2] += born_svalue_stack[iz,ix] * δt * δxI * δzI * modttI[iz,ix]  
-	end
+			@inbounds p[iz,ix,1,2] += born_svalue_stack[iz,ix, iisseq] * δt * δxI * δzI * modttI[iz,ix]  
 	end
 	end
 end

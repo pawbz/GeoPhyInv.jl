@@ -250,7 +250,9 @@ end
 1-D grid with a different sampling interval
 * Not yet implemented for npow2 grids
 """
-M1D_resamp(grid::M1D, δx::Float64) = M1D(grid.x[1], grid.x[end], δx)
+function M1D_resamp(grid::M1D, δx::Float64) 
+	return M1D(grid.x[1], grid.x[end], δx)
+end
 
 """
 1-D grid which is has a different size
