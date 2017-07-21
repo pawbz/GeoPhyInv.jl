@@ -11,17 +11,17 @@ model = SIT.Gallery.Seismic(:acou_homo1);
 tgrid = SIT.Gallery.M1D(:acou_homo1_long);
 
 #acqgeom = SIT.Gallery.Geom(:acou_homo1);
-acqgeom = SIT.Gallery.Geom(model.mgrid,:onetworandv);
+acqgeom = SIT.Gallery.Geom(model.mgrid,:surf);
 
 #src_n =2;
-acqsrc = SIT.Gallery.Src(:acou_homo1);
+acqsrc=SIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,1,model,3)
 
-@time rec1, b1, ii1, gg = SIT.Fdtd.mod!(model=model,  acqgeom=[acqgeom], acqsrc=[acqsrc], 
+@time rec1, b1,  gg = SIT.Fdtd.mod!(model=model,  acqgeom=[acqgeom], acqsrc=[acqsrc], 
 		     backprop_flag=1,
 		    tgridmod=tgrid, verbose=true, src_flags=[2], recv_flags=[2]);
 
-@time rec2, b2, ii2, gg = SIT.Fdtd.mod!( model=model, boundary=b1,
-		     backprop_flag=-1, initp=ii1,
+@time rec2, b2,  gg = SIT.Fdtd.mod!( model=model, boundary=b1,
+		     backprop_flag=-1,
 		    acqgeom=[acqgeom], acqsrc=[acqsrc], src_flags=[3], recv_flags=[1],
 			     tgridmod=tgrid, verbose=true);
 
@@ -30,7 +30,7 @@ acqsrc = SIT.Gallery.Src(:acou_homo1);
 # time reverse
 SIT.Data.TD_tr!(rec2[1]);
 # least-squares misfit
-err = SIT.Misfits.TD(rec1[1], rec2[1])
+err = SIT.Misfits.TD!(rec1[1], rec2[1])
 
 # normalization
 error = err[1]/SIT.Data.TD_dot(rec1[1], rec1[1])

@@ -2,6 +2,13 @@ __precompile__()
 
 module SIT
 
+#const depsfile = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
+#if isfile(depsfile)
+#	include(depsfile)
+#else
+#	error("SIT not properly installed. Please run Pkg.build(\"SIT\") then restart Julia.")
+#end
+
 # include modules (note: due to dependencies, order is important!)
 include("F90libs.jl")
 include("IO.jl")

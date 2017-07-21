@@ -8,7 +8,7 @@ import SIT.Models
 import SIT.Acquisition
 import SIT.Wavelets
 
-global marmousi_folder="/math/home/pawbz/marmousi2/"
+global marmousi_folder=joinpath(Pkg.dir("SIT"), "marmousi2")
 
 """
 Gallery of `M2D` grids.
@@ -86,9 +86,9 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 		      mgrid)
 
 	elseif(attrib == :seismic_marmousi2)
-		vp, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vp_marmousi-ii_0.1.su"))
-		vs, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vs_marmousi-ii_0.1.su"))
-		ρ, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"density_marmousi-ii_0.1.su"))
+		vp, h= IO.readsu(joinpath(marmousi_folder,"vp_marmousi-ii_0.1.su"))
+		vs, h= IO.readsu(joinpath(marmousi_folder,"vs_marmousi-ii_0.1.su"))
+		ρ,  h= IO.readsu(joinpath(marmousi_folder,"density_marmousi-ii_0.1.su"))
 		vp .*= 1000.; vs .*= 1000.; #ρ .*=1000
 		bound=0.1; vp0=zeros(2); vs0=zeros(2); ρ0=zeros(2);
 		boundvp=bound*mean(vp); boundvs=bound*mean(vs); boundρ=bound*mean(ρ);
@@ -98,12 +98,12 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 		vs0[2] = maximum(vs)+boundvs
 		ρ0[1] = ((minimum(ρ) - boundρ)<0.0) ? 0.0 : (minimum(ρ) - boundρ)
 		ρ0[2] = maximum(ρ)+boundρ
-		mgrid = Grid.M2D(0., 17000., 0., 3500.,nx,nz,40)
+		mgrid = Grid.M2D(0., 17000., 0., 3500.,size(vp,2),size(vp,1),40)
 		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
 	elseif(attrib == :seismic_marmousi2_high_res)
-		vp, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vp_marmousi-ii.su"))
-		vs, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"vs_marmousi-ii.su"))
-		ρ, nz, nx = IO.readsu_data(fname=string(marmousi_folder,"density_marmousi-ii.su"))
+		vp, h= IO.readsu(joinpath(marmousi_folder,"vp_marmousi-ii.su"))
+		vs, h= IO.readsu(joinpath(marmousi_folder,"vs_marmousi-ii.su"))
+		ρ,  h= IO.readsu(joinpath(marmousi_folder,"density_marmousi-ii.su"))
 		vp .*= 1000.; vs .*= 1000.; #ρ .*=1000
 		bound=0.1; vp0=zeros(2); vs0=zeros(2); ρ0=zeros(2);
 		boundvp=bound*mean(vp); boundvs=bound*mean(vs); boundρ=bound*mean(ρ);
@@ -113,7 +113,7 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 		vs0[2] = maximum(vs)+boundvs
 		ρ0[1] = ((minimum(ρ) - boundρ)<0.0) ? 0.0 : (minimum(ρ) - boundρ)
 		ρ0[2] = maximum(ρ)+boundρ
-		mgrid = Grid.M2D(0., 17000., 0., 3500.,nx,nz,40)
+		mgrid = Grid.M2D(0., 17000., 0., 3500.,size(vp,2),size(vp,1),40)
 		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
 
 	elseif(attrib == :seismic_marmousi2_box1)

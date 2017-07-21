@@ -100,7 +100,10 @@ Plot time-domain data of type `Data.TD`
 """
 function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(td)), 
 	    fieldvec::Vector{Int64}=[1],
-	    tr_flag::Bool=false, attrib::Symbol=:wav)
+	    tr_flag::Bool=false, attrib::Symbol=:wav, 
+	    wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
+	    bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
+	    )
 	nfield = length(fieldvec);
 
 	for id=1:length(td)
@@ -116,7 +119,7 @@ function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(t
 		end
 		if(attrib == :seis)
 			subplot(1,length(td),id)
-			imshow(dp, cmap="gray",aspect="auto", extent=extent)
+			imshow(dp, cmap="gray",aspect="auto", extent=extent, vmin=bclip[id], vmax=wclip[id])
 			title("common shot gather")
 			xlabel("receiver index");
 			ylabel(L"$t$ (s)");

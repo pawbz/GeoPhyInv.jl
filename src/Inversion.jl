@@ -81,6 +81,8 @@ type Param
 	dobs::Data.TD
 	"data preconditioning"
 	dprecon::Data.TD
+	"store temporary data"
+	dtemp::Vector{Data.TD}
 	"coupling functions"
 	w::Coupling.TD
 	verbose::Bool
@@ -162,16 +164,15 @@ function Param(
 	     Data.TD_zeros(nfield,tgrid,acqgeom), 
 	     Data.TD_zeros(nfield,tgrid,acqgeom), 
 	     dobs, dprecon, 
+	     [Data.TD_zeros(nfield,tgrid,acqgeom)], 
 	     Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, nfield, acqgeom), verbose, attrib,
 	     nothing)
 
 	# buffer allocation
 	forward_simulation_allocate_buffer!(pa)
-	x = zeros(xfwi_ninv(pa)); # dummy
-	last_x = rand(size(x)) # dummy last_x
 
 	# intial modelling dcal
-	illum = forward_simulation!(pa, modm=pa.modm, illum_out=mprecon_flag) # x is dummy here, since actually using pa.modm
+	illum = forward_simulation!(pa, modm=pa.modm, mattrib=:modm, illum_out=mprecon_flag) # x is dummy here, since actually using pa.modm
 
 	# build precon based on illum
 	build_mprecon!(pa, illum)
@@ -179,14 +180,12 @@ function Param(
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic) & Data.TD_iszero(pa.dobs))
 		# change source wavelets for modelling observed data
-		forward_simulation!(pa, modm=modm_obs, acqsrc=acqsrc_obs, dcal=pa.dobs) # x is dummy here
+		forward_simulation!(pa, modm=modm_obs, mattrib=:modm,acqsrc=acqsrc_obs, dattrib=:dobs) # x is dummy here
 	elseif(Data.TD_iszero(pa.dobs) & (attrib == :real))
 		error("input observed data for real data inversion")
 	else
 		error("invalid attrib")
 	end
-
-
 
 	return pa
 end
@@ -244,13 +243,12 @@ function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60.
 	forward_simulation_allocate_buffer!(pa)
 
 	last_x = rand(size(x)) # reset last_x
-	modi = Models.Seismic_zeros(pa.modi.mgrid);
-	# replace x and modi with initial model
-	Seismic_x!(pa.modm, modi, x, pa, 1)
+	# replace x and modi with initial model (pa.modm)
+	Seismic_x!(pa.modm, pa.modi, x, pa, 1)
 
 	# bounds
 	lower_x = similar(x); upper_x = similar(x);
-	Seismic_xbound!(modi, lower_x, upper_x, pa)
+	Seismic_xbound!(lower_x, upper_x, pa)
 
 	if(pa.attrib_inv == :cls)
 		df = OnceDifferentiable(x -> func_xfwi(x, last_x,  pa),
@@ -301,19 +299,14 @@ function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60.
 			return modm, modi, res
 		end
 	elseif(pa.attrib_inv == :migr)
-		df = OnceDifferentiable(x -> func_xfwi(x, last_x,  pa),
-			  (storage, x) -> grad_xfwi!(storage, x, last_x,  pa))
-		res = optimize(df, x, ConjugateGradient(), Optim.Options(iterations = 0,
-			      extended_trace=true, store_trace = true,
-		       show_trace = false))
+		storage = similar(x)
+		grad_xfwi!(storage, x, last_x,  pa)
 
 		# convert gradient vector to model
-		gmodi = Models.Seismic_zeros(pa.modi.mgrid); 
-		gmodm = Models.Seismic_zeros(pa.modm.mgrid); 
-		Seismic_gx!(gmodm,pa.modm,gmodi,modi,Optim.trace(res)[1].metadata["g(x)"],pa,-1)
-		println("maximum value of g(x):\t",  maximum(Optim.trace(res)[1].metadata["g(x)"]))
+		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage, pa,-1)
+		println("maximum value of g(x):\t",  maximum(storage))
 
-		return gmodi
+		return pa.gmodi
 	elseif(pa.attrib_inv == :migr_finite_difference)
 
 		gx = similar(x);
@@ -338,7 +331,7 @@ function forward_simulation_allocate_buffer!(pa::Param)
 	nx = pa.modm.mgrid.nx
 	nz = pa.modm.mgrid.nz
 	npml = pa.modm.mgrid.npml
-	pa.buffer = Fdtd.initialize_boundary(nx, nz, npml, pa.acqgeom.nss, pa.dcal.tgrid.nx) 
+	pa.buffer = (Fdtd.initialize_boundary(nx, nz, npml, pa.acqgeom.nss, pa.dcal.tgrid.nx))
 end
 
 
@@ -362,18 +355,22 @@ function forward_simulation!(
 			last_x::Vector{Float64}=ones(xfwi_ninv(pa));
 			modm::Models.Seismic=Models.Seismic_zeros(pa.modm.mgrid),
 			acqsrc::Acquisition.Src=pa.acqsrc,
-			dcal::Data.TD=pa.dcal,
+			mattrib::Symbol=:x,
+			dattrib::Symbol=:dcal,
 			illum_out::Bool=false
 			   )
-	if((x!=last_x) | !(Models.Seismic_iszero(modm)))
+	if(x!=last_x)
 		pa.verbose && println("updating buffer")
 		copy!(last_x, x)
 
-		if(Models.Seismic_iszero(modm))
+		if(mattrib == :x)
 			Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
 			model = pa.modm
-		else
+		elseif(mattrib == :modm)
+			(Models.Seismic_iszero(modm)) && error("need modm")
 			model = modm
+		else
+			error("invalid mattrib")
 		end
 
 		illum=zeros(pa.modm.mgrid.nz, pa.modm.mgrid.nx)
@@ -381,7 +378,7 @@ function forward_simulation!(
 		if(pa.attrib_mod == :fdtd)
 			Fdtd.mod!(model=model, acqgeom=[pa.acqgeom], 
 			    acqsrc=[pa.acqsrc],src_flags=[2], 
-			    TDout=[dcal],illum=illum, illum_flag=illum_out,
+			    TDout=pa.dtemp,illum=illum, illum_flag=illum_out,
 			    backprop_flag=1,
 			    boundary=pa.buffer, 
 			    tgridmod=pa.dcal.tgrid) 
@@ -410,6 +407,7 @@ function forward_simulation!(
 		else
 			error("invalid pa.attrib_mod")
 		end
+		setfield!(pa, dattrib, deepcopy(pa.dtemp[1]))
 		return illum
 	end
 end
@@ -600,12 +598,12 @@ end
 Return bound vectors for the `Seismic` model, 
 depeding on paramaterization
 """
-function Seismic_xbound!(modi, lower_x, upper_x, pa)
+function Seismic_xbound!(lower_x, upper_x, pa)
 	nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
 
-	x1=Models.Seismic_get(modi, Symbol((replace("$(pa.parameterization[1])", "χ", "")),0))
+	x1=Models.Seismic_get(pa.modi, Symbol((replace("$(pa.parameterization[1])", "χ", "")),0))
 	χx1 = Models.χ(x1,x1,1)
-	x2=Models.Seismic_get(modi, Symbol((replace("$(pa.parameterization[2])", "χ", "")),0))
+	x2=Models.Seismic_get(pa.modi, Symbol((replace("$(pa.parameterization[2])", "χ", "")),0))
 	χx2 = Models.χ(x2,x2,1)
 
 	lower_x[1:nznx] = copy(fill(χx1[1], nznx))

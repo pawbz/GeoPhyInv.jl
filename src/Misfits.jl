@@ -52,9 +52,6 @@ function TD!(x::Data.TD, y::Data.TD, w::Data.TD=Data.TD_ones(x.nfield,x.tgrid,x.
 	end
 	f == 0.0 ? warn("misfit is zero") : nothing
 
-	# check for zeros
-	(attrib==:grad) && Data.TD_iszero(x) && error("δx cannot be zero") 
-
 	return f
 end
 
