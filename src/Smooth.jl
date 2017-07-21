@@ -1,6 +1,6 @@
 module Smooth
 
-import SIT.DSP
+import JuMIT.DSP
 
 """
 ! this subroutine returns a zero phase gaussian wi

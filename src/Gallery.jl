@@ -2,13 +2,13 @@ __precompile__()
 
 module Gallery
 
-import SIT.IO
-import SIT.Grid
-import SIT.Models
-import SIT.Acquisition
-import SIT.Wavelets
+import JuMIT.IO
+import JuMIT.Grid
+import JuMIT.Models
+import JuMIT.Acquisition
+import JuMIT.Wavelets
 
-global marmousi_folder=joinpath(Pkg.dir("SIT"), "marmousi2")
+global marmousi_folder=joinpath(Pkg.dir("JuMIT"), "marmousi2")
 
 """
 Gallery of `M2D` grids.

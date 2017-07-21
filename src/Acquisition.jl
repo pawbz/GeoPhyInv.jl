@@ -9,10 +9,10 @@ help their construction.
 """
 module Acquisition
 
-import SIT.Grid
-import SIT.Models
-import SIT.Wavelets
-import SIT.DSP
+import JuMIT.Grid
+import JuMIT.Models
+import JuMIT.Wavelets
+import JuMIT.DSP
 using Distributions
 
 """

@@ -9,10 +9,10 @@ seismic data.
 """
 module Data
 
-import SIT.Acquisition
-import SIT.Grid
-import SIT.Coupling
-import SIT.DSP
+import JuMIT.Acquisition
+import JuMIT.Grid
+import JuMIT.Coupling
+import JuMIT.DSP
 using Interpolations
 
 """

@@ -2,14 +2,13 @@ __precompile__()
 
 module Fdtd
 
-import SIT.Grid
-import SIT.Interpolation
-import SIT.Models
-import SIT.F90libs
-import SIT.Acquisition
-import SIT.Data
-import SIT.Gallery
-import SIT.DSP
+import JuMIT.Grid
+import JuMIT.Interpolation
+import JuMIT.Models
+import JuMIT.Acquisition
+import JuMIT.Data
+import JuMIT.Gallery
+import JuMIT.DSP
 using DistributedArrays
 
 #As forward modeling method, the 

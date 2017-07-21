@@ -2,7 +2,7 @@ __precompile__()
 
 module DSP
 
-import SIT.Grid
+import JuMIT.Grid
 using Distributions
 using DSP # from julia
 

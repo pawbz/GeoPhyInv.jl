@@ -5,55 +5,55 @@ that either modify the type variable or construct them.
 
 # Grid
 ```@autodocs
-Modules = [SIT.Grid]
+Modules = [JuMIT.Grid]
 Order   = [:module, :type, :function]
 ```
 
 # Wavelets
 ```@autodocs
-Modules = [SIT.Wavelets]
+Modules = [JuMIT.Wavelets]
 Order   = [:module, :type, :function]
 ```
 # Coupling 
 ```@autodocs
-Modules = [SIT.Coupling]
+Modules = [JuMIT.Coupling]
 Order   = [:module, :type, :function]
 ```
 
 # Acquisition
 ```@autodocs
-Modules = [SIT.Acquisition]
+Modules = [JuMIT.Acquisition]
 Order   = [:module, :type, :function]
 ```
 
 # Interpolation
 ```@autodocs
-Modules = [SIT.Interpolation]
+Modules = [JuMIT.Interpolation]
 Order   = [:module, :type, :function]
 ```
 
 # Models
 ```@autodocs
-Modules = [SIT.Models]
+Modules = [JuMIT.Models]
 Order   = [:module, :type, :function]
 ```
 
 # Data
 ```@autodocs
-Modules = [SIT.Data]
+Modules = [JuMIT.Data]
 Order   = [:module, :type, :function]
 ```
 
 # Misfits
 ```@autodocs
-Modules = [SIT.Misfits]
+Modules = [JuMIT.Misfits]
 Order   = [:module, :type, :function]
 ```
 
 
 # Gallery
 ```@autodocs
-Modules = [SIT.Gallery]
+Modules = [JuMIT.Gallery]
 Order   = [:module, :type, :function]
 ```
 
@@ -61,21 +61,21 @@ Order   = [:module, :type, :function]
 # Fdtd
 
 ```@autodocs
-Modules = [SIT.Fdtd]
+Modules = [JuMIT.Fdtd]
 Order   = [:module, :type, :function]
 ```
  
 # Inversion
 
 ```@autodocs
-Modules = [SIT.Inversion]
+Modules = [JuMIT.Inversion]
 Order   = [:module, :type, :function]
 ```
 
 # Interferometry
 
 ```@autodocs
-Modules = [SIT.Interferometry]
+Modules = [JuMIT.Interferometry]
 Order   = [:module, :type, :function]
 ```
 
@@ -83,13 +83,13 @@ Order   = [:module, :type, :function]
 # CICA 
 
 ```@autodocs
-Modules = [SIT.CICA]
+Modules = [JuMIT.CICA]
 Order   = [:module, :type, :function]
 ```
 
 # Plots
 ```@autodocs
-Modules = [SIT.Plots]
+Modules = [JuMIT.Plots]
 Order   = [:module, :type, :function]
 ```
 

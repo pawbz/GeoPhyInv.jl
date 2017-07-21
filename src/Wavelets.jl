@@ -2,7 +2,7 @@ __precompile__()
 
 module Wavelets
 
-import SIT.Grid
+import JuMIT.Grid
 
 """
 Generate a Ricker Wavelet. Reference:

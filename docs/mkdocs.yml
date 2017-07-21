@@ -1,5 +1,5 @@
 site_name:        SeismicInversionToolbox.jl
-repo_url:         https://github.com/pawbz/SIT.jl
+repo_url:         https://github.com/pawbz/JuMIT.jl
 site_description: Description
 site_author:      pawbz
 theme: readthedocs

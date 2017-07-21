@@ -8,8 +8,8 @@ module CICA
 
 using MultivariateStats
 using Distributions
-import SIT.Grid:M1D
-import SIT.Misfits
+import JuMIT.Grid:M1D
+import JuMIT.Misfits
 
 """
 Performs ICA for convolutive mixtures.

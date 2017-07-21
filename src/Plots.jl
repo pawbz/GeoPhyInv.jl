@@ -5,10 +5,10 @@ using PyPlot
 #import PyCall: @pyimport
 #import PyPlot: pygui
 #@pyimport matplotlib2tikz
-import SIT.Acquisition
-import SIT.Grid
-import SIT.Data
-import SIT.Models
+import JuMIT.Acquisition
+import JuMIT.Grid
+import JuMIT.Data
+import JuMIT.Models
 
 export printfig
 

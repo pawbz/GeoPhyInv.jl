@@ -2,9 +2,9 @@ __precompile__()
 
 module Interferometry
 
-import SIT.Grid
-import SIT.Acquisition
-import SIT.Data
+import JuMIT.Grid
+import JuMIT.Acquisition
+import JuMIT.Data
 
 
 """

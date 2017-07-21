@@ -2,12 +2,12 @@ __precompile__()
 
 module Analytic
 
-import SIT.Grid
-import SIT.Acquisition
-import SIT.Models
-import SIT.Data
-import SIT.DSP
-import SIT.Gallery
+import JuMIT.Grid
+import JuMIT.Acquisition
+import JuMIT.Models
+import JuMIT.Data
+import JuMIT.DSP
+import JuMIT.Gallery
 
 
 """

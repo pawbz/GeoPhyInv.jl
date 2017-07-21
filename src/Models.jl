@@ -3,10 +3,10 @@ __precompile__()
 module Models
 
 
-import SIT.Grid
-import SIT.IO
-import SIT.Interpolation
-import SIT.Smooth
+import JuMIT.Grid
+import JuMIT.IO
+import JuMIT.Interpolation
+import JuMIT.Smooth
 
 """
 Data type fo represent a seismic model.

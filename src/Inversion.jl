@@ -15,14 +15,14 @@ of the `Param` after performing the inversion.
 """
 module Inversion
 
-import SIT.Interpolation
-import SIT.Models
-import SIT.Grid
-import SIT.Acquisition
-import SIT.Data
-import SIT.Coupling
-import SIT.Misfits
-import SIT.Fdtd
+import JuMIT.Interpolation
+import JuMIT.Models
+import JuMIT.Grid
+import JuMIT.Acquisition
+import JuMIT.Data
+import JuMIT.Coupling
+import JuMIT.Misfits
+import JuMIT.Fdtd
 using Optim
 using DistributedArrays
 

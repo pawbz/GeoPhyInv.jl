@@ -2,7 +2,7 @@ __precompile__()
 
 module Misfits
 
-import SIT.Data 
+import JuMIT.Data 
 
 """
 Normalized least-squares error between two vectors after 
