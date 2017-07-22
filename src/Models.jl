@@ -350,8 +350,16 @@ end
 
 """
 Apply smoothing to `Seismic` using a Gaussian filter of zwidth and xwidth
+
+# Arguments
+
+* `mod::Seismic` : argument that is modified
+* `zperc::Float64` : smoothing percentage in z-direction
+* `xperc::Float64=zperc` : smoothing percentage in x-direction
 """
-function Seismic_smooth!(mod::Seismic, zwidth::Float64, xwidth::Float64=zwidth)
+function Seismic_smooth!(mod::Seismic, zperc::Float64, xperc::Float64=zwidth)
+	xwidth = xperc * 0.01 * abs(mod.mgrid.x[end]-mod.mgrid.x[1])
+	zwidth = zperc * 0.01 * abs(mod.mgrid.z[end]-mod.mgrid.z[1])
 	xnwin=Int(div(xwidth,mod.mgrid.δx*2.))
 	znwin=Int(div(zwidth,mod.mgrid.δz*2.))
 

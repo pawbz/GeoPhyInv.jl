@@ -4,6 +4,7 @@ module JuMIT
 
 const JT = JuMIT
 const SIT = JuMIT
+export JT, SIT
 
 #const depsfile = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
 #if isfile(depsfile)

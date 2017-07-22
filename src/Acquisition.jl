@@ -453,17 +453,17 @@ end
 
 """
 Constructor of `Src`, which is typical for a input model such that 
-the model has `nwav` wavelengths.
+the model has `nλ` wavelengths.
 
 # Arguments
-* `nwav::Int64=10` : number of wavelenghts in the model
-nwav
+* `nλ::Int64=10` : number of wavelenghts in the model
+nλ
 """
-function Src_fixed_mod(nss::Int64, ns::Int64, nfield::Int64, model::Models.Seismic, nwav::Int64=10)
+function Src_fixed_mod(nss::Int64, ns::Int64, nfield::Int64, model::Models.Seismic, nλ::Int64=10)
 
 	x=model.mgrid.x; z=model.mgrid.z
 	# dominant wavelength using model dimensions
-	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nwav)
+	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nλ)
 	# average P velocity
 	vavg=Models.χ([mean(model.χvp)], model.vp0, -1)[1]
 
@@ -481,7 +481,7 @@ function Src_fixed_mod(nss::Int64, ns::Int64, nfield::Int64, model::Models.Seism
 	δt=0.5*δmin/vpmax
 
 	# check if δt is reasonable
-	#(δt > 0.1/fqdom) : error("decrease spatial sampling or nwav")
+	#(δt > 0.1/fqdom) : error("decrease spatial sampling or nλ")
 
 	tgrid=Grid.M1D(0.0, tmax, δt)
 	wav = Wavelets.ricker(fqdom=fqdom, tgrid=tgrid);
