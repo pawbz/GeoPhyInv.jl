@@ -108,11 +108,13 @@ Method used to preallocate `TD` with zeros.
 * data with zeros as `TD`
 """
 function TD_zeros(nfield::Int64, tgrid::Grid.M1D, acqgeom::Acquisition.Geom)
-	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],nfield,tgrid,acqgeom) 
+	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],nfield,
+	   deepcopy(tgrid),deepcopy(acqgeom)) 
 end
 "Same as `TD_zeros`, except for returning ones"
 function TD_ones(nfield::Int64, tgrid::Grid.M1D, acqgeom::Acquisition.Geom) 
-	return TD([ones(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],nfield,tgrid,acqgeom) 
+	return TD([ones(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],
+	   nfield,deepcopy(tgrid),deepcopy(acqgeom)) 
 end
 
 

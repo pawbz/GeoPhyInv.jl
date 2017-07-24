@@ -976,14 +976,14 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 	δs_temp=vpmin/5.0/freqmax;
 	δs_max = maximum([δx, δz])
 	all(δs_max .> δs_temp) ? 
-			warn(string("spatial sampling\t",δs_max,"\ndecrease spatial sampling below:\t",δs_temp)) :
+			warn(string("spatial sampling\t",δs_max,"\ndecrease spatial sampling below:\t",δs_temp), once=true) :
 			verbose ? println("spatial sampling\t",δs_max,"\tcan be as high as:\t",δs_temp) : nothing 
 
 	# check time sampling
 	δs_min = minimum([δx, δz])
 	δt_temp=0.5*δs_min/vpmax
 	all(δt .> δt_temp) ? 
-			warn(string("time sampling\t",δt,"\ndecrease time sampling below:\t",δt_temp)) :
+			warn(string("time sampling\t",δt,"\ndecrease time sampling below:\t",δt_temp), once=true) :
 			verbose ? println("time sampling\t",δt,"\tcan be as high as:\t",δt_temp) : nothing
 
 end

@@ -81,7 +81,7 @@ this method is used for preallocation.
 function Seismic_zeros(mgrid::Grid.M2D)
 	return Seismic(fill(0.0,2), fill(0.0,2), fill(0.0,2), 
 		zeros(mgrid.nz, mgrid.nx), zeros(mgrid.nz, mgrid.nx),
-		zeros(mgrid.nz, mgrid.nx), mgrid)
+		zeros(mgrid.nz, mgrid.nx), deepcopy(mgrid))
 end
 
 function Seismic_iszero(mod::Seismic)

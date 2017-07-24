@@ -32,11 +32,11 @@ Input the obeserved and modelled data to output the misfit
 and the adjoint sources
 TODO: 
 
-* `attrib::Symbol` : 
-  * `=:func`
-  * `=:funcgrad`
 """
-function TD!(x::Data.TD, y::Data.TD, w::Data.TD=Data.TD_ones(x.nfield,x.tgrid,x.acqgeom), attrib::Symbol=:func)
+function TD!(dfdx,
+	     x::Data.TD, 
+	     y::Data.TD, 
+	     w::Data.TD=Data.TD_ones(x.nfield,x.tgrid,x.acqgeom))
 
 	# check if x and y are similar
 	tgrid = x.tgrid;
@@ -46,7 +46,11 @@ function TD!(x::Data.TD, y::Data.TD, w::Data.TD=Data.TD_ones(x.nfield,x.tgrid,x.
 
 	f = 0.0;
 	for ifield=1:x.nfield, iss=1:acq.nss, ir=1:acq.nr[iss]
-		ft = fg_cls!(view(x.d[iss, ifield],:,ir), y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir], attrib);
+		if(!(dfdx === nothing))
+			ft = fg_cls!(view(dfdx.d[iss,ifield],:,ir), view(x.d[iss, ifield],:,ir), y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir]);
+		else
+			ft = fg_cls!(nothing, view(x.d[iss, ifield],:,ir), y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir]);
+		end
 		"multiplication with time sampling due to integration ?"
 		f += ft #* tgrid.δx;
 	end
@@ -56,12 +60,14 @@ function TD!(x::Data.TD, y::Data.TD, w::Data.TD=Data.TD_ones(x.nfield,x.tgrid,x.
 end
 
 
-function fg_cls!{N}(x::AbstractArray{Float64,N}, y::Array{Float64,N}, w::Array{Float64,N}=ones(x), attrib::Symbol=:func)
+function fg_cls!{N}(dfdx, 
+		    x::AbstractArray{Float64,N}, 
+		    y::Array{Float64,N}, w::Array{Float64,N}=ones(x))
 	(size(x) == size(y)) || error("size mismatch")
 	any(w .< 0.0) && error("weights cannot be negative") 
 	f = sum(w .* (x - y).^2)
-	if(attrib == :grad)
-		x[:] = 2.0 .* w[:] .* (x[:] - y[:])
+	if(!(dfdx === nothing))
+		dfdx[:] = 2.0 .* w[:] .* (x[:] - y[:])
 	end
 	return f
 end

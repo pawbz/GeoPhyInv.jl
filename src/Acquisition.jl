@@ -409,7 +409,7 @@ Allocate `Src` with zeros depending on the acquisition geometry.
 """
 function Src_zeros(acqgeom::Geom,  nfield::Int64, tgrid::Grid.M1D)
 	wavsrc = [zeros(tgrid.nx,acqgeom.ns[iss]) for iss=1:acqgeom.nss, ifield=1:nfield] 
-	return Src(acqgeom.nss, acqgeom.ns, nfield, wavsrc, tgrid)
+	return Src(acqgeom.nss, acqgeom.ns, nfield, wavsrc, deepcopy(tgrid))
 end
 
 """
@@ -448,7 +448,7 @@ function Src_fixed(nss::Int64,
 	     )
 
 	wavsrc = [repeat(wav,inner=(1,ns)) for iss=1:nss, ifield=1:nfield] 
-	return Src(nss, fill(ns, nss), nfield, wavsrc, tgrid)
+	return Src(nss, fill(ns, nss), nfield, wavsrc, deepcopy(tgrid))
 end
 
 """
@@ -497,7 +497,7 @@ Function that returns Src after time reversal
 """
 function Src_tr(src::Src)
 	return Src(src.nss,src.ns,src.nfield,
-	    [flipdim(src.wav[i,j],1) for i in 1:src.nss, j in 1:src.nfield],src.tgrid)
+	    [flipdim(src.wav[i,j],1) for i in 1:src.nss, j in 1:src.nfield],deepcopy(src.tgrid))
 end
 
 

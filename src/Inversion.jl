@@ -75,8 +75,12 @@ type Param
 	mprecon::AbstractArray{Float64,2}
 	"calculated data after applying w"
 	wdcal::Data.TD
+	"calculated data after applying w"
+	dfdwdcal::Data.TD
 	"calculated data"
 	dcal::Data.TD
+	"calculated data"
+	dfdcal::Data.TD
 	"observed data"
 	dobs::Data.TD
 	"data preconditioning"
@@ -151,19 +155,21 @@ function Param(
         # acqgeom geometry for adjoint propagation
 	adjacqgeom = AdjGeom(acqgeom)
 
-	pa = Param(acqsrc, 
+	pa = Param(deepcopy(acqsrc), 
 	     Acquisition.Src_zeros(adjacqgeom, nfield, tgrid),
-	     acqgeom, 
+	     deepcopy(acqgeom), 
 	     adjacqgeom,
 	     attrib_mod, attrib_inv, 
-	     modm, modm0, modi, 
+	     deepcopy(modm), deepcopy(modm0), modi, 
 	     Models.Seismic_zeros(modm.mgrid), 
 	     Models.Seismic_zeros(modi.mgrid), 
-	     mod_inv_parameterization,
+	     deepcopy(mod_inv_parameterization),
 	     zeros(2,2), # dummy, update mprecon later
 	     Data.TD_zeros(nfield,tgrid,acqgeom), 
 	     Data.TD_zeros(nfield,tgrid,acqgeom), 
-	     dobs, dprecon, 
+	     Data.TD_zeros(nfield,tgrid,acqgeom), 
+	     Data.TD_zeros(nfield,tgrid,acqgeom), 
+	     deepcopy(dobs), deepcopy(dprecon), 
 	     [Data.TD_zeros(nfield,tgrid,acqgeom)], 
 	     Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, nfield, acqgeom), verbose, attrib,
 	     nothing)
@@ -208,7 +214,7 @@ function wfwi_ninv(pa::Param)
 end
 
 """
-Full Waveform Inversion using `Optim`.
+Full Waveform Inversion using `Optim` package.
 This method updates `pa.modm` and `pa.dcal`. More details about the
 optional parameters can be found in the documentation of the `Optim` 
 package.
@@ -233,7 +239,7 @@ package.
   * `=:migr` return gradient at the first iteration, i.e., a migration image
   * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
 """
-function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60., iterations::Int64=5, f_tol::Float64=1e-3, g_tol::Float64=1e-3, x_tol::Float64=1e-3)
+function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., iterations::Int64=5, f_tol::Float64=1e-3, g_tol::Float64=1e-3, x_tol::Float64=1e-3)
 
 	# convert initial model to the inversion variable
 	x = zeros(xfwi_ninv(pa));
@@ -251,8 +257,8 @@ function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60.
 	Seismic_xbound!(lower_x, upper_x, pa)
 
 	if(pa.attrib_inv == :cls)
-		df = OnceDifferentiable(x -> func_xfwi(x, last_x,  pa),
-			  (storage, x) -> grad_xfwi!(storage, x, last_x, pa))
+		df = OnceDifferentiable(x -> func_grad_xfwi!(nothing, x, last_x,  pa),
+			  (storage, x) -> func_grad_xfwi!(storage, x, last_x, pa))
 		"""
 		Unbounded LBFGS inversion, only for testing
 		"""
@@ -268,39 +274,38 @@ function xfwi!(pa::Param; extended_trace::Bool=false, time_limit=Float64=2.0*60.
 		res = optimize(df, x, 
 			       lower_x,
 			       upper_x,
-			       Fminbox(); optimizer=LBFGS, iterations=iterations, # barrier function iterations
+			       Fminbox{LBFGS}(); iterations=iterations, # barrier function iterations
 				  #linesearch = Optim.LineSearches.morethuente!,
 			     optimizer_o=Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
 		 			iterations = 2, store_trace = true, time_limit=time_limit,
-					extended_trace=extended_trace, show_trace = true))
+					store_trace=store_trace,extended_trace=extended_trace, show_trace = true))
 		pa.verbose ? println(res) : nothing
-		# convert gradient vector to model
+
+		# update modm and modi
+		Seismic_x!(pa.modm, pa.modi, Optim.minimizer(res), pa, -1)
+
 		if(extended_trace)
+			# convert gradient vector to model
 			gmodi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
 			gmodm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)] 
-		end
-		modi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
-		modm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)]
-		for itr=1:Optim.iterations(res)
-			# update modm and modi
-			Seismic_x!(modm[itr], modi[itr], Optim.x_trace(res)[itr], pa, -1)
-			# update gmodm and gmodi
-			Seismic_gx!(gmodm[itr],modm[itr],gmodi[itr],modi[itr],Optim.trace(res)[itr].metadata["g(x)"],pa,-1)
-		end
-		# update pa.model
-		pa.modm.χvp[:,:] = modm[Optim.iterations(res)].χvp
-		pa.modm.χρ[:,:] = modm[Optim.iterations(res)].χρ
-		pa.modi.χvp[:,:] = modi[Optim.iterations(res)].χvp
-		pa.modi.χρ[:,:] = modi[Optim.iterations(res)].χρ
-	
-		if(extended_trace)
+			modi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
+			modm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)]
+			for itr=1:Optim.iterations(res)
+				# update modm and modi
+				Seismic_x!(modm[itr], modi[itr], Optim.x_trace(res)[itr], pa, -1)
+
+				# update gmodm and gmodi
+				Seismic_gx!(gmodm[itr],modm[itr],gmodi[itr],modi[itr],Optim.trace(res)[itr].metadata["g(x)"],pa,-1)
+			end
+			
 			return modm, modi, gmodm, gmodi, res
 		else
-			return modm, modi, res
+			return res
 		end
 	elseif(pa.attrib_inv == :migr)
 		storage = similar(x)
-		grad_xfwi!(storage, x, last_x,  pa)
+		func_grad_xfwi!(nothing, x, last_x,  pa)
+		func_grad_xfwi!(storage, x, last_x,  pa)
 
 		# convert gradient vector to model
 		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage, pa,-1)
@@ -361,7 +366,7 @@ function forward_simulation!(
 			   )
 	if(x!=last_x)
 		pa.verbose && println("updating buffer")
-		copy!(last_x, x)
+		last_x[:] = x[:]
 
 		if(mattrib == :x)
 			Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
@@ -438,21 +443,7 @@ end
 """
 Return functional and gradient of the CLS objective 
 """
-function func_xfwi(x::Vector{Float64},  last_x::Vector{Float64}, pa::Param)
-
-	pa.verbose && println("computing functional...")
-
-	forward_simulation!(pa, x, last_x)
-
-	# apply coupling to the modeled data
-	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
-
-	# compute misfit and δdcal
-	f = Misfits.TD!(pa.wdcal, pa.dobs, pa.dprecon, :func)
-	return f
-end
-
-function grad_xfwi!(storage::Vector{Float64}, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
+function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 
 	pa.verbose && println("computing gradient...")
 
@@ -461,47 +452,54 @@ function grad_xfwi!(storage::Vector{Float64}, x::Vector{Float64}, last_x::Vector
 	# apply coupling to the modeled data
 	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
 
-	# compute gradient w.r.t. coupled calculated data
-	f = Misfits.TD!(pa.wdcal, pa.dobs, pa.dprecon, :grad)
-
-	# compute gradient w.r.t. calculated data
-	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :r)
-
-	# adjoint sources
-	update_adjsrc!(pa.dcal, pa)
-
-	# x to model
-	Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
-
-	
-	if(pa.attrib_mod == :fdtd)
-		# adjoint simulation
-		Fdtd.mod!(npropwav=2, model=pa.modm,
-	        	acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[3, 2],
-			backprop_flag=-1, boundary=pa.buffer, 
-			gmodel=pa.gmodm, 
-			tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
-
-	elseif(pa.attrib_mod == :fdtd_born)
-		
-		# adjoint simulation
-		adj = Fdtd.mod(npropwav=2, model=pa.modm0,  
-		     acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[acqsrcsink, adjsrc], src_flags=[2.0, -2.0], 
-		     tgridmod=pa.dobs.tgrid, gmodel_flag=true, boundary_in=buffer[2], verbose=false)
-
-	elseif(pa.attrib_mod == :fdtd_hborn)
-		# adjoint simulation
-		adj = Fdtd.mod(npropwav=2, model=pa.modm0, 
-		     acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, adjsrc], src_flags=[-2.0, -2.0], 
-		     tgridmod=pa.dobs.tgrid, grad_out_flag=true, verbose=false)
+	if(storage === nothing)
+		# compute misfit and δdcal
+		f = Misfits.TD!(nothing, pa.wdcal, pa.dobs, pa.dprecon)
+		return f
 	else
-		error("invalid pa.attrib_mod")
+
+		# compute gradient w.r.t. coupled calculated data
+		f = Misfits.TD!(pa.dfdwdcal, pa.wdcal, pa.dobs, pa.dprecon)
+
+		# compute gradient w.r.t. calculated data
+		Data.TDcoup!(pa.dfdwdcal, pa.dfdcal, pa.w, :r)
+
+		# adjoint sources
+		update_adjsrc!(pa.dfdcal, pa)
+
+		# x to model
+		Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
+
+		
+		if(pa.attrib_mod == :fdtd)
+			# adjoint simulation
+			Fdtd.mod!(npropwav=2, model=pa.modm,
+				acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[3, 2],
+				backprop_flag=-1, boundary=pa.buffer, 
+				gmodel=pa.gmodm, 
+				tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
+
+		elseif(pa.attrib_mod == :fdtd_born)
+			
+			# adjoint simulation
+			adj = Fdtd.mod(npropwav=2, model=pa.modm0,  
+			     acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[acqsrcsink, adjsrc], src_flags=[2.0, -2.0], 
+			     tgridmod=pa.dobs.tgrid, gmodel_flag=true, boundary_in=buffer[2], verbose=false)
+
+		elseif(pa.attrib_mod == :fdtd_hborn)
+			# adjoint simulation
+			adj = Fdtd.mod(npropwav=2, model=pa.modm0, 
+			     acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, adjsrc], src_flags=[-2.0, -2.0], 
+			     tgridmod=pa.dobs.tgrid, grad_out_flag=true, verbose=false)
+		else
+			error("invalid pa.attrib_mod")
+		end
+
+		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
+
+		return storage
 	end
-
-	Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
-
-	return storage
-end # grad_xfwi!
+end # func_grad_xfwi!
 
 """
 Update pa.w
@@ -518,8 +516,8 @@ function wfwi!(pa::Param)
 
 	(Data.TD_iszero(pa.dcal)) && error("dcal zero wfwi")
 
-	df = OnceDifferentiable(x -> func_Coupling(x, last_x, pa),
-		  (storage, x) -> grad_Coupling!(storage, x, last_x, pa))
+	df = OnceDifferentiable(x -> func_grad_Coupling!(nothing, x, last_x, pa),
+		  (storage, x) -> func_grad_Coupling!(storage, x, last_x, pa))
 	"""
 	Unbounded LBFGS inversion, only for testing
 	"""
@@ -715,36 +713,14 @@ end
 """
 Return functional and gradient of the CLS objective 
 """
-function func_Coupling(x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
-	# allocate for w
-	w = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.nfield, pa.w.acqgeom)
-
-	# x to w 
-	Coupling_x!(w, x, pa, -1)
-
-	if(x!=last_x)
-		pa.verbose ? println("updating buffer") : nothing
-		copy!(last_x, x)
-		Data.TDcoup!(pa.wdcal, pa.dcal, w, :s)
-	end
-
-	# compute misfit and δdcal
-	f = Misfits.TD(pa.wdcal, pa.dobs, pa.dprecon)
-	return f
-end
-
-"There is a bug in gradient computation"
-function grad_Coupling!(x::Vector{Float64}, storage::Vector{Float64},
+function func_grad_Coupling!(x::Vector{Float64}, storage::Vector{Float64},
 			last_x::Vector{Float64}, 
 			pa::Param)
 
 	pa.verbose ? println("computing gradient...") : nothing
 
-	# allocate for w
-	w = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.nfield, pa.w.acqgeom)
-
 	# x to w 
-	Coupling_x!(w, x, pa, -1)
+	Coupling_x!(pa.w, x, pa, -1)
 
 	if(x!=last_x)
 		pa.verbose ? println("updating buffer") : nothing
@@ -752,18 +728,25 @@ function grad_Coupling!(x::Vector{Float64}, storage::Vector{Float64},
 		Data.TDcoup!(pa.wdcal, pa.dcal, w, :s)
 	end
 
-	f = Misfits.TD(pa.wdcal, pa.dobs, pa.dprecon, :grad)
+	if(storage === nothing)
+		# compute misfit and δdcal
+		f = Misfits.TD!(nothing, pa.wdcal, pa.dobs, pa.dprecon)
+		return f
+	else
 
-	# allocate for w
-	gw = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.nfield, pa.w.acqgeom)
+		f = Misfits.TD(pa.dfdwdacl, pa.wdcal, pa.dobs, pa.dprecon)
 
-	# get gradient w.r.t. w
-	Data.TDcoup!(δdcal, pa.dcal, gw, :w)
+		# allocate for w (do we need to preallocate)
+		gw = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.nfield, pa.w.acqgeom)
 
-	# convert w to x
-	Coupling_x!(gw, storage, pa, 1)
+		# get gradient w.r.t. w
+		Data.TDcoup!(pa.dfdwdacl, pa.dcal, gw, :w)
 
-	return storage
+		# convert w to x
+		Coupling_x!(gw, storage, pa, 1)
+
+		return storage
+	end
 end
 
 """

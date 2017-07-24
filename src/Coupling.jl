@@ -65,7 +65,7 @@ function TD_delta{T<:Real}(tlagssf::T,
 		 )
 	tgridssf = Grid.M1D_lag(tlagssf, δt)
 	tgridrf = Grid.M1D_lag(tlagrf, δt)
-	return TD_delta(tgridssf, tgridrf, nfield, acqgeom)
+	return TD_delta(tgridssf, tgridrf, nfield, deepcopy(acqgeom))
 end
 
 function TD_delta(tgridssf::Grid.M1D, tgridrf::Grid.M1D,
