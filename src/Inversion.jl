@@ -92,6 +92,8 @@ type Param
 	verbose::Bool
 	attrib::Symbol
 	buffer::Any
+	"update buffer in every iteration?"
+	buffer_update_flag::Bool
 end
 
 
@@ -172,7 +174,7 @@ function Param(
 	     deepcopy(dobs), deepcopy(dprecon), 
 	     [Data.TD_zeros(nfield,tgrid,acqgeom)], 
 	     Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, nfield, acqgeom), verbose, attrib,
-	     nothing)
+	     nothing, true)
 
 	# buffer allocation
 	forward_simulation_allocate_buffer!(pa)
@@ -304,7 +306,6 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 		end
 	elseif(pa.attrib_inv == :migr)
 		storage = similar(x)
-		func_grad_xfwi!(nothing, x, last_x,  pa)
 		func_grad_xfwi!(storage, x, last_x,  pa)
 
 		# convert gradient vector to model
@@ -388,27 +389,42 @@ function forward_simulation!(
 			    boundary=pa.buffer, 
 			    tgridmod=pa.dcal.tgrid) 
 		elseif(pa.attrib_mod == :fdtd_born)
-			Fdtd.mod(born_flag=true,npropwav=2, model=pa.modm0, model_pert=model, 
-	    		    acqgeom=[pa.acqgeom,pa.acqgeom], acqsrc=[pa.acqsrc,pa.acqsrc], 
-			    TDout=buffer1, illum=illum, illum_flag=mprecon_flag,
-			    backprop_flag=1,
-			    boundary=buffer2,
+			"""
+			Two propagating fields, both in the background model.
+			"""
+			backprop_flag = pa.buffer_update_flag ? 1 : 0
+
+			Fdtd.mod!(born_flag=true, npropwav=2, model=pa.modm0, model_pert=model, 
+	    		    acqgeom=[pa.acqgeom, pa.acqgeom], acqsrc=[pa.acqsrc, pa.acqsrc], 
+			    TDout=pa.dtemp, illum=illum, illum_flag=illum_out,
+			    backprop_flag=backprop_flag,
+			    boundary=pa.buffer,
 			    src_flags=[2, 0], recv_flags = [0, 1], 
 			    tgridmod=pa.dcal.tgrid);
+
+			# switch off buffer update from now on (because the buffer doesn't change with x)
+			#pa.buffer_update_flag = false
 		elseif(pa.attrib_mod == :fdtd_hborn)
-			# storing boundary values 
-			hbuffer = Fdtd.mod(model=model, acqgeom=[pa.acqgeom], 
-						  acqsrc=[pa.acqsrc], 
-						  tgridmod=pa.dcal.tgrid, 
-						  boundary_save_flag=true);
+			if(pa.buffer_update_flag)
+				# storing boundary values 
+				Fdtd.mod!(model=pa.modm0, acqgeom=[pa.acqgeom], 
+						 acqsrc=[pa.acqsrc], 
+						 backprop_flag=1,
+						 boundary=pa.buffer,
+						 tgridmod=pa.dcal.tgrid, 
+						 src_flags=[2], recv_flags=[0], verbose=pa.verbose)
+				# switch off buffer update from now on (because the buffer doesn't change with x)
+				#pa.buffer_update_flag = false
+			end
 
+			Fdtd.mod!(backprop_flag=-1, boundary=pa.buffer,
+			    npropwav=2, model=pa.modm0, model_pert=model, 
+			    acqgeom=[pa.acqgeom, pa.acqgeom], 
+			    acqsrc=[pa.acqsrc, pa.acqsrc], src_flags=[3, 0], 
+			    TDout=pa.dtemp,
+			    recv_flags=[0, 1],
+			    tgridmod=pa.dcal.tgrid, born_flag=true, verbose=pa.verbose);
 
-			buffer[1], buffer[2], buffer[3] = Fdtd.mod(boundary_in=hbuffer[2],
-			      npropwav=2,model=pa.modm0, model_pert=model, 
-			       acqgeom=[pa.acqgeom,pa.acqgeom], 
-			       acqsrc=[acqsrcsink,pa.acqsrc], src_flags=[3.0, 0.0], 
-			       recv_flags=[0, 1],
-			   tgridmod=pa.dcal.tgrid, verbose=false, boundary_save_flag=true, born_flag=true);
 		else
 			error("invalid pa.attrib_mod")
 		end
@@ -480,17 +496,19 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 				tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
 
 		elseif(pa.attrib_mod == :fdtd_born)
-			
 			# adjoint simulation
-			adj = Fdtd.mod(npropwav=2, model=pa.modm0,  
-			     acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[acqsrcsink, adjsrc], src_flags=[2.0, -2.0], 
-			     tgridmod=pa.dobs.tgrid, gmodel_flag=true, boundary_in=buffer[2], verbose=false)
+			Fdtd.mod!(npropwav=2, model=pa.modm0,  
+				acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[3, 2], 
+				backprop_flag=-1, boundary=pa.buffer, 
+				gmodel=pa.gmodm, 
+				tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
 
 		elseif(pa.attrib_mod == :fdtd_hborn)
 			# adjoint simulation
-			adj = Fdtd.mod(npropwav=2, model=pa.modm0, 
-			     acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, adjsrc], src_flags=[-2.0, -2.0], 
-			     tgridmod=pa.dobs.tgrid, grad_out_flag=true, verbose=false)
+			Fdtd.mod!(npropwav=2, model=pa.modm0,  
+				acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[2, 2], 
+				gmodel=pa.gmodm, 
+				tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
 		else
 			error("invalid pa.attrib_mod")
 		end
