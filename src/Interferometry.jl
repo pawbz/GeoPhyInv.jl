@@ -35,8 +35,8 @@ function TD_virtual_diff(
 	# central wavelength (use zero for testing)
 	println(string("dominant wavelength in the data:\t",λdom))
 
-	rx = Array(Vector{Float64}, nur); rz = Array(Vector{Float64}, nur);
-	datmat = zeros(2*nt-1, nur, nur, data.nfield);
+	rx = Array{Vector{Float64}}(nur); rz = Array{Vector{Float64}}(nur);
+	datmat = zeros(nur, data.nfield, 2*nt-1, nur);
 	for ifield =1:data.nfield
 		# loop over virtual sources
 		for irs = 1:nur
@@ -61,14 +61,14 @@ function TD_virtual_diff(
 					# stacking over these sources
 					for isson=1:length(sson)
 						if(sson[isson] != [0])
-							datmat[:, ir, irs, ifield] += 
+							datmat[ir, ifield,:,irs] += 
 							xcorr(
 							  datan.d[isson,ifield][:, sson[isson][2]], 
 							  datan.d[isson,ifield][:, sson[isson][1]])
 						end
 					end
 					# normalize depending on the stack
-					nsson != 0 ? datmat[:, ir, irs, ifield] /= nsson : nothing
+					nsson != 0 ? datmat[ ir,  ifield, :, irs] /= nsson : nothing
 				end
 			end
 			if(irvec != [])
@@ -82,7 +82,7 @@ function TD_virtual_diff(
 	sz = [[urpos[1][irs]] for irs in 1:nur];
 
 	# bool array acoording to undef
-	ars = [isdefined(rx,irs) ? true : false for irs=1:nur];
+	ars = [isassigned(rx,irs) ? true : false for irs=1:nur];
 
 	# select only positions that are active
 	rx = rx[ars];	rz = rz[ars];

@@ -55,20 +55,34 @@ Print information about `Seismic`
 function print(mod::Seismic, name::String="")
 	println("\tSeismic Model:\t",name)
 	println("\t> number of samples:\t","x\t",mod.mgrid.nx,"\tz\t",mod.mgrid.nz)
+	println("\t> vp:\t","min\t",minimum(Seismic_get(mod,:vp)),"\tmax\t",maximum(Seismic_get(mod,:vp)))
 	println("\t> vp bounds:\t","min\t",mod.vp0[1],"\tmax\t",mod.vp0[2])
+	println("\t> ρ:\t","min\t",minimum(Seismic_get(mod,:ρ)),"\tmax\t",maximum(Seismic_get(mod,:ρ)))
 	println("\t> ρ bounds:\t","min\t",mod.ρ0[1],"\tmax\t",mod.ρ0[2])
 end
 
-function Seismic_adjust_bounds!(mod::Seismic)
+"""
+Return medium property bounds based on maximum and minimum values of the array and frac.
+The bounds cannot be less than zero
+
+"""
+function bounds(mod::Array{Float64}, frac::Float64=0.1)
+	any(mod .< 0.0) && error("model values less than zero")
+	bounds=zeros(2)
+	bound=frac*mean(mod)
+	bounds[1] = ((minimum(mod) - bound)<0.0) ? 0.0 : (minimum(mod) - bound)
+	bounds[2] = maximum(mod)+bound
+	return bounds
+end
+
+function adjust_bounds!(mod::Seismic, frac::Float64)
 	for f in [:χvp, :χρ, :χvs]
 		f0 = Symbol((replace("$(f)", "χ", "")),0)
-		m = getfield(mod, f)
-		m0 = getfield(mod, f0)
-		mavg, mmin, mmax = mean(m), minimum(m), maximum(m)
-		b=χ([mmin-0.05, mmax+0.05], m0, -1) 
-		
-		setfield!(mod, f0, b)
+		fm = Symbol((replace("$(f)", "χ", "")))
+		m = Seismic_get(mod, fm)
+		setfield!(mod, f0, bounds(m , frac))
 	end
+	return mod
 end
 
 """
@@ -131,6 +145,8 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 		return ρ;
 	elseif(attrib == :vp)
 		return vp;
+	elseif(attrib == :vs)
+		return vs;
 	elseif(attrib == :ρI0)
 		return ρI0
 	elseif(attrib == :χρI)
@@ -324,12 +340,12 @@ function Seismic_addon!(mod::Seismic;
 		       )
 
 	temp = zeros(mod.mgrid.nz, mod.mgrid.nx)
-	if(!(circ_loc == nothing))
+	if(!(circ_loc === nothing))
 		temp += [((sqrt((mod.mgrid.x[ix]-circ_loc[2])^2 + 
 			(mod.mgrid.z[iz]-circ_loc[1])^2 ) <= circ_rad) ? circ_pert : 0.0)  for 
 	   		iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx ]
 	end
-	if(!(rect_loc == nothing))
+	if(!(rect_loc === nothing))
 		temp += [
 			(((mod.mgrid.x[ix]-rect_loc[4]) * (mod.mgrid.x[ix]-rect_loc[2]) < 0.0) & 
 			((mod.mgrid.z[iz]-rect_loc[3]) * (mod.mgrid.z[iz]-rect_loc[1]) < 0.0)) ?
@@ -356,20 +372,35 @@ Apply smoothing to `Seismic` using a Gaussian filter of zwidth and xwidth
 * `mod::Seismic` : argument that is modified
 * `zperc::Float64` : smoothing percentage in z-direction
 * `xperc::Float64=zperc` : smoothing percentage in x-direction
+
+# Keyword Arguments
+
+* `zmin::Float64=mod.mgrid.z[1]` : 
+* `zmax::Float64=mod.mgrid.z[end]` : 
+* `xmin::Float64=mod.mgrid.x[1]` : 
+* `xmax::Float64=mod.mgrid.x[end]` : 
 """
-function Seismic_smooth!(mod::Seismic, zperc::Float64, xperc::Float64=zwidth)
+function Seismic_smooth!(mod::Seismic, zperc::Float64, xperc::Float64=zwidth;
+			 zmin::Float64=mod.mgrid.z[1], zmax::Float64=mod.mgrid.z[end],
+			 xmin::Float64=mod.mgrid.x[1], xmax::Float64=mod.mgrid.x[end] 
+			)
 	xwidth = xperc * 0.01 * abs(mod.mgrid.x[end]-mod.mgrid.x[1])
 	zwidth = zperc * 0.01 * abs(mod.mgrid.z[end]-mod.mgrid.z[1])
 	xnwin=Int(div(xwidth,mod.mgrid.δx*2.))
 	znwin=Int(div(zwidth,mod.mgrid.δz*2.))
 
+	izmin = Interpolation.indminn(mod.mgrid.z, zmin, 1)[1]
+	izmax = Interpolation.indminn(mod.mgrid.z, zmax, 1)[1]
+	ixmin = Interpolation.indminn(mod.mgrid.x, xmin, 1)[1]
+	ixmax = Interpolation.indminn(mod.mgrid.x, xmax, 1)[1]
+
 	# calculate means
 	mχvp = mean(mod.χvp);	mχvs = mean(mod.χvs);	mχρ = mean(mod.χρ)
 	# remove means before Gaussian filtering
 	mod.χvp -= mχvp; mod.χvs -= mχvs; mod.χρ -= mχρ
-	Smooth.gaussian!(mod.χvp,[znwin,xnwin])
-	Smooth.gaussian!(mod.χvs,[znwin,xnwin])
-	Smooth.gaussian!(mod.χρ,[znwin,xnwin])
+	Smooth.gaussian!(view(mod.χvp, izmin:izmax, ixmin:ixmax),[znwin,xnwin])
+	Smooth.gaussian!(view(mod.χρ, izmin:izmax, ixmin:ixmax),[znwin,xnwin])
+	Smooth.gaussian!(view(mod.χvs, izmin:izmax, ixmin:ixmax),[znwin,xnwin])
 	# add mean back
 	mod.χvp += mχvp; mod.χvs += mχvs; mod.χρ += mχρ
 end
@@ -393,7 +424,7 @@ function Seismic_pad_trun(mod::Seismic)
 end
 
 """
-Extend a model on all four sides
+PML Extend a model on all four sides
 """
 function pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
 	if(isequal(flag,1)) 

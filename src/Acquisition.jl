@@ -14,6 +14,7 @@ import JuMIT.Models
 import JuMIT.Wavelets
 import JuMIT.DSP
 using Distributions
+using DSP # from Julia
 
 """
 Acquisiton has supersources, sources and receivers.
@@ -128,7 +129,7 @@ recorded.
 """
 function Geom_find(acq::Geom; rpos::Array{Float64,1}=nothing, rpos0::Array{Float64,1}=nothing)
 	rpos==nothing ? error("need rpos") : nothing
-	sson = Array(Vector{Int64}, acq.nss);
+	sson = Array{Vector{Int64}}(acq.nss);
 	for iss = 1:acq.nss
 		rvec = [[acq.rz[iss][ir],acq.rx[iss][ir]] for ir=1:acq.nr[iss]]
 		ir=findfirst(rvec, rpos)
@@ -456,16 +457,31 @@ Constructor of `Src`, which is typical for a input model such that
 the model has `nλ` wavelengths.
 
 # Arguments
-* `nλ::Int64=10` : number of wavelenghts in the model
-nλ
-"""
-function Src_fixed_mod(nss::Int64, ns::Int64, nfield::Int64, model::Models.Seismic, nλ::Int64=10)
 
-	x=model.mgrid.x; z=model.mgrid.z
-	# dominant wavelength using model dimensions
+* `nss::Int64` : number of supersources
+* `ns::Int64` : number of source per each supersource
+* `nfield::Int64` :
+
+# Keyword Arguments
+
+* `mod::Models.Seismic` :
+* `nλ::Int64=10` : number of wavelengths in the mod
+* `wav_func::Function=(fqdom, tgrid)->Wavelets.ricker(fqdom,tgrid)` : which wavelet to generate, see Wavelets.jl
+* `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the model, use this fraction to increase of reduce the maximum time
+"""
+function Src_fixed_mod(
+		nss::Int64, ns::Int64, nfield::Int64; 
+		mod::Models.Seismic=nothing, 
+		nλ::Int64=10,
+		wav_func::Function=(fqdom, tgrid)->Wavelets.ricker(fqdom,tgrid),
+		tmaxfrac::Float64=1.0
+		)
+
+	x=mod.mgrid.x; z=mod.mgrid.z
+	# dominant wavelength using mod dimensions
 	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nλ)
 	# average P velocity
-	vavg=Models.χ([mean(model.χvp)], model.vp0, -1)[1]
+	vavg=Models.χ([mean(mod.χvp)], mod.vp0, -1)[1]
 
 	fqdom = vavg/λdom
 
@@ -473,22 +489,46 @@ function Src_fixed_mod(nss::Int64, ns::Int64, nfield::Int64, model::Models.Seism
 	d = sqrt((x[1]-x[end]).^2+(z[1]-z[end]).^2)
 	
 	# use two-way maximum distance to get tmax
-	tmax=2.*d/vavg
+	tmax=2.*d/vavg .* tmaxfrac
 
 	# choose sampling interval to obey max freq of source wavelet
-	δmin = minimum([model.mgrid.δx, model.mgrid.δz])
-	vpmax = model.vp0[2]
+	δmin = minimum([mod.mgrid.δx, mod.mgrid.δz])
+	vpmax = mod.vp0[2]
 	δt=0.5*δmin/vpmax
 
 	# check if δt is reasonable
 	#(δt > 0.1/fqdom) : error("decrease spatial sampling or nλ")
 
 	tgrid=Grid.M1D(0.0, tmax, δt)
-	wav = Wavelets.ricker(fqdom=fqdom, tgrid=tgrid);
+	wav = wav_func(fqdom, tgrid);
 
 	src=Src_fixed(nss, ns, nfield, wav, tgrid)
 	print(src)
 	# choose ricker waveletes of fdom
+	return src
+end
+
+"""
+Generate band-limited random source signals 
+"""
+function Src_fixed_random(nss::Int64, ns::Int64, nfield::Int64, fmin::Float64, fmax::Float64, tgrid::Grid.M1D, tmax::Float64=tgrid.x[end] )
+	fs = 1/ tgrid.δx;
+	designmethod = Butterworth(4);
+	filtsource = Bandpass(fmin, fmax; fs=fs);
+
+	itmax = indmin(abs.(tgrid.x-tmax))
+	# 20% taper window
+	twin = DSP.taper(ones(itmax),20.) 
+	X = zeros(itmax)
+	wavsrc = [repeat(zeros(tgrid.nx),inner=(1,ns)) for iss=1:nss, ifield=1:nfield] 
+	for ifield in 1:nfield, iss in 1:nss, is in 1:ns
+		X[:] = rand(Uniform(-1.0, 1.0), itmax) .* twin
+		# band limit
+		filt!(X, digitalfilter(filtsource, designmethod), X);
+		wavsrc[iss, ifield][1:itmax,is] = X.*twin
+	end
+	src= Src(nss, fill(ns, nss), nfield, wavsrc, deepcopy(tgrid))
+	print(src)
 	return src
 end
 

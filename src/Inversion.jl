@@ -179,23 +179,25 @@ function Param(
 	# buffer allocation
 	forward_simulation_allocate_buffer!(pa)
 
-	# intial modelling dcal
-	illum = forward_simulation!(pa, modm=pa.modm, mattrib=:modm, illum_out=mprecon_flag) # x is dummy here, since actually using pa.modm
-
-	# build precon based on illum
-	build_mprecon!(pa, illum)
+	# update pdcal
+	update_dcal!(pa, mprecon_flag)
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic) & Data.TD_iszero(pa.dobs))
 		# change source wavelets for modelling observed data
 		forward_simulation!(pa, modm=modm_obs, mattrib=:modm,acqsrc=acqsrc_obs, dattrib=:dobs) # x is dummy here
-	elseif(Data.TD_iszero(pa.dobs) & (attrib == :real))
-		error("input observed data for real data inversion")
-	else
-		error("invalid attrib")
 	end
+	Data.TD_iszero(pa.dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
 
 	return pa
+end
+
+function update_dcal!(pa, mprecon_flag)
+	# intial modelling dcal
+	illum = forward_simulation!(pa, modm=pa.modm, mattrib=:modm, illum_out=mprecon_flag) # x is dummy here, since actually using pa.modm
+
+	# build precon based on illum
+	build_mprecon!(pa, illum)
 end
 
 """
@@ -248,8 +250,6 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	last_x = similar(x)
 	pa.verbose ? println("xfwi: number of inversion variables:\t", length(x)) : nothing
 
-	forward_simulation_allocate_buffer!(pa)
-
 	last_x = rand(size(x)) # reset last_x
 	# replace x and modi with initial model (pa.modm)
 	Seismic_x!(pa.modm, pa.modi, x, pa, 1)
@@ -285,6 +285,9 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 
 		# update modm and modi
 		Seismic_x!(pa.modm, pa.modi, Optim.minimizer(res), pa, -1)
+
+		# update calculated data in pa
+		update_dcal!(pa, false)
 
 		if(extended_trace)
 			# convert gradient vector to model
@@ -383,7 +386,7 @@ function forward_simulation!(
 		# generate modelled data, border values, etc.
 		if(pa.attrib_mod == :fdtd)
 			Fdtd.mod!(model=model, acqgeom=[pa.acqgeom], 
-			    acqsrc=[pa.acqsrc],src_flags=[2], 
+			    acqsrc=[acqsrc],src_flags=[2], 
 			    TDout=pa.dtemp,illum=illum, illum_flag=illum_out,
 			    backprop_flag=1,
 			    boundary=pa.buffer, 
@@ -395,7 +398,7 @@ function forward_simulation!(
 			backprop_flag = pa.buffer_update_flag ? 1 : 0
 
 			Fdtd.mod!(born_flag=true, npropwav=2, model=pa.modm0, model_pert=model, 
-	    		    acqgeom=[pa.acqgeom, pa.acqgeom], acqsrc=[pa.acqsrc, pa.acqsrc], 
+	    		    acqgeom=[pa.acqgeom, pa.acqgeom], acqsrc=[acqsrc, acqsrc], 
 			    TDout=pa.dtemp, illum=illum, illum_flag=illum_out,
 			    backprop_flag=backprop_flag,
 			    boundary=pa.buffer,
@@ -403,24 +406,24 @@ function forward_simulation!(
 			    tgridmod=pa.dcal.tgrid);
 
 			# switch off buffer update from now on (because the buffer doesn't change with x)
-			#pa.buffer_update_flag = false
+			pa.buffer_update_flag = false
 		elseif(pa.attrib_mod == :fdtd_hborn)
 			if(pa.buffer_update_flag)
 				# storing boundary values 
 				Fdtd.mod!(model=pa.modm0, acqgeom=[pa.acqgeom], 
-						 acqsrc=[pa.acqsrc], 
+						 acqsrc=[acqsrc], 
 						 backprop_flag=1,
 						 boundary=pa.buffer,
 						 tgridmod=pa.dcal.tgrid, 
 						 src_flags=[2], recv_flags=[0], verbose=pa.verbose)
 				# switch off buffer update from now on (because the buffer doesn't change with x)
-				#pa.buffer_update_flag = false
+				pa.buffer_update_flag = false
 			end
 
 			Fdtd.mod!(backprop_flag=-1, boundary=pa.buffer,
 			    npropwav=2, model=pa.modm0, model_pert=model, 
 			    acqgeom=[pa.acqgeom, pa.acqgeom], 
-			    acqsrc=[pa.acqsrc, pa.acqsrc], src_flags=[3, 0], 
+			    acqsrc=[acqsrc, acqsrc], src_flags=[3, 0], 
 			    TDout=pa.dtemp,
 			    recv_flags=[0, 1],
 			    tgridmod=pa.dcal.tgrid, born_flag=true, verbose=pa.verbose);
@@ -542,7 +545,7 @@ function wfwi!(pa::Param)
 	res = optimize(df, x, 
 		       LBFGS(),
 		       Optim.Options(g_tol = 1e-12,
-		       iterations = 10, store_trace = true,
+		       iterations = 100, store_trace = true,
 		       extended_trace=true, show_trace = true))
 	"testing gradient using auto-differentiation"
 #	res = optimize(x -> func_Coupling(x, last_x, buffer1, pa), x, 
@@ -553,8 +556,10 @@ function wfwi!(pa::Param)
 
 	pa.verbose ? println(res) : nothing
 	# update w in pa
-	Coupling_x!(pa.w, Optim.x_trace(res)[Optim.iterations(res)], pa, -1)
 
+	Coupling_x!(pa.w, Optim.minimizer(res), pa, -1)
+
+	return res
 end # wfwi
 
 """
@@ -731,7 +736,7 @@ end
 """
 Return functional and gradient of the CLS objective 
 """
-function func_grad_Coupling!(x::Vector{Float64}, storage::Vector{Float64},
+function func_grad_Coupling!(storage, x::Vector{Float64},
 			last_x::Vector{Float64}, 
 			pa::Param)
 
@@ -743,7 +748,7 @@ function func_grad_Coupling!(x::Vector{Float64}, storage::Vector{Float64},
 	if(x!=last_x)
 		pa.verbose ? println("updating buffer") : nothing
 		copy!(last_x, x)
-		Data.TDcoup!(pa.wdcal, pa.dcal, w, :s)
+		Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
 	end
 
 	if(storage === nothing)
@@ -752,13 +757,13 @@ function func_grad_Coupling!(x::Vector{Float64}, storage::Vector{Float64},
 		return f
 	else
 
-		f = Misfits.TD(pa.dfdwdacl, pa.wdcal, pa.dobs, pa.dprecon)
+		f = Misfits.TD!(pa.dfdwdcal, pa.wdcal, pa.dobs, pa.dprecon)
 
 		# allocate for w (do we need to preallocate)
 		gw = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.nfield, pa.w.acqgeom)
 
 		# get gradient w.r.t. w
-		Data.TDcoup!(pa.dfdwdacl, pa.dcal, gw, :w)
+		Data.TDcoup!(pa.dfdwdcal, pa.dcal, gw, :w)
 
 		# convert w to x
 		Coupling_x!(gw, storage, pa, 1)

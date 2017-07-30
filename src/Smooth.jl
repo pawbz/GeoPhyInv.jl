@@ -55,7 +55,7 @@ n1,&     ! first dimension of dat
 n2,&     ! second dimension of dat
 nwin&    ! half of the width of the gaussian window used for smoothing
 """
-function gaussian!{N}(x::Array{Float64,N}, nwin::Vector{Int64})
+function gaussian!{N}(x::AbstractArray{Float64,N}, nwin::Vector{Int64})
 
 	# convolution with a Gaussian window
 	if(N==1)

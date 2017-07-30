@@ -7,7 +7,11 @@ using Distributions
 using DSP # from julia
 
 """
-generate random signals in the frequency domain 
+Generate a band-limited 
+random signal of a particular maximum time, `tmax`.
+
+
+
 such that a box car function is applied in the time domain
 """
 function get_random_tmax_signal(;
@@ -18,44 +22,44 @@ function get_random_tmax_signal(;
 	dist::Symbol=:gaussian # distribution type
 	)
 
-# initialize outputs
-S = fill(complex(0.0,0.0),fgrid.nx);
-Sreal = fill(0.0,fgrid.nx);
-s = fill(complex(0.0,0.0),fgrid.nx);
+	# initialize outputs
+	S = fill(complex(0.0,0.0),fgrid.nx);
+	Sreal = fill(0.0,fgrid.nx);
+	s = fill(complex(0.0,0.0),fgrid.nx);
 
-Δf = 1.0 / tmax
-Δf <= fgrid.δx ? error("sampling smaller than grid sampling") :
-Δf >= (fmax-fmin) ? error("need to increase tmax") :
-fvec = [f for f in fmin:Δf:fmax]
-ifvec = fill(0, size(fvec))
+	Δf = 1.0 / tmax
+	Δf <= fgrid.δx ? error("sampling smaller than grid sampling") :
+	Δf >= (fmax-fmin) ? error("need to increase tmax") :
+	fvec = [f for f in fmin:Δf:fmax]
+	ifvec = fill(0, size(fvec))
 
-println("number of frequencies added to signal:\t", size(fvec,1))
-println("interval between random variable:\t", Δf)
-println("minimum frequency added to signal\t",minimum(fvec))
-println("maximum frequency added to signal\t",maximum(fvec))
-for iff in eachindex(fvec)
-	ifvec[iff] =  indmin((fgrid.x - fvec[iff]).^2.0)
-end
+	println("number of frequencies added to signal:\t", size(fvec,1))
+	println("interval between random variable:\t", Δf)
+	println("minimum frequency added to signal\t",minimum(fvec))
+	println("maximum frequency added to signal\t",maximum(fvec))
+	for iff in eachindex(fvec)
+		ifvec[iff] =  indmin((fgrid.x - fvec[iff]).^2.0)
+	end
 
-if(dist == :gaussian)
-	X = randn(size(fvec));
-elseif(dist == :uniform)
-	X = rand(Uniform(-2.0, 2.0), size(fvec))
-else
-	error("invalid dist")
-end
+	if(dist == :gaussian)
+		X = randn(size(fvec));
+	elseif(dist == :uniform)
+		X = rand(Uniform(-2.0, 2.0), size(fvec))
+	else
+		error("invalid dist")
+	end
 
-for iff in eachindex(fvec)
-	Sreal += X[iff] .* sinc(tmax.*(abs(fgrid.x - fgrid.x[ifvec[iff]])))
-end
+	for iff in eachindex(fvec)
+		Sreal += X[iff] .* sinc(tmax.*(abs(fgrid.x - fgrid.x[ifvec[iff]])))
+	end
 
-S = complex.(Sreal, 0.0);
+	S = complex.(Sreal, 0.0);
 
-# remove mean 
-#S[1] = 0.0; 
-s = ifft(S); 
+	# remove mean 
+	#S[1] = 0.0; 
+	s = ifft(S); 
 
-return S, s
+	return S, s
 
 end
 

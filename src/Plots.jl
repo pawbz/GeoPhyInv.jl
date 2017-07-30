@@ -5,6 +5,7 @@ using PyPlot
 #import PyCall: @pyimport
 #import PyPlot: pygui
 #@pyimport matplotlib2tikz
+import JuMIT.Interpolation
 import JuMIT.Acquisition
 import JuMIT.Grid
 import JuMIT.Data
@@ -152,8 +153,8 @@ function Seismic(model::Models.Seismic;
 		 zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]] 
 		 )
 	#indices
-	ixmin = findfirst(model.mgrid.x, xlim[1]); ixmax = findfirst(model.mgrid.x, xlim[2])
-	izmin = findfirst(model.mgrid.z, zlim[1]); izmax = findfirst(model.mgrid.z, zlim[2])
+	ixmin = Interpolation.indminn(model.mgrid.x, xlim[1])[1]; ixmax = Interpolation.indminn(model.mgrid.x, xlim[2])[1]
+	izmin = Interpolation.indminn(model.mgrid.z, zlim[1])[1]; izmax = Interpolation.indminn(model.mgrid.z, zlim[2])[1]
 	nrow = (model.mgrid.nx > model.mgrid.nz) ? 2 : 1
 	ncol = (model.mgrid.nx > model.mgrid.nz) ? 1 : 2
 	subplot(nrow,ncol,1)

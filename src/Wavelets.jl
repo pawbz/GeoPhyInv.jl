@@ -3,10 +3,12 @@ __precompile__()
 module Wavelets
 
 import JuMIT.Grid
+import JuMIT.DSP
 
 """
 Generate a Ricker Wavelet. Reference:
 Frequencies of the Ricker wavelet, Yanghua Wang, GEOPHYSICS, VOL. 80, NO. 2
+Bandwidth = 1.2 * fpeak for ricker
 
 # Keyword Arguments
 
@@ -14,15 +16,14 @@ Frequencies of the Ricker wavelet, Yanghua Wang, GEOPHYSICS, VOL. 80, NO. 2
 * `tgrid::Grid.M1D`: time-domain grid
 * `tpeak::Float64=tgrid.x[1]+1.5/fqdom`: the peak of the ricker in time (has a default)
 """
-function ricker(;
-		fqdom::Float64=nothing,
-		tgrid::Grid.M1D=nothing,
+function ricker(fqdom::Float64,
+		tgrid::Grid.M1D;
 		tpeak::Float64=tgrid.x[1]+1.5/fqdom, # using approximate half width of ricker
 		attrib::AbstractString="",
 		trim_tol::Float64=0.0
 		)
-	(tpeak < tgrid.x[1]+1.5/fqdom) ? error("cannot output Ricker for given tgrid and tpeak") : nothing
-	(tpeak > tgrid.x[end]-1.5/fqdom) ? error("cannot output Ricker for given tgrid and tpeak")  : nothing
+	(tpeak < tgrid.x[1]+1.5/fqdom) && error("cannot output Ricker for given tgrid and tpeak")
+	(tpeak > tgrid.x[end]-1.5/fqdom) && error("cannot output Ricker for given tgrid and tpeak")
 
 	isapprox(fqdom,0.0) && error("dominant frequency cannot be zero")
 
@@ -63,15 +64,21 @@ end
 
 """
 ormbsy wavelet
+
+
+* `tperc::Float64=0.0` : the wavelet is tapered in time using this percentage value
 """
-function  ormsby(;
-		f1::Float64=5.0,
-		f4::Float64=40.0,
+function  ormsby(
+		fqdom,
+		tgrid::Grid.M1D;
+		fracbandwidth::Float64=1.2, # using same value as Ricker
+		f1::Float64=fqdom-fracbandwidth*0.5*fqdom,
+		f4::Float64=fqdom+fracbandwidth*0.5*fqdom,
 		f2::Float64=0.25*f4+0.75*f1,
 		f3::Float64=0.25*f1+0.75*f4,
-		tpeak::Float64=0.25,
-		tgrid::Grid.M1D=nothing,
-		trim_tol::Float64=0.0
+		tpeak::Float64=tgrid.x[1]+1.5/(0.5*(f1+f4)), # using approximate half width 
+		trim_tol::Float64=0.0,
+		tperc::Float64=0.0
 		)
 
 # some constants
@@ -92,16 +99,17 @@ for it = 1: tgrid.nx
 	wav[it] =  (A43 * S4 - A34 * S3) - (A21 * S2 - A12 * S1)
 end
 
-isapprox(maximum(abs(wav)),0.0) && warn("wavelet is zeros")
+isapprox(maximum(abs.(wav)),0.0) && warn("wavelet is zeros")
 
 # normalize
-wav /= maximum(abs(wav));
+wav /= maximum(abs.(wav));
 
 if(trim_tol != 0.0)
-	return wav[abs(wav).>=trim_tol]
-else
-	return wav
+	wav = wav[abs(wav).>=trim_tol]
 end
+
+wav = wav .* DSP.taper(ones(wav),tperc)
+return wav
 
 end
 
