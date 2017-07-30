@@ -70,7 +70,7 @@ function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 	end
 
 	if(attrib == :interp)
-		# yout is only updated when yin is present
+		# yout is only updated within bounds of yin 
 		ioutmin = indminn(xout,xin[1],1)[1]
 		ioutmax = indminn(xout,xin[end],1)[1]
 
@@ -80,8 +80,12 @@ function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 			interp_func(view(xin, ivec), view(yin, ivec), view(xout, i), view(yout,i))
 		end
 	elseif(attrib == :spray)
+		# spary values of yin within bounds of yout
+		iinmin = indminn(xin,xout[1],1)[1]
+		iinmax = indminn(xin,xout[end],1)[1]
+
 		yout[:] = zero(Float64);
-		@simd for i in eachindex(xin)
+		@simd for i in iinmin:iinmax
 			ivec=indminn(xout,xin[i], np);
 			spray_func(view(xout, ivec), view(yout,ivec),view(xin, i), view(yin, i))
 		end
@@ -105,45 +109,49 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 		error("invalid attrib")
 	end
 
-	# yout is only updated when yin is present
-	i1outmin = indminn(zout,zin[1],1)[1]
-	i1outmax = indminn(zout,zin[end],1)[1]
-	i2outmin = indminn(xout,xin[1],1)[1]
-	i2outmax = indminn(xout,xin[end],1)[1]
-
-
-	yout[i1outmin:i1outmax, i2outmin:i2outmax] = zero(Float64);
 	if(attrib == :interp)
+		# yout is only updated within bounds of yin 
+		i1outmin = indminn(zout,zin[1],1)[1]
+		i1outmax = indminn(zout,zin[end],1)[1]
+		i2outmin = indminn(xout,xin[1],1)[1]
+		i2outmax = indminn(xout,xin[end],1)[1]
+		yout[i1outmin:i1outmax, i2outmin:i2outmax] = zero(Float64);
+
 		y_x=zeros(Float64, length(zin), length(i2outmin:i2outmax))
 		# first along x
 		for ix in i2outmin:i2outmax
 			@simd for iz in eachindex(zin)
 				ivec=indminn(xin,xout[ix], np);
-				interp_func(view(xin, ivec), view(yin, iz,ivec), view(xout,ix), view(y_x,iz,ix))
+				interp_func(view(xin, ivec), view(yin, iz,ivec), view(xout,ix), view(y_x,iz,ix-i2outmin+1))
 			end
 		end
 		# then along z
 		for ix in i2outmin:i2outmax
 			@simd for iz in i1outmin:i1outmax
 				ivec=indminn(zin,zout[iz], np);
-				interp_func(view(zin, ivec), view(y_x, ivec,ix), view(zout,iz), view(yout,iz,ix))
+				interp_func(view(zin, ivec), view(y_x, ivec,ix-i2outmin+1), view(zout,iz), view(yout,iz,ix))
 			end
 		end
 	elseif(attrib == :spray)
+		# spary values of yin only within bounds of yout
+		i1inmin = indminn(zin,zout[1],1)[1]
+		i1inmax = indminn(zin,zout[end],1)[1]
+		i2inmin = indminn(xin,xout[1],1)[1]
+		i2inmax = indminn(xin,xout[end],1)[1]
 		yout[:, :] = zero(Float64);
-		y_z = zeros(Float64, length(zout), length(xin))
+		y_z = zeros(Float64, length(zout), length(i2inmin:i2inmax))
 		# first along z
-		for ix in eachindex(xin)
-			@simd for iz in eachindex(zin)
+		for ix in i2inmin:i2inmax
+			@simd for iz in i1inmin:i1inmax
 				ivec=indminn(zout,zin[iz], np);
-				spray_func(view(zout, ivec), view(y_z,ivec,ix), view(zin ,iz), view(yin, iz,ix))
+				spray_func(view(zout, ivec), view(y_z,ivec,ix-i2inmin+1), view(zin ,iz), view(yin, iz,ix))
 			end
 		end
 		# then along x
-		for ix in eachindex(xin)
+		for ix in i2inmin:i2inmax
 			@simd for iz in eachindex(zout)
 				ivec=indminn(xout,xin[ix], np);
-				spray_func(view(xout, ivec), view(yout,iz,ivec), view(xin, ix), view(y_z, iz,ix))
+				spray_func(view(xout, ivec), view(yout,iz,ivec), view(xin, ix), view(y_z, iz,ix-i2inmin+1))
 			end
 		end
 	end

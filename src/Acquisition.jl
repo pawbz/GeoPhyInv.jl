@@ -14,7 +14,6 @@ import JuMIT.Models
 import JuMIT.Wavelets
 import JuMIT.DSP
 using Distributions
-using DSP # from Julia
 
 """
 Acquisiton has supersources, sources and receivers.
@@ -512,20 +511,9 @@ end
 Generate band-limited random source signals 
 """
 function Src_fixed_random(nss::Int64, ns::Int64, nfield::Int64, fmin::Float64, fmax::Float64, tgrid::Grid.M1D, tmax::Float64=tgrid.x[end] )
-	fs = 1/ tgrid.δx;
-	designmethod = Butterworth(4);
-	filtsource = Bandpass(fmin, fmax; fs=fs);
-
-	itmax = indmin(abs.(tgrid.x-tmax))
-	# 20% taper window
-	twin = DSP.taper(ones(itmax),20.) 
-	X = zeros(itmax)
 	wavsrc = [repeat(zeros(tgrid.nx),inner=(1,ns)) for iss=1:nss, ifield=1:nfield] 
 	for ifield in 1:nfield, iss in 1:nss, is in 1:ns
-		X[:] = rand(Uniform(-1.0, 1.0), itmax) .* twin
-		# band limit
-		filt!(X, digitalfilter(filtsource, designmethod), X);
-		wavsrc[iss, ifield][1:itmax,is] = X.*twin
+		wavsrc[iss, ifield][:,is] = DSP.get_tapered_random_tmax_signal(tgrid, fmin, fmax,tmax )
 	end
 	src= Src(nss, fill(ns, nss), nfield, wavsrc, deepcopy(tgrid))
 	print(src)

@@ -6,6 +6,26 @@ import JuMIT.Grid
 using Distributions
 using DSP # from julia
 
+
+function get_tapered_random_tmax_signal(tgrid::Grid.M1D, fmin::Float64, fmax::Float64, tmax::Float64)
+
+	fs = 1/ tgrid.δx;
+	designmethod = Butterworth(4);
+	filtsource = Bandpass(fmin, fmax; fs=fs);
+
+	itmax = indmin(abs.(tgrid.x-tmax))
+	# 20% taper window
+	twin = taper(ones(itmax),20.) 
+	X = zeros(itmax)
+	wavsrc = zeros(tgrid.nx) 
+	X[:] = rand(Uniform(-1.0, 1.0), itmax) .* twin
+	# band limit
+	filt!(X, digitalfilter(filtsource, designmethod), X);
+	wavsrc[1:itmax] = X.*twin
+end
+
+
+
 """
 Generate a band-limited 
 random signal of a particular maximum time, `tmax`.

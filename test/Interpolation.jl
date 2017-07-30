@@ -1,10 +1,11 @@
 using JuMIT
 using Base.Test
 
+# also testing behaviour when out of bounds!!
 nx=Array(linspace(1,20,10));
-mx=Array(linspace(10,20,20)); 
+mx=Array(linspace(3,25,20)); 
 nz=Array(linspace(1,20,30));
-mz=Array(linspace(5,20,40)); 
+mz=Array(linspace(5,27,40)); 
 
 for Battrib in [:B1, :B2]
 
