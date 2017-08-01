@@ -106,10 +106,11 @@ Resample a 2-D grid.
 M2D_resamp(grid::M2D, δx::Float64, δz::Float64) = M2D(grid.x[1], grid.x[end], 
 					grid.z[1], grid.z[end], δx, δz, grid.npml)
 
+
 """
 Extend M2D by on its PML grid points on all sides.
 """
-function M2D_pad_trun(mgrid::M2D; flag::Int64=1)
+function M2D_pml_pad_trun(mgrid::M2D; flag::Int64=1)
 
 	if(isequal(flag,1)) 
 		xmin = mgrid.x[1] - mgrid.npml*mgrid.δx

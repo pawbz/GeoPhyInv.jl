@@ -1,3 +1,5 @@
+addprocs(10)
+
 using JuMIT
 using Base.Test
 

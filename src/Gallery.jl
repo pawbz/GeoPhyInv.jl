@@ -71,9 +71,9 @@ Gallery of `Seismic` models.
   * `attrib=:acou_homo2` : same as above, but with spatial sampling as 40 m (faster testing)
   * `attrib=:seismic_marmousi2` : marmousi model with lower resolution; ideal for surface seismic experiments
   * `attrib=:seismic_marmousi2_high_res` : marmousi model high resolution; slower to load
-  * `attrib=:seismic_marmousi2_box1` : 1x1 kilometer box of marmousi model; ideal for crosswell, borehole seismic studies
-  * `attrib=:seismic_marmousi2_box2` : box for surface seismic studies
-  * `attrib=:seismic_marmousi2_box3` : 100x100 meter box of marmousi model at the center
+  * `attrib=:seismic_marmousi2_xwell` : boxed marmousi model ideal for crosswell experiments 
+  * `attrib=:seismic_marmousi2_surf` : boxed marmousi2 for surface seismic experiments
+  * `attrib=:seismic_marmousi2_downhole` : boxed marmousi2 for downhole seismic experiments  
 
 """
 function Seismic(attrib::Symbol, δ::Float64=0.0)
@@ -121,23 +121,18 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 		mgrid = Grid.M2D(0., 17000., 0., 3500.,size(vp,2),size(vp,1),40)
 		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
 
-	elseif(attrib == :seismic_marmousi2_box1)
-		mgrid=Grid.M2D(8500.,9500., 1000., 2000.,5.,5.,40)
-		marm_box1=Models.Seismic_zeros(mgrid)
-		Models.Seismic_interp_spray!(Seismic(:seismic_marmousi2), marm_box1, :interp, :B1)
-		model= Models.adjust_bounds!(marm_box1, bfrac)
-	elseif(attrib == :seismic_marmousi2_box2)
-		marm_full = Seismic(:seismic_marmousi2)
-		mgrid=Grid.M2D(6000.,12000., marm_full.mgrid.z[1],
-		 	marm_full.mgrid.z[end] ,5.,5.,40)
-		marm_box2=Models.Seismic_zeros(mgrid)
-		Models.Seismic_interp_spray!(marm_full, marm_box2, :interp, :B1)
-		model= Models.adjust_bounds!(marm_box2, bfrac)
-	elseif(attrib == :seismic_marmousi2_box3)
-		mgrid=Grid.M2D(9000.,9100., 1500., 1700.,0.1,0.1,40)
-		marm_box3=Models.Seismic_zeros(mgrid)
-		Models.Seismic_interp_spray!(Seismic(:seismic_marmousi2_high_res), marm_box3, :interp, :B1)
-		model= Models.adjust_bounds!(marm_box3, bfrac)
+	elseif(attrib == :seismic_marmousi2_xwell)
+		model=Models.Seismic_trun(Seismic(:seismic_marmousi2_high_res), 
+				     zmin=1000., zmax=2000., xmin=8500., xmax=9500.,)
+		Models.adjust_bounds!(model, bfrac) # adjuts bounds just inside the bounds 
+	elseif(attrib == :seismic_marmousi2_surf)
+		model=Models.Seismic_trun(Seismic(:seismic_marmousi2_high_res), 
+				     xmin=6000., xmax=12000.,)
+		Models.adjust_bounds!(model, bfrac) # adjust bounds just inside the bounds 
+	elseif(attrib == :seismic_marmousi2_downhole)
+		model=Models.Seismic_trun(Seismic(:seismic_marmousi2_high_res), 
+				     xmin=9025., xmax=9125., zmin=1400., zmax=1600.,)
+		Models.adjust_bounds!(model, bfrac) # adjust bounds just inside the bounds 
 	else
 		error("invalid attrib")
 	end

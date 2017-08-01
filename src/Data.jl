@@ -11,9 +11,9 @@ module Data
 
 import JuMIT.Acquisition
 import JuMIT.Grid
+import JuMIT.Interpolation
 import JuMIT.Coupling
 import JuMIT.DSP
-using Interpolations
 
 """
 Time domain representation of Seismic Data.
@@ -62,12 +62,6 @@ function TD_resamp(data::TD,
 	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:data.nfield],
 	      data.nfield,tgrid,data.acqgeom)
 	TD_resamp!(data, dataout)
-	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
-		itp = interpolate((data.tgrid.x,),
-		    data.d[iss, ifield][:, ir], 
-			     Gridded(Linear()))
-		dataout.d[iss, ifield][:,ir] = itp[tgrid.x]
-	end
 	return dataout
 end
 
@@ -82,13 +76,17 @@ Method to resample data in time.
 """
 
 function TD_resamp!(data::TD, dataout::TD)
+	# check if datasets are similar
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
 	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
-		itp = interpolate((data.tgrid.x,),
-		    data.d[iss, ifield][:, ir], 
-			     Gridded(Linear()))
-		dataout.d[iss, ifield][:,ir] = copy(itp[dataout.tgrid.x])
+		din = data.d[iss, ifield][:, ir]
+		xin = data.tgrid.x
+		xout = dataout.tgrid.x
+		dout = similar(xout)
+		Interpolation.interp_spray!(xin, din, xout, dout, :interp, :B1 )
+
+		dataout.d[iss, ifield][:,ir] = copy(dout)
 	end
 	return dataout
 end

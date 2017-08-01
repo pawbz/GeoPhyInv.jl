@@ -198,8 +198,8 @@ Author: Pawan Bharadwaj
 
 
 	# extend models in the PML layers
-	exmodel = Models.Seismic_pad_trun(model);
-	exmodel_pert = Models.Seismic_pad_trun(model_pert);
+	exmodel = Models.Seismic_pml_pad_trun(model);
+	exmodel_pert = Models.Seismic_pml_pad_trun(model_pert);
 
 	
 	#create some aliases
@@ -273,9 +273,9 @@ Author: Pawan Bharadwaj
 	end
 
 	"summing gradient over all the sources after truncation in PML"
-	grad_modtt_stack = Models.pad_trun(squeeze(sum(Array(grad_modtt),3),3),model.mgrid.npml,-1);
-	grad_modrrvx_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvx),3),3),model.mgrid.npml,-1);
-	grad_modrrvz_stack = Models.pad_trun(squeeze(sum(Array(grad_modrrvz),3),3),model.mgrid.npml,-1);
+	grad_modtt_stack = Models.pml_pad_trun(squeeze(sum(Array(grad_modtt),3),3),model.mgrid.npml,-1);
+	grad_modrrvx_stack = Models.pml_pad_trun(squeeze(sum(Array(grad_modrrvx),3),3),model.mgrid.npml,-1);
+	grad_modrrvz_stack = Models.pml_pad_trun(squeeze(sum(Array(grad_modrrvz),3),3),model.mgrid.npml,-1);
 
 	grad_modrr_stack = (grad_modrrvx_stack .+ grad_modrrvz_stack) .* (0.5)
 
@@ -294,7 +294,7 @@ Author: Pawan Bharadwaj
 				     [:χKI, :χρI], 1
 				     )
 	# output illum
-	(illum_flag) ? (illum[:] = Models.pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)) : nothing
+	(illum_flag) ? (illum[:] = Models.pml_pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)) : nothing
 
 	# output snaps
 	(snaps_flag) ? 	snaps[:] = Array(snaps_out) : nothing

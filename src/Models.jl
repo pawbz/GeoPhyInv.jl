@@ -55,6 +55,7 @@ Print information about `Seismic`
 function print(mod::Seismic, name::String="")
 	println("\tSeismic Model:\t",name)
 	println("\t> number of samples:\t","x\t",mod.mgrid.nx,"\tz\t",mod.mgrid.nz)
+	println("\t> sampling intervals:\t","x\t",mod.mgrid.δx,"\tz\t",mod.mgrid.δz)
 	println("\t> vp:\t","min\t",minimum(Seismic_get(mod,:vp)),"\tmax\t",maximum(Seismic_get(mod,:vp)))
 	println("\t> vp bounds:\t","min\t",mod.vp0[1],"\tmax\t",mod.vp0[2])
 	println("\t> ρ:\t","min\t",minimum(Seismic_get(mod,:ρ)),"\tmax\t",maximum(Seismic_get(mod,:ρ)))
@@ -404,28 +405,71 @@ function Seismic_smooth!(mod::Seismic, zperc::Float64, xperc::Float64=zwidth;
 	mod.χvp += mχvp; mod.χvs += mχvs; mod.χρ += mχρ
 end
 
+"""
+Return a truncated seismic model using input bounds.
+Note that there is no interpolation going on here, but only truncation, so 
+the input bounds cannot be strictly imposed.
+
+# Arguments
+* `mod::Seismic` : model that is truncated
+
+# Keyword Arguments
+
+* `zmin::Float64=mod.mgrid.z[1]` : 
+* `zmax::Float64=mod.mgrid.z[end]` : 
+* `xmin::Float64=mod.mgrid.x[1]` : 
+* `xmax::Float64=mod.mgrid.x[end]` : 
+"""
+function Seismic_trun(mod::Seismic;
+			 zmin::Float64=mod.mgrid.z[1], zmax::Float64=mod.mgrid.z[end],
+			 xmin::Float64=mod.mgrid.x[1], xmax::Float64=mod.mgrid.x[end] 
+			 )
+
+	izmin = Interpolation.indminn(mod.mgrid.z, zmin, 1)[1]
+	izmax = Interpolation.indminn(mod.mgrid.z, zmax, 1)[1]
+	ixmin = Interpolation.indminn(mod.mgrid.x, xmin, 1)[1]
+	ixmax = Interpolation.indminn(mod.mgrid.x, xmax, 1)[1]
+
+	x = mod.mgrid.x[ixmin:ixmax]
+	z = mod.mgrid.z[izmin:izmax]
+	npml =  mod.mgrid.npml
+	δx, δz = mod.mgrid.δx, mod.mgrid.δz
+
+	mgrid_trun = Grid.M2D(x, z, length(x), length(z), npml, δx, δz)
+	
+	# allocate model
+	mod_trun = Seismic_zeros(mgrid_trun)
+
+	for f in [:χvp, :χvs, :χρ]
+		f0 = Symbol((replace("$(f)", "χ", "")),0)
+		setfield!(mod_trun, f, getfield(mod, f)[izmin:izmax, ixmin:ixmax])
+		setfield!(mod_trun, f0, getfield(mod, f0)) # adjust bounds later after truncation if necessary
+	end
+	return mod_trun
+
+end
 
 """
 Extend a seismic model into PML layers
 """
-function Seismic_pad_trun(mod::Seismic)
+function Seismic_pml_pad_trun(mod::Seismic)
 
-	vpex = pad_trun(χ(mod.χvp, mod.vp0, -1),mod.mgrid.npml);
-	vsex = pad_trun(χ(mod.χvs, mod.vs0, -1),mod.mgrid.npml);
-	ρex = pad_trun(χ(mod.χρ, mod.ρ0, -1),mod.mgrid.npml);
+	vpex = pml_pad_trun(χ(mod.χvp, mod.vp0, -1),mod.mgrid.npml);
+	vsex = pml_pad_trun(χ(mod.χvs, mod.vs0, -1),mod.mgrid.npml);
+	ρex = pml_pad_trun(χ(mod.χρ, mod.ρ0, -1),mod.mgrid.npml);
 	return Seismic(mod.vp0,
 		 mod.vs0,
 		 mod.ρ0,
 		 χ(vpex,mod.vp0),
 		 χ(vsex,mod.vs0),
 		 χ(ρex,mod.ρ0),
-		 Grid.M2D_pad_trun(mod.mgrid))
+		 Grid.M2D_pml_pad_trun(mod.mgrid))
 end
 
 """
 PML Extend a model on all four sides
 """
-function pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
+function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
 	if(isequal(flag,1)) 
 		nz = size(mod,1); nx = size(mod,2)
 		modex = zeros(nz + 2*np, nx + 2*np)
