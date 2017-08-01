@@ -1,5 +1,5 @@
 
-using Optim
+using Optim, LineSearches
 
 
 f(x) = (1.0 - x[1])^2 + 100.0 * (x[2] - x[1]^2)^2
@@ -14,10 +14,16 @@ end
 
 
 # without preconditioner
-res_hz = optimize(df, [0., 0.], [-1., -1.0], [2., 2.,], Fminbox{GradientDescent}())
+res_hz = optimize(df, [0., 0.], [-1., -1.0], [2., 2.,], Fminbox{ConjugateGradient}(), 
+		  linesearch = BackTracking(order=3), f_tol=1e-5, x_tol=1e-3,
+		  iterations=100,
+		  optimizer_o=Optim.Options( f_tol=1e-5, x_tol=1e-3,iterations=2, show_trace=true      ))
+println(res_hz)
+
+#res_hz = optimize(df, [0., 0.], LBFGS())
 #res_hz = optimize(df, prob.initial_x) 
 #		  optimizer_o=Optim.Options(show_trace=true))
-println(res_hz)
+#println(res_hz)
 
 
 # testing preconditioner

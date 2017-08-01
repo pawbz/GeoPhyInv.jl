@@ -23,7 +23,7 @@ import JuMIT.Data
 import JuMIT.Coupling
 import JuMIT.Misfits
 import JuMIT.Fdtd
-using Optim
+using Optim, LineSearches
 using DistributedArrays
 
 
@@ -222,6 +222,7 @@ Full Waveform Inversion using `Optim` package.
 This method updates `pa.modm` and `pa.dcal`. More details about the
 optional parameters can be found in the documentation of the `Optim` 
 package.
+`pa.modi` is used as initial model if non-zero.
 
 # Arguments that are modified
 
@@ -232,8 +233,10 @@ package.
 * `extended_trace::Bool=true` : save extended trace
 * `time_limit=Float64=2.0*60.` : time limit for inversion (testing)
 * `iterations::Int64=5` : maximum number of iterations
-* `f_tol::Float64=1e-3` : functional tolerance
-* `g_tol::Float64=1e-3` : gradient tolerance
+* `linesearch_iterations::Int64=3` : maximum number of line search iterations
+
+* `f_tol::Float64=1e-5` : functional tolerance
+* `g_tol::Float64=1e-8` : gradient tolerance
 * `x_tol::Float64=1e-3` : model tolerance
 
 # Outputs
@@ -243,7 +246,8 @@ package.
   * `=:migr` return gradient at the first iteration, i.e., a migration image
   * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
 """
-function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., iterations::Int64=5, f_tol::Float64=1e-3, g_tol::Float64=1e-3, x_tol::Float64=1e-3)
+function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., iterations::Int64=5,
+	       f_tol::Float64=1e-5, g_tol::Float64=1e-8, x_tol::Float64=1e-3, linesearch_iterations::Int64=3)
 
 	# convert initial model to the inversion variable
 	x = zeros(xfwi_ninv(pa));
@@ -251,8 +255,14 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	pa.verbose ? println("xfwi: number of inversion variables:\t", length(x)) : nothing
 
 	last_x = rand(size(x)) # reset last_x
+
 	# replace x and modi with initial model (pa.modm)
-	Seismic_x!(pa.modm, pa.modi, x, pa, 1)
+	if(Models.Seismic_iszero(pa.modi)) # then use modm
+		Models.Seismic_iszero(pa.modm) ? error("no initial model present in pa") :	Seismic_x!(pa.modm, pa.modi, x, pa, 1)
+	else
+		# use modi as starting model without disturbing modm
+		Seismic_x!(nothing, pa.modi, x, pa, 1)
+	end
 
 	# bounds
 	lower_x = similar(x); upper_x = similar(x);
@@ -276,11 +286,19 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 		res = optimize(df, x, 
 			       lower_x,
 			       upper_x,
-			       Fminbox{LBFGS}(); iterations=iterations, # barrier function iterations
+			       Fminbox{LBFGS}(); iterations=iterations, # actual iterations
+			       # LBFGS was behaving wierd with backtracking
+			       #linesearch = BackTracking(order=3), # to reduce the number of gradient calls
+				  g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
+				  extended_trace=extended_trace,
+				  store_trace=store_trace,
 				  #linesearch = Optim.LineSearches.morethuente!,
-			     optimizer_o=Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
-		 			iterations = 2, store_trace = true, time_limit=time_limit,
-					store_trace=store_trace,extended_trace=extended_trace, show_trace = true))
+			     optimizer_o=Optim.Options(
+				  g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
+				  	# iterations inside every line search, I choose 3 because better performance on Rosenbrock
+		 			iterations = linesearch_iterations, 
+					#time_limit=time_limit,
+					store_trace=store_trace,extended_trace=extended_trace, show_trace=true))
 		pa.verbose ? println(res) : nothing
 
 		# update modm and modi
@@ -565,7 +583,7 @@ end # wfwi
 """
 Convert `Seismic` model to x and vice versa
 
-* `modm::Models.Seismic` : seismic model on modelling grid (input zeros to not use it)
+* `modm` : seismic model on modelling grid (input nothing to not use it)
 * `modi::Models.Seismic` : seismic model on inversion grid
 * `x::Vector{Float64}` : inversion vector
 * `pa::Param` : fwi parameters
@@ -574,17 +592,20 @@ Convert `Seismic` model to x and vice versa
   * `=-1` updates both modm and modi using x
 """
 function Seismic_x!(
-		    modm::Models.Seismic, 
+		    modm, 
 		    modi::Models.Seismic,
 		    x::Vector{Float64}, 
 		    pa::Param, 
 		    flag::Int64)
 	if(flag ==1) # convert modm or modi to x
-		all([Models.Seismic_iszero(modm), Models.Seismic_iszero(modi)]) ? 
-					error("input modi or modm") : nothing
+		if(modm===nothing)
+			all([Models.Seismic_iszero(modi)]) && error("input modi") 
+		else
+			all([Models.Seismic_iszero(modm), Models.Seismic_iszero(modi)]) && error("input modi or modm")
 
-		# 1. get modi using interpolation and modm
-		Models.Seismic_iszero(modm) ? nothing : Models.Seismic_interp_spray!(modm, modi, :interp)
+			# 1. get modi using interpolation and modm
+			!(Models.Seismic_iszero(modm)) && Models.Seismic_interp_spray!(modm, modi, :interp)
+		end
 
 		nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
 		# 2. re-parameterization on the inversion grid (include other parameterizations here)

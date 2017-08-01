@@ -73,6 +73,8 @@ Gallery of `Seismic` models.
   * `attrib=:seismic_marmousi2_high_res` : marmousi model high resolution; slower to load
   * `attrib=:seismic_marmousi2_box1` : 1x1 kilometer box of marmousi model; ideal for crosswell, borehole seismic studies
   * `attrib=:seismic_marmousi2_box2` : box for surface seismic studies
+  * `attrib=:seismic_marmousi2_box3` : 100x100 meter box of marmousi model at the center
+
 """
 function Seismic(attrib::Symbol, δ::Float64=0.0)
 	bfrac=0.1; 
@@ -131,6 +133,11 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 		marm_box2=Models.Seismic_zeros(mgrid)
 		Models.Seismic_interp_spray!(marm_full, marm_box2, :interp, :B1)
 		model= Models.adjust_bounds!(marm_box2, bfrac)
+	elseif(attrib == :seismic_marmousi2_box3)
+		mgrid=Grid.M2D(9000.,9100., 1500., 1700.,0.1,0.1,40)
+		marm_box3=Models.Seismic_zeros(mgrid)
+		Models.Seismic_interp_spray!(Seismic(:seismic_marmousi2_high_res), marm_box3, :interp, :B1)
+		model= Models.adjust_bounds!(marm_box3, bfrac)
 	else
 		error("invalid attrib")
 	end

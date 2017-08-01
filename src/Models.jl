@@ -64,7 +64,6 @@ end
 """
 Return medium property bounds based on maximum and minimum values of the array and frac.
 The bounds cannot be less than zero
-
 """
 function bounds(mod::Array{Float64}, frac::Float64=0.1)
 	any(mod .< 0.0) && error("model values less than zero")
@@ -332,20 +331,20 @@ Add features to a model.
 function Seismic_addon!(mod::Seismic; 
 		       circ_loc::Vector{Float64}=[0., 0.,],
 		       circ_rad::Float64=0.0,
-		       circ_pert::Float64=0.1,
+		       circ_pert::Float64=0.0,
 		       rect_loc::Vector{Float64}=[0., 0., 0., 0.,],
-		       rect_pert::Float64=0.1,
+		       rect_pert::Float64=0.0,
 		       randn_perc::Real=0.0,
 		       fields::Vector{Symbol}=[:χvp,:χρ,:χvs]
 		       )
 
 	temp = zeros(mod.mgrid.nz, mod.mgrid.nx)
-	if(!(circ_loc === nothing))
+	if(!(circ_pert == 0.0))
 		temp += [((sqrt((mod.mgrid.x[ix]-circ_loc[2])^2 + 
 			(mod.mgrid.z[iz]-circ_loc[1])^2 ) <= circ_rad) ? circ_pert : 0.0)  for 
 	   		iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx ]
 	end
-	if(!(rect_loc === nothing))
+	if(!(rect_pert == 0.0))
 		temp += [
 			(((mod.mgrid.x[ix]-rect_loc[4]) * (mod.mgrid.x[ix]-rect_loc[2]) < 0.0) & 
 			((mod.mgrid.z[iz]-rect_loc[3]) * (mod.mgrid.z[iz]-rect_loc[1]) < 0.0)) ?

@@ -59,8 +59,8 @@ function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 
 	if(Battrib == :B1)
 		np=2;
-		interp_func = interp_B1_1D!
-		spray_func = spray_B1_1D!
+		interp_func = interp_B1_1D 
+		spray_func = spray_B1_1D 
 	elseif(Battrib == :B2)
 		np=4;
 		interp_func = interp_B2_1D!
@@ -77,7 +77,7 @@ function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 		yout[ioutmin:ioutmax] = zero(Float64);
 		@simd for i in ioutmin:ioutmax
 			ivec=indminn(xin,xout[i], np);
-			interp_func(view(xin, ivec), view(yin, ivec), view(xout, i), view(yout,i))
+			interp_func(i, yout, xin[ivec]...,yin[ivec]..., xout[i])
 		end
 	elseif(attrib == :spray)
 		# spary values of yin within bounds of yout
@@ -87,7 +87,7 @@ function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 		yout[:] = zero(Float64);
 		@simd for i in iinmin:iinmax
 			ivec=indminn(xout,xin[i], np);
-			spray_func(view(xout, ivec), view(yout,ivec),view(xin, i), view(yin, i))
+			spray_func(ivec..., yout, xout[ivec]..., xin[i], yin[i])
 		end
 	end
 end # interp_spray!
@@ -99,8 +99,8 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 					  )
 	if(Battrib == :B1)
 		np=2;
-		interp_func = interp_B1_1D!
-		spray_func = spray_B1_1D!
+		interp_func = interp_B1_1D 
+		spray_func = spray_B1_1D 
 	elseif(Battrib == :B2)
 		np=4;
 		interp_func = interp_B2_1D!
@@ -121,15 +121,17 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 		# first along x
 		for ix in i2outmin:i2outmax
 			@simd for iz in eachindex(zin)
-				ivec=indminn(xin,xout[ix], np);
-				interp_func(view(xin, ivec), view(yin, iz,ivec), view(xout,ix), view(y_x,iz,ix-i2outmin+1))
+				ivec=indminn(xin, xout[ix], np);
+				iy=(ix-i2outmin)*length(zin)+iz
+				interp_func(iy, y_x, xin[ivec]..., yin[iz, ivec]..., xout[ix])
 			end
 		end
 		# then along z
 		for ix in i2outmin:i2outmax
 			@simd for iz in i1outmin:i1outmax
 				ivec=indminn(zin,zout[iz], np);
-				interp_func(view(zin, ivec), view(y_x, ivec,ix-i2outmin+1), view(zout,iz), view(yout,iz,ix))
+				iy=iz+(ix-1)*length(zout)
+				interp_func(iy, yout, zin[ivec]..., y_x[ivec, ix-i2outmin+1]..., zout[iz]...)
 			end
 		end
 	elseif(attrib == :spray)
@@ -144,14 +146,16 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 		for ix in i2inmin:i2inmax
 			@simd for iz in i1inmin:i1inmax
 				ivec=indminn(zout,zin[iz], np);
-				spray_func(view(zout, ivec), view(y_z,ivec,ix-i2inmin+1), view(zin ,iz), view(yin, iz,ix))
+				iy=ivec+(ix-i2inmin)*length(zout)
+				spray_func(iy..., y_z, zout[ivec]..., zin[iz], yin[iz, ix])
 			end
 		end
 		# then along x
 		for ix in i2inmin:i2inmax
 			@simd for iz in eachindex(zout)
 				ivec=indminn(xout,xin[ix], np);
-				spray_func(view(xout, ivec), view(yout,iz,ivec), view(xin, ix), view(y_z, iz,ix-i2inmin+1))
+				iy=(ivec-1).*length(zout) + iz
+				spray_func(iy..., yout, xout[ivec]...,  xin[ix], y_z[iz,ix-i2inmin+1])
 			end
 		end
 	end
@@ -173,24 +177,15 @@ spraying returns y1, y2 using y
 bilinear interpolation
 Reference: http://www.ajdesigner.com/phpinterpolation/bilinear_interpolation_equation.php
 """
-function interp_B1_1D!(xV::AbstractVector{Float64}, yV::AbstractVector{Float64}, x::AbstractArray{Float64,0}, y::AbstractArray{Float64,0})
-	denom = (xV[2] - xV[1])
-	y[1] = ((yV[1]*(xV[2]-x[1]) + yV[2]*(x[1]-xV[1])) / denom)
-	return y
+function interp_B1_1D(iy, yV, x1, x2, y1, y2, x)
+	denom = (x2 - x1)
+	yV[iy] = ((y1*(x2-x) + y2*(x-x1)) / denom)
 end # interpolate_spray_B1_1D
 
-function spray_B1_1D!(xV::AbstractVector{Float64}, yV::AbstractVector{Float64}, x::AbstractArray{Float64,0}, y::AbstractArray{Float64,0})
-	denom = (xV[2] - xV[1])
-	if((xV[2]-x[1]) == zero(Float64)) 
-	else
-		yV[1] += (y[1] * (xV[2]-x[1])/denom)
-	end
-	if((x[1]-xV[1]) == zero(Float64))
-		yV[2] += (zero(Float64));
-	else
-		yV[2] += (y[1] * (x[1]-xV[1])/denom)
-	end
-	return yV
+function spray_B1_1D( iy1, iy2, yV, x1, x2, x, y)
+	denom = (x2 - x1)
+	yV[iy1] += (y * (x2-x)/denom)
+	yV[iy2] += (y * (x-x1)/denom)
 end # interpolate_spray_B1_1D
 
 
@@ -207,90 +202,89 @@ spraying returns y1, y2, y3, y4 using y
                 y=f(x) |                      
                        +                      
 """
-function interp_B2_1D!(xV::AbstractVector{Float64}, yV::AbstractVector{Float64}, x::AbstractArray{Float64,0}, y::AbstractArray{Float64,0})
+function interp_B2_1D!(iy, yV, x1, x2, x3, x4, y1, y2, y3, y4, x)
 	
 	"some constants"
-	h = (xV[2] - xV[1]);
+	h = (x2 - x1);
 	hcube = h*h*h;
 	hcubeI = hcube^(-1.0)
 
 	if(h == zero(Float64)) then
-		y[1] =  (Float64(0.25) * (yV[1] + yV[2] + yV[3] + yV[4]))
+		y[iy] =  (Float64(0.25) * (y1 + y2 + y3 + y4))
 	else
 		
-		if((((x[1]-xV[1])*(x[1]-xV[2])) < zero(Float64)) | (x[1]==xV[1])) 
+		if((((x-x1)*(x-x2)) < zero(Float64)) | (x==x1)) 
 			"left edge interpolate"
-			c1 = (1.0 / 6.0 * (2.0 * h - (x[1] - (xV[1]-h)))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - ((xV[4]-h) - x[1]))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[2]-h) - x[1])^2.0 * (2.0 * h - (x[1] - (xV[2]-h))) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[3]-h) - x[1])^2.0 * (2.0 * h + (x[1] - (xV[3]-h))) ) )) * hcubeI
-			y[1] = (yV[1] * (c2 + 2.0*c1) + yV[2] * (c3 - c1) + yV[3] * c4)
-		elseif((((x[1]-xV[3])*(x[1]-xV[4])) < zero(Float64)) | (x[1]==xV[4])) 
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (x1-h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((x4-h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((x2-h) - x)^2.0 * (2.0 * h - (x - (x2-h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((x3-h) - x)^2.0 * (2.0 * h + (x - (x3-h))) ) )) * hcubeI
+			yV[iy] = (y1 * (c2 + 2.0*c1) + y2 * (c3 - c1) + y3 * c4)
+		elseif((((x-x3)*(x-x4)) < zero(Float64)) | (x==x4)) 
 			"right edge interpolate"
-			c1 = (1.0 / 6.0 * (2.0 * h - (x[1] - (xV[1]+h)))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - ((xV[4]+h) - x[1]))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[2]+h) - x[1])^2.0 * (2.0 * h - (x[1] - (xV[2]+h))) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[3]+h) - x[1])^2.0 * (2.0 * h + (x[1] - (xV[3]+h))) ) )) * hcubeI
-			y[1] = (yV[2] * c1 + yV[3] * (c2 - c4) + yV[4] * (c3 + 2.0*c4))
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (x1+h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((x4+h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((x2+h) - x)^2.0 * (2.0 * h - (x - (x2+h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((x3+h) - x)^2.0 * (2.0 * h + (x - (x3+h))) ) )) * hcubeI
+			yV[iy] = (y2 * c1 + y3 * (c2 - c4) + y4 * (c3 + 2.0*c4))
 		else
-			c1 = (1.0 / 6.0 * (2.0 * h - (x[1] - xV[1]))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - (xV[4] - x[1]))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * (xV[2] - x[1])^2.0 * (2.0 * h - (x[1] - xV[2])) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * (xV[3] - x[1])^2.0 * (2.0 * h + (x[1] - xV[3])) ) )) * hcubeI
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - x1))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - (x4 - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * (x2 - x)^2.0 * (2.0 * h - (x - x2)) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * (x3 - x)^2.0 * (2.0 * h + (x - x3)) ) )) * hcubeI
 			"center interpolate"
-			y[1] = ((yV[1] * c1 + yV[2] * c2 + yV[3] * c3 + yV[4] * c4))
+			yV[iy] = ((y1 * c1 + y2 * c2 + y3 * c3 + y4 * c4))
 		end
 	end
-	return yV
+	return yV[iy]
 
 end # interp_B2_1D
 
-function spray_B2_1D!(xV::AbstractVector{Float64}, yV::AbstractVector{Float64}, x::AbstractArray{Float64,0}, y::AbstractArray{Float64,0})
+function spray_B2_1D!(iy1, iy2, iy3, iy4, yV, x1, x2, x3, x4, x, y)
 
 	"some constants"
-	h = (xV[2] - xV[1]);
+	h = (x2 - x1);
 	hcube = h*h*h;
 	hcubeI = hcube^(-1.0)
 
 	if(h == zero(Float64)) then
-		yV[1] += (y[1])
-		yV[2] += (y[1]) 
-		yV[3] += (y[1]) 
-		yV[4] += (y[1]) 
+		yV[iy1] += (y)
+		yV[iy2] += (y) 
+		yV[iy3] += (y) 
+		yV[iy4] += (y) 
 	else
-		if((((x[1]-xV[1])*(x[1]-xV[2])) < zero(Float64)) | (x[1]==xV[1])) 
+		if((((x-x1)*(x-x2)) < zero(Float64)) | (x==x1)) 
 			"left edge spray"
-			c1 = (1.0 / 6.0 * (2.0 * h - (x[1] - (xV[1]-h)))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - ((xV[4]-h) - x[1]))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[2]-h) - x[1])^2.0 * (2.0 * h - (x[1] - (xV[2]-h))) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[3]-h) - x[1])^2.0 * (2.0 * h + (x[1] - (xV[3]-h))) ) )) * hcubeI
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (x1-h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((x4-h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((x2-h) - x)^2.0 * (2.0 * h - (x - (x2-h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((x3-h) - x)^2.0 * (2.0 * h + (x - (x3-h))) ) )) * hcubeI
 
-			yV[1] += (y[1] * (c2 + 2.0*c1))
-			yV[2] += (y[1] * (c3 - c1))
-			yV[3] += (y[1] * c4)
-		elseif((((x[1]-xV[3])*(x[1]-xV[4])) < zero(Float64)) | (x[1]==xV[4])) 
+			yV[iy1] += (y * (c2 + 2.0*c1))
+			yV[iy2] += (y * (c3 - c1))
+			yV[iy3] += (y * c4)
+		elseif((((x-x3)*(x-x4)) < zero(Float64)) | (x==x4)) 
 			"right edge spray"        
-			c1 = (1.0 / 6.0 * (2.0 * h - (x[1] - (xV[1]+h)))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - ((xV[4]+h) - x[1]))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[2]+h) - x[1])^2.0 * (2.0 * h - (x[1] - (xV[2]+h))) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((xV[3]+h) - x[1])^2.0 * (2.0 * h + (x[1] - (xV[3]+h))) ) )) * hcubeI
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (x1+h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((x4+h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((x2+h) - x)^2.0 * (2.0 * h - (x - (x2+h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((x3+h) - x)^2.0 * (2.0 * h + (x - (x3+h))) ) )) * hcubeI
 
-			yV[2] += y[1] * c1 
-			yV[3] += y[1] * (c2 - c4) 
-			yV[4] += y[1] * (c3+ 2.0 * c4) 
+			yV[iy2] += y * c1 
+			yV[iy3] += y * (c2 - c4) 
+			yV[iy4] += y * (c3+ 2.0 * c4) 
 		else
 			"center spray"
-			c1 = (1.0 / 6.0 * (2.0 * h - (x[1] - xV[1]))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - (xV[4] - x[1]))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * (xV[2] - x[1])^2.0 * (2.0 * h - (x[1] - xV[2])) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * (xV[3] - x[1])^2.0 * (2.0 * h + (x[1] - xV[3])) ) )) * hcubeI
-			yV[1] += (y[1] * c1)
-			yV[2] += (y[1] * c2)
-			yV[3] += (y[1] * c3) 
-			yV[4] += (y[1] * c4) 
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - x1))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - (x4 - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * (x2 - x)^2.0 * (2.0 * h - (x - x2)) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * (x3 - x)^2.0 * (2.0 * h + (x - x3)) ) )) * hcubeI
+			yV[iy1] += (y * c1)
+			yV[iy2] += (y * c2)
+			yV[iy3] += (y * c3) 
+			yV[iy4] += (y * c4) 
 		end
 	end
-	return yV
 end # interpolate_spray_B3_1D
 
 
