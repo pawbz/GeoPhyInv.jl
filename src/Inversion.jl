@@ -112,7 +112,9 @@ Constructor for `Param`
 # Optional Arguments
 
 * `igrid::Grid.M2D=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
-* `mprecon_flag::Bool=false` : flag to use a model preconditioner
+* `mprecon_factor::Float64=1` : factor to control model preconditioner, always greater than 1
+  * `=1` means the preconditioning is switched off
+  * `>1` means the preconditioning is switched on, larger the mprecon_factor, stronger the applied preconditioner becomes
 * `dobs::Data.TD` : observed data
 * `dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.acqgeom)` : data preconditioning, defaults to one 
 * `tlagssf::Float64=0.0` : maximum lagtime of unknown source filter
@@ -135,7 +137,7 @@ function Param(
 	       modm::Models.Seismic;
 	       # other optional 
 	       igrid::Grid.M2D=modm.mgrid,
-	       mprecon_flag::Bool=false,
+	       mprecon_factor::Float64=1.0,
 	       dobs::Data.TD=Data.TD_zeros(1,tgrid,acqgeom),
 	       dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.acqgeom),
 	       tlagssf::Float64=0.0,
@@ -180,7 +182,7 @@ function Param(
 	forward_simulation_allocate_buffer!(pa)
 
 	# update pdcal
-	update_dcal!(pa, mprecon_flag)
+	update_dcal!(pa, mprecon_factor)
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic) & Data.TD_iszero(pa.dobs))
@@ -192,12 +194,16 @@ function Param(
 	return pa
 end
 
-function update_dcal!(pa, mprecon_flag)
+"""
+Use to update `dcal` in pa (only for testing)
+"""
+function update_dcal!(pa, mprecon_factor=1.0)
+	illum_out = (mprecon_factor == 1.0) ? false : true
 	# intial modelling dcal
-	illum = forward_simulation!(pa, modm=pa.modm, mattrib=:modm, illum_out=mprecon_flag) # x is dummy here, since actually using pa.modm
+	illum = forward_simulation!(pa, modm=pa.modm, mattrib=:modm, illum_out=illum_out) # x is dummy here, since actually using pa.modm
 
 	# build precon based on illum
-	build_mprecon!(pa, illum)
+	build_mprecon!(pa, illum, mprecon_factor)
 end
 
 """
@@ -305,7 +311,7 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 		Seismic_x!(pa.modm, pa.modi, Optim.minimizer(res), pa, -1)
 
 		# update calculated data in pa
-		update_dcal!(pa, false)
+		update_dcal!(pa)
 
 		if(extended_trace)
 			# convert gradient vector to model
@@ -400,7 +406,7 @@ function forward_simulation!(
 			error("invalid mattrib")
 		end
 
-		illum=zeros(pa.modm.mgrid.nz, pa.modm.mgrid.nx)
+		illum=ones(pa.modm.mgrid.nz, pa.modm.mgrid.nx)
 		# generate modelled data, border values, etc.
 		if(pa.attrib_mod == :fdtd)
 			Fdtd.mod!(model=model, acqgeom=[pa.acqgeom], 
@@ -417,7 +423,8 @@ function forward_simulation!(
 
 			Fdtd.mod!(born_flag=true, npropwav=2, model=pa.modm0, model_pert=model, 
 	    		    acqgeom=[pa.acqgeom, pa.acqgeom], acqsrc=[acqsrc, acqsrc], 
-			    TDout=pa.dtemp, illum=illum, illum_flag=illum_out,
+			    TDout=pa.dtemp, 
+			    illum=illum, illum_flag=illum_out,
 			    backprop_flag=backprop_flag,
 			    boundary=pa.buffer,
 			    src_flags=[2, 0], recv_flags = [0, 1], 
@@ -441,6 +448,7 @@ function forward_simulation!(
 			Fdtd.mod!(backprop_flag=-1, boundary=pa.buffer,
 			    npropwav=2, model=pa.modm0, model_pert=model, 
 			    acqgeom=[pa.acqgeom, pa.acqgeom], 
+			    illum=illum, illum_flag=illum_out,
 			    acqsrc=[acqsrc, acqsrc], src_flags=[3, 0], 
 			    TDout=pa.dtemp,
 			    recv_flags=[0, 1],
@@ -450,30 +458,37 @@ function forward_simulation!(
 			error("invalid pa.attrib_mod")
 		end
 		setfield!(pa, dattrib, deepcopy(pa.dtemp[1]))
+		!(illum_out) && (illum[:] = 1.0)  # illum is ones when absent
 		return illum
 	end
 end
 
 "build a model precon"
-function build_mprecon!(pa,illum::Array{Float64})
+function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
+	"illum cannot be zero when building mprecon"
+	(any(illum .<= 0.0)) && error("illum cannot be negative or zero")
+	(mprecon_factor < 1.0)  && error("invalid mprecon_factor")
 
 	illumi = zeros(pa.modi.mgrid.nz, pa.modi.mgrid.nx)
-	if(maximum(abs, illum) != 0.0)
-		Interpolation.interp_spray!(pa.modm.mgrid.x, pa.modm.mgrid.z, illum,
-		      pa.modi.mgrid.x, pa.modi.mgrid.z, illumi, :spray, :B2)
+	Interpolation.interp_spray!(pa.modm.mgrid.x, pa.modm.mgrid.z, illum,
+	      pa.modi.mgrid.x, pa.modi.mgrid.z, illumi, :interp, :B1)
+	(any(illumi .<= 0.0)) && error("illumi cannot be negative or zero")
 
-		# use log to fix scaling of illum 
-		# (note that illum is not the exact diagonal of the Hessian matrix, so I am doing tricks here) 
-		# TODO: insert a factor here to control the amount of preconditioning
-		illumi = 1.0+log.(illumi./minimum(illumi))
+	# use log to fix scaling of illum 
+	# (note that illum is not the exact diagonal of the Hessian matrix, so I am doing tricks here) 
+	# larger the mprecon_factor, stronger the preconditioning
+	# division by maximum is safe because illum is non zero
+	minillumi = minimum(illumi)
+	maxillumi = maximum(illumi)
+	illumi -= minillumi; # remove mean 	
+	(maxillumi ≠ 0.0) && (illumi ./= maxillumi) # normalize using maxillumi
+	#illumi = 1.0 + log.(1. + (mprecon_factor-1) * illumi) # illumi now lies between 1.0 and some value depending on how large illumi is
+	illumi = (1. + (mprecon_factor-1) * illumi) # illumi now lies between 1.0 and some value depending on how large illumi is
 
-		illumi = vcat(vec(illumi), vec(illumi))
+	illumi = vcat(vec(illumi), vec(illumi))
 
-		length(illumi) == xfwi_ninv(pa) ? nothing : error("something went wrong with creating mprecon")
-		pa.mprecon = spdiagm(illumi,(0),xfwi_ninv(pa), xfwi_ninv(pa))
-	else
-		pa.mprecon = spdiagm(ones(xfwi_ninv(pa)),(0),xfwi_ninv(pa),xfwi_ninv(pa))
-	end
+	length(illumi) == xfwi_ninv(pa) ? nothing : error("something went wrong with creating mprecon")
+	pa.mprecon = spdiagm(illumi,(0),xfwi_ninv(pa), xfwi_ninv(pa))
 end
 
 
@@ -643,20 +658,29 @@ depeding on paramaterization
 function Seismic_xbound!(lower_x, upper_x, pa)
 	nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
 
-	x1=Models.Seismic_get(pa.modi, Symbol((replace("$(pa.parameterization[1])", "χ", "")),0))
-	χx1 = Models.χ(x1,x1,1)
-	x2=Models.Seismic_get(pa.modi, Symbol((replace("$(pa.parameterization[2])", "χ", "")),0))
-	χx2 = Models.χ(x2,x2,1)
+	bound1 = similar(lower_x)
+	# create a Seismic model with minimum possible values
+	modbound = deepcopy(pa.modi);
+	modbound.χvp = Models.χ(fill(modbound.vp0[1], size(modbound.χvp)), modbound.vp0)
+	modbound.χvs = Models.χ(fill(modbound.vs0[1], size(modbound.χvs)), modbound.vs0)
+	modbound.χρ = Models.χ(fill(modbound.ρ0[1], size(modbound.χρ)), modbound.ρ0)
 
-	lower_x[1:nznx] = copy(fill(χx1[1], nznx))
-	lower_x[nznx+1:2*nznx] = copy(fill(χx2[1], nznx))
-	upper_x[1:nznx] = copy(fill(χx1[2], nznx))
-	upper_x[nznx+1:2*nznx] = copy(fill(χx2[2], nznx))
+	Seismic_x!(nothing, modbound, bound1, pa, 1) # update lower_x using such a model
 
-	# apply preconditioner to the bounds as well
-	lower_x[:] =  copy(pa.mprecon * lower_x)
-	upper_x[:] =  copy(pa.mprecon * upper_x)
 
+	bound2=similar(upper_x)
+	# create a Seismic model with maximum possible values
+	modbound.χvp = Models.χ(fill(modbound.vp0[2], size(modbound.χvp)), modbound.vp0)
+	modbound.χvs = Models.χ(fill(modbound.vs0[2], size(modbound.χvs)), modbound.vs0)
+	modbound.χρ = Models.χ(fill(modbound.ρ0[2], size(modbound.χρ)), modbound.ρ0)
+
+	Seismic_x!(nothing, modbound, bound2, pa, 1) # update upper_x using such a model
+
+	# this sorting operation is important because 
+	lower_x[:] = min.(bound1, bound2)
+	upper_x[:] = max.(bound1, bound2)
+
+	return modbound
 end
 
 """

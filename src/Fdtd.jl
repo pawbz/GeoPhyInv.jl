@@ -294,10 +294,10 @@ Author: Pawan Bharadwaj
 				     [:χKI, :χρI], 1
 				     )
 	# output illum
-	(illum_flag) ? (illum[:] = Models.pml_pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)) : nothing
+	(illum_flag) && (illum[:] = Models.pml_pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)) 
 
 	# output snaps
-	(snaps_flag) ? 	snaps[:] = Array(snaps_out) : nothing
+	(snaps_flag) && (snaps[:] = Array(snaps_out))
 
 	# update TDout after forming a vector and resampling
 	ipropout=0;
