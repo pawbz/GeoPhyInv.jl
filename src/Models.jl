@@ -75,12 +75,18 @@ function bounds(mod::Array{Float64}, frac::Float64=0.1)
 	return bounds
 end
 
+"""
+Adjust the bounds and hence the reference values.
+Since the reference values are adjust the χ fields should also be changed
+"""
 function adjust_bounds!(mod::Seismic, frac::Float64)
 	for f in [:χvp, :χρ, :χvs]
 		f0 = Symbol((replace("$(f)", "χ", "")),0)
 		fm = Symbol((replace("$(f)", "χ", "")))
 		m = Seismic_get(mod, fm)
-		setfield!(mod, f0, bounds(m , frac))
+		m0 = bounds(m, frac)
+		setfield!(mod, f0, m0)
+		setfield!(mod, f, χ(m, m0, 1))
 	end
 	return mod
 end
