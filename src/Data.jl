@@ -230,6 +230,8 @@ Currently, only source filters are applied.
   * `=:s` to apply `w` to `r` and modify `s`
   * `=:r` to apply adjoint of `w` to `s` and modify `r`
   * `=:w` modify `w` using `r` and `s`
+
+TODO: need to work on parallelization and speed up here
 """
 function TDcoup!(
                s::TD,
@@ -250,7 +252,7 @@ function TDcoup!(
 		sv=s.d[iss, ifield][:, ir]
 		rv=r.d[iss, ifield][:, ir]
 		wv=w.ssf[iss, ifield]
-		DSP.fast_filt!(sv,rv,wv,attrib)
+		DSP.fast_filt!(sv, rv, wv, attrib)
 		s.d[iss, ifield][:, ir]=copy(sv)
 		r.d[iss, ifield][:, ir]=copy(rv)
 		w.ssf[iss, ifield][:]=copy(wv)

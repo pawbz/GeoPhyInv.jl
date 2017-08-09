@@ -20,7 +20,8 @@ function ricker(fqdom::Float64,
 		tgrid::Grid.M1D;
 		tpeak::Float64=tgrid.x[1]+1.5/fqdom, # using approximate half width of ricker
 		attrib::AbstractString="",
-		trim_tol::Float64=0.0
+		trim_tol::Float64=0.0,
+		maxamp::Float64=1.0,
 		)
 	(tpeak < tgrid.x[1]+1.5/fqdom) && error("cannot output Ricker for given tgrid and tpeak")
 	(tpeak > tgrid.x[end]-1.5/fqdom) && error("cannot output Ricker for given tgrid and tpeak")
@@ -48,7 +49,7 @@ function ricker(fqdom::Float64,
 	#! ricker wavelet
 		for it = 1:nt
 			tsquare = (tgrid.x[it]-tpeak) * (tgrid.x[it]-tpeak)
-			wav[it] = (1.0 - 2.0 * pf * tsquare) * exp(-1.0e0 * pf * tsquare)
+			wav[it] = (1.0 - 2.0 * pf * tsquare) * exp(-1.0e0 * pf * tsquare) * maxamp
 		end
 	end
 

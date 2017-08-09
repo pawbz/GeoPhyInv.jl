@@ -64,6 +64,7 @@ function print(geom::Geom, name::String="")
 	println("\t> number of supersources:\t",geom.nss)
 	println("\t> sources per supersource:\t","min\t",minimum(geom.ns[:]), "\tmax\t", maximum(geom.ns[:]))
 	println("\t> receivers per supersource:\t","min\t",minimum(geom.nr[:]), "\tmax\t", maximum(geom.nr[:]))
+	println("\t> number of unique positions of:\t","sources\t",Geom_get([geom],:nus), "\treceivers\t", Geom_get([geom],:nur))
 end
 
 """
@@ -291,12 +292,12 @@ of the angular offset are given by `θlim`
 * `nss::Int64=10` : number of supersources
 * `nr::Int64=10` : number receivers for each super source
 * `loc::Vector{Float64}=[0.,0.]` : location of origin
-* `rad::Vector{Float64}=[100.,100.]` : radius for source and receiver circles
-  * `[0.,100.]` for sources at the center of circle
-* `θlim::Vector{Float64}=[0.,2*pi]` : range of angular offset between source and receiver
-
+* `rad::Vector{Float64}=[100.,100.]` : radius for source and receiver circles, for example,
+  * `=[0.,100.]` for sources at the center of circle
+* `θlim::Vector{Float64}=[0.,π]` : acquisition is limited to these angular offsets between 0 and π
 
 # Return
+
 * a circular acquisition geometry `Geom`
 """
 function Geom_circ(;
@@ -304,23 +305,47 @@ function Geom_circ(;
 		   nr::Int64=10,
 		   loc::Vector{Float64}=[0.,0.],
 		   rad::Vector{Float64}=[100.,100.],
-		   θlim::Vector{Float64}=[0.,2*pi]
+		   θlim::Vector{Float64}=[0.,π]
 	       )
-	rxall = fill(zeros(nr),nss)
-	rzall = fill(zeros(nr),nss)
-	sx = zeros(nss)
-	sz = zeros(nss)
-	δθr = abs((θlim[2] - θlim[1])) / nr;
-	for iss =1:nss
-		θs = (iss)*2.*pi / (nss);
-		sx[iss] = rad[1]*cos(θs) + loc[2]
-		sz[iss] = rad[1]*sin(θs) + loc[1]
-		rxall[iss] = [rad[2] * cos(θs + θlim[1] + (ir-1)*δθr) + loc[2] for ir in 1:nr]
-		rzall[iss] = [rad[2] * sin(θs + θlim[1] + (ir-1)*δθr) + loc[1] for ir in 1:nr]
+
+	# modify nr such that approximately nr receivers are present in θlim
+	nra = nr * convert(Int64, floor(π/(abs(diff(θlim)[1]))))
+
+	(nra==0) && error("θlim should be from 0 to π")
+
+	sxx, szz = circ_coord(loc..., nss, rad[1])
+	rxxa, rzza = circ_coord(loc..., nra, rad[2])
+	sx=Array{Array{Float64}}(nss)
+	sz=Array{Array{Float64}}(nss)
+	rx=Array{Array{Float64}}(nss)
+	rz=Array{Array{Float64}}(nss)
+	ns=Array{Int64}(nss)
+	nr=Array{Int64}(nss)
+
+	for iss=1:nss
+		rangles = [angle(complex(rxxa[ira]-loc[2], rzza[ira]-loc[1])) for ira in 1:nra]
+		sangles = angle(complex(sxx[iss]-loc[2], szz[iss]-loc[1]))
+		diff = abs.(rangles-sangles)
+		diff = [min(diff[ira], (2π - diff[ira])) for ira in 1:nra]
+		angles = find(minimum(θlim) .<= diff .<= maximum(θlim))
+		sx[iss] = [sxx[iss]]
+		sz[iss] = [szz[iss]]
+		ns[iss] = 1 
+		nr[iss] = length(angles)
+		rx[iss] = rxxa[angles]
+		rz[iss] = rzza[angles]
 	end
-	sxall = [[sx[iss]] for iss=1:nss];
-	szall = [[sz[iss]] for iss=1:nss];
-	return Geom(sxall, szall, rxall, rzall, nss, fill(1,nss), fill(nr,nss))
+	geom =  Geom(sx, sz, rx, rz, nss, ns, nr)
+
+	print(geom, "circular acquisition geometry")
+	return geom
+end
+
+function circ_coord(z, x, n, rad)
+	θ = (n==1) ? [0.0] : collect(linspace(0, 2π, n+1))
+	xx = (rad .* cos.(θ) + x)[1:n]
+	zz = (rad .* sin.(θ) + z)[1:n]
+	return xx, zz
 end
 
 """

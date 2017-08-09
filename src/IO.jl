@@ -2,6 +2,8 @@ __precompile__()
 
 module IO
 
+import JuMIT.Data
+
 type SegyHeader
 	tracl::Int32
 	tracr::Int32
@@ -248,8 +250,11 @@ function readsu(fname, verbose=false)
 	# reading data and headers
 	for j=1:nrecords
 		position = file_hsize + total*(j-1)*4 + segy_count["trace"]
+		# goto trace position
 		seek(stream,position)
+		# read trace
 		d[:,j] = convert(Array{Float64,1}, read(stream,Float32,nt))
+		# read header, seek is inside this function
 		h_segy[j] = GrabSegyHeader(stream,swap_bytes,nt,file_hsize,j)
 	end
 	close(stream)
@@ -258,5 +263,63 @@ function readsu(fname, verbose=false)
 
 end
 
+"""
+Write a SU file using data and headers
+
+# Arguments
+
+* `fname` : filename
+* `d` : data matrix, output of readsu, for example
+* `h_segy` : header vector, see output of readsu
+"""
+function writesu(fname, d, h_segy::Vector{SegyHeader}=[InitSegyHeader() for irec in 1:size(d,2)])
+
+	nt = size(d, 1)
+	total = 60 + nt
+	#nrecords = round(Int,(filesize(stream)-file_hsize)/4/total)
+	nrecords = size(d, 2)
+
+	file_hsize=0
+	swap_bytes = false
+
+	stream = open(fname, "w")
+
+	# reading data and headers
+	for j=1:nrecords
+		# add nt in header if absent
+		(h_segy[j].ns == 0) && (h_segy[j].ns = nt)
+
+
+		PutSegyHeader(stream,h_segy[j],nt,file_hsize,j)
+
+		# write down the trace
+		dvecsp = convert(Vector{Float32}, d[:,j])
+		position = file_hsize + total*(j-1)*4 + segy_count["trace"]
+		seek(stream,position)
+		write(stream, dvecsp)
+	end
+	close(stream)
+end
+
+function TD(d::Data.TD, attrib=:su)
+	
+	nrecords = sum(d.acqgeom.nr)
+	nss = d.acqgeom.nss
+
+	# create a data matrix of first field
+	dp = hcat(d.d[collect(1:nss),1][:,:]...);
+
+	# headers
+	h_segy = [InitSegyHeader() for irec in 1:nrecords]
+	irec = 0
+	for iss=1:nss
+		for ir=1:d.acqgeom.nr[iss]
+			irec += 1
+			h_segy[irec].ns = d.tgrid.nx
+			h_segy[irec].dt = d.tgrid.δx*1000000 
+		end
+	end
+	writesu(fname, d, h_segy)
+end
 
 end # module

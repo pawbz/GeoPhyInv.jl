@@ -10,7 +10,6 @@ module JuMIT
 #end
 
 # include modules (note: due to dependencies, order is important!)
-include("IO.jl")
 include("Grid.jl")
 include("Interpolation.jl")
 include("DSP.jl")
@@ -21,6 +20,7 @@ include("Acquisition.jl")
 include("Coupling.jl")
 include("Data.jl")
 include("Interferometry.jl")
+include("IO.jl")
 include("Gallery.jl")
 include("Analytic.jl")
 include("Fdtd.jl")

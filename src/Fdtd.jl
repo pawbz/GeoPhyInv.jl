@@ -26,7 +26,9 @@ using DistributedArrays
 # ```
 
 function initialize_boundary(nx::Int64, nz::Int64, npml::Int64, nss::Int64, nt::Int64)
-	return DArray((nss,), workers(),[nworkers()]) do I
+	nwork = min(nss, nworkers())
+	work = workers()[1:nwork]
+	return DArray((nss,), work,[nwork]) do I
 	    			[[zeros(3,nx+6,nt),
 				  zeros(nz+6,3,nt),
 				  zeros(3,nx+6,nt),
@@ -211,21 +213,24 @@ Author: Pawan Bharadwaj
 	ibx0=model.mgrid.npml-2; ibx1=model.mgrid.nx+model.mgrid.npml+3
 	ibz0=model.mgrid.npml-2; ibz1=model.mgrid.nz+model.mgrid.npml+3
 
+	nwork = min(src_nseq, nworkers())
+	work = workers()[1:nwork]
+
 	# records_output, distributed array among different procs
-	recv_out = dzeros((recv_n,recv_nfield,npropwav,tim_nt,src_nseq), workers(), [1,1,1,1,nworkers()])
+	recv_out = dzeros((recv_n,recv_nfield,npropwav,tim_nt,src_nseq), work, [1,1,1,1,nwork])
 
 
 
 	# gradient outputs
-	grad_modtt = dzeros((nz, nx, src_nseq), workers(), [1,1,nworkers()])
-	grad_modrrvx = dzeros((nz, nx, src_nseq), workers(), [1,1,nworkers()])
-	grad_modrrvz = dzeros((nz, nx, src_nseq), workers(), [1,1,nworkers()])
+	grad_modtt = dzeros((nz, nx, src_nseq), work, [1,1,nwork])
+	grad_modrrvx = dzeros((nz, nx, src_nseq), work, [1,1,nwork])
+	grad_modrrvz = dzeros((nz, nx, src_nseq), work, [1,1,nwork])
 
 
 	"saving illum"
-	illum_all =  (illum_flag) ? dzeros((nz, nx, src_nseq), workers(), [1,1,nworkers()]) : [0.0]
+	illum_all =  (illum_flag) ? dzeros((nz, nx, src_nseq), work, [1,1,nwork]) : [0.0]
 
-	snaps_out = (snaps_flag) ? dzeros(size(snaps), workers(), [1,1,1,nworkers()]) : [0.0]
+	snaps_out = (snaps_flag) ? dzeros(size(snaps), work, [1,1,1,nwork]) : [0.0]
 
 	"density values on vx and vz stagerred grids"
 	modrrvx = get_rhovxI(Models.Seismic_get(exmodel, :ρI))
@@ -240,7 +245,7 @@ Author: Pawan Bharadwaj
 		δmodrrvz = get_rhovzI(Models.Seismic_get(exmodel_pert, :ρI)) - get_rhovzI(Models.Seismic_get(exmodel, :ρI))
 		"inverse Bulk Modulus contrasts for Born Modelling"
 		δmodtt = Models.Seismic_get(exmodel_pert, :KI) - Models.Seismic_get(exmodel, :KI)
-		born_svalue_stack = dzeros((exmodel.mgrid.nz, exmodel.mgrid.nx, src_nseq), workers(), [1,1,nworkers()])
+		born_svalue_stack = dzeros((exmodel.mgrid.nz, exmodel.mgrid.nx, src_nseq), work, [1,1,nwork])
 	else
 		δmodtt, δmodrrvx, δmodrrvz = [0.0], [0.0], [0.0]
 		born_svalue_stack = [0.0]
@@ -267,7 +272,8 @@ Author: Pawan Bharadwaj
 				               vpmax, vpmin, freqmin, freqmax, 
 					       abs_trbl, tsnaps, src_wav_mat, src_nfield, 
 					       born_flag,
-					       localpart(born_svalue_stack), δmodtt)
+					       localpart(born_svalue_stack), δmodtt,
+					       δmodrrvx, δmodrrvz)
 			end
 		end
 	end
@@ -335,7 +341,8 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 		       vpmax::Float64, vpmin::Float64, freqmin::Float64, freqmax::Float64, 
 		       abs_trbl::Vector{Symbol}, tsnaps::Vector{Float64}, src_wav_mat::Array{Float64}, src_nfield::Int64,
 		       born_flag::Bool,
-		       born_svalue_stack::Array{Float64}, δmodtt::Array{Float64})
+		       born_svalue_stack::Array{Float64}, δmodtt::Array{Float64},
+		       δmodrrvx::Array{Float64}, δmodrrvz::Array{Float64})
 
 	#create some aliases
 	nx, nz = exmodel.mgrid.nx, exmodel.mgrid.nz
@@ -452,7 +459,9 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 				)
 
 			if(born_flag)
-				add_born_sources!(iisseq, p, pp, ppp, δmodtt, modttI, δtI, δt, born_svalue_stack, nx, nz, δxI, δzI)
+				add_born_sources!(iisseq, p, pp, ppp, dpdx, dpdz, δmodtt, modttI, 
+				   δmodrrvx, δmodrrvz,
+				      δtI, δt, born_svalue_stack, nx, nz, δxI, δzI, δx24I, δz24I)
 			end
 
 			# record boundaries
@@ -706,9 +715,12 @@ Need illumination to estimate the approximate diagonal of Hessian
 	end
 end
 
-function add_born_sources!(iisseq::Int64, p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64}, δmodtt::Array{Float64}, modttI::Array{Float64},
+function add_born_sources!(iisseq::Int64, p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64}, 
+			   dpdx::Array{Float64}, dpdz::Array{Float64},
+			   δmodtt::Array{Float64}, modttI::Array{Float64},
+			   δmodrrvx::Array{Float64}, δmodrrvz::Array{Float64},
 			   δtI::Float64, δt::Float64, born_svalue_stack::Array{Float64}, 
-			   nx::Int64, nz::Int64, δxI::Float64, δzI::Float64)
+			   nx::Int64, nz::Int64, δxI::Float64, δzI::Float64, δx24I, δz24I)
 	# secondary sources for Born modeling
 	# adding born sources from pressure(:,:,1) to pressure(:,:,2)
 	# upto until [it-2]
@@ -722,9 +734,9 @@ function add_born_sources!(iisseq::Int64, p::Array{Float64}, pp::Array{Float64},
 		@simd for iz=3:nz-2
 
 			@inbounds born_svalue_stack[iz,ix, iisseq] += 
-				δt * ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δmodtt[iz, ix] * δtI * δtI) )#+ (
-			  #(27.e0*dpdx[iz,ix,1,1] * δmodrrvx[iz,ix] -27.e0*dpdx[iz,ix-1,1,1] * δmodrrvx[iz,ix-1] -dpdx[iz,ix+1,1,1] * δmodrrvx[iz,ix+1] +dpdx[iz,ix-2,1,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) + (
-			  #(27.e0*dpdz[iz,ix,1,1] * δmodrrvz[iz,ix] -27.e0*dpdz[iz-1,ix,1,1] * δmodrrvz[iz-1,ix] -dpdz[iz+1,ix,1,1] * δmodrrvz[iz+1,ix] +dpdz[iz-2,ix,1,1] * δmodrrvz[iz-2,ix] ) * (δz24I)) ) 
+				δt * ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δmodtt[iz, ix] * δtI * δtI) + (
+			  (27.e0*dpdx[iz,ix,1,1] * δmodrrvx[iz,ix] -27.e0*dpdx[iz,ix-1,1,1] * δmodrrvx[iz,ix-1] -dpdx[iz,ix+1,1,1] * δmodrrvx[iz,ix+1] +dpdx[iz,ix-2,1,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) + (
+			  (27.e0*dpdz[iz,ix,1,1] * δmodrrvz[iz,ix] -27.e0*dpdz[iz-1,ix,1,1] * δmodrrvz[iz-1,ix] -dpdz[iz+1,ix,1,1] * δmodrrvz[iz+1,ix] +dpdz[iz-2,ix,1,1] * δmodrrvz[iz-2,ix] ) * (δz24I)) ) 
 
 			@inbounds p[iz,ix,1,2] += born_svalue_stack[iz,ix, iisseq] * δt * δxI * δzI * modttI[iz,ix]  
 	end

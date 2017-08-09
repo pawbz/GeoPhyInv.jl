@@ -35,6 +35,16 @@ function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64=1)
 	return sort(ivec)
 end
 
+"return index such that "
+function indminn_inside(x, valbeg, valend)
+	iibeg = indminn(x, valbeg, 2)
+	iiend = indminn(x, valend, 2)
+	ibeg = findfirst((valbeg-x[iibeg]).*(valend-x[iibeg]) .<= 0.0)
+	iend = findlast((valbeg-x[iiend]).*(valend-x[iiend]) .<= 0.0)
+
+	return iibeg[ibeg], iiend[iend]
+end
+
 ## slower version for large vectors
 #function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64)
 #	xa =abs(x-val)
@@ -70,9 +80,9 @@ function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 	end
 
 	if(attrib == :interp)
-		# yout is only updated within bounds of yin 
-		ioutmin = indminn(xout,xin[1],1)[1]
-		ioutmax = indminn(xout,xin[end],1)[1]
+		# yout is only updated "within" bounds of yin 
+		# get two indices and choose the inner most one
+		ioutmin, ioutmax = indminn_inside(xout, xin[1], xin[end])
 
 		yout[ioutmin:ioutmax] = zero(Float64);
 		@simd for i in ioutmin:ioutmax
@@ -80,9 +90,9 @@ function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
 			interp_func(i, yout, xin[ivec]...,yin[ivec]..., xout[i])
 		end
 	elseif(attrib == :spray)
-		# spary values of yin within bounds of yout
-		iinmin = indminn(xin,xout[1],1)[1]
-		iinmax = indminn(xin,xout[end],1)[1]
+		# spary values of yin "within" bounds of yout
+		# get 2 indices and choose the inner most one
+		iinmin, iinmax = indminn_inside(xin,xout[1],xout[end])
 
 		yout[:] = zero(Float64);
 		@simd for i in iinmin:iinmax
@@ -111,10 +121,9 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 
 	if(attrib == :interp)
 		# yout is only updated within bounds of yin 
-		i1outmin = indminn(zout,zin[1],1)[1]
-		i1outmax = indminn(zout,zin[end],1)[1]
-		i2outmin = indminn(xout,xin[1],1)[1]
-		i2outmax = indminn(xout,xin[end],1)[1]
+		# get 2 indices and choose the inner most one
+		i1outmin, i1outmax = indminn_inside(zout,zin[1],zin[end])
+		i2outmin, i2outmax = indminn_inside(xout,xin[1],xin[end])
 		yout[i1outmin:i1outmax, i2outmin:i2outmax] = zero(Float64);
 
 		y_x=zeros(Float64, length(zin), length(i2outmin:i2outmax))
@@ -136,10 +145,9 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 		end
 	elseif(attrib == :spray)
 		# spary values of yin only within bounds of yout
-		i1inmin = indminn(zin,zout[1],1)[1]
-		i1inmax = indminn(zin,zout[end],1)[1]
-		i2inmin = indminn(xin,xout[1],1)[1]
-		i2inmax = indminn(xin,xout[end],1)[1]
+		# get 2 indices and choose the inner most one
+		i1inmin, i1inmax = indminn_inside(zin,zout[1],zout[end])
+		i2inmin, i2inmax = indminn_inside(xin,xout[1],xout[end])
 		yout[:, :] = zero(Float64);
 		y_z = zeros(Float64, length(zout), length(i2inmin:i2inmax))
 		# first along z

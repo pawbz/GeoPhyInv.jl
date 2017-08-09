@@ -159,6 +159,10 @@ function Param(
         # acqgeom geometry for adjoint propagation
 	adjacqgeom = AdjGeom(acqgeom)
 
+	#
+	((attrib_mod == :fdtd_hborn) | (attrib_mod == :fdtd_born)) && (Models.Seismic_isequal(modm0, modm_obs)) && error("change background model used for Born modelling")
+
+
 	pa = Param(deepcopy(acqsrc), 
 	     Acquisition.Src_zeros(adjacqgeom, nfield, tgrid),
 	     deepcopy(acqgeom), 
@@ -282,9 +286,9 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 		"""
 		#res = optimize(df, x, 
 	        #		       LBFGS(),
-	 	#	     Optim.Options(g_tol = 1e-12,
-		# 			iterations = 10, store_trace = true,
-		# 			extended_trace=true, show_trace = true))
+	 	#	     Optim.Options(g_tol = g_tol,
+		# 			iterations = iterations, store_trace = store_trace,
+		# 			extended_trace=extended_trace, show_trace = true))
 
 		"""
 		Bounded LBFGS inversion
@@ -313,6 +317,9 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 		# update calculated data in pa
 		update_dcal!(pa)
 
+		# leave buffer update flag to true before leaving xfwi
+		pa.buffer_update_flag = true
+
 		if(extended_trace)
 			# convert gradient vector to model
 			gmodi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
@@ -339,6 +346,9 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage, pa,-1)
 		println("maximum value of g(x):\t",  maximum(storage))
 
+		# leave buffer update flag to true before leaving xfwi
+		pa.buffer_update_flag = true
+
 		return pa.gmodi
 	elseif(pa.attrib_inv == :migr_finite_difference)
 
@@ -351,6 +361,8 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 		Seismic_gx!(gmodm,pa.modm,gmodi,modi,gx,pa,-1)
 		println("maximum value of g(x):\t",  maximum(gx))
 
+		# leave buffer update flag to true before leaving xfwi
+		pa.buffer_update_flag = true
 		return gmodi
 	else
 		error("invalid pa.attrib_inv")

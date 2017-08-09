@@ -133,6 +133,11 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 		model=Models.Seismic_trun(Seismic(:seismic_marmousi2_high_res), 
 				     xmin=9025., xmax=9125., zmin=1400., zmax=1600.,)
 		Models.adjust_bounds!(model, bfrac) # adjust bounds just inside the bounds 
+	elseif(attrib == :seismic_marmousi2_vsp)
+		model=Models.Seismic_trun(Seismic(:seismic_marmousi2_high_res), 
+				     xmin=7500., xmax=10500., zmax=2000.,)
+		Models.adjust_bounds!(model, bfrac) # adjust bounds just inside the bounds 
+
 	else
 		error("invalid attrib")
 	end
@@ -180,9 +185,9 @@ function Geom(mgrid::Grid.M2D, attrib::Symbol; nss=2, nr=2, rand_flags=[false, f
 	elseif(attrib == :surf)
 		geom=Acquisition.Geom_fixed(otx, ntx, otwz, otx, ntx, otwz, nss, nr, :horizontal, :horizontal, rand_flags)
 	elseif(attrib == :vsp)
-		geom=Acquisition.Geom_fixed(otx, ntx, otwz, otz, ntz, otx, nss, nr, :horizontal, :vertical, rand_flags)
+		geom=Acquisition.Geom_fixed(otx, ntx, otwz, quatz, ntz, otx, nss, nr, :horizontal, :vertical, rand_flags)
 	elseif(attrib == :rvsp)
-		geom=Acquisition.Geom_fixed(otz, ntz, otx, otx, ntx, otwz, nss, nr, :vertical, :horizontal, rand_flags)
+		geom=Acquisition.Geom_fixed(quatz, ntz, otx, otx, ntx, otwz, nss, nr, :vertical, :horizontal, rand_flags)
 	elseif(attrib == :downhole)
 		geom=Acquisition.Geom_fixed(quatz, otz, quatx, quatz, otz, quatx, nss, nr, :vertical, :vertical, rand_flags)
 	else

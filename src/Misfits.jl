@@ -44,17 +44,21 @@ function TD!(dfdx,
 	nfield = x.nfield;
 	nss = acq.nss;
 
+	normfact = Data.TD_dot(y, y)
+	(normfact == 0.0) && error("y cannot be zero")
+
 	f = 0.0;
 	for ifield=1:x.nfield, iss=1:acq.nss, ir=1:acq.nr[iss]
 		if(!(dfdx === nothing))
 			ft = fg_cls!(view(dfdx.d[iss,ifield],:,ir), view(x.d[iss, ifield],:,ir), y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir]);
+			dfdx.d[iss,ifield][:,ir] /= normfact
 		else
 			ft = fg_cls!(nothing, view(x.d[iss, ifield],:,ir), y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir]);
 		end
 		"multiplication with time sampling due to integration ?"
-		f += ft #* tgrid.δx;
+		f += ft / normfact #* tgrid.δx;
 	end
-	f == 0.0 ? warn("misfit is zero") : nothing
+	(f == 0.0) && warn("misfit computed is zero")
 
 	return f
 end
