@@ -56,19 +56,22 @@ Plot acquisition geometry `Acquisition.Geom` on
 and model grid `M2D`.
 
 `attrib::Symbol=:unique` : default; plots unique source and receiver positions 
+`ssvec::Vector{Int64}` : plot source and receivers of only these supersources
 """
-function Geom(geom::Acquisition.Geom;
-	      iss::Int64=0
-	     )
-	if(iss==0)
+function Geom(geom::Acquisition.Geom; ssvec=nothing)
+	if(ssvec===nothing)
 		urpos = Acquisition.Geom_get([geom],:urpos)
 		uspos = Acquisition.Geom_get([geom],:uspos)
 
 		plot(urpos[2], urpos[1], "v", color="blue",ms=10)
 		plot(uspos[2], uspos[1], "*", color="red",ms=15)
 	else
-		plot(geom.rx[iss], geom.rz[iss], "v", color="blue",ms=10)
-		plot(geom.sx[iss], geom.sz[iss], "*", color="red",ms=15)
+		rxpos = [geom.rx[iss] for iss in ssvec]
+		rzpos = [geom.rz[iss] for iss in ssvec]
+		sxpos = [geom.sx[iss] for iss in ssvec]
+		szpos = [geom.sz[iss] for iss in ssvec]
+		plot(vcat(rxpos...), vcat(rzpos...), "v", color="blue",ms=10)
+		plot(vcat(sxpos...), vcat(szpos...), "*", color="red",ms=15)
 	end
 end
 
@@ -146,36 +149,47 @@ Plot the velocity and density seismic models.
 
 * `xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]]` : minimum and maximum limits of the second dimension while plotting
 * `zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]]` : minimum and maximum limits of the first dimension while plotting
+* `fields::Vector{Symbol}=[:vp, :ρ]` : fields that are to be plotted, see Models.Seismic_get 
+* `overlay_model=nothing` : use a overlay model
+* `use_bounds=false` : impose bounds from the model or not?
 
 """
 function Seismic(model::Models.Seismic; 
 		 xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]],
-		 zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]] 
+		 zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]],
+		 fields::Vector{Symbol}=[:vp, :ρ],
+		 overlay_model=nothing, 
+		 use_bounds=false,
 		 )
 	#indices
 	ixmin = Interpolation.indminn(model.mgrid.x, xlim[1])[1]; ixmax = Interpolation.indminn(model.mgrid.x, xlim[2])[1]
 	izmin = Interpolation.indminn(model.mgrid.z, zlim[1])[1]; izmax = Interpolation.indminn(model.mgrid.z, zlim[2])[1]
-	nrow = (model.mgrid.nx > model.mgrid.nz) ? 2 : 1
-	ncol = (model.mgrid.nx > model.mgrid.nz) ? 1 : 2
-	subplot(nrow,ncol,1)
-	ax = imshow(Models.χ(model.χvp[izmin:izmax,ixmin:ixmax],model.vp0,-1), 
-	     cmap="gray",
-	         extent=[model.mgrid.x[ixmin], 
-		  model.mgrid.x[ixmax], model.mgrid.z[izmax], model.mgrid.z[izmin],]);
-		 xlabel(L"$x$ (m)");
-		 ylabel(L"$z$ (m)");
-		 title(L"$v_p$")
-		 colorbar();
-	subplot(nrow,ncol,2)
-	ax = imshow(Models.χ(model.χρ[izmin:izmax,ixmin:ixmax],model.ρ0,-1), 
-	     cmap="gray",
-	         extent=[model.mgrid.x[ixmin], 
-		  model.mgrid.x[ixmax], model.mgrid.z[izmax], model.mgrid.z[izmin],]);
-		 xlabel(L"$x$ (m)");
-		 ylabel(L"$z$ (m)");
-		 title(L"$\rho$")
-		 colorbar();
+	nrow = (model.mgrid.nx > model.mgrid.nz) ? length(fields) : 1
+	ncol = (model.mgrid.nx > model.mgrid.nz) ? 1 : length(fields)
+	for i in 1:length(fields)
+		subplot(nrow,ncol,i)
+
+		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
+		m = Models.Seismic_get(model, fields[i])[izmin:izmax,ixmin:ixmax]
+		ext = [model.mgrid.x[ixmin], model.mgrid.x[ixmax], model.mgrid.z[izmax], model.mgrid.z[izmin],]
+		vmin = use_bounds ? Models.Seismic_get(model, f0)[1] : minimum(m)
+		vmax = use_bounds ? Models.Seismic_get(model, f0)[2] : maximum(m)
+		ax = imshow(m,		     cmap="gray", 		     extent=ext, vmin=vmin, vmax=vmax)
+			 xlabel(L"$x$ (m)");
+			 ylabel(L"$z$ (m)");
+			 title(string(fields[i]))
+			 colorbar();
+		
+		if(!(overlay_model ===  nothing))
+			# remove mean in the backgroud model
+			mbg = Models.Seismic_get(overlay_model, fields[i])[izmin:izmax,ixmin:ixmax]
+			mbg -= mean(mbg)
+			mbgmax=maximum(abs, mbg)
+			axbg = imshow(mbg,cmap="PiYG", alpha=0.3, vmin=-1.0*mbgmax, vmax=mbgmax, extent=ext)
+		end
+	 end
 	 tight_layout()
+	 subplots_adjust(top=0.88)
 
 end
 

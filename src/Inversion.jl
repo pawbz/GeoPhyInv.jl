@@ -160,7 +160,9 @@ function Param(
 	adjacqgeom = AdjGeom(acqgeom)
 
 	#
-	((attrib_mod == :fdtd_hborn) | (attrib_mod == :fdtd_born)) && (Models.Seismic_isequal(modm0, modm_obs)) && error("change background model used for Born modelling")
+	((attrib_mod == :fdtd_hborn) | (attrib_mod == :fdtd_born)) && 
+	(attrib == :synthetic) &&
+	(Models.Seismic_isequal(modm0, modm_obs)) && error("change background model used for Born modelling")
 
 
 	pa = Param(deepcopy(acqsrc), 
@@ -247,7 +249,7 @@ package.
 
 * `f_tol::Float64=1e-5` : functional tolerance
 * `g_tol::Float64=1e-8` : gradient tolerance
-* `x_tol::Float64=1e-3` : model tolerance
+* `x_tol::Float64=1e-5` : model tolerance
 
 # Outputs
 
@@ -257,12 +259,13 @@ package.
   * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
 """
 function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., iterations::Int64=5,
-	       f_tol::Float64=1e-5, g_tol::Float64=1e-8, x_tol::Float64=1e-3, linesearch_iterations::Int64=3)
+	       f_tol::Float64=1e-5, g_tol::Float64=1e-8, x_tol::Float64=1e-5, linesearch_iterations::Int64=3)
 
 	# convert initial model to the inversion variable
 	x = zeros(xfwi_ninv(pa));
 	last_x = similar(x)
-	pa.verbose ? println("xfwi: number of inversion variables:\t", length(x)) : nothing
+	println("updating modm and modi...")
+	println("> xfwi: number of inversion variables:\t", length(x)) 
 
 	last_x = rand(size(x)) # reset last_x
 
@@ -353,17 +356,15 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	elseif(pa.attrib_inv == :migr_finite_difference)
 
 		gx = similar(x);
-		gx = finite_difference!(x -> func_xfwi(x, last_x, pa), x, gx, :central)
+		gx = finite_difference!(x -> func_grad_xfwi!(nothing, x, last_x,  pa), x, gx, :central)
 
 		# convert gradient vector to model
-		gmodi = Models.Seismic_zeros(pa.modi.mgrid); 
-		gmodm = Models.Seismic_zeros(pa.modm.mgrid); 
-		Seismic_gx!(gmodm,pa.modm,gmodi,modi,gx,pa,-1)
+		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,gx,pa,-1)
 		println("maximum value of g(x):\t",  maximum(gx))
 
 		# leave buffer update flag to true before leaving xfwi
 		pa.buffer_update_flag = true
-		return gmodi
+		return pa.gmodi
 	else
 		error("invalid pa.attrib_inv")
 	end
@@ -567,15 +568,69 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 	end
 end # func_grad_xfwi!
 
+function hessian_xfwi!(loc, pa)
+
+	model_pert = deepcopy(pa.modm)
+	model_m0i = deepcopy(pa.modi)
+
+	x = zeros(xfwi_ninv(pa))
+	gx = similar(x)
+	# put modm0  into m0i and x
+	Seismic_x!(pa.modm0, model_m0i, x, pa, 1)		
+
+	model_perti = deepcopy(model_m0i)
+	Models.Seismic_addon!(model_m0i, point_loc=loc, point_pert=0.1) 
+
+	Seismic_x!(nothing, model_m0i, x, pa, 1)		
+	# put perturbed x into model_pert and model_perti
+	Seismic_x!(model_pert, model_perti, x, pa, -1)		
+
+	# generate Born Data
+	Fdtd.mod!(born_flag=true, npropwav=2, model=pa.modm0, model_pert=model_pert, 
+	    acqgeom=[pa.acqgeom, pa.acqgeom], acqsrc=[pa.acqsrc, pa.acqsrc], 
+	    TDout=pa.dtemp, 
+	    backprop_flag=1,
+	    boundary=pa.buffer,
+	    src_flags=[2, 0], recv_flags = [0, 1], 
+	    tgridmod=pa.dcal.tgrid);
+
+	setfield!(pa, :dcal, deepcopy(pa.dtemp[1]))
+	
+
+	# apply coupling to the modeled data
+	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
+
+	# compute gradient w.r.t. calculated data
+	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :r)
+
+	# adjoint sources
+	update_adjsrc!(pa.dcal, pa)
+
+	# adjoint simulation
+	Fdtd.mod!(npropwav=2, model=pa.modm0,
+		acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[3, 2],
+		backprop_flag=-1, boundary=pa.buffer, 
+		gmodel=pa.gmodm, 
+		tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
+
+	Seismic_gx!(pa.gmodm,pa.modm0,pa.gmodi,model_m0i,gx,pa,1) 
+
+	return pa.gmodi, model_pert, model_perti
+end
+
 """
 Update pa.w
 """
-function wfwi!(pa::Param)
+
+function wfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., 
+	       f_tol::Float64=1e-8, g_tol::Float64=1e-8, x_tol::Float64=1e-8)
 
 	# convert initial model to the inversion variable
 	x = zeros(wfwi_ninv(pa));
-	pa.verbose ? println("wfwi: number of inversion variables:\t", length(x)) : nothing
 	last_x = rand(size(x)) # reset last_x
+
+	println("updating w...")
+	println("> wfwi: number of inversion variables:\t", length(x)) 
 
 	# initial w to x
 	Coupling_x!(pa.w, x, pa, 1)
@@ -589,9 +644,9 @@ function wfwi!(pa::Param)
 	"""
 	res = optimize(df, x, 
 		       LBFGS(),
-		       Optim.Options(g_tol = 1e-12,
-		       iterations = 100, store_trace = true,
-		       extended_trace=true, show_trace = true))
+		       Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
+		       iterations = 100, store_trace = store_trace,
+		       extended_trace=extended_trace, show_trace = true))
 	"testing gradient using auto-differentiation"
 #	res = optimize(x -> func_Coupling(x, last_x, buffer1, pa), x, 
 #		       LBFGS(),
@@ -886,8 +941,8 @@ function finite_difference!{S <: Number, T <: Number}(f::Function,
 	# What is the dimension of x?
 	n = length(x)
 
-	gpar = SharedArray(eltype(g), size(g))
-	xpar = SharedArray(eltype(x), size(x)); xpar = x;
+	gpar = SharedArray{eltype(g)}(size(g))
+	xpar = SharedArray{eltype(x)}(size(x)); xpar = x;
 	# Iterate over each dimension of the gradient separately.
 	# Use xplusdx to store x + dx instead of creating a new vector on each pass.
 	# Use xminusdx to store x - dx instead of creating a new vector on each pass.

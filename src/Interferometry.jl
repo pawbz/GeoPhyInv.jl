@@ -62,7 +62,7 @@ function TD_virtual_diff(
 					for isson=1:length(sson)
 						if(sson[isson] != [0])
 							datmat[ir, ifield,:,irs] += 
-							xcorr(
+							-1.0 * xcorr(
 							  datan.d[isson,ifield][:, sson[isson][2]], 
 							  datan.d[isson,ifield][:, sson[isson][1]])
 						end

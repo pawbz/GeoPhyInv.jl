@@ -153,10 +153,20 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 		return vp;
 	elseif(attrib == :vs)
 		return vs;
+	elseif(attrib == :ρ0)
+		return mod.ρ0;
+	elseif(attrib == :vp0)
+		return mod.vp0;
+	elseif(attrib == :vs0)
+		return mod.vs0;
 	elseif(attrib == :ρI0)
 		return ρI0
 	elseif(attrib == :χρI)
 		return χ(ρ.^(-1.0), ρI0);
+	elseif(attrib == :χρ)
+		return mod.χρ;
+	elseif(attrib == :χvp)
+		return mod.χvp;
 	elseif(attrib == :χK)
 		return χ(vp .* vp .* ρ, K0);
 	elseif(attrib == :χμ)
@@ -328,14 +338,19 @@ Add features to a model.
 * `mod::Seismic` : model that is modified
 
 # Keyword Arguments
-* `circ_loc::Vector{Float64}=nothing` : location of center of perturbation
+
+* `point_loc::Vector{Float64}=[0., 0.,]` : approx location of point pert.
+* `point_pert::Float64=0.0` : perturbation at the point scatterer
+* `circ_loc::Vector{Float64}=nothing` : location of center of perturbation, [z, x]
 * `circ_rad::Float64=0.0` : radius of circular perturbation
 * `circ_pert::Float64=0.1` : perturbation inside a circle
-* `rect_loc::Array{Float64}=nothing` : rectangle location
+* `rect_loc::Array{Float64}=nothing` : rectangle location, [zmin, xmin, zmax, xmax]
 * `rect_pert::Float64=0.1` : perturbation in a rectangle
 * `randn_pert::Float64=0.0` : percentage of reference values for additive random noise
 """
 function Seismic_addon!(mod::Seismic; 
+		       point_loc::Vector{Float64}=[0., 0.,],
+		       point_pert::Float64=0.0,
 		       circ_loc::Vector{Float64}=[0., 0.,],
 		       circ_rad::Float64=0.0,
 		       circ_pert::Float64=0.0,
@@ -344,8 +359,12 @@ function Seismic_addon!(mod::Seismic;
 		       randn_perc::Real=0.0,
 		       fields::Vector{Symbol}=[:χvp,:χρ,:χvs]
 		       )
-
 	temp = zeros(mod.mgrid.nz, mod.mgrid.nx)
+
+	ipointlocx = Interpolation.indminn(mod.mgrid.x, point_loc[2], 1)[1] 
+	ipointlocz = Interpolation.indminn(mod.mgrid.z, point_loc[1], 1)[1] 
+	temp[ipointlocz, ipointlocx] += point_pert
+
 	if(!(circ_pert == 0.0))
 		temp += [((sqrt((mod.mgrid.x[ix]-circ_loc[2])^2 + 
 			(mod.mgrid.z[iz]-circ_loc[1])^2 ) <= circ_rad) ? circ_pert : 0.0)  for 

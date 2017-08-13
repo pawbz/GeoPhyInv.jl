@@ -22,6 +22,8 @@ function get_tapered_random_tmax_signal(tgrid::Grid.M1D, fmin::Float64, fmax::Fl
 	# band limit
 	filt!(X, digitalfilter(filtsource, designmethod), X);
 	wavsrc[1:itmax] = X.*twin
+	
+	return wavsrc
 end
 
 
@@ -165,8 +167,13 @@ function fast_filt!{T<:Real}(
 	nlag_npow2_pad_truncate!(s, spow2, nx-1, 0, np2, 1)
 
 	if(attrib == :s)
-		nlag_npow2_pad_truncate!(w, wpow2, nl, nl, np2, 1)
-		fft!(rpow2); fft!(wpow2);
+		if(w===nothing)
+			wpow2 = filt_func()nlag_npow2_pad_truncate!(w, wpow2, nl, nl, np2, 1)
+		else
+			nlag_npow2_pad_truncate!(w, wpow2, nl, nl, np2, 1)
+			fft!(wpow2);
+		end
+		fft!(rpow2)
 		spow2 = rpow2 .* wpow2;
 		ifft!(spow2)
 		nlag_npow2_pad_truncate!(s, spow2, nx-1, 0, np2, -1)
@@ -245,5 +252,87 @@ function nlag_npow2_pad_truncate!{T<:Number}(
 		error("invalid flag")
 	end
 end
+
+"""
+A bandpass butterworth filter using `fmin` and `fmax` in the frequency domain.
+Return either a zero-phase or minimum-phase filter using `attrib`.
+More info on minimum-phase filtering: http://www.katjaas.nl/minimumphase/minimumphase.html.
+! then it is converted to minimum phase filter in the cepstral domain
+! more info: http://www.katjaas.nl/minimumphase/minimumphase.html
+! positive quefrencies correspond to minimum phase component of the signal
+! negetive quefrencies correspond to maximum phase component of the signal
+! signal = minimum phase [convolved with] maximum phase
+
+
+# Arguments
+
+* ``
+
+# Keyword Arguments
+
+* `order::Int64` : order of the butterworth filter
+* `attrib::Symbol`
+  * `=:zp` means zero phase 
+  * `=:mp` means zero phase 
+* `fmin::Float64`
+  * `=0.` means a lowpass filter at fmax
+* `fmax::Float64`
+  * `=0.` means a highpass filter at fmin
+
+"""
+function butterworth_filter(npow2grid; order::Int64=2, attrib::Symbol, fmin=0.0, fmax=0.0)
+# Author : Pawan Bharadwaj
+#          p.b.pisupati@tudelft.nl
+# August 2017, imported to Julia from FORTRAN90
+
+(fmin < 0.0) && error("fmin cannot be .lt. zero")
+(fmax < 0.0) && error("fmax cannot be .lt. zero")
+(fmax ≠ 0.0) && (fmax <= fmin) && error("fmax .le. fmin") 
+
+if(fmin == 0.0) 
+        # lowpass filter
+	F  = complex.((1.0 + (npow2grid.x./fmax)**(2.0*order))^(-1.0), 0.0)
+elseif(fmax == 0.0) 
+        # highpass filter
+	F  = complex.((1.0 + (fmin./npow2grid.x)**(2.0*order))^(-1.0), 0.0)
+elseif((fmin ≠ 0.0) .and. (fmax ≠ 0.0))
+        # bandpass filter
+        x1 = sqrt(fmin*fmax) / (fmax-fmin) * (npow2grid.x./sqrt(fmin*fmax) + sqrt(fmax*fmin)./npow2grid.x);
+        F  = complex.((1.0 + (x1)^(2.0*order))^(-1.0), 0.0)
+end
+# DC component is always forced zero
+F[1] = complex(0.0, 0.0);
+
+# conversion to minimum phase
+if(attrib == :mp)
+# to prevent log(0)
+	damp = 1e-20 * maximum(abs.(F))
+	# logarithm 
+	X = log.(complex.(abs.(F) + damp, 0.0)) 
+	# to cepstral domain - IFFT
+	ifft!(X)
+	# only real part output
+	X = complex.(real.(X), 0.0);
+	# scaling
+	# X = X / complex(real(npow2), 0.0)
+
+	# positive cepstrum x 2
+	X[2 : npow2/2 + 1] *= complex(2.0, 0.0)
+	# remove negative quefrencies
+	X[npow2/2 + 2 : npow2] = complex(0.0, 0.0) 
+
+	# FFT
+	fft!(X)
+
+	# exponential
+	F = exp.(X)
+
+	F /= complex(maximum(abs.(F)), 0.0)
+end
+
+return F
+
+end # butterworth
+
 
 end # module

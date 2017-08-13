@@ -738,7 +738,7 @@ function add_born_sources!(iisseq::Int64, p::Array{Float64}, pp::Array{Float64},
 			  (27.e0*dpdx[iz,ix,1,1] * δmodrrvx[iz,ix] -27.e0*dpdx[iz,ix-1,1,1] * δmodrrvx[iz,ix-1] -dpdx[iz,ix+1,1,1] * δmodrrvx[iz,ix+1] +dpdx[iz,ix-2,1,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) + (
 			  (27.e0*dpdz[iz,ix,1,1] * δmodrrvz[iz,ix] -27.e0*dpdz[iz-1,ix,1,1] * δmodrrvz[iz-1,ix] -dpdz[iz+1,ix,1,1] * δmodrrvz[iz+1,ix] +dpdz[iz-2,ix,1,1] * δmodrrvz[iz-2,ix] ) * (δz24I)) ) 
 
-			@inbounds p[iz,ix,1,2] += born_svalue_stack[iz,ix, iisseq] * δt * δxI * δzI * modttI[iz,ix]  
+			@inbounds p[iz,ix,1,2] += born_svalue_stack[iz,ix, iisseq] * δt * modttI[iz,ix] #* δxI * δzI 
 	end
 	end
 end

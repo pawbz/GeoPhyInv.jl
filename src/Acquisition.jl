@@ -538,7 +538,7 @@ Generate band-limited random source signals
 function Src_fixed_random(nss::Int64, ns::Int64, nfield::Int64, fmin::Float64, fmax::Float64, tgrid::Grid.M1D, tmax::Float64=tgrid.x[end] )
 	wavsrc = [repeat(zeros(tgrid.nx),inner=(1,ns)) for iss=1:nss, ifield=1:nfield] 
 	for ifield in 1:nfield, iss in 1:nss, is in 1:ns
-		wavsrc[iss, ifield][:,is] = DSP.get_tapered_random_tmax_signal(tgrid, fmin, fmax,tmax )
+		wavsrc[iss, ifield][:,is] = DSP.get_tapered_random_tmax_signal(tgrid, fmin, fmax, tmax)
 	end
 	src= Src(nss, fill(ns, nss), nfield, wavsrc, deepcopy(tgrid))
 	print(src)
