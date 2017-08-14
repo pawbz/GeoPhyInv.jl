@@ -83,8 +83,19 @@ Plot the source wavelet used for acquisition.
 
 * `acqsrc::Acquisition.Src` : source acquisition parameters
 """
-function Src(acqsrc::Acquisition.Src)
-	plot(acqsrc.tgrid.x, acqsrc.wav[1,1][:,:])
+function Src(acqsrc::Acquisition.Src; )
+	wav = acqsrc.wav[1,1][:,:]
+	powwav = (abs.(fft(wav)).^2)
+	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing 
+	tgrid= acqsrc.tgrid
+	fgrid= Grid.M1D_fft(tgrid)
+	subplot(2,1,1)
+	plot(tgrid.x, wav)
+	xlabel(L"$t$ (s)");
+	subplot(2,1,2)
+	plot(fgrid.x[1:div(fgrid.nx,2)], powwavdb[1:div(fgrid.nx,2)])
+	ylabel("power (dB)");
+	xlabel("frequency (Hz)");
 end
 
 

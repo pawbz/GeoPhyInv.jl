@@ -249,7 +249,7 @@ end
 
 """
 1-D grid with a different sampling interval
-* Not yet implemented for npow2 grids
+* Not yet implemented for fft grids
 """
 function M1D_resamp(grid::M1D, δx::Float64) 
 	return M1D(grid.x[1], grid.x[end], δx)
@@ -267,30 +267,36 @@ function M1D_truncate(grid::M1D, xbeg::Float64, xend::Float64)
 	return M1D(x, size(x,1), x[2]-x[1])
 end
 
-"""
-output an npow2grid of either time or frequency
-"""
-function M1D_npow2(npow2::Int64, δ::Float64)
-	vec = zeros(npow2);
 
+"grid after FFT"
+M1D_fft(grid::M1D) = M1D_fft(grid.nx, 1.0/grid.nx/grid.δx)
+
+
+function M1D_fft(nx::Int64, δ::Float64)
+	vec = zeros(nx);
 	# zero lag
 	vec[1] = 0.0;
 
-	# positive lags
-	for i = 1: div(npow2,2)
-		vec[1+i] = δ * i
+	if(isodd(nx))
+		# +ve
+		for i = 1: div(nx,2)
+			vec[1+i] = δ * i
+		end
+		# -ve
+		for i = 1: div(nx,2)
+			vec[nx-i+1] = -δ * i
+		end
+	else
+		# +ve
+		for i = 1: div(nx,2)
+			vec[1+i] = δ * i
+		end
+		# -ve one less the number of +ve lags
+		for i = 1: div(nx,2)-1
+			vec[nx-i+1] = -δ * i
+		end
 	end
-
-	# negative lags -- one less than positive lags
-	for i = 1: div(npow2,2)-1
-		vec[npow2-i+1] = -δ * i
-	end
-	return M1D(vec, npow2, δ)
+	return M1D(vec, nx, δ)
 end
-
-"convertion between time and frequency npow2 grids"
-M1D_npow2_tf(grid::M1D) = M1D_npow2(grid.nx, 1.0/grid.nx/grid.δx)
-
-
 
 end # module
