@@ -89,26 +89,27 @@ function findfreq{ND}(
 		  x::Array{Float64, ND},
 		  tgrid::Grid.M1D;
 		  attrib::Symbol=:peak,
-		  threshold::Float64=1e-6
+		  threshold::Float64=-300.
 		  )
 
 nfft = nextpow2(tgrid.nx);
 # npow2 grid for time
-tnpow2grid = Grid.M1D_npow2(nfft, tgrid.δx);
+tnpow2grid = Grid.M1D_fft(nfft, tgrid.δx);
 # corresponding npow2 frequency grid 
-fnpow2grid = Grid.M1D_npow2_tf(tnpow2grid);
+fnpow2grid = Grid.M1D_fft(tnpow2grid);
 
 cx = fill(complex(0.0,0.0),nfft);
 cx[1:tgrid.nx] = complex.(x,0.0);
 
 cx = fft(cx);
-ax = real(cx.*conj(cx));
+ax = (abs.(cx).^2); # power spectrum in dB
 ax[fnpow2grid.x .< 0.] = 0. # remove negative frequencies
 
 if(maximum(ax) == 0.0)
 	warn("x is zero"); return 0.0
 else 
 	ax /= maximum(ax);
+	ax = 10. .* log10.(ax)
 end
 
 if(attrib == :max)
