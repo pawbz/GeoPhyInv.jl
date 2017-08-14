@@ -10,7 +10,7 @@ using DSP # from julia
 function get_tapered_random_tmax_signal(tgrid::Grid.M1D, fmin::Float64, fmax::Float64, tmax::Float64)
 
 	fs = 1/ tgrid.δx;
-	designmethod = Butterworth(4);
+	designmethod = Butterworth(6);
 	filtsource = Bandpass(fmin, fmax; fs=fs);
 
 	itmax = indmin(abs.(tgrid.x-tmax))
@@ -21,7 +21,8 @@ function get_tapered_random_tmax_signal(tgrid::Grid.M1D, fmin::Float64, fmax::Fl
 	X[:] = rand(Uniform(-1.0, 1.0), itmax) .* twin
 	# band limit
 	filt!(X, digitalfilter(filtsource, designmethod), X);
-	wavsrc[1:itmax] = X.*twin
+	#wavsrc[1:itmax] = X.*twin
+	wavsrc[1:itmax] = X
 end
 
 
@@ -89,7 +90,7 @@ function findfreq{ND}(
 		  x::Array{Float64, ND},
 		  tgrid::Grid.M1D;
 		  attrib::Symbol=:peak,
-		  threshold::Float64=-300.
+		  threshold::Float64=-50.
 		  )
 
 nfft = nextpow2(tgrid.nx);
