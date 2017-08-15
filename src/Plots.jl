@@ -96,6 +96,7 @@ function Src(acqsrc::Acquisition.Src; )
 	plot(fgrid.x[1:div(fgrid.nx,2)], powwavdb[1:div(fgrid.nx,2)])
 	ylabel("power (dB)");
 	xlabel("frequency (Hz)");
+	tight_layout()
 end
 
 

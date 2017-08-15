@@ -177,10 +177,9 @@ Author: Pawan Bharadwaj
 
 	# necessary that nss and fields should be same for all nprop
 	src_nseq = acqgeom[1].nss;
-	src_fields = acqsrc[1].fields
-	src_ifields = findin([:P, :Vx, :Vz], acqsrc[1].fields)
+	src_fields = [acqsrc[ipropwav].fields for ipropwav in 1:npropwav]
+	src_ifields = [findin([:P, :Vx, :Vz], acqsrc[ipropwav].fields) for ipropwav in 1:npropwav]
 	fill(src_nseq, npropwav) != [getfield(acqgeom[ip],:nss) for ip=1:npropwav] ? error("different supersources") : nothing
-	fill(src_fields, npropwav) != [getfield(acqsrc[ip],:fields) for ip=1:npropwav] ? error("different fields") : nothing
 
 	# create acquisition geometry with each source shooting 
 	# at every unique receiver position
@@ -255,7 +254,7 @@ Author: Pawan Bharadwaj
 
 
 	# source wavelets
-	src_wav_mat = zeros(src_nsmul,length(src_ifields),npropwav,tim_nt,src_nseq)
+	src_wav_mat = [zeros(src_nsmul,length(src_ifields[ipropwav]),tim_nt) for ipropwav in 1:npropwav, isseq in 1:src_nseq]
 	fill_src_wav_mat!(src_wav_mat, acqsrc_uspos, src_flags)
 
 	# all localparts of DArrays are input to this method
@@ -341,7 +340,8 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 		       acqgeom_uspos::Array{Acquisition.Geom}, acqgeom_urpos::Array{Acquisition.Geom}, 
 		       modttI::Array{Float64}, modrrvx::Array{Float64}, modrrvz::Array{Float64},
 		       vpmax::Float64, vpmin::Float64, freqmin::Float64, freqmax::Float64, 
-		       abs_trbl::Vector{Symbol}, tsnaps::Vector{Float64}, src_wav_mat::Array{Float64}, src_ifields::Vector{Int64},
+		       abs_trbl::Vector{Symbol}, tsnaps::Vector{Float64}, src_wav_mat::Array{Array{Float64,3},2}, 
+		       src_ifields::Vector{Vector{Int64}},
 		       born_flag::Bool,
 		       born_svalue_stack::Array{Float64}, δmodtt::Array{Float64},
 		       δmodrrvx::Array{Float64}, δmodrrvz::Array{Float64})
@@ -529,26 +529,26 @@ end # mod_per_shot
 
 @inline @inbounds @fastmath function add_source!( 
 				it::Int64, isseq::Int64,
-				p::Array{Float64}, src_wav_mat::AbstractArray{Float64},
+				p::Array{Float64}, src_wav_mat::Array{Array{Float64,3},2},
 				src_spray_weights::Array{Float64},
 				modttI::Array{Float64},
 				issmulx1::Array{Int64}, issmulx2::Array{Int64},
 				issmulz1::Array{Int64}, issmulz2::Array{Int64},
-				npropwav::Int64, src_ifields::Vector{Int64}, src_nsmul::Int64,
+				npropwav::Int64, src_ifields::Vector{Vector{Int64}}, src_nsmul::Int64,
 				δt::Float64, δxI::Float64, δzI::Float64
 				)
 	"""
 	adding source to pressure field at [it] 
 	"""
 	for ipropwav = 1:npropwav
-	for (ifieldsrc, ifield) in enumerate(src_ifields)
+	for (ifieldsrc, ifield) in enumerate(src_ifields[ipropwav])
 	@simd for issmul = 1:src_nsmul
 		"""
 		use src_wav_mat at [it], i.e., sum of source terms
 		until [it-1]
 		division of source term with δx and δz (see Jan's fdelmodc manual)
 		"""
-		source_term = src_wav_mat[issmul, ifieldsrc, ipropwav,it,isseq] * δt * δxI * δzI
+		source_term = src_wav_mat[ipropwav, isseq][issmul, ifieldsrc, it] * δt * δxI * δzI
 		
 		"""
 		multiplication with modttI
@@ -940,55 +940,60 @@ function snap_save!(iisseq::Int64, itsnapssave::Int64,
 	end
 end
 
-function fill_src_wav_mat!(src_wav_mat::Array{Float64}, acqsrc_uspos::Array{Acquisition.Src},src_flags::Vector{Int64})
+function fill_src_wav_mat!(src_wav_mat::Array{Array{Float64, 3}, 2}, acqsrc_uspos::Array{Acquisition.Src},src_flags::Vector{Int64})
 
-	src_nsmul, src_nfield, npropwav, tim_nt, src_nseq = size(src_wav_mat)
+	npropwav, src_nseq = size(src_wav_mat)
 	δt = acqsrc_uspos[1].tgrid.δx
-	for ipropwav=1:npropwav, ifield=1:src_nfield, isseq=1:src_nseq, issmul=1:src_nsmul
-		src_tim_nt = acqsrc_uspos[ipropwav].tgrid.nx;
-		if(src_flags[ipropwav] == 0)
-			nothing # just put zeros, no sources added
-		elseif(src_flags[ipropwav] == 1)
-			"ϕ[t] = s[t]"
-			for it=1:src_tim_nt
-				source_term = acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul]
-				src_wav_mat[issmul,ifield,ipropwav,it,isseq] = source_term
-			end
-		elseif(src_flags[ipropwav] == 2)
-			"ϕ[t] = ∑₁ᵗ⁻¹ s[t]"
-			source_term_stack = 0.0;
-			if(ifield == 1)
+	for isseq=1:src_nseq
+	for ipropwav=1:npropwav
+		src_nsmul, src_nfield, tim_nt = size(src_wav_mat[ipropwav,isseq])
+		for ifield=1:src_nfield, issmul=1:src_nsmul
+			src_tim_nt = acqsrc_uspos[ipropwav].tgrid.nx;
+			if(src_flags[ipropwav] == 0)
+				nothing # just put zeros, no sources added
+			elseif(src_flags[ipropwav] == 1)
+				"ϕ[t] = s[t]"
+				for it=1:src_tim_nt
+					source_term = acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul]
+					src_wav_mat[ipropwav, isseq][issmul,ifield,it] = source_term
+				end
+			elseif(src_flags[ipropwav] == 2)
+				"ϕ[t] = ∑₁ᵗ⁻¹ s[t]"
+				source_term_stack = 0.0;
+				if(ifield == 1)
+					for it=1:src_tim_nt-1
+						source_term_stack += (acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt)
+						src_wav_mat[ipropwav, isseq][issmul,ifield,it+1] = source_term_stack
+					end
+				else
+					for it=2:src_tim_nt-1
+						source_term_stack += (((acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt) +
+						   (acqsrc_uspos[ipropwav].wav[isseq,ifield][it-1,issmul] .* δt)) * 0.5)
+						src_wav_mat[ipropwav, isseq][issmul,ifield,it+1] = source_term_stack
+					end
+
+				end
+				if(tim_nt > src_tim_nt)
+					src_wav_mat[ipropwav, isseq][issmul,ifield,src_tim_nt+1:end] = src_wav_mat[ipropwav, isseq][issmul,ifield,src_tim_nt]
+				end
+			elseif(src_flags[ipropwav] == 3)
+				"use this to add source sink: need during adjoint propagation from boundary"
+				"multiplication with -1 for subtraction"
+				"time reversal"
+				"as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
+				"ϕ[t] = "
+				source_term_stack = 0.0;
 				for it=1:src_tim_nt-1
 					source_term_stack += (acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt)
-					src_wav_mat[issmul,ifield,ipropwav,it+1,isseq] = source_term_stack
+					src_wav_mat[ipropwav, isseq][issmul,ifield,tim_nt-it+1] = -1.0 * source_term_stack
 				end
-			else
-				for it=2:src_tim_nt-1
-					source_term_stack += (((acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt) +
-					   (acqsrc_uspos[ipropwav].wav[isseq,ifield][it-1,issmul] .* δt)) * 0.5)
-					src_wav_mat[issmul,ifield,ipropwav,it+1,isseq] = source_term_stack
+				if(tim_nt > src_tim_nt)
+					tim_nt_diff = tim_nt-src_tim_nt
+					src_wav_mat[ipropwav, isseq][issmul,ifield,1:tim_nt_diff+1] = src_wav_mat[ipropwav, isseq][issmul,ifield,tim_nt_diff+2]
 				end
-
-			end
-			if(tim_nt > src_tim_nt)
-				src_wav_mat[issmul,ifield,ipropwav,src_tim_nt+1:end,isseq] = src_wav_mat[issmul,ifield,ipropwav,src_tim_nt,isseq]
-			end
-		elseif(src_flags[ipropwav] == 3)
-			"use this to add source sink: need during adjoint propagation from boundary"
-			"multiplication with -1 for subtraction"
-			"time reversal"
-			"as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
-			"ϕ[t] = "
-			source_term_stack = 0.0;
-			for it=1:src_tim_nt-1
-				source_term_stack += (acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt)
-				src_wav_mat[issmul,ifield,ipropwav,tim_nt-it+1,isseq] = -1.0 * source_term_stack
-			end
-			if(tim_nt > src_tim_nt)
-				tim_nt_diff = tim_nt-src_tim_nt
-				src_wav_mat[issmul,ifield,ipropwav,1:tim_nt_diff+1,isseq] = src_wav_mat[issmul,ifield,ipropwav,tim_nt_diff+2,isseq]
 			end
 		end
+	end
 	end
 end
 

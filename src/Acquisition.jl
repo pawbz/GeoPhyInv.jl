@@ -585,7 +585,7 @@ function Src_uspos(src::Vector{Src}, acq::Vector{Geom})
 	end
 	# output src
 	return [Src(src[ip].nss,fill(nus, src[ip].nss),
-	     length(src[ip].fields),wavout[ip],src[ip].tgrid) for ip=1:np]
+	     src[ip].fields,wavout[ip],src[ip].tgrid) for ip=1:np]
 end
 
 

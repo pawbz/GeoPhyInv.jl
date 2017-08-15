@@ -44,7 +44,7 @@ type TD
 		any([
 		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
 		  length(fields) == 0,
-		  broadcast(size,ssf) != [tgridssf.nx for iss=1:acqgeom.nss, ifield=1:length(fields)]
+		  broadcast(size,ssf) != [(tgridssf.nx,) for iss=1:acqgeom.nss, ifield=1:length(fields)]
 		  ]) ? 
 		error("error in TD construction") : new(ssf, rf, fields, tgridssf, tgridrf, acqgeom)
 
