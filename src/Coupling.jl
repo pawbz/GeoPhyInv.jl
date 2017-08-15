@@ -87,7 +87,6 @@ function TD_delta(tgridssf::Grid.M1D, tgridrf::Grid.M1D,
 	spiss[nspikessf] = 1.0; spir[nspikerf] = 1.0; 
 	# number of unique receivers (implement in future)
 	# one receiver filter for each unique receiver
-	println(fields)
 	return TD([spiss for iss=1:acqgeom.nss, ifield=1:length(fields)],
 	   [repeat(spir, outer=[1,acqgeom.nr[iss]]) for iss=1:acqgeom.nss, ifield=1:length(fields)],
 	   fields,tgridssf,tgridrf,deepcopy(acqgeom))
