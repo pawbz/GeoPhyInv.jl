@@ -417,24 +417,31 @@ Data type for the source related parameters during acquisiton.
 # Fields
 * `nss::Int64` : number of supersources
 * `ns::Array{Int64}` : number of sources for each supersource
-* `nfield::Int64` : number of fields
+* `fields::Vector{Symbol}` : number of fields
 * `wav::Array{Float64}` : wavelets in time domain
 * `tgrid::Grid.M1D` : time grid 
 """
 type Src
 	nss::Int64
 	ns::Vector{Int64}
-	nfield::Int64
+	fields::Vector{Symbol}
 	wav::Array{Array{Float64,2},2}
 	tgrid::Grid.M1D
+	Src(nss, ns, fields, wav, tgrid) = 
+		any([
+		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
+		  length(fields) == 0,
+		  broadcast(size,wav) ≠ [(tgrid.nx,ns[iss]) for iss=1:nss, ifield=1:length(fields)]
+		  ]) ? 
+		error("error in Src construction") : new(nss, ns, fields, wav, tgrid)
 end
 
 """
 Allocate `Src` with zeros depending on the acquisition geometry.
 """
-function Src_zeros(acqgeom::Geom,  nfield::Int64, tgrid::Grid.M1D)
-	wavsrc = [zeros(tgrid.nx,acqgeom.ns[iss]) for iss=1:acqgeom.nss, ifield=1:nfield] 
-	return Src(acqgeom.nss, acqgeom.ns, nfield, wavsrc, deepcopy(tgrid))
+function Src_zeros(acqgeom::Geom,  fields::Vector{Symbol}, tgrid::Grid.M1D)
+	wavsrc = [zeros(tgrid.nx,acqgeom.ns[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)] 
+	return Src(acqgeom.nss, acqgeom.ns, fields, wavsrc, deepcopy(tgrid))
 end
 
 """
@@ -444,9 +451,9 @@ function print(src::Src, name::String="")
 	println("\tSource Acquisition:\t",name)
 	println("\t> number of supersources:\t",src.nss)
 	println("\t> sources per supersource:\t","min\t",minimum(src.ns[:]), "\tmax\t", maximum(src.ns[:]))
-	freqmin = minimum([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:min) for i in 1:src.nss, j in 1:src.nfield])
-	freqmax = maximum([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:max) for i in 1:src.nss, j in 1:src.nfield])
-	freqpeak = mean([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:peak) for i in 1:src.nss, j in 1:src.nfield])
+	freqmin = minimum([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:min) for i in 1:src.nss, j in 1:length(src.fields)])
+	freqmax = maximum([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:max) for i in 1:src.nss, j in 1:length(src.fields)])
+	freqpeak = mean([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:peak) for i in 1:src.nss, j in 1:length(src.fields)])
 	println("\t> frequency:\t","min\t",freqmin, "\tmax\t",freqmax,"\tpeak\t",freqpeak)
 	println("\t> time:\t","min\t",src.tgrid.x[1], "\tmax\t", src.tgrid.x[end])
 	println("\t> samples:\t",src.tgrid.nx)
@@ -461,19 +468,19 @@ Uses same source wavelet, i.e., `wav` for all sources and supersources
 
 * `nss::Int64` : number of supersources
 * `ns::Int64` : number of sources
-* `nfield::Int64` : number of fields the sources are exciting
+* `fields::Vector{Symbol}` : number of fields the sources are exciting
 * `wav::Array{Float64}` : a source wavelet that is used for all sources and supersources
 * `tgrid::Grid.M1D` : time grid for the wavelet
 """
 function Src_fixed(nss::Int64, 
 	     ns::Int64, 
-	     nfield::Int64,
+	     fields::Vector{Symbol},
 	     wav::Array{Float64},
 	     tgrid::Grid.M1D
 	     )
 
-	wavsrc = [repeat(wav,inner=(1,ns)) for iss=1:nss, ifield=1:nfield] 
-	return Src(nss, fill(ns, nss), nfield, wavsrc, deepcopy(tgrid))
+	wavsrc = [repeat(wav,inner=(1,ns)) for iss=1:nss, ifield=1:length(fields)] 
+	return Src(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
 end
 
 """
@@ -484,7 +491,7 @@ the model has `nλ` wavelengths.
 
 * `nss::Int64` : number of supersources
 * `ns::Int64` : number of source per each supersource
-* `nfield::Int64` :
+* `fields::Vector{Symbol}` :
 
 # Keyword Arguments
 
@@ -494,7 +501,7 @@ the model has `nλ` wavelengths.
 * `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the model, use this fraction to increase of reduce the maximum time
 """
 function Src_fixed_mod(
-		nss::Int64, ns::Int64, nfield::Int64; 
+		nss::Int64, ns::Int64, fields::Vector{Symbol}; 
 		mod::Models.Seismic=nothing, 
 		nλ::Int64=10,
 		wav_func::Function=(fqdom, tgrid)->Wavelets.ricker(fqdom,tgrid),
@@ -526,7 +533,7 @@ function Src_fixed_mod(
 	tgrid=Grid.M1D(0.0, tmax, δt)
 	wav = wav_func(fqdom, tgrid);
 
-	src=Src_fixed(nss, ns, nfield, wav, tgrid)
+	src=Src_fixed(nss, ns, fields, wav, tgrid)
 	print(src)
 	# choose ricker waveletes of fdom
 	return src
@@ -535,12 +542,12 @@ end
 """
 Generate band-limited random source signals 
 """
-function Src_fixed_random(nss::Int64, ns::Int64, nfield::Int64, fmin::Float64, fmax::Float64, tgrid::Grid.M1D, tmax::Float64=tgrid.x[end] )
-	wavsrc = [repeat(zeros(tgrid.nx),inner=(1,ns)) for iss=1:nss, ifield=1:nfield] 
-	for ifield in 1:nfield, iss in 1:nss, is in 1:ns
+function Src_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol}, fmin::Float64, fmax::Float64, tgrid::Grid.M1D, tmax::Float64=tgrid.x[end] )
+	wavsrc = [repeat(zeros(tgrid.nx),inner=(1,ns)) for iss=1:nss, ifield=1:length(fields)] 
+	for ifield in 1:length(fields), iss in 1:nss, is in 1:ns
 		wavsrc[iss, ifield][:,is] = DSP.get_tapered_random_tmax_signal(tgrid, fmin, fmax, tmax)
 	end
-	src= Src(nss, fill(ns, nss), nfield, wavsrc, deepcopy(tgrid))
+	src= Src(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
 	print(src)
 	return src
 end
@@ -549,8 +556,8 @@ end
 Function that returns Src after time reversal
 """
 function Src_tr(src::Src)
-	return Src(src.nss,src.ns,src.nfield,
-	    [flipdim(src.wav[i,j],1) for i in 1:src.nss, j in 1:src.nfield],deepcopy(src.tgrid))
+	return Src(src.nss,src.ns,src.fields,
+	    [flipdim(src.wav[i,j],1) for i in 1:src.nss, j in 1:length(src.fields)],deepcopy(src.tgrid))
 end
 
 
@@ -566,10 +573,10 @@ function Src_uspos(src::Vector{Src}, acq::Vector{Geom})
 	nus=Geom_get(acq,:nus) 
 	uspos=Geom_get(acq,:uspos)
 	# all zeros for all unique positions
-	wavout = [[zeros(src[ip].tgrid.nx,nus) for iss=1:src[ip].nss, ifield=1:src[ip].nfield] for ip=1:np]
+	wavout = [[zeros(src[ip].tgrid.nx,nus) for iss=1:src[ip].nss, ifield=1:length(src[ip].fields)] for ip=1:np]
 	# fill source wavelets when necessary
 	for ip=1:np
-		for ifield=1:src[ip].nfield, iss=1:src[ip].nss, is=1:acq[ip].ns[iss]
+		for ifield=1:length(src[ip].fields), iss=1:src[ip].nss, is=1:acq[ip].ns[iss]
 			is0=find([[uspos[1][i]-acq[ip].sz[iss][is],
 		      uspos[2][i]-acq[ip].sx[iss][is]] == [0., 0.,] for i in 1:nus])
 
@@ -578,7 +585,7 @@ function Src_uspos(src::Vector{Src}, acq::Vector{Geom})
 	end
 	# output src
 	return [Src(src[ip].nss,fill(nus, src[ip].nss),
-	     	src[ip].nfield,wavout[ip],src[ip].tgrid) for ip=1:np]
+	     length(src[ip].fields),wavout[ip],src[ip].tgrid) for ip=1:np]
 end
 
 

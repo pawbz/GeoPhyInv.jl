@@ -64,7 +64,7 @@ function mod(;
 	      [zeros(nt,nr[iss]) for iss=1:nss, ifield=1:1],
 	      1,tgridmod,acqgeom)
 
-	for ifield = 1:data.nfield, iss = 1:nss
+	for ifield = 1:length(data.fields), iss = 1:nss
 		sx = acqgeom.sx[iss][:]
 		rx = acqgeom.rx[iss][:]
 		sz = acqgeom.sz[iss][:]

@@ -211,15 +211,15 @@ function Src(attrib::Symbol, nss::Int64=1)
 	if(attrib == :acou_homo1)
 		tgrid = M1D(attrib)
 		wav = Wavelets.ricker(10.0, tgrid, tpeak=0.25, )
-		return Acquisition.Src_fixed(nss, 1, 1, wav, tgrid)
+		return Acquisition.Src_fixed(nss, 1, [:P], wav, tgrid)
 	elseif(attrib == :acou_homo2)
 		tgrid = M1D(attrib)
 		wav = Wavelets.ricker(3.0, tgrid, tpeak=0.3, )
-		return Acquisition.Src_fixed(nss, 1, 1, wav, tgrid)
+		return Acquisition.Src_fixed(nss, 1, [:P], wav, tgrid)
 	elseif(attrib == :vecacou_homo1)
 		tgrid = M1D(:acou_homo1)
 		wav = Wavelets.ricker(10.0, tgrid, tpeak=0.25, )
-		return Acquisition.Src_fixed(nss, 1, 3, wav, tgrid)
+		return Acquisition.Src_fixed(nss, 1, [:P, :Vx, :Vz], wav, tgrid)
 	end
 end
 

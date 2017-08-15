@@ -21,22 +21,23 @@ Time domain representation of Seismic Data.
 # Fields
 
 * `d::Array{Array{Float64,2},2}` : data 
-* `nfield::Int64` : number of components recorded at each receiver
+* `fields::Vector{Symbol}` : components recorded at each receiver
 * `tgrid::Grid.M1D` : grid to represent time
 * `acqgeom::Acquisition.Geom` : acquisition geometry used to generate the data
 """
 type TD
 	d::Array{Array{Float64,2},2}
-	nfield::Int64
+	fields::Vector{Symbol}
 	tgrid::Grid.M1D
 	acqgeom::Acquisition.Geom
 	"adding conditions that are to be false while construction"
-	TD(d, nfield, tgrid, acqgeom) = 
+	TD(d, fields, tgrid, acqgeom) = 
 		any([
-       		  nfield < 0.0,
-		  broadcast(size,d) != [(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield]
+		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
+		  length(fields) == 0,
+		  broadcast(size,d) != [(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)]
 		  ]) ? 
-		error("error in TD construction") : new(d, nfield, tgrid, acqgeom)
+		error("error in TD construction") : new(d, fields, tgrid, acqgeom)
 
 end
 
@@ -59,8 +60,8 @@ function TD_resamp(data::TD,
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
 	dataout = TD(
-	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:data.nfield],
-	      data.nfield,tgrid,data.acqgeom)
+	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:length(data.fields)],
+	      length(data.fields),tgrid,data.acqgeom)
 	TD_resamp!(data, dataout)
 	return dataout
 end
@@ -79,7 +80,7 @@ function TD_resamp!(data::TD, dataout::TD)
 	# check if datasets are similar
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
-	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
+	for ifield = 1:length(data.fields), iss = 1:nss, ir = 1:nr[iss]
 		din = data.d[iss, ifield][:, ir]
 		xin = data.tgrid.x
 		xout = dataout.tgrid.x
@@ -97,7 +98,7 @@ Method used to preallocate `TD` with zeros.
 
 # Arguments
 
-* `nfield::Int64` : number of components
+* `fields::Vector{Symbol}` : number of components
 * `tgrid::Grid.M1D` : time domain grid
 * `acqgeom::Acquisition.Geom` : acquisition geometry
 
@@ -105,14 +106,14 @@ Method used to preallocate `TD` with zeros.
 
 * data with zeros as `TD`
 """
-function TD_zeros(nfield::Int64, tgrid::Grid.M1D, acqgeom::Acquisition.Geom)
-	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],nfield,
+function TD_zeros(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.Geom)
+	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],fields,
 	   deepcopy(tgrid),deepcopy(acqgeom)) 
 end
 "Same as `TD_zeros`, except for returning ones"
-function TD_ones(nfield::Int64, tgrid::Grid.M1D, acqgeom::Acquisition.Geom) 
-	return TD([ones(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:nfield],
-	   nfield,deepcopy(tgrid),deepcopy(acqgeom)) 
+function TD_ones(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.Geom) 
+	return TD([ones(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],
+	   fields,deepcopy(tgrid),deepcopy(acqgeom)) 
 end
 
 
@@ -131,7 +132,7 @@ Time reverse the records of each receiver in `TD`
 * `data::TD` : input data that is modified
 """
 function TD_tr!(data::TD)
-	data.d = copy([flipdim(data.d[i,j],1) for i in 1:data.acqgeom.nss, j in 1:data.nfield]);
+	data.d = copy([flipdim(data.d[i,j],1) for i in 1:data.acqgeom.nss, j in 1:length(data.fields)]);
 end
 
 """
@@ -148,7 +149,7 @@ Returns dot product of data.
 """
 function TD_dot(data1::TD, data2::TD)
 	dotd = 0.0;
-	for ifield = 1:data1.nfield, iss = 1:data1.acqgeom.nss, ir = 1:data1.acqgeom.nr[iss]
+	for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss, ir = 1:data1.acqgeom.nr[iss]
 		dotd += dot(data1.d[iss, ifield][:, ir],data2.d[iss, ifield][:, ir])
 	end
 	return dotd
@@ -172,7 +173,7 @@ Normalize time-domain seismic data.
 function TD_normalize(data::TD, attrib::Symbol)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
 	datan = deepcopy(data);
-	for ifield = 1:data.nfield, iss = 1:nss, ir = 1:nr[iss]
+	for ifield = 1:length(data.fields), iss = 1:nss, ir = 1:nr[iss]
 		if(attrib == :recrms)
 			nval = sqrt(mean(datan.d[iss, ifield][:,ir].^2.))
 		elseif(attrib == :recmax)
@@ -196,16 +197,16 @@ for all supersources.
 
 """
 function TD_urpos(d::Array{Float64}, 
-		   nfield::Int64, 
+		   fields::Vector{Symbol}, 
 		   tgrid::Grid.M1D, 
 		   acq::Acquisition.Geom,
 		   nur::Int64,
 		   urpos::Tuple{Array{Float64,1},Array{Float64,1}
 		  }
 		   )
-	dout = [zeros(tgrid.nx,acq.nr[iss]) for iss=1:acq.nss, ifield=1:nfield] 
+	dout = [zeros(tgrid.nx,acq.nr[iss]) for iss=1:acq.nss, ifield=1:length(fields)] 
 
-	for ifield=1:nfield, iss=1:acq.nss, ir=1:acq.nr[iss]
+	for ifield=1:length(fields), iss=1:acq.nss, ir=1:acq.nr[iss]
 		# find index in urpos
 		irr=find([[urpos[1][i]-acq.rz[iss][ir],
 		       urpos[2][i]-acq.rx[iss][ir]] == [0., 0.,] for i in 1:nur])
@@ -213,7 +214,7 @@ function TD_urpos(d::Array{Float64},
 		dout[iss, ifield][:,ir] = d[irr[1],ifield, :,iss] 
 	end
 
-	return TD(dout, nfield, tgrid, acq)
+	return TD(dout, fields, tgrid, acq)
 
 end
 
@@ -240,11 +241,11 @@ function TDcoup!(
 	       attrib::Symbol
 	       )
 	nr = r.acqgeom.nr;	nss = r.acqgeom.nss;	nt = r.tgrid.nx;
-	nfield = (w.nfield == r.nfield == s.nfield) ? w.nfield : error("different nfields")
+	fields = (w.fields == r.fields == s.fields) ? w.fields : error("different fields")
 	sv=zeros(s.tgrid.nx)
 	rv=zeros(r.tgrid.nx)
 	wv=zeros(w.tgridssf.nx)
-	for ifield = 1:nfield, iss = 1:nss, ir = 1:nr[iss]
+	for ifield = 1:length(fields), iss = 1:nss, ir = 1:nr[iss]
 		# receiver coupling
 	#	DSP.fast_filt!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],
 #		 w.rf[iss, ifield][:,ir],:s)
@@ -290,7 +291,7 @@ function TD_weight!(
 	tvecexp = dw.tgrid.x - dw.tgrid.x[1]
 	tmaxI = maximum(abs(tvecexp))^(-1)
 	nt = dw.tgrid.nx
-	nfield=dw.nfield
+	fields=dw.fields
 	nss=dw.acqgeom.nss
 	rx=dw.acqgeom.rx; rz=dw.acqgeom.rz
 	sx=dw.acqgeom.sx; sz=dw.acqgeom.sz
@@ -300,7 +301,7 @@ function TD_weight!(
 	twin=zeros(nt)
 	twin[itlim[1] : itlim[2]] = DSP.taper(ones(itlim[2]-itlim[1]+1),ttaperperc) 
 
-	for ifield = 1:nfield, iss = 1:nss
+	for ifield = 1:length(fields), iss = 1:nss
 		zo = sqrt((rz[iss][:]-mean(sz[iss])).^2) # offsets computed using mean of source position
 		xo = sqrt((rx[iss][:]-mean(sx[iss])).^2)
 		zomaxI = maximum(zo)^(-1)

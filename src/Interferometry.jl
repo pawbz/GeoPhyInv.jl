@@ -23,7 +23,7 @@ function TD_virtual_diff(
 			)
 
 	nr = maximum(data.acqgeom.nr);	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
-	nfield = data.nfield;
+	fields = data.fields;
 	# normalize the records in data
 	datan = Data.TD_normalize(data,:recrms)
 
@@ -36,8 +36,8 @@ function TD_virtual_diff(
 	println(string("dominant wavelength in the data:\t",λdom))
 
 	rx = Array{Vector{Float64}}(nur); rz = Array{Vector{Float64}}(nur);
-	datmat = zeros(nur, data.nfield, 2*nt-1, nur);
-	for ifield =1:data.nfield
+	datmat = zeros(nur, length(fields), 2*nt-1, nur);
+	for ifield =1:length(fields)
 		# loop over virtual sources
 		for irs = 1:nur
 
@@ -102,7 +102,7 @@ function TD_virtual_diff(
 	tlag > 0.0 ? tgridcut=Grid.M1D(-tlag, +tlag, data.tgrid.δx) : error("tlag < 0")
 
 	return Data.TD_resamp(
-		       Data.TD_urpos(datmat,data.nfield,tgridxcorr,vacqgeom,nur,urpos), 
+		       Data.TD_urpos(datmat,data.fields,tgridxcorr,vacqgeom,nur,urpos), 
 		       tgridcut)
 
 end

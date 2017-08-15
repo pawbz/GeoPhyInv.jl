@@ -136,10 +136,11 @@ function Param(
 	       attrib_inv::Symbol,
 	       modm::Models.Seismic;
 	       # other optional 
+	       recv_fields=[:P],
 	       igrid::Grid.M2D=modm.mgrid,
 	       mprecon_factor::Float64=1.0,
-	       dobs::Data.TD=Data.TD_zeros(1,tgrid,acqgeom),
-	       dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.acqgeom),
+	       dobs::Data.TD=Data.TD_zeros(recv_fields,tgrid,acqgeom),
+	       dprecon::Data.TD=Data.TD_ones(recv_fields,dobs.tgrid,dobs.acqgeom),
 	       tlagssf::Float64=0.0,
 	       tlagrf::Float64=0.0,
 	       acqsrc_obs::Acquisition.Src=acqsrc,
@@ -150,7 +151,6 @@ function Param(
 	       attrib::Symbol=:synthetic
 	       )
 
-	nfield=1
 
 	# create modi according to igrid and  interpolation of modm
 	modi = Models.Seismic_zeros(igrid);
@@ -166,7 +166,7 @@ function Param(
 
 
 	pa = Param(deepcopy(acqsrc), 
-	     Acquisition.Src_zeros(adjacqgeom, nfield, tgrid),
+	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
 	     attrib_mod, attrib_inv, 
@@ -175,13 +175,13 @@ function Param(
 	     Models.Seismic_zeros(modi.mgrid), 
 	     deepcopy(mod_inv_parameterization),
 	     zeros(2,2), # dummy, update mprecon later
-	     Data.TD_zeros(nfield,tgrid,acqgeom), 
-	     Data.TD_zeros(nfield,tgrid,acqgeom), 
-	     Data.TD_zeros(nfield,tgrid,acqgeom), 
-	     Data.TD_zeros(nfield,tgrid,acqgeom), 
+	     Data.TD_zeros(recv_fields,tgrid,acqgeom), 
+	     Data.TD_zeros(recv_fields,tgrid,acqgeom), 
+	     Data.TD_zeros(recv_fields,tgrid,acqgeom), 
+	     Data.TD_zeros(recv_fields,tgrid,acqgeom), 
 	     deepcopy(dobs), deepcopy(dprecon), 
-	     [Data.TD_zeros(nfield,tgrid,acqgeom)], 
-	     Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, nfield, acqgeom), verbose, attrib,
+	     [Data.TD_zeros(recv_fields,tgrid,acqgeom)], 
+	     Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, recv_fields, acqgeom), verbose, attrib,
 	     nothing, true)
 
 	# buffer allocation
@@ -821,7 +821,7 @@ end
 Convert the data `TD` to `Src` after time reversal.
 """
 function update_adjsrc!(δdat::Data.TD, pa::Param)
-	for i in 1:pa.adjacqgeom.nss, j in 1:δdat.nfield
+	for i in 1:pa.adjacqgeom.nss, j in 1:length(δdat.fields)
 		pa.adjsrc.wav[i,j] = (flipdim(δdat.d[i,j],1))
 	end
 end
@@ -872,7 +872,7 @@ function func_grad_Coupling!(storage, x::Vector{Float64},
 		f = Misfits.TD!(pa.dfdwdcal, pa.wdcal, pa.dobs, pa.dprecon)
 
 		# allocate for w (do we need to preallocate)
-		gw = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.nfield, pa.w.acqgeom)
+		gw = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.fields, pa.w.acqgeom)
 
 		# get gradient w.r.t. w
 		Data.TDcoup!(pa.dfdwdcal, pa.dcal, gw, :w)
@@ -895,7 +895,7 @@ function Coupling_x!(w::Coupling.TD,
 		x[1:pa.w.tgridssf.nx] = copy(vec(w.ssf[1,1][:]));
 	elseif(flag == -1) # convert x to w
 		# update source functions
-		for iss=1:pa.w.acqgeom.nss, ifield=1:pa.w.nfield
+		for iss=1:pa.w.acqgeom.nss, ifield=1:length(pa.w.fields)
 			w.ssf[iss, ifield][:] = copy(x)
 		end
 	else

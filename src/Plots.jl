@@ -114,23 +114,24 @@ Plot time-domain data of type `Data.TD`
 * `attrib::Symbol=:wav` : specify type of plot
 """
 function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(td)), 
-	    fieldvec::Vector{Int64}=[1],
+	    fieldvec::Vector{Symbol}=[:P],
 	    tr_flag::Bool=false, attrib::Symbol=:wav, 
 	    wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
 	    bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
 	    )
-	nfield = length(fieldvec);
 
 	for id=1:length(td)
+
+		fieldvec = findin(td[id].fields, fields)
 		any(ssvec[id] .> td[id].acqgeom.nss) && error("invalid ssvec")
 		ns = length(ssvec[id]);
 		nr = maximum(td[id].acqgeom.nr);
 		if(tr_flag)
 			dp = hcat(td[id].d[ssvec[id],fieldvec][end:-1:1,:]...);
-			extent=[1, nr*ns*nfield, td[id].tgrid.x[1],td[id].tgrid.x[end],]
+			extent=[1, nr*ns*length(fieldvec), td[id].tgrid.x[1],td[id].tgrid.x[end],]
 		else
 			dp = hcat(td[id].d[ssvec[id],fieldvec][:,:]...);
-			extent=[1, nr*ns*nfield, td[id].tgrid.x[end],td[id].tgrid.x[1],]
+			extent=[1, nr*ns*length(fieldvec), td[id].tgrid.x[end],td[id].tgrid.x[1],]
 		end
 		if(attrib == :seis)
 			subplot(1,length(td),id)
@@ -189,7 +190,7 @@ function Seismic(model::Models.Seismic;
 			 xlabel(L"$x$ (m)");
 			 ylabel(L"$z$ (m)");
 			 title(string(fields[i]))
-			 colorbar();
+			 colorbar(ax, fraction=0.046, pad=0.04);
 		
 		if(!(overlay_model ===  nothing))
 			# remove mean in the backgroud model

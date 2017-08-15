@@ -282,7 +282,7 @@ More info on minimum-phase filtering: http://www.katjaas.nl/minimumphase/minimum
   * `=0.` means a highpass filter at fmin
 
 """
-function butterworth_filter(npow2grid; order::Int64=2, attrib::Symbol, fmin=0.0, fmax=0.0)
+function butterworth_filter(fvec; order::Int64=2, attrib::Symbol=:zp, fmin=0.0, fmax=0.0)
 # Author : Pawan Bharadwaj
 #          p.b.pisupati@tudelft.nl
 # August 2017, imported to Julia from FORTRAN90
@@ -293,14 +293,14 @@ function butterworth_filter(npow2grid; order::Int64=2, attrib::Symbol, fmin=0.0,
 
 if(fmin == 0.0) 
         # lowpass filter
-	F  = complex.((1.0 + (npow2grid.x./fmax)**(2.0*order))^(-1.0), 0.0)
+	F  = complex.((1.0 + (fvec./fmax).^(2.0*order)).^(-1.0), 0.0)
 elseif(fmax == 0.0) 
         # highpass filter
-	F  = complex.((1.0 + (fmin./npow2grid.x)**(2.0*order))^(-1.0), 0.0)
-elseif((fmin ≠ 0.0) .and. (fmax ≠ 0.0))
+	F  = complex.((1.0 + (fmin./fvec).^(2.0*order)).^(-1.0), 0.0)
+elseif((fmin ≠ 0.0) & (fmax ≠ 0.0))
         # bandpass filter
-        x1 = sqrt(fmin*fmax) / (fmax-fmin) * (npow2grid.x./sqrt(fmin*fmax) + sqrt(fmax*fmin)./npow2grid.x);
-        F  = complex.((1.0 + (x1)^(2.0*order))^(-1.0), 0.0)
+        x1 = sqrt(fmin*fmax) / (fmax-fmin) * (fvec./sqrt(fmin*fmax) + sqrt(fmax*fmin)./fvec);
+        F  = complex.((1.0 + (x1).^(2.0*order)).^(-1.0), 0.0)
 end
 # DC component is always forced zero
 F[1] = complex(0.0, 0.0);

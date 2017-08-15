@@ -36,19 +36,19 @@ TODO:
 function TD!(dfdx,
 	     x::Data.TD, 
 	     y::Data.TD, 
-	     w::Data.TD=Data.TD_ones(x.nfield,x.tgrid,x.acqgeom))
+	     w::Data.TD=Data.TD_ones(x.fields,x.tgrid,x.acqgeom))
 
 	# check if x and y are similar
 	tgrid = x.tgrid;
 	acq = x.acqgeom;
-	nfield = x.nfield;
+	fields = x.fields;
 	nss = acq.nss;
 
 	normfact = Data.TD_dot(y, y)
 	(normfact == 0.0) && error("y cannot be zero")
 
 	f = 0.0;
-	for ifield=1:x.nfield, iss=1:acq.nss, ir=1:acq.nr[iss]
+	for ifield=1:length(fields), iss=1:acq.nss, ir=1:acq.nr[iss]
 		if(!(dfdx === nothing))
 			ft = fg_cls!(view(dfdx.d[iss,ifield],:,ir), view(x.d[iss, ifield],:,ir), y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir]);
 			dfdx.d[iss,ifield][:,ir] /= normfact

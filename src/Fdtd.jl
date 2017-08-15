@@ -59,7 +59,7 @@ end
 * `recv_flags::Vector{Int64}=fill(1,npropwav)` : receiver related flags for each propagating wavefield
   * `=[0]` receivers do not record (or) inactive receivers
   * `=[0,1]` receivers are active only for the second propagating wavefield
-* `recv_nfield::Int64=1` : multi-component receiver flag; types fields the receivers record (to be changed later)
+* `recv_fields::Vector{Symbol}=[:P]` : multi-component receiver flag; types fields the receivers record (to be changed later)
 * `backprop_flag::Bool=Int64` : save final state variables and the boundary conditions for later use
   * `=1` save boundary and final values in `boundary` 
   * `=-1` use stored values in `boundary` for back propagation
@@ -76,7 +76,7 @@ end
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
 * `gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
-* `TDout::Vector{Data.TD}=[Data.TD_zeros(recv_nfield,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags))]`
+* `TDout::Vector{Data.TD}=[Data.TD_zeros(recv_fields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags))]`
 * `illum::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx)` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
 * `snaps::Array{Float64,4}=zeros(model.mgrid.nz,model.mgrid.nx,length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
@@ -118,8 +118,8 @@ Author: Pawan Bharadwaj
 	acqsrc::Array{Acquisition.Src} = fill(Gallery.Src(:acou_homo1),npropwav),
 	src_flags::Vector{Int64}=fill(2,npropwav), 
 	recv_flags::Vector{Int64}=fill(1,npropwav),
-	recv_nfield::Int64=1, 
-	TDout::Vector{Data.TD}=[Data.TD_zeros(recv_nfield,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags)) ],
+	recv_fields::Vector{Symbol}=[:P], 
+	TDout::Vector{Data.TD}=[Data.TD_zeros(recv_fields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags)) ],
 	backprop_flag::Int64=0,  
 	boundary::DistributedArrays.DArray{Array{Array{Float64,3},1},1,Array{Array{Array{Float64,3},1},1}}=
 			initialize_boundary(model.mgrid.nx, model.mgrid.nz, model.mgrid.npml, acqgeom[1].nss, tgridmod.nx),
@@ -175,11 +175,12 @@ Author: Pawan Bharadwaj
 	any([getfield(acqgeom[ip],:nss) != getfield(acqsrc[ip],:nss) for ip=1:npropwav])  ? error("different supersources") : nothing
 	any([getfield(acqgeom[ip],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npropwav])  ? error("different sources") : nothing
 
-	# necessary that nss and nfield should be same for all nprop
+	# necessary that nss and fields should be same for all nprop
 	src_nseq = acqgeom[1].nss;
-	src_nfield = acqsrc[1].nfield
+	src_fields = acqsrc[1].fields
+	src_ifields = findin([:P, :Vx, :Vz], acqsrc[1].fields)
 	fill(src_nseq, npropwav) != [getfield(acqgeom[ip],:nss) for ip=1:npropwav] ? error("different supersources") : nothing
-	fill(src_nfield, npropwav) != [getfield(acqsrc[ip],:nfield) for ip=1:npropwav] ? error("different fields") : nothing
+	fill(src_fields, npropwav) != [getfield(acqsrc[ip],:fields) for ip=1:npropwav] ? error("different fields") : nothing
 
 	# create acquisition geometry with each source shooting 
 	# at every unique receiver position
@@ -217,7 +218,8 @@ Author: Pawan Bharadwaj
 	work = workers()[1:nwork]
 
 	# records_output, distributed array among different procs
-	recv_out = dzeros((recv_n,recv_nfield,npropwav,tim_nt,src_nseq), work, [1,1,1,1,nwork])
+	recv_ifields = findin([:P, :Vx, :Vz], recv_fields)
+	recv_out = dzeros((recv_n,length(recv_ifields),npropwav,tim_nt,src_nseq), work, [1,1,1,1,nwork])
 
 
 
@@ -253,7 +255,7 @@ Author: Pawan Bharadwaj
 
 
 	# source wavelets
-	src_wav_mat = zeros(src_nsmul,src_nfield,npropwav,tim_nt,src_nseq)
+	src_wav_mat = zeros(src_nsmul,length(src_ifields),npropwav,tim_nt,src_nseq)
 	fill_src_wav_mat!(src_wav_mat, acqsrc_uspos, src_flags)
 
 	# all localparts of DArrays are input to this method
@@ -265,12 +267,12 @@ Author: Pawan Bharadwaj
 					       localpart(recv_out),  
 					       localpart(snaps_out), localpart(illum_all),
 					       snaps_flag,
-					       illum_flag, backprop_flag, gmodel_flag, verbose, recv_n, recv_nfield, npropwav, src_nsmul, 
+					       illum_flag, backprop_flag, gmodel_flag, verbose, recv_n, recv_ifields, npropwav, src_nsmul, 
 					       exmodel, model, tgridmod,
 					       acqgeom_uspos, acqgeom_urpos,
 					       modttI, modrrvx, modrrvz,
 				               vpmax, vpmin, freqmin, freqmax, 
-					       abs_trbl, tsnaps, src_wav_mat, src_nfield, 
+					       abs_trbl, tsnaps, src_wav_mat, src_ifields, 
 					       born_flag,
 					       localpart(born_svalue_stack), δmodtt,
 					       δmodrrvx, δmodrrvz)
@@ -310,7 +312,7 @@ Author: Pawan Bharadwaj
 	for iprop in 1:npropwav
 		if(recv_flags[iprop] ≠ 0)
 			ipropout += 1
-			Data.TD_resamp!(Data.TD_urpos((Array(recv_out[:,:,iprop,:,:])), recv_nfield, tgridmod, acqgeom[iprop],
+			Data.TD_resamp!(Data.TD_urpos((Array(recv_out[:,:,iprop,:,:])), recv_fields, tgridmod, acqgeom[iprop],
 				acqgeom_urpos[1].nr[1],
 				(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
 				), TDout[ipropout]) 
@@ -334,12 +336,12 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 		       recv_out::Array{Float64}, 
 		       snaps_out::Array{Float64}, illum_all::Array{Float64}, snaps_flag::Bool,
 		       illum_flag::Bool, backprop_flag::Int64, gmodel_flag::Bool, verbose::Bool, 
-		       recv_n::Int64, recv_nfield::Int64, npropwav::Int64, src_nsmul::Int64, 
+		       recv_n::Int64, recv_ifields::Vector{Int64}, npropwav::Int64, src_nsmul::Int64, 
 		       exmodel::Models.Seismic, model::Models.Seismic, tgridmod::Grid.M1D, 
 		       acqgeom_uspos::Array{Acquisition.Geom}, acqgeom_urpos::Array{Acquisition.Geom}, 
 		       modttI::Array{Float64}, modrrvx::Array{Float64}, modrrvz::Array{Float64},
 		       vpmax::Float64, vpmin::Float64, freqmin::Float64, freqmax::Float64, 
-		       abs_trbl::Vector{Symbol}, tsnaps::Vector{Float64}, src_wav_mat::Array{Float64}, src_nfield::Int64,
+		       abs_trbl::Vector{Symbol}, tsnaps::Vector{Float64}, src_wav_mat::Array{Float64}, src_ifields::Vector{Int64},
 		       born_flag::Bool,
 		       born_svalue_stack::Array{Float64}, δmodtt::Array{Float64},
 		       δmodrrvx::Array{Float64}, δmodrrvz::Array{Float64})
@@ -454,7 +456,7 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 			end
 	 
 			add_source!(it, isseq, p, src_wav_mat, src_spray_weights,
-				modttI, issmulx1, issmulx2, issmulz1, issmulz2, npropwav, src_nfield, src_nsmul,
+				modttI, issmulx1, issmulx2, issmulz1, issmulz2, npropwav, src_ifields, src_nsmul,
 				δt::Float64, δxI::Float64, δzI::Float64
 				)
 
@@ -472,7 +474,7 @@ function mod_per_proc!(sseqvec::UnitRange{Int64},
 		                        ibx0::Int64, ibz0::Int64, ibx1::Int64, ibz1::Int64)
 			end
 
-			record!(it, iisseq, recv_out, p, rec_interpolate_weights, irecx1, irecx2, irecz1, irecz2, npropwav, recv_nfield, recv_n)
+			record!(it, iisseq, recv_out, p, rec_interpolate_weights, irecx1, irecx2, irecz1, irecz2, npropwav, recv_ifields, recv_n)
 
 			if(gmodel_flag)
 				compute_gradient!(iisseq, p, pp, ppp, dpdx, dpdz,
@@ -532,21 +534,21 @@ end # mod_per_shot
 				modttI::Array{Float64},
 				issmulx1::Array{Int64}, issmulx2::Array{Int64},
 				issmulz1::Array{Int64}, issmulz2::Array{Int64},
-				npropwav::Int64, src_nfield::Int64, src_nsmul::Int64,
+				npropwav::Int64, src_ifields::Vector{Int64}, src_nsmul::Int64,
 				δt::Float64, δxI::Float64, δzI::Float64
 				)
 	"""
 	adding source to pressure field at [it] 
 	"""
 	for ipropwav = 1:npropwav
-	for ifield = 1:src_nfield
+	for (ifieldsrc, ifield) in enumerate(src_ifields)
 	@simd for issmul = 1:src_nsmul
 		"""
 		use src_wav_mat at [it], i.e., sum of source terms
 		until [it-1]
 		division of source term with δx and δz (see Jan's fdelmodc manual)
 		"""
-		source_term = src_wav_mat[issmul, ifield, ipropwav,it,isseq] * δt * δxI * δzI
+		source_term = src_wav_mat[issmul, ifieldsrc, ipropwav,it,isseq] * δt * δxI * δzI
 		
 		"""
 		multiplication with modttI
@@ -581,13 +583,13 @@ end
 		 rec_interpolate_weights::Array{Float64},
 		 irecx1::Array{Int64}, irecx2::Array{Int64},
 		 irecz1::Array{Int64}, irecz2::Array{Int64},
-		 npropwav::Int64, recv_nfield::Int64, 
+		 npropwav::Int64, recv_ifields::Vector{Int64}, 
 		 recv_n::Int64)
 
 	for ipropwav = 1:npropwav
-	for ifield = 1:recv_nfield
+	for (ifieldrecv, ifield) in enumerate(recv_ifields)
 	@simd for irec = 1:recv_n
-			recv_out[irec,ifield,ipropwav,it, iisseq] = 
+			recv_out[irec,ifieldrecv,ipropwav,it, iisseq] = 
 			(
 			p[irecz1[irec,ipropwav],irecx1[irec,ipropwav],ifield,ipropwav]*
 			rec_interpolate_weights[1,irec,ipropwav]+
@@ -955,9 +957,18 @@ function fill_src_wav_mat!(src_wav_mat::Array{Float64}, acqsrc_uspos::Array{Acqu
 		elseif(src_flags[ipropwav] == 2)
 			"ϕ[t] = ∑₁ᵗ⁻¹ s[t]"
 			source_term_stack = 0.0;
-			for it=1:src_tim_nt-1
-				source_term_stack += (acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt)
-				src_wav_mat[issmul,ifield,ipropwav,it+1,isseq] = source_term_stack
+			if(ifield == 1)
+				for it=1:src_tim_nt-1
+					source_term_stack += (acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt)
+					src_wav_mat[issmul,ifield,ipropwav,it+1,isseq] = source_term_stack
+				end
+			else
+				for it=2:src_tim_nt-1
+					source_term_stack += (((acqsrc_uspos[ipropwav].wav[isseq,ifield][it,issmul] .* δt) +
+					   (acqsrc_uspos[ipropwav].wav[isseq,ifield][it-1,issmul] .* δt)) * 0.5)
+					src_wav_mat[issmul,ifield,ipropwav,it+1,isseq] = source_term_stack
+				end
+
 			end
 			if(tim_nt > src_tim_nt)
 				src_wav_mat[issmul,ifield,ipropwav,src_tim_nt+1:end,isseq] = src_wav_mat[issmul,ifield,ipropwav,src_tim_nt,isseq]
