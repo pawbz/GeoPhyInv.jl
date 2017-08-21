@@ -133,9 +133,9 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 		model=Models.Seismic_trun(Seismic(:seismic_marmousi2_high_res), 
 				     xmin=9025., xmax=9125., zmin=1400., zmax=1600.,)
 		Models.adjust_bounds!(model, bfrac) # adjust bounds just inside the bounds 
-	elseif(attrib == :seismic_marmousi2_vsp)
+	elseif(attrib == :seismic_marmousi2_rvsp)
 		model=Models.Seismic_trun(Seismic(:seismic_marmousi2_high_res), 
-				     xmin=7500., xmax=10500., zmax=2000.,)
+				     xmin=8000., xmax=10000., zmax=1700.,zmin=500.)
 		Models.adjust_bounds!(model, bfrac) # adjust bounds just inside the bounds 
 
 	else

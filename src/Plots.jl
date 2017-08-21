@@ -58,21 +58,38 @@ and model grid `M2D`.
 `attrib::Symbol=:unique` : default; plots unique source and receiver positions 
 `ssvec::Vector{Int64}` : plot source and receivers of only these supersources
 """
-function Geom(geom::Acquisition.Geom; ssvec=nothing)
+function Geom(geom::Acquisition.Geom; ssvec=nothing, fields=[:s, :r])
 	if(ssvec===nothing)
-		urpos = Acquisition.Geom_get([geom],:urpos)
-		uspos = Acquisition.Geom_get([geom],:uspos)
-
-		plot(urpos[2], urpos[1], "v", color="blue",ms=10)
-		plot(uspos[2], uspos[1], "*", color="red",ms=15)
+		if(:r ∈ fields)
+			urpos = Acquisition.Geom_get([geom],:urpos)
+			b = plot(urpos[2], urpos[1], "v", color="blue",ms=10)
+		else
+			b=nothing
+		end
+		if(:s ∈ fields)
+			uspos = Acquisition.Geom_get([geom],:uspos)
+			a = plot(uspos[2], uspos[1], "*", color="red",ms=15)
+		else
+			a=nothing
+		end
 	else
-		rxpos = [geom.rx[iss] for iss in ssvec]
-		rzpos = [geom.rz[iss] for iss in ssvec]
-		sxpos = [geom.sx[iss] for iss in ssvec]
-		szpos = [geom.sz[iss] for iss in ssvec]
-		plot(vcat(rxpos...), vcat(rzpos...), "v", color="blue",ms=10)
-		plot(vcat(sxpos...), vcat(szpos...), "*", color="red",ms=15)
+		if(:r ∈ fields)
+			b = plot(vcat(rxpos...), vcat(rzpos...), "v", color="blue",ms=10)
+			rxpos = [geom.rx[iss] for iss in ssvec]
+			rzpos = [geom.rz[iss] for iss in ssvec]
+		else
+			b=nothing
+		end
+		if(:s ∈ fields)
+			sxpos = [geom.sx[iss] for iss in ssvec]
+			szpos = [geom.sz[iss] for iss in ssvec]
+			a = plot(vcat(sxpos...), vcat(szpos...), "*", color="red",ms=15)
+		else
+			a=nothing
+		end
 	end
+	# return handles for sources and receivers individually to modify later
+	return [a,b]
 end
 
 
@@ -115,7 +132,7 @@ Plot time-domain data of type `Data.TD`
 * `attrib::Symbol=:wav` : specify type of plot
 """
 function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(td)), 
-	    fieldvec::Vector{Symbol}=[:P],
+	    fields::Vector{Symbol}=[:P],
 	    tr_flag::Bool=false, attrib::Symbol=:wav, 
 	    wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
 	    bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
@@ -180,7 +197,7 @@ function Seismic(model::Models.Seismic;
 	nrow = (model.mgrid.nx > model.mgrid.nz) ? length(fields) : 1
 	ncol = (model.mgrid.nx > model.mgrid.nz) ? 1 : length(fields)
 	for i in 1:length(fields)
-		subplot(nrow,ncol,i)
+		(length(fields) ≠1) && subplot(nrow,ncol,i)
 
 		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
 		m = Models.Seismic_get(model, fields[i])[izmin:izmax,ixmin:ixmax]
@@ -191,7 +208,7 @@ function Seismic(model::Models.Seismic;
 			 xlabel(L"$x$ (m)");
 			 ylabel(L"$z$ (m)");
 			 title(string(fields[i]))
-			 colorbar(ax, fraction=0.046, pad=0.04);
+			 (length(fields) ≠1) && colorbar(ax, fraction=0.046, pad=0.04);
 		
 		if(!(overlay_model ===  nothing))
 			# remove mean in the backgroud model
