@@ -6,7 +6,7 @@ Independent Component Analysis for Convolutive Mixtures
 """
 module CICA
 
-using MultivariateStats
+#using MultivariateStats
 using Distributions
 import JuMIT.Grid:M1D
 import JuMIT.Misfits
@@ -56,7 +56,7 @@ for iband = 1: nbandtot
 	Xband[:,:,iband] = transpose(X[ixmin:ixmax,:]);
 
 	# do ICA
-	Mband[iband] = fit(ICA, Xband[:,:,iband], src_n; 
+	Mband[iband] = ica(Xband[:,:,iband], src_n; 
 	     do_whiten=true, fun=icagfun(:gaus), verbose=false, maxiter=200,
 	     tol=1e-20, winit=ones(src_n,src_n))
 
@@ -267,6 +267,166 @@ function exact_freq_mixing(;
 		ds[:, ir] = ifft(Ds[:, ir])
 	end
 	return D, d, Ds, ds, Db, db
+end
+
+
+
+# Independent Component Analysis
+
+centralize(x::AbstractVector, m::AbstractVector) = (isempty(m) ? x : x - m)::typeof(x)
+centralize(x::AbstractMatrix, m::AbstractVector) = (isempty(m) ? x : x .- m)::typeof(x)
+
+decentralize(x::AbstractVector, m::AbstractVector) = (isempty(m) ? x : x + m)::typeof(x)
+decentralize(x::AbstractMatrix, m::AbstractVector) = (isempty(m) ? x : x .+ m)::typeof(x)
+
+
+preprocess_mean{T<:Number}(X::Matrix{T}, m) = (m == nothing ? vec(Base.mean(X, 2)) :
+                                                      m == 0 ? T[] : 
+                                                      m)::Vector{T}
+function do_whiten(x)
+    nrec, nt = size(x)
+    # construct covariance matrix
+    C = (x * x') ./ nt
+    # eigenvalue decomposition of the covariance matrix
+    Efac = eigfact(C)
+    v, P = Efac.values, Efac.vectors
+    # whitening matrix
+    W0 = scale!(P, sqrt.(inv.(v)))
+    # for testing --  this should be a diagonal matrix
+    println(W0' * C * W0)
+    y = W0' * x
+    return y, W0'
+end
+
+
+# Fast ICA
+#
+# Reference:
+#
+#   Aapo Hyvarinen and Erkki Oja
+#   Independent Component Analysis: Algorithms and Applications.
+#   Neural Network 13(4-5), 2000.
+#
+function fastica!{T}(xin::Matrix{T}, 
+		     nsrc::Int;
+		     maxiter::Int=100,
+		     whiten_flag::Bool=true,             # whether to perform pre-whitening 
+                     tol::Real=1.0e-10,                 # convergence tolerance
+                     Win::Matrix{T}=zeros(T,0,0),  # init guess of W, size (m, k)
+		     A::Matrix{T}=zeros(T,0,0), # mixing matrix used to estimate performance of algorithm (unknown)
+                          verbose::Bool=false)              # whether to display iterations
+	# check input arguments
+	nrec, nt = size(xin)
+	(nt < 1) && error("there must be more than one samples, i.e. nt > 1.")
+	(nsrc > nrec) && error("nsrc must not exceed nrec")
+	(maxiter < 1) && error("maxiter must be greater than 1.")
+	(tol < 0.) && error("tol must be positive.")
+
+	# preprocess data
+	x = similar(xin)
+	mv = Vector{T}(nrec)
+	for irec=1:nrec
+		mv[irec] = mean(xin[irec, :])
+		x[irec, :] = xin[irec, :] - mv[irec]
+	end
+	if(whiten_flag)
+		x, Q = do_whiten(x)
+	end
+
+	nc, nt = size(x)
+	# initial unmixing matrix
+	if(T == Float64)
+		attrib_ica=:real
+		W = (length(Win) ≠ 0) ? Win : randn(nc,nc)
+	elseif(T == Complex{Float64})
+		attrib_ica=:complex
+		W = (length(Win) ≠ 0) ? Win : complex.(randn(nc,nc) + randn(nc,nc))
+	else
+	    	error("unknown type")
+	end
+	Wp = similar(W)
+	# normalize each column
+	for ic = 1:nc
+		w = view(W,:,ic)
+		scale!(w, 1.0 / sqrt(sum(abs2, w)))
+	end
+
+	# for complex ICA
+	eps = 0.1
+
+	# preallocating GWx, gWx, dgWx
+	GWx = Matrix{T}(nc, nt)
+	gWx = Matrix{T}(nc, nt)
+	dgWx = Matrix{T}(nc, nt)
+
+	EG = zeros(nc, maxiter)
+	SSE = zeros(maxiter)
+	# main loop
+	t = 0
+	converged = false
+	while !converged && t < maxiter
+		t += 1
+		Wp = copy(W)
+	    	for ic = 1:nc
+			if(attrib_ica == :complex)
+				xx = W[:,ic]'*x
+				y = abs.(xx).^2
+				attrib_func = :log
+				if(attrib_func == :log)
+					GWx[ic,:] = log.(eps + y)
+					gWx[ic,:] = 1./(eps + y)
+					dgWx[ic,:] = -1./(eps + y).^2
+				elseif(attrib_func == :gaus)
+					GWx[ic,:] = -exp.(-0.5*xx.*xx)
+					gWx[ic,:] = xx.*exp.(-0.5*xx.*xx)
+					dgWx[ic,:] = exp.(-0.5*xx.*xx) - xx.*xx
+				else
+					error("invalid attrib_func")
+				end
+
+				a = mean(x .* (ones(nc,1)*conj(W[:,ic]'*x)) .* (ones(nc,1)*gWx[[ic],:]),2)[:,1]
+				b = mean(gWx[[ic],:] + abs.(W[:,ic]'*x).^2 .* dgWx[[ic],:]) * W[:,ic]
+				W[:,ic] = a - b
+
+			elseif(attrib_ica == :real)
+				xx = W[:,ic]'*x
+				GWx[ic,:] = -exp.(-0.5*xx.*xx)
+				gWx[ic,:] = xx.*exp.(-0.5*xx.*xx)
+				dgWx[ic,:] = exp.(-0.5*xx.*xx) - xx.*xx
+				a = mean(x .* (ones(nc,1)*gWx[[ic],:]),2)[:,1]
+				b = mean(dgWx[[ic],:]) * W[:,ic]
+				W[:,ic] = a - b
+			else
+				error("invalid attrib_ica")
+			end
+
+		end
+		# Symmetric decorrelation:
+		W = W * sqrtm(inv(W'*W));
+
+		# compare with Wp
+		converged = (maximum(abs.(W-Wp)) < tol)
+
+		EG[:,t] = mean(GWx,2);
+		if(length(A) ≠ 0)
+			K=abs.(W'*Q*A);
+			err=0.0
+			for ic in 1:nc    
+				kk = K[ic,:]    
+				ii = indmax(abs.(kk))    
+				kk ./= kk[ii]    
+				err += sum(abs.(kk[1:ii-1])) + sum(abs.(kk[ii+1:end]))
+			end
+			SSE[t] = err;
+		end
+	end
+	# demixing 
+	x = W' * x
+	# construct model
+	if(whiten_flag)
+		W = W' * Q
+	end
+	return x, W, EG[:,1:t], SSE[1:t]
 end
 
 

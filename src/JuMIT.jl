@@ -28,5 +28,6 @@ include("Misfits.jl")
 include("Inversion.jl")
 include("CICA.jl")
 include("Plots.jl")
+include("Decon.jl")
 
 end # module

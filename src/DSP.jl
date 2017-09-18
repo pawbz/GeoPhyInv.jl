@@ -155,44 +155,48 @@ function fast_filt!{T<:Real}(
 		   s::AbstractArray{T}, 
 		   r::AbstractArray{T},
 		   w::AbstractArray{T},
-		   attrib::Symbol
+		   attrib::Symbol;
+		   # default +ve and -ve lags 
+		   nsplags::Int64=length(s)-1,
+		   nsnlags::Int64=length(s)-1-nsplags,
+		   nrplags::Int64=length(r)-1,
+		   nrnlags::Int64=length(r)-1-nrplags,
+		   nwplags::Int64=div(length(w)-1,2),
+		   nwnlags::Int64=length(w)-1-nwplags,
 		  ) 
+	(nsplags+nsnlags+1 ≠ length(s)) && error("length s")
+	(nrplags+nrnlags+1 ≠ length(r)) && error("length r")
+	(nwplags+nwnlags+1 ≠ length(w)) && error("length w")
 
-	isodd(length(w)) ? nl=div(length(w)-1,2) : error("filt length should be even")
-	nx = (length(r) == length(s)) ? length(s) : error("x and y length")
-	np2 = nextpow2(maximum([2*length(s), 2*length(r), length(w)]));	
+	np2 = nextpow2(maximum([2*length(s), 2*length(r), 2*length(w)]));	
 		
 	rpow2=complex.(zeros(T,np2), zeros(T,np2)); 
 	spow2=complex.(zeros(T,np2), zeros(T,np2)); 
 	wpow2=complex.(zeros(T,np2), zeros(T,np2));
-	nlag_npow2_pad_truncate!(r, rpow2, nx-1, 0, np2, 1)
-	nlag_npow2_pad_truncate!(s, spow2, nx-1, 0, np2, 1)
+	nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, 1)
+	nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, 1)
 
 	if(attrib == :s)
-		if(w===nothing)
-			wpow2 = filt_func()nlag_npow2_pad_truncate!(w, wpow2, nl, nl, np2, 1)
-		else
-			nlag_npow2_pad_truncate!(w, wpow2, nl, nl, np2, 1)
-			fft!(wpow2);
-		end
+		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, 1)
+		fft!(wpow2);
 		fft!(rpow2)
 		spow2 = rpow2 .* wpow2;
 		ifft!(spow2)
-		nlag_npow2_pad_truncate!(s, spow2, nx-1, 0, np2, -1)
+		nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, -1)
 		return s
 	elseif(attrib == :r)
-		nlag_npow2_pad_truncate!(flipdim(w,1), wpow2, nl, nl, np2, 1)
+		nlag_npow2_pad_truncate!(flipdim(w,1), wpow2, nwnlags, nwplags, np2, 1)
 		fft!(spow2); fft!(wpow2);
 		rpow2 = spow2 .* wpow2
 		ifft!(rpow2)
-		nlag_npow2_pad_truncate!(r, rpow2, nx-1, 0, np2, -1)
+		nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, -1)
 		return r
 	elseif(attrib == :w)
-		nlag_npow2_pad_truncate!(w, wpow2, nl, nl, np2, 1)
+		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, 1)
 		fft!(rpow2); fft!(spow2);
 		wpow2 = spow2 .* conj(rpow2);
 		ifft!(wpow2)
-		nlag_npow2_pad_truncate!(w, wpow2, nl, nl, np2, -1)
+		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, -1)
 		return w
 	end
 end

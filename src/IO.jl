@@ -2,7 +2,7 @@ __precompile__()
 
 module IO
 
-import JuMIT.Data
+#import JuMIT.Data
 
 type SegyHeader
 	tracl::Int32
@@ -301,25 +301,25 @@ function writesu(fname, d, h_segy::Vector{SegyHeader}=[InitSegyHeader() for irec
 	close(stream)
 end
 
-function TD(d::Data.TD, attrib=:su)
-	
-	nrecords = sum(d.acqgeom.nr)
-	nss = d.acqgeom.nss
-
-	# create a data matrix of first field
-	dp = hcat(d.d[collect(1:nss),1][:,:]...);
-
-	# headers
-	h_segy = [InitSegyHeader() for irec in 1:nrecords]
-	irec = 0
-	for iss=1:nss
-		for ir=1:d.acqgeom.nr[iss]
-			irec += 1
-			h_segy[irec].ns = d.tgrid.nx
-			h_segy[irec].dt = d.tgrid.δx*1000000 
-		end
-	end
-	writesu(fname, d, h_segy)
-end
+#function TD(d::Data.TD, attrib=:su)
+#	
+#	nrecords = sum(d.acqgeom.nr)
+#	nss = d.acqgeom.nss
+#
+#	# create a data matrix of first field
+#	dp = hcat(d.d[collect(1:nss),1][:,:]...);
+#
+#	# headers
+#	h_segy = [InitSegyHeader() for irec in 1:nrecords]
+#	irec = 0
+#	for iss=1:nss
+#		for ir=1:d.acqgeom.nr[iss]
+#			irec += 1
+#			h_segy[irec].ns = d.tgrid.nx
+#			h_segy[irec].dt = d.tgrid.δx*1000000 
+#		end
+#	end
+#	writesu(fname, d, h_segy)
+#end
 
 end # module
