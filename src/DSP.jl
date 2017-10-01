@@ -4,6 +4,7 @@ module DSP
 
 import JuMIT.Grid
 using Distributions
+using DistributedArrays
 using DSP # from julia
 
 
@@ -151,10 +152,10 @@ end
 # Arguments
 * `RW` :  the first time series which is causal
 """
-function fast_filt!{T<:Real}(
-		   s::AbstractArray{T}, 
-		   r::AbstractArray{T},
-		   w::AbstractArray{T},
+function fast_filt!{T<:Real, ND}(
+		   s::AbstractArray{T, ND}, 
+		   r::AbstractArray{T, ND},
+		   w::AbstractArray{T, ND},
 		   attrib::Symbol;
 		   # default +ve and -ve lags 
 		   nsplags::Int64=length(s)-1,
@@ -164,15 +165,21 @@ function fast_filt!{T<:Real}(
 		   nwplags::Int64=div(length(w)-1,2),
 		   nwnlags::Int64=length(w)-1-nwplags,
 		  ) 
-	(nsplags+nsnlags+1 ≠ length(s)) && error("length s")
-	(nrplags+nrnlags+1 ≠ length(r)) && error("length r")
-	(nwplags+nwnlags+1 ≠ length(w)) && error("length w")
+	# check if nlags are consistent with the first dimension of inputs
+	(nsplags+nsnlags+1 ≠ size(s,1)) && error("length s")
+	(nrplags+nrnlags+1 ≠ size(r,1)) && error("length r")
+	(nwplags+nwnlags+1 ≠ size(w,1)) && error("length w")
 
+	# maximum first dimension for fft
 	np2 = nextpow2(maximum([2*length(s), 2*length(r), 2*length(w)]));	
 		
+	# allocate
 	rpow2=complex.(zeros(T,np2), zeros(T,np2)); 
 	spow2=complex.(zeros(T,np2), zeros(T,np2)); 
 	wpow2=complex.(zeros(T,np2), zeros(T,np2));
+
+	# loop over dimensions
+
 	nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, 1)
 	nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, 1)
 
@@ -257,6 +264,33 @@ function nlag_npow2_pad_truncate!{T<:Number}(
 	else
 		error("invalid flag")
 	end
+end
+
+function nlag_npow2_pad_truncate!{T<:Number}(
+				  x::AbstractArray{T, 2}, 
+				  xpow2::AbstractArray{Complex{T},2}, 
+				  nplags::Integer, 
+				  nnlags::Integer, 
+				  npow2::Integer, 
+				  flag::Integer
+				  )
+
+	nwork = nworkers()
+	work = workers()[1:nwork]
+
+	xd=distribute(x, procs=work, dist=[1, nwork])
+	xdpow2=distribute(xpow2, procs=work, dist=[1, nwork])
+
+	@sync begin
+		for (ip, p) in enumerate(procs(xd))
+			@async remotecall_wait(p) do 
+				nlag_npow2_pad_truncate!(localpart(xd), localpart(xpow2), nplags, nnlags, npow2, flag)
+			end
+		end
+	end
+
+	x[:] = Array(xd)
+	xpow2[:] = Array(xdpow2)
 end
 
 """

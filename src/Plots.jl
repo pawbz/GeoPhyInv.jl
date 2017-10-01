@@ -74,9 +74,9 @@ function Geom(geom::Acquisition.Geom; ssvec=nothing, fields=[:s, :r])
 		end
 	else
 		if(:r ∈ fields)
-			b = plot(vcat(rxpos...), vcat(rzpos...), "v", color="blue",ms=10)
 			rxpos = [geom.rx[iss] for iss in ssvec]
 			rzpos = [geom.rz[iss] for iss in ssvec]
+			b = plot(vcat(rxpos...), vcat(rzpos...), "v", color="blue",ms=10)
 		else
 			b=nothing
 		end

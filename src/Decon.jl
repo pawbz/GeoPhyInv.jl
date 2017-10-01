@@ -91,7 +91,7 @@ function forward_simulation!(
 		rv = zeros(pa.ntgf)
 		sv = zeros(pa.nt)
 		wv = zeros(pa.nt)
-		pa.verbose && println("updating buffer")
+		#pa.verbose && println("updating buffer")
 		dtemp = zeros(pa.dobs)
 		last_x[:] = x[:]
 		for ir in 1:pa.nr
@@ -110,7 +110,7 @@ function func_grad!(storage, x::Vector{Float64},
 			last_x::Vector{Float64}, 
 			pa)
 
-	pa.verbose && println("computing gradient...")
+	#pa.verbose && println("computing gradient...")
 
 	# x to w 
 	x_to_model!(x, pa)
@@ -163,8 +163,8 @@ function update!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, 
 	x = zeros(ninv(pa));
 	last_x = rand(size(x)) # reset last_x
 
-	pa.verbose && println("updating pa...")
-	pa.verbose && println("> number of inversion variables:\t", length(x)) 
+	#pa.verbose && println("updating pa...")
+	#pa.verbose && println("> number of inversion variables:\t", length(x)) 
 
 	# initial w to x
 	model_to_x!(x, pa)
@@ -177,8 +177,9 @@ function update!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, 
 	res = optimize(df, x, 
 		       LBFGS(),
 		       Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
-		       iterations = 1000, store_trace = store_trace,
+		       iterations = 100, store_trace = store_trace,
 		       extended_trace=extended_trace, show_trace = false))
+	pa.verbose && println(res)
 
 	x_to_model!(Optim.minimizer(res), pa)
 
@@ -193,6 +194,8 @@ function update_all!(pa)
 	itr_all=0
 	maxitr_all=10
 	while !converged_all && itr_all < maxitr_all
+		itr_all += 1
+		pa.verbose && (itr_all > 1) && println("\t", "failed to converge.. reintializing round trips")
 		# starting models
 		pa.wav[:] = randn(size(pa.wav))
 		pa.gf[:] = randn(size(pa.gf))
@@ -202,11 +205,12 @@ function update_all!(pa)
 		fwavmin=Inf
 		fwavmax=0.0
 
-		maxitr=1000
+		maxitr=200
 		itr=0
 		converged=false
 		tol=1e-8
 		while !converged && itr < maxitr
+			pa.verbose && (itr > 1) && println("\t", "round trip: ", itr)
 			itr += 1
 			pa.attrib_inv=:gf    
 			resgf = update!(pa)

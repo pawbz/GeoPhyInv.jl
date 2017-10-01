@@ -3,7 +3,7 @@ using Base.Test
 
 np=16;
 n=7
-x = randn(n); xa = similar(x)
+x = randn(n,5); xa = similar(x)
 z = complex.(zeros(np),zeros(np));
 
 # cover all lags
