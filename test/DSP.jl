@@ -1,13 +1,15 @@
+addprocs(4)
 using JuMIT
 using Base.Test
 
-np=16;
+np=16
 n=7
-x = randn(n,5); xa = similar(x)
-z = complex.(zeros(np),zeros(np));
+n2=100
+x = randn(n,n2); xa = similar(x)
+z = complex.(zeros(np,n2),zeros(np,n2));
 
-# cover all lags
-for i in [0, 2, 4, n-1]
+# cover all lags for serial mode
+@time for i in [0, 2, 4, n-1]
 	JuMIT.DSP.nlag_npow2_pad_truncate!(x, z, n-i-1,i,np,1)
 	JuMIT.DSP.nlag_npow2_pad_truncate!(xa, z, n-i-1,i,np,-1)
 	@test x ≈ xa
@@ -15,15 +17,14 @@ end
 
 # fast_filt
 # note that this test works for only some delta functions
-for nw in [7, 8], nr in [20, 10], ns in [11, 10] 
-	
+for nw in [7, 8], nr in [20, 10], ns in [11, 10]
+
 	r = zeros(nr); w = zeros(nw); s = zeros(ns);
 	ra = similar(r); wa = similar(w); sa = similar(s);
 
-	r[5]=1.; w[3]=1.; 
+	r[5]=1.; w[3]=1.;
 
 	JuMIT.DSP.fast_filt!(s,r,w,:s)
-
 	JuMIT.DSP.fast_filt!(s,r,wa,:w)
 	@test w ≈ wa
 
@@ -38,30 +39,44 @@ end
 
 ## dot product test for fast filt
 
-for nw in [101, 100], nr in [1000, 1001], ns in [1500, 901], nrp in [0, 500], nsp in [0, 501], nwp in [0, 50]
+function filt_loop(func, n2)
+	for nw in [101, 100], nr in [1000, 1001], ns in [1500, 901], nrp in [0, 500], nsp in [0, 501], nwp in [0, 50]
 
-	r=randn(nr)
-	s=randn(ns)
-	w=randn(nw)
-	JuMIT.DSP.fast_filt!(s,r,w,:s, nrplags=nrp, nsplags=nsp, nwplags=nwp)
+		r=randn(nr, n2...)
+		s=randn(ns, n2...)
+		w=randn(nw, n2...)
+		func(s,r,w,:s, nrplags=nrp, nsplags=nsp, nwplags=nwp)
 
-	sa=randn(ns);
-	ra=similar(r)
-	JuMIT.DSP.fast_filt!(sa,ra,w,:r, nrplags=nrp, nsplags=nsp, nwplags=nwp)
+		sa=randn(ns, n2...);
+		ra=similar(r)
+		func(sa,ra,w,:r, nrplags=nrp, nsplags=nsp, nwplags=nwp)
 
-	# dot product test
-	@test dot(s, sa) ≈ dot(ra, r) 
+		# dot product test
+		@test dot(s, sa) ≈ dot(ra, r)
 
-	r=randn(nr)
-	s=randn(ns)
-	w=zeros(nw)
-	JuMIT.DSP.fast_filt!(s,r,w,:w, nrplags=nrp, nsplags=nsp, nwplags=nwp)
+		r=randn(nr, n2...)
+		s=randn(ns, n2...)
+		w=zeros(nw, n2...)
+		func(s,r,w,:w, nrplags=nrp, nsplags=nsp, nwplags=nwp)
 
 
-	wa=randn(nw);
-	ra=similar(r);
-	JuMIT.DSP.fast_filt!(s,ra,wa,:r, nrplags=nrp, nsplags=nsp, nwplags=nwp)
+		wa=randn(nw, n2...);
+		ra=similar(r);
+		func(s,ra,wa,:r, nrplags=nrp, nsplags=nsp, nwplags=nwp)
 
-	# dot product test
-	@test dot(r, ra) ≈ dot(wa, w) 
+		# dot product test
+		@test dot(r, ra) ≈ dot(wa, w)
+	end
 end
+
+n2=128
+@time filt_loop(JuMIT.DSP.fast_filt!, n2)
+@time filt_loop(JuMIT.DSP.fast_filt!, n2)
+@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
+@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
+
+n2=(128,4)
+@time filt_loop(JuMIT.DSP.fast_filt!, n2)
+@time filt_loop(JuMIT.DSP.fast_filt!, n2)
+@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
+@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)

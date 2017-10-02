@@ -4,7 +4,6 @@ module Models
 
 
 import JuMIT.Grid
-import JuMIT.IO
 import JuMIT.Interpolation
 import JuMIT.Smooth
 

@@ -152,61 +152,148 @@ end
 # Arguments
 * `RW` :  the first time series which is causal
 """
-function fast_filt!{T<:Real, ND}(
-		   s::AbstractArray{T, ND}, 
-		   r::AbstractArray{T, ND},
-		   w::AbstractArray{T, ND},
+function fast_filt_vec!{T}(
+		   s::AbstractArray{T,1}, 
+		   r::AbstractArray{T,1},
+		   w::AbstractArray{T,1},
+		   attrib,nsplags,nsnlags,nrplags,nrnlags,nwplags,nwnlags,fftplan)
+	np2=length(fftplan)
+	# allocate
+	rpow2=complex.(zeros(T,np2), zeros(T,np2)); 
+	spow2=complex.(zeros(T,np2), zeros(T,np2)); 
+	wpow2=complex.(zeros(T,np2), zeros(T,np2));
+
+
+	nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, 1)
+	nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, 1)
+	nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, 1)
+
+	if(attrib == :s)
+		if (fftplan === nothing) 
+			fft!(wpow2) 
+			fft!(rpow2)
+		else 
+			A_mul_B!(wpow2, fftplan, wpow2)
+			A_mul_B!(rpow2, fftplan, rpow2)
+		end
+		@. spow2 = rpow2 * wpow2;
+		if (fftplan === nothing) 
+			ifft!(spow2)
+		else 
+			A_ldiv_B!(spow2, fftplan, spow2)
+		end
+		nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, -1)
+		return s
+	elseif(attrib == :r)
+		if (fftplan === nothing) 
+			fft!(wpow2) 
+			fft!(spow2)
+		else 
+			A_mul_B!(wpow2, fftplan, wpow2)
+			A_mul_B!(spow2, fftplan, spow2)
+		end
+		conj!(wpow2)
+		@. rpow2 = spow2 * wpow2
+		if (fftplan === nothing) 
+			ifft!(rpow2)
+		else 
+			A_ldiv_B!(rpow2, fftplan, rpow2)
+		end
+		nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, -1)
+		return r
+	elseif(attrib == :w)
+		if (fftplan === nothing) 
+			fft!(rpow2) 
+			fft!(spow2)
+		else 
+			A_mul_B!(rpow2, fftplan, rpow2)
+			A_mul_B!(spow2, fftplan, spow2)
+		end
+		conj!(rpow2)
+		@. wpow2 = spow2 * rpow2;
+		if (fftplan === nothing) 
+			ifft!(wpow2)
+		else 
+			A_ldiv_B!(wpow2, fftplan, wpow2)
+		end
+		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, -1)
+		return w
+	end
+end
+
+function fast_filt!{T<:Real,N}(
+		   s::AbstractArray{T,N}, 
+		   r::AbstractArray{T,N},
+		   w::AbstractArray{T,N},
 		   attrib::Symbol;
 		   # default +ve and -ve lags 
-		   nsplags::Int64=length(s)-1,
-		   nsnlags::Int64=length(s)-1-nsplags,
-		   nrplags::Int64=length(r)-1,
-		   nrnlags::Int64=length(r)-1-nrplags,
-		   nwplags::Int64=div(length(w)-1,2),
-		   nwnlags::Int64=length(w)-1-nwplags,
+		   nsplags::Int64=size(s,1)-1,
+		   nsnlags::Int64=size(s,1)-1-nsplags,
+		   nrplags::Int64=size(r,1)-1,
+		   nrnlags::Int64=size(r,1)-1-nrplags,
+		   nwplags::Int64=div(size(w,1)-1,2),
+		   nwnlags::Int64=size(w,1)-1-nwplags,
+		   np2=nextpow2(maximum([2*size(s,1), 2*size(r,1), 2*size(w,1)])),
+		   fftplan=plan_fft!(complex.(zeros(np2))),
 		  ) 
 	# check if nlags are consistent with the first dimension of inputs
 	(nsplags+nsnlags+1 ≠ size(s,1)) && error("length s")
 	(nrplags+nrnlags+1 ≠ size(r,1)) && error("length r")
 	(nwplags+nwnlags+1 ≠ size(w,1)) && error("length w")
 
-	# maximum first dimension for fft
-	np2 = nextpow2(maximum([2*length(s), 2*length(r), 2*length(w)]));	
-		
-	# allocate
-	rpow2=complex.(zeros(T,np2), zeros(T,np2)); 
-	spow2=complex.(zeros(T,np2), zeros(T,np2)); 
-	wpow2=complex.(zeros(T,np2), zeros(T,np2));
+	(size(s)[2:end] ≠ size(r)[2:end] ≠ size(w)[2:end]) && error("second dimension of s,r,w")
+	for id in CartesianRange(size(s)[2:end])
+		sv=view(s,:,id)
+		rv=view(r,:,id)
+		wv=view(w,:,id)
+		fast_filt_vec!(sv,rv,wv,attrib,
+			   nsplags,nsnlags,nrplags,nrnlags,
+			   nwplags,nwnlags,fftplan)
 
-	# loop over dimensions
-
-	nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, 1)
-	nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, 1)
-
-	if(attrib == :s)
-		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, 1)
-		fft!(wpow2);
-		fft!(rpow2)
-		spow2 = rpow2 .* wpow2;
-		ifft!(spow2)
-		nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, -1)
-		return s
-	elseif(attrib == :r)
-		nlag_npow2_pad_truncate!(flipdim(w,1), wpow2, nwnlags, nwplags, np2, 1)
-		fft!(spow2); fft!(wpow2);
-		rpow2 = spow2 .* wpow2
-		ifft!(rpow2)
-		nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, -1)
-		return r
-	elseif(attrib == :w)
-		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, 1)
-		fft!(rpow2); fft!(spow2);
-		wpow2 = spow2 .* conj(rpow2);
-		ifft!(wpow2)
-		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, -1)
-		return w
 	end
 end
+
+function fast_filt_parallel!{T<:Real,N}(
+		   s::AbstractArray{T,N}, 
+		   r::AbstractArray{T,N},
+		   w::AbstractArray{T,N},
+		   attrib::Symbol;
+		   # default +ve and -ve lags 
+		   nsplags::Int64=size(s,1)-1,
+		   nsnlags::Int64=size(s,1)-1-nsplags,
+		   nrplags::Int64=size(r,1)-1,
+		   nrnlags::Int64=size(r,1)-1-nrplags,
+		   nwplags::Int64=div(size(w,1)-1,2),
+		   nwnlags::Int64=size(w,1)-1-nwplags,
+		   parallel_dim=2,
+		   work=workers()[1:min(size(s,parallel_dim), nworkers())]
+		   ) 
+	((parallel_dim < 2) | (parallel_dim > N)) && error("invalid parallel_dim")
+	nwork = length(work)
+	dist=[((id==parallel_dim) ? nwork : 1) for id in 1:N]
+
+	FFTW.set_num_threads(Sys.CPU_CORES)
+
+	sd=distribute(s, procs=work, dist=dist)
+	rd=distribute(r, procs=work, dist=dist)
+	wd=distribute(w, procs=work, dist=dist)
+
+	@sync begin
+		for (ip, p) in enumerate(procs(sd))
+			@async remotecall_wait(p) do 
+				fast_filt!(localpart(sd), localpart(rd), localpart(wd), 
+					   attrib,
+					   nsplags=nsplags,nsnlags=nsnlags,
+					   nrplags=nrplags,nrnlags=nrnlags,
+					   nwplags=nwplags,nwnlags=nwnlags)
+			end
+		end
+	end
+	s[:] = Array(sd)
+	r[:] = Array(rd)
+	w[:] = Array(wd)
+end
+
 
 """
 
@@ -266,6 +353,10 @@ function nlag_npow2_pad_truncate!{T<:Number}(
 	end
 end
 
+
+"""
+When `x` and `xpow2` are matrices, loop over the second dimension.
+"""
 function nlag_npow2_pad_truncate!{T<:Number}(
 				  x::AbstractArray{T, 2}, 
 				  xpow2::AbstractArray{Complex{T},2}, 
@@ -274,23 +365,11 @@ function nlag_npow2_pad_truncate!{T<:Number}(
 				  npow2::Integer, 
 				  flag::Integer
 				  )
-
-	nwork = nworkers()
-	work = workers()[1:nwork]
-
-	xd=distribute(x, procs=work, dist=[1, nwork])
-	xdpow2=distribute(xpow2, procs=work, dist=[1, nwork])
-
-	@sync begin
-		for (ip, p) in enumerate(procs(xd))
-			@async remotecall_wait(p) do 
-				nlag_npow2_pad_truncate!(localpart(xd), localpart(xpow2), nplags, nnlags, npow2, flag)
-			end
-		end
+	(size(x)[2:end] ≠ size(xpow2)[2:end]) && error("second dimension of x and xpow2")
+	for id in CartesianRange(size(x)[2:end])
+		nlag_npow2_pad_truncate!(view(x,:,id), view(xpow2,:,id), nplags, nnlags, npow2, flag)
 	end
 
-	x[:] = Array(xd)
-	xpow2[:] = Array(xdpow2)
 end
 
 """
