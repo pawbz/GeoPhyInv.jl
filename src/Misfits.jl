@@ -66,12 +66,12 @@ end
 
 function fg_cls!{N}(dfdx, 
 		    x::AbstractArray{Float64,N}, 
-		    y::Array{Float64,N}, w::Array{Float64,N}=ones(x))
-	(size(x) == size(y)) || error("size mismatch")
-	any(w .< 0.0) && error("weights cannot be negative") 
+		    y::Array{Float64,N}, 
+		    w::Array{Float64,N}=ones(x))
+	(size(x) == size(y) == size(w)) || error("sizes mismatch")
 	f = sum(w .* (x - y).^2)
 	if(!(dfdx === nothing))
-		dfdx[:] = 2.0 .* w[:] .* (x[:] - y[:])
+		copy!(dfdx, 2.0 .* w .* (x-y))
 	end
 	return f
 end

@@ -152,16 +152,17 @@ end
 # Arguments
 * `RW` :  the first time series which is causal
 """
-function fast_filt_vec!{T}(
-		   s::AbstractArray{T,1}, 
-		   r::AbstractArray{T,1},
-		   w::AbstractArray{T,1},
+function fast_filt_vec!{T,N}(
+		   s::AbstractArray{T,N}, 
+		   r::AbstractArray{T,N},
+		   w::AbstractArray{T,N},
 		   attrib,nsplags,nsnlags,nrplags,nrnlags,nwplags,nwnlags,fftplan)
-	np2=length(fftplan)
+	np2=size(fftplan,1)
 	# allocate
-	rpow2=complex.(zeros(T,np2), zeros(T,np2)); 
-	spow2=complex.(zeros(T,np2), zeros(T,np2)); 
-	wpow2=complex.(zeros(T,np2), zeros(T,np2));
+	dim=size(r)[2:end]
+	rpow2=complex.(zeros(T,np2,dim...), zeros(T,np2,dim...)); 
+	spow2=complex.(zeros(T,np2,dim...), zeros(T,np2,dim...)); 
+	wpow2=complex.(zeros(T,np2,dim...), zeros(T,np2,dim...));
 
 
 	nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, 1)
@@ -169,53 +170,26 @@ function fast_filt_vec!{T}(
 	nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, 1)
 
 	if(attrib == :s)
-		if (fftplan === nothing) 
-			fft!(wpow2) 
-			fft!(rpow2)
-		else 
-			A_mul_B!(wpow2, fftplan, wpow2)
-			A_mul_B!(rpow2, fftplan, rpow2)
-		end
-		@. spow2 = rpow2 * wpow2;
-		if (fftplan === nothing) 
-			ifft!(spow2)
-		else 
-			A_ldiv_B!(spow2, fftplan, spow2)
-		end
+		A_mul_B!(wpow2, fftplan, wpow2)
+		A_mul_B!(rpow2, fftplan, rpow2)
+		copy!(spow2, rpow2 .* wpow2);
+		A_ldiv_B!(spow2, fftplan, spow2)
 		nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, -1)
 		return s
 	elseif(attrib == :r)
-		if (fftplan === nothing) 
-			fft!(wpow2) 
-			fft!(spow2)
-		else 
-			A_mul_B!(wpow2, fftplan, wpow2)
-			A_mul_B!(spow2, fftplan, spow2)
-		end
+		A_mul_B!(wpow2, fftplan, wpow2)
+		A_mul_B!(spow2, fftplan, spow2)
 		conj!(wpow2)
-		@. rpow2 = spow2 * wpow2
-		if (fftplan === nothing) 
-			ifft!(rpow2)
-		else 
-			A_ldiv_B!(rpow2, fftplan, rpow2)
-		end
+		copy!(rpow2, spow2 .* wpow2)
+		A_ldiv_B!(rpow2, fftplan, rpow2)
 		nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, -1)
 		return r
 	elseif(attrib == :w)
-		if (fftplan === nothing) 
-			fft!(rpow2) 
-			fft!(spow2)
-		else 
-			A_mul_B!(rpow2, fftplan, rpow2)
-			A_mul_B!(spow2, fftplan, spow2)
-		end
+		A_mul_B!(rpow2, fftplan, rpow2)
+		A_mul_B!(spow2, fftplan, spow2)
 		conj!(rpow2)
-		@. wpow2 = spow2 * rpow2;
-		if (fftplan === nothing) 
-			ifft!(wpow2)
-		else 
-			A_ldiv_B!(wpow2, fftplan, wpow2)
-		end
+		copy!(wpow2, spow2 .* rpow2);
+		A_ldiv_B!(wpow2, fftplan, wpow2)
 		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, -1)
 		return w
 	end
@@ -234,21 +208,42 @@ function fast_filt!{T<:Real,N}(
 		   nwplags::Int64=div(size(w,1)-1,2),
 		   nwnlags::Int64=size(w,1)-1-nwplags,
 		   np2=nextpow2(maximum([2*size(s,1), 2*size(r,1), 2*size(w,1)])),
-		   fftplan=plan_fft!(complex.(zeros(np2))),
+		   fftplan=nothing,
+		   mode=1,
 		  ) 
+
 	# check if nlags are consistent with the first dimension of inputs
 	(nsplags+nsnlags+1 ≠ size(s,1)) && error("length s")
 	(nrplags+nrnlags+1 ≠ size(r,1)) && error("length r")
 	(nwplags+nwnlags+1 ≠ size(w,1)) && error("length w")
 
 	(size(s)[2:end] ≠ size(r)[2:end] ≠ size(w)[2:end]) && error("second dimension of s,r,w")
-	for id in CartesianRange(size(s)[2:end])
-		sv=view(s,:,id)
-		rv=view(r,:,id)
-		wv=view(w,:,id)
-		fast_filt_vec!(sv,rv,wv,attrib,
-			   nsplags,nsnlags,nrplags,nrnlags,
-			   nwplags,nwnlags,fftplan)
+
+	if(fftplan===nothing)
+		#FFTW.set_num_threads(Sys.CPU_CORES)
+		if(mode==1)
+			fftplan=plan_fft!(complex.(zeros(np2)),
+		     		flags=FFTW.PATIENT,timelimit=30)
+		else
+			fftplan=plan_fft!(complex.(zeros(np2,size(s)[2:end]...)),
+		     		flags=FFTW.PATIENT,timelimit=30)
+		end
+	end
+
+	if(mode==1)
+		for id in CartesianRange(size(s)[2:end])
+			sv=view(s,:,id)
+			rv=view(r,:,id)
+			wv=view(w,:,id)
+			fast_filt_vec!(sv,rv,wv,attrib,
+				   nsplags,nsnlags,nrplags,nrnlags,
+				   nwplags,nwnlags,fftplan)
+
+		end
+	else
+			fast_filt_vec!(s,r,w,attrib,
+				   nsplags,nsnlags,nrplags,nrnlags,
+				   nwplags,nwnlags,fftplan)
 
 	end
 end
@@ -266,13 +261,15 @@ function fast_filt_parallel!{T<:Real,N}(
 		   nwplags::Int64=div(size(w,1)-1,2),
 		   nwnlags::Int64=size(w,1)-1-nwplags,
 		   parallel_dim=2,
-		   work=workers()[1:min(size(s,parallel_dim), nworkers())]
+		   work=workers()[1:min(size(s,parallel_dim), nworkers())],
+		   np2=nextpow2(maximum([2*size(s,1), 2*size(r,1), 2*size(w,1)])),
+		   fftplan=plan_fft!(complex.(zeros(np2)),flags=FFTW.PATIENT,timelimit=20),
 		   ) 
 	((parallel_dim < 2) | (parallel_dim > N)) && error("invalid parallel_dim")
 	nwork = length(work)
 	dist=[((id==parallel_dim) ? nwork : 1) for id in 1:N]
 
-	FFTW.set_num_threads(Sys.CPU_CORES)
+	#FFTW.set_num_threads(Sys.CPU_CORES)
 
 	sd=distribute(s, procs=work, dist=dist)
 	rd=distribute(r, procs=work, dist=dist)
@@ -285,7 +282,7 @@ function fast_filt_parallel!{T<:Real,N}(
 					   attrib,
 					   nsplags=nsplags,nsnlags=nsnlags,
 					   nrplags=nrplags,nrnlags=nrnlags,
-					   nwplags=nwplags,nwnlags=nwnlags)
+					   nwplags=nwplags,nwnlags=nwnlags,)
 			end
 		end
 	end
@@ -323,28 +320,28 @@ function nlag_npow2_pad_truncate!{T<:Number}(
 	(length(xpow2) == npow2) ? nothing : error("size xpow2")
 
 	if(flag == 1)
-		xpow2[1] = copy(x[nnlags+1]); # zero lag
+		xpow2[1] = complex.(x[nnlags+1],T(0)) # zero lag
 		# +ve lags
 		if (nplags > 0) 
-			xpow2[2:nplags+1] = copy(complex.(x[nnlags+2:nnlags+1+nplags],T(0)))
+			xpow2[2:nplags+1]= complex.(x[nnlags+2:nnlags+1+nplags],T(0))
 		end
 		# -ve lags
 		if(nnlags != 0) 
 			for i=1:nnlags
-				xpow2[npow2-i+1] = copy(complex.(x[nnlags+1-i],T(0)))
+				xpow2[npow2-i+1] = complex.(x[nnlags+1-i],T(0))
 			end
 		end
 		return xpow2
 	elseif(flag == -1)
-		x[nnlags+1] =  copy(real(xpow2[1])); # zero lag
+		x[nnlags+1] =  real.(xpow2[1]); # zero lag
 		if(nplags != 0) 
 			for i=1:nplags
-				x[nnlags+1+i] = copy(real(xpow2[1+i]));
+				x[nnlags+1+i] = real.(xpow2[1+i]);
 			end
 		end
 		if(nnlags != 0)
 			for i=1:nnlags
-				x[nnlags+1-i] = copy(real(xpow2[npow2-i+1]))
+				x[nnlags+1-i] = real.(xpow2[npow2-i+1])
 			end
 		end
 		return x
@@ -357,17 +354,19 @@ end
 """
 When `x` and `xpow2` are matrices, loop over the second dimension.
 """
-function nlag_npow2_pad_truncate!{T<:Number}(
-				  x::AbstractArray{T, 2}, 
-				  xpow2::AbstractArray{Complex{T},2}, 
+function nlag_npow2_pad_truncate!{T<:Number,N}(
+				  x::AbstractArray{T, N}, 
+				  xpow2::AbstractArray{Complex{T},N}, 
 				  nplags::Integer, 
 				  nnlags::Integer, 
 				  npow2::Integer, 
 				  flag::Integer
 				  )
-	(size(x)[2:end] ≠ size(xpow2)[2:end]) && error("second dimension of x and xpow2")
+	(size(x)[2:end] ≠ size(xpow2)[2:end]) && error("dimension of x and xpow2")
 	for id in CartesianRange(size(x)[2:end])
-		nlag_npow2_pad_truncate!(view(x,:,id), view(xpow2,:,id), nplags, nnlags, npow2, flag)
+		xv=view(x,:,id)
+		xpow2v=view(xpow2,:,id)
+		nlag_npow2_pad_truncate!(xv, xpow2v, nplags, nnlags, npow2, flag)
 	end
 
 end

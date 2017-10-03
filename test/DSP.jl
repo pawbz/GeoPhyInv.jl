@@ -2,8 +2,8 @@ addprocs(4)
 using JuMIT
 using Base.Test
 
-np=16
-n=7
+np=16000
+n=7777
 n2=100
 x = randn(n,n2); xa = similar(x)
 z = complex.(zeros(np,n2),zeros(np,n2));
@@ -72,11 +72,11 @@ end
 n2=128
 @time filt_loop(JuMIT.DSP.fast_filt!, n2)
 @time filt_loop(JuMIT.DSP.fast_filt!, n2)
-@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
-@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
+#@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
+#@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
 
 n2=(128,4)
 @time filt_loop(JuMIT.DSP.fast_filt!, n2)
 @time filt_loop(JuMIT.DSP.fast_filt!, n2)
-@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
-@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
+#@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
+#@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)

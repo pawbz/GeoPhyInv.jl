@@ -8,27 +8,44 @@ using Optim, LineSearches
 
 type Param
 	gf::Array{Float64,2}
+	dgf::Array{Float64,2}
 	ntgf::Int64
 	dobs::Array{Float64,2}
 	dcal::Array{Float64,2}
+	ddcal::Array{Float64,2}
 	wav::Vector{Float64}
+	wavmat::Array{Float64,2}
+	dwavmat::Array{Float64,2}
 	nt::Int64
 	nr::Int64
 	attrib_inv::Symbol
 	verbose::Bool
+	fftplan
 end
 
 function Param(ntgf, nt, nr, gfobs, wavobs; verbose=false, attrib_inv=:gf,) 
 	dobs=zeros(nt, nr)
 	dcal=zeros(nt, nr)
+	ddcal=zeros(nt, nr)
 	
 	# initial values are random
 	wav=randn(nt)
+	wavmat=repeat(wav,outer=(1,nr))
+	dwavmat=similar(wavmat)
 	gf=randn(ntgf,nr)
+	dgf=similar(gf)
 
-	pa = Param(gf, ntgf, dobs, dcal, wav, nt, nr, attrib_inv, verbose)
+	# use maximum threads for fft
+	#FFTW.set_num_threads(Sys.CPU_CORES)
+	# fft dimension for plan
+	np2=nextpow2(maximum([2*nt, 2*ntgf]))
+	# create plan
+	fftplan = plan_fft!(complex.(zeros(np2)),[1],flags=FFTW.PATIENT)
 
-	forward_simulation!(pa, mattrib=:gfwav, dattrib=:dobs, gf=gfobs, wav=wavobs)
+	pa = Param(gf, dgf, ntgf, dobs, dcal, ddcal, wav, wavmat, dwavmat,
+	     nt, nr, attrib_inv, verbose, fftplan)
+
+	F!(pa, mattrib=:gfwav, dattrib=:dobs, gf=gfobs, wav=wavobs)
 
 	return pa
 end
@@ -42,9 +59,9 @@ end
 
 function model_to_x!(x, pa)
 	if(pa.attrib_inv == :wav)
-		x[:] = copy(pa.wav)
+		copy!(x, pa.wav)
 	else(pa.attrib_inv == :gf)
-		x[:] = vec(copy(pa.gf))
+		copy!(x, pa.gf)
 	end
 	return x
 end
@@ -52,14 +69,14 @@ end
 
 function x_to_model!(x, pa)
 	if(pa.attrib_inv == :wav)
-		pa.wav[:] = copy(x)
+		copy!(pa.wav, x)
 	else(pa.attrib_inv == :gf)
-		pa.gf = reshape(x, pa.ntgf, pa.nr)
+		copy!(pa.gf, x)
 	end
 	return pa
 end
 
-function forward_simulation!(
+function F!(
 			pa::Param,
 			x::Vector{Float64}=zeros(ninv(pa)),
 			last_x::Vector{Float64}=ones(ninv(pa));
@@ -80,7 +97,7 @@ function forward_simulation!(
 			(iszero(gf)) && error("need gf")
 		elseif(mattrib == :wav)
 			gf=pa.gf
-			(iszero(gf)) && error("need gf")
+			(iszero(wav)) && error("need wav")
 		elseif(mattrib == :gfwav)
 			(iszero(gf)) && error("need gf")
 			(iszero(wav)) && error("need wav")
@@ -88,20 +105,13 @@ function forward_simulation!(
 			error("invalid mattrib")
 		end
 
-		rv = zeros(pa.ntgf)
-		sv = zeros(pa.nt)
-		wv = zeros(pa.nt)
 		#pa.verbose && println("updating buffer")
-		dtemp = zeros(pa.dobs)
-		last_x[:] = x[:]
-		for ir in 1:pa.nr
-			rv[:] = gf[:, ir]
-			wv[:] = wav
-			DSP.fast_filt!(sv, rv, wv, :s, nwplags=pa.nt-1)
-			dtemp[:, ir] = copy(sv)
-		end
-
-		setfield!(pa, dattrib, deepcopy(dtemp))
+		copy!(last_x, x)
+		copy!(pa.wavmat, repeat(wav,outer=(1,pa.nr)))
+		DSP.fast_filt!(pa.ddcal, gf, pa.wavmat, :s, nwplags=pa.nt-1,
+		  np2=size(pa.fftplan,1), fftplan=pa.fftplan
+		  			)
+		copy!(getfield(pa, dattrib), pa.ddcal)
 		return pa
 	end
 end
@@ -115,45 +125,37 @@ function func_grad!(storage, x::Vector{Float64},
 	# x to w 
 	x_to_model!(x, pa)
 
-	rv = zeros(pa.ntgf)
-	sv = zeros(pa.nt)
-	wv = zeros(pa.nt)
-	forward_simulation!(pa, x, last_x)
+	F!(pa, x, last_x)
 
 	if(storage === nothing)
 		# compute misfit and δdcal
 		f = Misfits.fg_cls!(nothing, pa.dcal, pa.dobs)
 		return f
 	else
-		ddcal = similar(pa.dobs)
-		f = Misfits.fg_cls!(ddcal, pa.dcal, pa.dobs)
-
-		gwav = similar(pa.wav)
-		gwav[:] = 0.0
-		ggf = similar(pa.gf)
-		if(pa.attrib_inv == :wav)
-			for ir in 1:pa.nr
-				rv[:] = pa.gf[:, ir]
-				sv[:] = ddcal[:, ir]
-				DSP.fast_filt!(sv, rv, wv, :w, nwplags=pa.nt-1)
-				gwav[:] += wv
-			end
-			storage[:] = vec(gwav)
-		else(pa.attrib_inv == :gf)
-			for ir in 1:pa.nr
-				sv = ddcal[:, ir]
-				wv = pa.wav
-				DSP.fast_filt!(sv, rv, wv, :r, nwplags=pa.nt-1)
-				ggf[:, ir] = copy(rv)
-			end
-			storage[:] = copy(vec(ggf))
-			return storage
-		end
-
+		f = Misfits.fg_cls!(pa.ddcal, pa.dcal, pa.dobs)
+		Fadj!(pa, storage, pa.ddcal)
+		return f
 	end
 end
 
-
+"""
+Apply Fadj to 
+"""
+function Fadj!(pa, storage, dcal)
+	if(pa.attrib_inv == :wav)
+		DSP.fast_filt!(dcal, pa.gf, pa.wavmat, :w, nwplags=pa.nt-1, 
+		  np2=size(pa.fftplan,1), fftplan=pa.fftplan
+			)
+		copy!(storage, sum(pa.wavmat,2))
+	else(pa.attrib_inv == :gf)
+		copy!(pa.wavmat, repeat(pa.wav,outer=(1,pa.nr)))
+		DSP.fast_filt!(dcal, pa.dgf, pa.wavmat, :r, nwplags=pa.nt-1,
+		  np2=size(pa.fftplan,1), fftplan=pa.fftplan
+			)
+		copy!(storage, pa.dgf)
+	end
+	return storage
+end
 
 # core algorithm
 function update!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., 
@@ -161,7 +163,7 @@ function update!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, 
 
 	# convert initial model to the inversion variable
 	x = zeros(ninv(pa));
-	last_x = rand(size(x)) # reset last_x
+	last_x = randn(size(x)) # reset last_x
 
 	#pa.verbose && println("updating pa...")
 	#pa.verbose && println("> number of inversion variables:\t", length(x)) 
@@ -184,7 +186,6 @@ function update!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, 
 	x_to_model!(Optim.minimizer(res), pa)
 
 	return res
-
 end
 
 
