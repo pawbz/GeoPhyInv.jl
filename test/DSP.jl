@@ -39,17 +39,27 @@ end
 
 ## dot product test for fast filt
 
-function filt_loop(func, n2)
-	for nw in [101, 100], nr in [1000, 1001], ns in [1500, 901], nrp in [0, 500], nsp in [0, 501], nwp in [0, 50]
+function filt_loop(func, n2; inplaceflag=false)
+	if(inplaceflag)
+		nwvec=[1024,1024]
+		nrvec=[1024,1024]
+		nsvec=[1024,1024]
+	else
+		nwvec=[101, 100]
+		nrvec=[1000, 1001]
+		nsvec=[1500, 901]
+	end
+	np2=1024;
+	for nw in nwvec, nr in nrvec, ns in nsvec, nrp in [0, 500], nsp in [0, 501], nwp in [0, 50]
 
 		r=randn(nr, n2...)
 		s=randn(ns, n2...)
 		w=randn(nw, n2...)
-		func(s,r,w,:s, nrplags=nrp, nsplags=nsp, nwplags=nwp)
+		func(s,r,w,:s, nrplags=nrp, nsplags=nsp, nwplags=nwp, np2=np2)
 
 		sa=randn(ns, n2...);
 		ra=similar(r)
-		func(sa,ra,w,:r, nrplags=nrp, nsplags=nsp, nwplags=nwp)
+		func(sa,ra,w,:r, nrplags=nrp, nsplags=nsp, nwplags=nwp, np2=np2)
 
 		# dot product test
 		@test dot(s, sa) ≈ dot(ra, r)
@@ -57,12 +67,12 @@ function filt_loop(func, n2)
 		r=randn(nr, n2...)
 		s=randn(ns, n2...)
 		w=zeros(nw, n2...)
-		func(s,r,w,:w, nrplags=nrp, nsplags=nsp, nwplags=nwp)
+		func(s,r,w,:w, nrplags=nrp, nsplags=nsp, nwplags=nwp, np2=np2)
 
 
 		wa=randn(nw, n2...);
 		ra=similar(r);
-		func(s,ra,wa,:r, nrplags=nrp, nsplags=nsp, nwplags=nwp)
+		func(s,ra,wa,:r, nrplags=nrp, nsplags=nsp, nwplags=nwp, np2=np2)
 
 		# dot product test
 		@test dot(r, ra) ≈ dot(wa, w)
@@ -75,8 +85,8 @@ n2=128
 #@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
 #@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
 
-n2=(128,4)
-@time filt_loop(JuMIT.DSP.fast_filt!, n2)
-@time filt_loop(JuMIT.DSP.fast_filt!, n2)
+#n2=(128,4)
+#@time filt_loop(JuMIT.DSP.fast_filt!, n2)
+#@time filt_loop(JuMIT.DSP.fast_filt!, n2)
 #@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)
 #@time filt_loop(JuMIT.DSP.fast_filt_parallel!, n2)

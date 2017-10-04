@@ -156,15 +156,22 @@ function fast_filt_vec!{T,N}(
 		   s::AbstractArray{T,N}, 
 		   r::AbstractArray{T,N},
 		   w::AbstractArray{T,N},
-		   attrib,nsplags,nsnlags,nrplags,nrnlags,nwplags,nwnlags,fftplan)
-	np2=size(fftplan,1)
-	# allocate
-	dim=size(r)[2:end]
-	rpow2=complex.(zeros(T,np2,dim...), zeros(T,np2,dim...)); 
-	spow2=complex.(zeros(T,np2,dim...), zeros(T,np2,dim...)); 
-	wpow2=complex.(zeros(T,np2,dim...), zeros(T,np2,dim...));
+		   spow2,
+		   rpow2, 
+		   wpow2,
+		   attrib,nsplags,nsnlags,nrplags,nrnlags,nwplags,nwnlags,
+		   np2,
+		   fftplan, ifftplan)
+	sizecheck = ((size(s,1)==np2)&(size(w,1)==np2)&(size(r,1)==np2))
+	typecheck = ((eltype(s)<:Complex)&(eltype(w)<:Complex)&(eltype(r)<:Complex))
+	inplaceflag = (sizecheck & typecheck)
+	
+	# initialize pow2 vectors
+	spow2[:] = complex.(T(0))
+	rpow2[:] = complex.(T(0))
+	wpow2[:] = complex.(T(0))
 
-
+	# just arrange order
 	nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, 1)
 	nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, 1)
 	nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, 1)
@@ -173,7 +180,7 @@ function fast_filt_vec!{T,N}(
 		A_mul_B!(wpow2, fftplan, wpow2)
 		A_mul_B!(rpow2, fftplan, rpow2)
 		copy!(spow2, rpow2 .* wpow2);
-		A_ldiv_B!(spow2, fftplan, spow2)
+		A_mul_B!(spow2, ifftplan, spow2)
 		nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, -1)
 		return s
 	elseif(attrib == :r)
@@ -181,7 +188,7 @@ function fast_filt_vec!{T,N}(
 		A_mul_B!(spow2, fftplan, spow2)
 		conj!(wpow2)
 		copy!(rpow2, spow2 .* wpow2)
-		A_ldiv_B!(rpow2, fftplan, rpow2)
+		A_mul_B!(rpow2, ifftplan, rpow2)
 		nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, -1)
 		return r
 	elseif(attrib == :w)
@@ -189,7 +196,7 @@ function fast_filt_vec!{T,N}(
 		A_mul_B!(spow2, fftplan, spow2)
 		conj!(rpow2)
 		copy!(wpow2, spow2 .* rpow2);
-		A_ldiv_B!(wpow2, fftplan, wpow2)
+		A_mul_B!(wpow2, ifftplan, wpow2)
 		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, -1)
 		return w
 	end
@@ -200,6 +207,9 @@ function fast_filt!{T<:Real,N}(
 		   r::AbstractArray{T,N},
 		   w::AbstractArray{T,N},
 		   attrib::Symbol;
+		   spow2=nothing, 
+		   rpow2=nothing,
+		   wpow2=nothing,
 		   # default +ve and -ve lags 
 		   nsplags::Int64=size(s,1)-1,
 		   nsnlags::Int64=size(s,1)-1-nsplags,
@@ -209,7 +219,7 @@ function fast_filt!{T<:Real,N}(
 		   nwnlags::Int64=size(w,1)-1-nwplags,
 		   np2=nextpow2(maximum([2*size(s,1), 2*size(r,1), 2*size(w,1)])),
 		   fftplan=nothing,
-		   mode=1,
+		   ifftplan=nothing,
 		  ) 
 
 	# check if nlags are consistent with the first dimension of inputs
@@ -218,36 +228,40 @@ function fast_filt!{T<:Real,N}(
 	(nwplags+nwnlags+1 ≠ size(w,1)) && error("length w")
 
 	(size(s)[2:end] ≠ size(r)[2:end] ≠ size(w)[2:end]) && error("second dimension of s,r,w")
+	dim=size(s)[2:end];
 
 	if(fftplan===nothing)
 		#FFTW.set_num_threads(Sys.CPU_CORES)
-		if(mode==1)
-			fftplan=plan_fft!(complex.(zeros(np2)),
-		     		flags=FFTW.PATIENT,timelimit=30)
-		else
-			fftplan=plan_fft!(complex.(zeros(np2,size(s)[2:end]...)),
-		     		flags=FFTW.PATIENT,timelimit=30)
-		end
+		fftplan=plan_fft!(complex.(zeros(np2,dim...)),
+		    		flags=FFTW.PATIENT,timelimit=30)
+		ifftplan=plan_ifft!(complex.(zeros(np2,dim...)),
+				flags=FFTW.PATIENT,timelimit=30)
 	end
 
-	if(mode==1)
-		for id in CartesianRange(size(s)[2:end])
-			sv=view(s,:,id)
-			rv=view(r,:,id)
-			wv=view(w,:,id)
-			fast_filt_vec!(sv,rv,wv,attrib,
-				   nsplags,nsnlags,nrplags,nrnlags,
-				   nwplags,nwnlags,fftplan)
+	# allocate if not preallocated
+	(spow2===nothing) && (spow2=complex.(zeros(T,np2,dim...)))
+	(rpow2===nothing) && (rpow2=complex.(zeros(T,np2,dim...))) 
+	(wpow2===nothing) && (wpow2=complex.(zeros(T,np2,dim...)))
 
-		end
-	else
-			fast_filt_vec!(s,r,w,attrib,
-				   nsplags,nsnlags,nrplags,nrnlags,
-				   nwplags,nwnlags,fftplan)
+#	if(mode==1)
+#		for id in CartesianRange(size(s)[2:end])
+#			sv=view(s,:,id)
+#			rv=view(r,:,id)
+#			wv=view(w,:,id)
+#			fast_filt_vec!(sv,rv,wv,spow2,rpow2,wpow2,attrib,
+#				   nsplags,nsnlags,nrplags,nrnlags,
+#				   nwplags,nwnlags,np2,fftplan, ifftplan)
+#
+#		end
+#	else
+	fast_filt_vec!(s,r,w,spow2,rpow2,wpow2,attrib,
+		   nsplags,nsnlags,nrplags,nrnlags,
+		   nwplags,nwnlags,np2, fftplan, ifftplan)
 
-	end
+#	end
 end
 
+"not being used at the moment"
 function fast_filt_parallel!{T<:Real,N}(
 		   s::AbstractArray{T,N}, 
 		   r::AbstractArray{T,N},
@@ -308,9 +322,9 @@ end
 * `flag` : = 1 means xpow2 is returned using x
 	   = -1 means x is returned using xpow2
 """
-function nlag_npow2_pad_truncate!{T<:Number}(
-				  x::AbstractVector{T}, 
-				  xpow2::AbstractVector{Complex{T}}, 
+function nlag_npow2_pad_truncate!{T1, T2}(
+				  x::AbstractVector{T1}, 
+				  xpow2::AbstractVector{T2}, 
 				  nplags::Integer, 
 				  nnlags::Integer, 
 				  npow2::Integer, 
@@ -320,20 +334,20 @@ function nlag_npow2_pad_truncate!{T<:Number}(
 	(length(xpow2) == npow2) ? nothing : error("size xpow2")
 
 	if(flag == 1)
-		xpow2[1] = complex.(x[nnlags+1],T(0)) # zero lag
+		xpow2[1] = complex.(x[nnlags+1]) # zero lag
 		# +ve lags
 		if (nplags > 0) 
-			xpow2[2:nplags+1]= complex.(x[nnlags+2:nnlags+1+nplags],T(0))
+			xpow2[2:nplags+1]= complex.(x[nnlags+2:nnlags+1+nplags])
 		end
 		# -ve lags
 		if(nnlags != 0) 
 			for i=1:nnlags
-				xpow2[npow2-i+1] = complex.(x[nnlags+1-i],T(0))
+				xpow2[npow2-i+1] = complex.(x[nnlags+1-i])
 			end
 		end
 		return xpow2
 	elseif(flag == -1)
-		x[nnlags+1] =  real.(xpow2[1]); # zero lag
+		x[nnlags+1] = real.(xpow2[1]); # zero lag
 		if(nplags != 0) 
 			for i=1:nplags
 				x[nnlags+1+i] = real.(xpow2[1+i]);
