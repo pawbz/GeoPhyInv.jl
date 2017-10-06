@@ -311,10 +311,10 @@ Author: Pawan Bharadwaj
 	for iprop in 1:npropwav
 		if(recv_flags[iprop] ≠ 0)
 			ipropout += 1
-			Data.TD_resamp!(Data.TD_urpos((Array(recv_out[:,:,iprop,:,:])), recv_fields, tgridmod, acqgeom[iprop],
+			Data.TD_resamp!(TDout[ipropout], Data.TD_urpos((Array(recv_out[:,:,iprop,:,:])), recv_fields, tgridmod, acqgeom[iprop],
 				acqgeom_urpos[1].nr[1],
 				(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
-				), TDout[ipropout]) 
+				)) 
 		end
 	end
 

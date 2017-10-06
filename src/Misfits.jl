@@ -5,27 +5,22 @@ module Misfits
 import JuMIT.Data 
 
 """
-Normalized least-squares error between two vectors after 
+Normalized least-squares error between two arrays after 
 estimating a scalar that best fits on to another.
 Return misfit and α such that αx-y is minimum.
 Normalization is done with respect to the 
 norm of y.
 """
-function error_after_scaling(
-			     x::Array{Float64},
-			     y::Array{Float64}
+function error_after_scaling{T}(
+			     x::Array{T},
+			     y::Array{T}
 			    )
-length(x) != length(y) ? error("vectors of different length") :
+	(size(x) ≠ size(y)) && error("x and y different sizes") 
+	α = sum(x.*y)/sum(x.*x)
+	J = norm(y-α*x)/norm(y)
 
-α = dot(x,y)/dot(x,x)
-
-J = norm(y-α*x)/norm(y)
-#J = norm(α.*x-y)/norm(y)
-
-return J, α
-
+	return J, α
 end
-
 
 """
 Input the obeserved and modelled data to output the misfit
@@ -81,5 +76,21 @@ function fg_cls_conv(r, s, w)
 
 end
 
+"""
+measure if x is inverse of y upto for scaling and permutation
+x⁻¹y  should be diagonal or anti diagonal		
+}	
+"""
+function error_after_scaling_permutation{T}(x::Matrix{T}, y::Matrix{T}) 
+	K=abs.(x*y);
+	err=0.0
+	for ic in 1:nc    
+		kk = K[ic,:]    
+		ii = indmax(abs.(kk))    
+		kk ./= kk[ii]    
+		err += sum(abs.(kk[1:ii-1])) + sum(abs.(kk[ii+1:end]))
+	end
+	return = err;
+end
 
 end # module

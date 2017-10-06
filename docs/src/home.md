@@ -49,6 +49,7 @@ redability.
 We followed this documentation [![guide](http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/)](http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/)
 
 
+* The methods ending with `!` ideally should not allocate and memory. They are supposed to be fast and iteratively called inside loops.
 
 ## Installation
 

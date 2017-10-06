@@ -62,7 +62,7 @@ function TD_resamp(data::TD,
 	dataout = TD(
 	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:length(data.fields)],
 	      length(data.fields),tgrid,data.acqgeom)
-	TD_resamp!(data, dataout)
+	TD_resamp!(dataout, data)
 	return dataout
 end
 
@@ -75,8 +75,7 @@ Method to resample data in time.
 * `data::TD` : input data of type `TD`
 * `dataout::TD` : preallocated data of type `TD` that is modified
 """
-
-function TD_resamp!(data::TD, dataout::TD)
+function TD_resamp!(dataout::TD, data::TD)
 	# check if datasets are similar
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr

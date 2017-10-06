@@ -28,3 +28,19 @@ pa=JuMIT.Decon.Param(ntgf, nt, nr, gfobs, wavobs, verbose=false)
 
 	@test dot(x, gx) ≈ dot(dcal, dcala)
 end
+
+
+# a simple decon test
+ntgf = 5
+nr = 10
+nt = 15
+
+gfobs=randn(ntgf, nr)
+wavobs=randn(nt)
+
+pa=JuMIT.Decon.Param(ntgf, nt, nr, gfobs, wavobs, verbose=false)
+JuMIT.Decon.update_all!(pa)
+f, α = JuMIT.Misfits.error_after_scaling(pa.wav, wavobs)
+@test (f<1e-3)
+f, α = JuMIT.Misfits.error_after_scaling(pa.gf, gfobs)
+@test (f<1e-3)

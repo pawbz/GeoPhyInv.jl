@@ -237,7 +237,7 @@ function update_all!(pa)
 		fwavmin=Inf
 		fwavmax=0.0
 
-		maxitr=400
+		maxitr=1000
 		itr=0
 		converged=false
 		tol=1e-8
