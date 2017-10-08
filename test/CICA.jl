@@ -18,8 +18,21 @@ s2 = s2 .* exp.(im*rand(unip,nt))
 S = hcat(s1, s2)';
 A = complex.(randn(recv_n, 2), randn(recv_n, 2));
 X = A * S;
-Sout = JuMIT.CICA.fastica!(X, 2,A=A)
 
-err = Sout[4][end]
+ica=JuMIT.CICA.ICA(X, 2)
+##
+@time Sout=JuMIT.CICA.fastica!(ica, A=A);
+err = Sout[3][end]
+@test (err<1e-1)
 
+# REAL ICA
+s1=rand(uni, nt)
+s2=randn(nt)
+S = hcat(s1, s2)';
+A = randn(recv_n, 2);
+X = A * S;
+
+ica=JuMIT.CICA.ICA(X, 2)
+@time Sout=JuMIT.CICA.fastica!(ica, A=A);
+err = Sout[3][end]
 @test (err<1e-1)

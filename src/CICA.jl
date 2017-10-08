@@ -12,63 +12,134 @@ import JuMIT.Grid:M1D
 import JuMIT.Misfits
 
 type ICA{T}
-	"blended data (nrec, nt)"
+	"blended data at receivers(nr, nt)"
 	x::Array{T,2}
+	"blended data after whitening (ns, nt)"
+	xhat::Array{T,2}
+	"deblended data (ns, nt)"
+	s::Array{T,2}
 	"number of sources or independent components"
 	ns::Int64
+	"number of receivers"
+	nr::Int64
+	"number of samples"
+	nt::Int64
 	"store G(Wx)"
 	GWx::Matrix{T}
 	"store g(Wx)"
 	gWx::Matrix{T}
 	"store dg(Wx)"
 	dgWx::Matrix{T}
+	"whitening matrix --- this is updated after preprocessing"
+	Q::Array{T}
 	"unmixing matrix --- this is updated after ICA"
 	W::Array{T}
 	"previous unmixing matrix"
 	Wp::Array{T}
 	"store mean vector"
-	mv::Vector{T}
+	mv::Matrix{T}
 	"real or complex ica"
 	attrib::Symbol
 	"maximum iterations"
-	maxiter:Int64
+	maxiter::Int64
 	"tolerance"
 	tol::Float64
 end
 
 function ICA(x,
+	     ns,
 	     maxiter::Int=100,
-	     tol::Real=1.0e-10,                 # convergence tolerance
+	     tol::Real=1e-10,                 # convergence tolerance
 	     Win=nothing,  # init guess of W, size (m, k)
 	     )
 
 	T = eltype(x)
 
 	# check input arguments
-	nrec, nt = size(x)
+	nr, nt = size(x)
 	(nt < 1) && error("there must be more than one samples, i.e. nt > 1.")
-	(nsrc > nrec) && error("nsrc must not exceed nrec")
+	(ns > nr) && error("ns must not exceed nr")
+
+	(maxiter < 1) && error("maxiter must be greater than 1.")
+	(tol < 0.) && error("tol must be positive.")
 
 	# allocating vectors, that store G, g, and dg
-	GWx = Matrix{T}(nc, nt)
-	gWx = Matrix{T}(nc, nt)
-	dgWx = Matrix{T}(nc, nt)
+	GWx = Matrix{T}(ns, nt)
+	gWx = Matrix{T}(ns, nt)
+	dgWx = Matrix{T}(ns, nt)
 
 	# random initialization of unmixing matrix
 	if(T == Float64)
 		attrib=:real
-		W = (Win === nothing) ? randn(nc,nc) : Win
+		W = (Win === nothing) ? randn(ns,ns) : Win
 	elseif(T == Complex{Float64})
 		attrib=:complex
-		W = (Win === nothing) ? complex.(randn(nc,nc) + randn(nc,nc)) : Win
+		W = (Win === nothing) ? complex.(randn(ns,ns) + randn(ns,ns)) : Win
 	else
 	    	error("unknown type")
 	end
+
+	# normalize each column of W necessary if arbitary Win is given
+	for is = 1:ns
+		w = view(W,:,is)
+		scale!(w, 1.0 / sqrt(sum(abs2, w)))
+	end
+
 	Wp = similar(W)
 
 
-	return ICA(x, )
+	Q = Matrix{T}(nr, ns)
+	xhat = Matrix{T}(ns, nt)
 
+	mv = Matrix{T}(nr, 1)
+	# deblended data
+	s = Matrix{T}(ns, nt)
+	return ICA(x, xhat, s, ns, nr, nt, GWx, gWx, dgWx, Q, W, Wp, mv, attrib, maxiter, tol)
+
+end
+
+"""
+* update mv by storing mean of each component of x
+* remove mean from each component of x
+"""
+function remove_mean!(ica::ICA)
+	mean!(ica.mv, ica.x)
+	for it=1:ica.nt, ir=1:ica.nr
+		ica.x[ir, it] -= ica.mv[ir, 1]
+	end
+end
+
+"""
+add stored mean to x
+"""
+function add_mean!(ica::ICA)
+	for it=1:ica.nt, ir=1:ica.nr
+		ica.x[ir, it] += ica.mv[ir, 1]
+	end
+	for ir=1:ica.nr
+		ica.mv[ir, 1] = zero(eltype(ica.mv))
+	end
+end
+
+"""
+Apply deblending matrix W to preprocessed data xhat and return deblended data ica.s
+"""
+function deblend!(ica::ICA)
+	Ac_mul_B!(ica.s, ica.W, ica.xhat)
+	return ica.s
+end
+
+"""
+update xhat
+"""
+function preprocess!(ica::ICA)
+	# remove and store mean
+	remove_mean!(ica)
+
+	do_whiten!(ica)
+	 
+	# adding mean back to x; avoided making a copy of x
+	add_mean!(ica)
 end
 
 # Fast ICA
@@ -79,94 +150,110 @@ end
 #   Independent Component Analysis: Algorithms and Applications.
 #   Neural Network 13(4-5), 2000.
 #
-function fastica!{T}(x::Matrix{T}, 
-		     nsrc::Int;
-		     whiten_flag::Bool=true,             # whether to perform pre-whitening 
-                     tol::Real=1.0e-10,                 # convergence tolerance
-		     A=nothing, # mixing matrix used to estimate performance of algorithm (unknown)
-                          verbose::Bool=false)              # whether to display iterations
+function fastica!(ica::ICA; verbose::Bool=false, A=nothing)   
 
-	(maxiter < 1) && error("maxiter must be greater than 1.")
-	(tol < 0.) && error("tol must be positive.")
+	ns, nt = ica.ns, ica.nt
 
-	# preprocess data
-	mv = Vector{T}(nrec)
-
-	# calculate and store mean
-	for irec=1:nrec
-		mv[irec] =  mean(x[irec, :])
-	end
-	# remove mean from x; will be added back later
-	for irec=1:nrec
-		copy!(x[irec, :], (x[irec, :] - mv[irec]))
-	end
-	if(whiten_flag)
-		Q = do_whiten!(x)
-	end
-
-	nc, nt = size(x)
-	# normalize each column
-	for ic = 1:nc
-		w = view(W,:,ic)
-		scale!(w, 1.0 / sqrt(sum(abs2, w)))
-	end
+	preprocess!(ica)
 
 	# for complex ICA
 	eps = 0.1
 
-	# preallocating GWx, gWx, dgWx
-	GWx = Matrix{T}(nc, nt)
-	gWx = Matrix{T}(nc, nt)
-	dgWx = Matrix{T}(nc, nt)
+	# aliases for x, W, Wp
+	x=ica.xhat
+	s=ica.s
+	W=ica.W
+	Q=ica.Q
+	Wp=ica.Wp
 
-	EG = zeros(nc, maxiter)
+	# some other aliases
+	maxiter = ica.maxiter
+
+
+	# aliases GWx, gWx, dgWx
+	GWx = ica.GWx;	gWx = ica.gWx;	dgWx = ica.dgWx
+
+	# store expectation of G
+	EG = zeros(ns, maxiter)
+
+	# store error in the unmixing matrix	
 	SSE = zeros(maxiter)
+
 	# main loop
 	t = 0
 	converged = false
 	while !converged && t < maxiter
 		t += 1
-		Wp = copy(W)
-	    	for ic = 1:nc
-			if(attrib_ica == :complex)
-				xx = W[:,ic]'*x
-				y = abs.(xx).^2
-				attrib_func = :log
-				if(attrib_func == :log)
-					GWx[ic,:] = log.(eps + y)
-					gWx[ic,:] = 1./(eps + y)
-					dgWx[ic,:] = -1./(eps + y).^2
-				elseif(attrib_func == :gaus)
-					GWx[ic,:] = -exp.(-0.5*xx.*xx)
-					gWx[ic,:] = xx.*exp.(-0.5*xx.*xx)
-					dgWx[ic,:] = exp.(-0.5*xx.*xx) - xx.*xx
-				else
-					error("invalid attrib_func")
+		copy!(Wp, W)
+		deblend!(ica)
+
+		if(ica.attrib == :complex)
+			@simd for it=1:nt
+				for is=1:ns
+					ss=eps+abs(s[is, it])^2
+					GWx[is, it] = log(ss)
+					gWx[is, it] = inv(ss)
+					dgWx[is, it] = -1. * inv(ss*ss)
 				end
-
-				a = mean(x .* (ones(nc,1)*conj(W[:,ic]'*x)) .* (ones(nc,1)*gWx[[ic],:]),2)[:,1]
-				b = mean(gWx[[ic],:] + abs.(W[:,ic]'*x).^2 .* dgWx[[ic],:]) * W[:,ic]
-				W[:,ic] = a - b
-
-			elseif(attrib_ica == :real)
-				xx = W[:,ic]'*x
-				GWx[ic,:] = -exp.(-0.5*xx.*xx)
-				gWx[ic,:] = xx.*exp.(-0.5*xx.*xx)
-				dgWx[ic,:] = exp.(-0.5*xx.*xx) - xx.*xx
-				a = mean(x .* (ones(nc,1)*gWx[[ic],:]),2)[:,1]
-				b = mean(dgWx[[ic],:]) * W[:,ic]
-				W[:,ic] = a - b
-			else
-				error("invalid attrib_ica")
 			end
 
+			for ic = 1:ns
+				b=zero(eltype(x))
+				@simd for it=1:nt
+					b+=gWx[ic,it]+(abs.(s[ic,it]).^2 * dgWx[ic,it])
+				end
+				for ic1=1:ns
+					a=zero(eltype(x))
+					@simd for it=1:nt
+						a+=x[ic1,it]*conj(s[ic,it])*gWx[ic,it]
+					end
+					W[ic1, ic]=a-b*W[ic1,ic]
+				end
+			end
+		elseif(ica.attrib == :real)
+			@simd for it=1:nt
+				for is=1:ns
+					GWx[is,it]=-exp(0.5*s[is,it]*s[is,it])
+					gWx[is,it]=-s[is,it]*GWx[is,it]
+					dgWx[is,it]=-GWx[is,it] - (s[is,it]*s[is,it])
+				end
+			end
+			for ic = 1:ns
+				b=zero(eltype(x))
+				@simd for it=1:nt
+					b+=dgWx[ic,it]
+				end
+				for ic1=1:ns
+					a=zero(eltype(x))
+					@simd for it=1:nt
+						a+=x[ic1,it]*gWx[ic,it]
+					end
+					W[ic1, ic]=a-b*W[ic1,ic]
+				end
+			end
+		else
+			error("invalid ica.attrib")
+
 		end
+
+
+#			copy!(s, )
+#			#xx = W[:,ic]'*x
+#			#y = abs.(xx).^2
+#			copy!(GWx[ic,:], log.(eps + abs.(W[:,ic]'*x).^2))
+#			copy!(gWx[ic,:], 1./(eps + abs.(W[:,ic]'*x).^2))
+#			copy!(dgWx[ic,:], -1./(eps + abs.(W[:,ic]'*x).^2).^2)
+#
+#					error("invalid ica.attrib")
+#		end
+#
+#		end
 
 		# Symmetric decorrelation:
 		copy!(W, W * sqrtm(inv(W'*W)))
 
 		# compare W with Wp as a convergence criteria
-		converged = (maximum(abs.(W-Wp)) < tol)
+		converged = (maximum(abs.(W-Wp)) < ica.tol)
 
 		# storing the expectation of G(Wx) --- measure of Gaussianity
 		EG[:,t] = mean(GWx,2);
@@ -176,25 +263,35 @@ function fastica!{T}(x::Matrix{T},
 		# note that W'Q and A can still be different by a 
 		# permutation and scaling matrix, so...
 		if(!(A === nothing))
-			SSE[t] = Misfits.error_after_scaling_permutation(W'*Q, A)
+			SSE[t] = error_unmixing(W'*Q', A)
 		end
 	end
 
-	# demixing 
-	x = W' * x
-
-	# construct model
-	if(whiten_flag)
-		W = W' * Q
-	end
-
-	# adding mean back to x; avoided making a copy of x
-	for irec=1:nrec
-		copy!(x[irec, :], (x[irec, :] + mv[irec]))
-	end
-
-	return x, W, EG[:,1:t], SSE[1:t]
+	return ica, EG[:,1:t], SSE[1:t]
 end
+
+"""
+Compute the error in the unmixing matrix.
+
+* x is the unmixing matrix
+* y is the original mixing matrix 
+
+Ideally, x should be inverse of y upto scaling and permutation.
+}	
+"""
+function error_unmixing{T}(x::Matrix{T}, y::Matrix{T}) 
+	K=abs.(x*y);
+	nc=size(x,2)
+	err=0.0
+	for ic in 1:nc    
+		kk = K[ic,:]    
+		ii = indmax(abs.(kk))    
+		kk ./= kk[ii]    
+		err += sum(abs.(kk[1:ii-1])) + sum(abs.(kk[ii+1:end]))
+	end
+	return err
+end
+
 
 """
 Performs ICA for convolutive mixtures.
@@ -456,31 +553,28 @@ end
 
 
 
-# Independent Component Analysis
+function do_whiten!(ica::ICA)
+    nr, nt = ica.nr, ica.nt
+    ntI = 1/nt
+    x=ica.x
+    xhat=ica.xhat
+    Q=ica.Q
+    C=Matrix{eltype(x)}(nr, nr)
 
-centralize(x::AbstractVector, m::AbstractVector) = (isempty(m) ? x : x - m)::typeof(x)
-centralize(x::AbstractMatrix, m::AbstractVector) = (isempty(m) ? x : x .- m)::typeof(x)
-
-decentralize(x::AbstractVector, m::AbstractVector) = (isempty(m) ? x : x + m)::typeof(x)
-decentralize(x::AbstractMatrix, m::AbstractVector) = (isempty(m) ? x : x .+ m)::typeof(x)
-
-
-preprocess_mean{T<:Number}(X::Matrix{T}, m) = (m == nothing ? vec(Base.mean(X, 2)) :
-                                                      m == 0 ? T[] : 
-                                                      m)::Vector{T}
-function do_whiten!(x)
-    nrec, nt = size(x)
     # construct covariance matrix
-    C = (x * x') ./ nt
+    A_mul_Bc!(C, x, x)
+    scale!(C, ntI)
+
     # eigenvalue decomposition of the covariance matrix
     Efac = eigfact(C)
     v, P = Efac.values, Efac.vectors
     # whitening matrix
-    W0 = scale!(P, sqrt.(inv.(v)))
+    copy!(Q, scale!(P, sqrt.(inv.(v))))
+
     # for testing --  this should be a diagonal matrix
     #println(W0' * C * W0)
-    copy!(x, W0' * x)
-    return W0'
+    Ac_mul_B!(xhat, Q, x)
+    return Q
 end
 
 

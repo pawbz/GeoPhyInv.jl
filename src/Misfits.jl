@@ -76,21 +76,5 @@ function fg_cls_conv(r, s, w)
 
 end
 
-"""
-measure if x is inverse of y upto for scaling and permutation
-x⁻¹y  should be diagonal or anti diagonal		
-}	
-"""
-function error_after_scaling_permutation{T}(x::Matrix{T}, y::Matrix{T}) 
-	K=abs.(x*y);
-	err=0.0
-	for ic in 1:nc    
-		kk = K[ic,:]    
-		ii = indmax(abs.(kk))    
-		kk ./= kk[ii]    
-		err += sum(abs.(kk[1:ii-1])) + sum(abs.(kk[ii+1:end]))
-	end
-	return = err;
-end
 
 end # module
