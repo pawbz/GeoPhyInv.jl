@@ -1,8 +1,9 @@
 using JuMIT
 using Distributions
 using Base.Test
+using MultivariateStats
 
-nt = 1024
+nt = 1600
 recv_n=2
 
 uni=Uniform(-1, 1)
@@ -20,11 +21,10 @@ A = complex.(randn(recv_n, 2), randn(recv_n, 2));
 X = A * S;
 
 ica=JuMIT.CICA.ICA(X, 2)
-##
 @time Sout=JuMIT.CICA.fastica!(ica, A=A);
-err = Sout[3][end]
+err = Sout[2]
 @test (err<1e-1)
-
+##
 # REAL ICA
 s1=rand(uni, nt)
 s2=randn(nt)
@@ -33,6 +33,10 @@ A = randn(recv_n, 2);
 X = A * S;
 
 ica=JuMIT.CICA.ICA(X, 2)
+M = fit(ICA, X, 2; do_whiten=true, winit=ica.W,fun=icagfun(:gaus)); W = M.W;
 @time Sout=JuMIT.CICA.fastica!(ica, A=A);
-err = Sout[3][end]
+
+# using fastica from multivariate stats
+
+err = Sout[2]
 @test (err<1e-1)

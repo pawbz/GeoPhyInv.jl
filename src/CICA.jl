@@ -48,7 +48,7 @@ end
 
 function ICA(x,
 	     ns,
-	     maxiter::Int=100,
+	     maxiter::Int=1000,
 	     tol::Real=1e-10,                 # convergence tolerance
 	     Win=nothing,  # init guess of W, size (m, k)
 	     )
@@ -69,23 +69,8 @@ function ICA(x,
 	dgWx = Matrix{T}(ns, nt)
 
 	# random initialization of unmixing matrix
-	if(T == Float64)
-		attrib=:real
-		W = (Win === nothing) ? randn(ns,ns) : Win
-	elseif(T == Complex{Float64})
-		attrib=:complex
-		W = (Win === nothing) ? complex.(randn(ns,ns) + randn(ns,ns)) : Win
-	else
-	    	error("unknown type")
-	end
-
-	# normalize each column of W necessary if arbitary Win is given
-	for is = 1:ns
-		w = view(W,:,is)
-		scale!(w, 1.0 / sqrt(sum(abs2, w)))
-	end
-
-	Wp = similar(W)
+	W = Matrix{T}(ns,ns)
+	Wp = Matrix{T}(ns,ns)
 
 
 	Q = Matrix{T}(nr, ns)
@@ -94,9 +79,42 @@ function ICA(x,
 	mv = Matrix{T}(nr, 1)
 	# deblended data
 	s = Matrix{T}(ns, nt)
-	return ICA(x, xhat, s, ns, nr, nt, GWx, gWx, dgWx, Q, W, Wp, mv, attrib, maxiter, tol)
 
+	(T == Float64) ? attrib=:real : attrib=:complex
+
+	ica=ICA(x, xhat, s, ns, nr, nt, GWx, gWx, dgWx, Q, W, Wp, mv, attrib, maxiter, tol)
+
+	unmixing_initialize!(ica, Win)
+
+	return ica
 end
+
+function unmixing_initialize!(ica::ICA, Win=nothing)
+	T = eltype(ica.x)
+	ns=ica.ns
+	W=ica.W
+	Wp=ica.Wp
+
+	if(!(Win===nothing))
+		copy!(W, Win)
+	else
+		if(ica.attrib==:real)
+			copy!(W,randn(ns,ns)) 
+		elseif(ica.attrib==:complex)
+			copy!(W,complex.(randn(ns,ns)+randn(ns,ns)))
+		else
+			error("unknown attrib")
+		end
+	end
+
+	# normalize each column of W necessary if arbitary Win is given
+	for is = 1:ns
+		w = view(W,:,is)
+		scale!(w, 1.0 / sqrt(sum(abs2, w)))
+	end
+	return ica
+end
+
 
 """
 * update mv by storing mean of each component of x
@@ -153,6 +171,7 @@ end
 function fastica!(ica::ICA; verbose::Bool=false, A=nothing)   
 
 	ns, nt = ica.ns, ica.nt
+	ntI = inv(nt)
 
 	preprocess!(ica)
 
@@ -173,15 +192,16 @@ function fastica!(ica::ICA; verbose::Bool=false, A=nothing)
 	# aliases GWx, gWx, dgWx
 	GWx = ica.GWx;	gWx = ica.gWx;	dgWx = ica.dgWx
 
-	# store expectation of G
+	# store expectation of G -- it measures Gaussianity
 	EG = zeros(ns, maxiter)
 
-	# store error in the unmixing matrix	
-	SSE = zeros(maxiter)
+	# store error in the unmixing matrix -- only for testing (commented)
+	# SSE = zeros(maxiter)
+
 
 	# main loop
-	t = 0
-	converged = false
+	t=0
+	converged=false
 	while !converged && t < maxiter
 		t += 1
 		copy!(Wp, W)
@@ -202,20 +222,22 @@ function fastica!(ica::ICA; verbose::Bool=false, A=nothing)
 				@simd for it=1:nt
 					b+=gWx[ic,it]+(abs.(s[ic,it]).^2 * dgWx[ic,it])
 				end
+				b *= ntI
 				for ic1=1:ns
 					a=zero(eltype(x))
 					@simd for it=1:nt
 						a+=x[ic1,it]*conj(s[ic,it])*gWx[ic,it]
 					end
+					a *= ntI
 					W[ic1, ic]=a-b*W[ic1,ic]
 				end
 			end
 		elseif(ica.attrib == :real)
 			@simd for it=1:nt
 				for is=1:ns
-					GWx[is,it]=-exp(0.5*s[is,it]*s[is,it])
-					gWx[is,it]=-s[is,it]*GWx[is,it]
-					dgWx[is,it]=-GWx[is,it] - (s[is,it]*s[is,it])
+					GWx[is,it]=exp(-0.5*s[is,it]*s[is,it])
+					gWx[is,it]=s[is,it]*GWx[is,it]
+					dgWx[is,it]=GWx[is,it]*(1.-(s[is,it]*s[is,it]))
 				end
 			end
 			for ic = 1:ns
@@ -223,52 +245,78 @@ function fastica!(ica::ICA; verbose::Bool=false, A=nothing)
 				@simd for it=1:nt
 					b+=dgWx[ic,it]
 				end
+				b *= ntI
 				for ic1=1:ns
 					a=zero(eltype(x))
 					@simd for it=1:nt
 						a+=x[ic1,it]*gWx[ic,it]
 					end
+					a *= ntI
 					W[ic1, ic]=a-b*W[ic1,ic]
 				end
 			end
 		else
 			error("invalid ica.attrib")
-
 		end
 
-
-#			copy!(s, )
-#			#xx = W[:,ic]'*x
-#			#y = abs.(xx).^2
-#			copy!(GWx[ic,:], log.(eps + abs.(W[:,ic]'*x).^2))
-#			copy!(gWx[ic,:], 1./(eps + abs.(W[:,ic]'*x).^2))
-#			copy!(dgWx[ic,:], -1./(eps + abs.(W[:,ic]'*x).^2).^2)
-#
-#					error("invalid ica.attrib")
-#		end
-#
-#		end
 
 		# Symmetric decorrelation:
 		copy!(W, W * sqrtm(inv(W'*W)))
 
 		# compare W with Wp as a convergence criteria
-		converged = (maximum(abs.(W-Wp)) < ica.tol)
+		chgall=0.0
+		for ic in 1:ns
+			chg=0.0
+			for ic1 in 1:ns
+				chg += abs(W[ic1, ic]-Wp[ic1, ic]) 
+			end
+			chgall = max(chg, chgall) 
+		end
+		converged = (chgall < ica.tol)
 
 		# storing the expectation of G(Wx) --- measure of Gaussianity
-		EG[:,t] = mean(GWx,2);
+		for ic in 1:ns, it in 1:nt
+			EG[ic,t] += (GWx[ic, it] * ntI)
+		end
 
 		# compute the distance between A and W'Q
 		# this gives the measure of the success of the algorithm
 		# note that W'Q and A can still be different by a 
 		# permutation and scaling matrix, so...
-		if(!(A === nothing))
-			SSE[t] = error_unmixing(W'*Q', A)
-		end
+		# if(!(A === nothing))
+		#	SSE[t] = error_unmixing(W'*Q', A)
+		# end
 	end
 
-	return ica, EG[:,1:t], SSE[1:t]
+	if(!(A === nothing))
+	      SSE = error_unmixing(W'*Q', A)
+	end
+	
+	# remove zeros
+	EG = EG[:,1:t]
+			
+	# test the performance of the algorithm
+	return ica, SSE, EG
 end
+
+
+"""
+Work on it later, how to restart ICA if the starting model is bad.
+"""
+function fastica()
+	tall=0
+	converged_all=false
+
+	while !converged_all && tall < 10
+		tall += 1
+		unmixing_initialize!(ica)
+		converged_all = sum(abs.(EG[:,1]))/sum(abs.(EG[:,end]))
+		println(converged_all)
+	end
+end
+
+
+
 
 """
 Compute the error in the unmixing matrix.
@@ -567,7 +615,8 @@ function do_whiten!(ica::ICA)
 
     # eigenvalue decomposition of the covariance matrix
     Efac = eigfact(C)
-    v, P = Efac.values, Efac.vectors
+    ord = sortperm(Efac.values; rev=true)
+    v, P = Efac.values[ord], Efac.vectors[:, ord]
     # whitening matrix
     copy!(Q, scale!(P, sqrt.(inv.(v))))
 
