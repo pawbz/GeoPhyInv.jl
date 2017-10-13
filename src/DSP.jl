@@ -164,12 +164,11 @@ function fast_filt_vec!{T,N}(
 		   fftplan, ifftplan)
 	sizecheck = ((size(s,1)==np2)&(size(w,1)==np2)&(size(r,1)==np2))
 	typecheck = ((eltype(s)<:Complex)&(eltype(w)<:Complex)&(eltype(r)<:Complex))
-	inplaceflag = (sizecheck & typecheck)
 	
 	# initialize pow2 vectors
-	spow2[:] = complex.(T(0))
-	rpow2[:] = complex.(T(0))
-	wpow2[:] = complex.(T(0))
+	spow2[:] = complex(T(0))
+	rpow2[:] = complex(T(0))
+	wpow2[:] = complex(T(0))
 
 	# just arrange order
 	nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, 1)
@@ -179,7 +178,7 @@ function fast_filt_vec!{T,N}(
 	if(attrib == :s)
 		A_mul_B!(wpow2, fftplan, wpow2)
 		A_mul_B!(rpow2, fftplan, rpow2)
-		copy!(spow2, rpow2 .* wpow2);
+		@. spow2 = rpow2 * wpow2
 		A_mul_B!(spow2, ifftplan, spow2)
 		nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, -1)
 		return s
@@ -187,7 +186,7 @@ function fast_filt_vec!{T,N}(
 		A_mul_B!(wpow2, fftplan, wpow2)
 		A_mul_B!(spow2, fftplan, spow2)
 		conj!(wpow2)
-		copy!(rpow2, spow2 .* wpow2)
+		@. rpow2 = spow2 * wpow2
 		A_mul_B!(rpow2, ifftplan, rpow2)
 		nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, -1)
 		return r
@@ -195,7 +194,7 @@ function fast_filt_vec!{T,N}(
 		A_mul_B!(rpow2, fftplan, rpow2)
 		A_mul_B!(spow2, fftplan, spow2)
 		conj!(rpow2)
-		copy!(wpow2, spow2 .* rpow2);
+		@. wpow2 = spow2 * rpow2
 		A_mul_B!(wpow2, ifftplan, wpow2)
 		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, -1)
 		return w
@@ -330,19 +329,19 @@ function nlag_npow2_pad_truncate!{T1, T2}(
 				  npow2::Integer, 
 				  flag::Integer
 				  )
-	(length(x) == nplags + nnlags + 1) ? nothing : error("size x")
-	(length(xpow2) == npow2) ? nothing : error("size xpow2")
+	(length(x) ≠ nplags + nnlags + 1) && error("size x")
+	(length(xpow2) ≠ npow2) && error("size xpow2")
 
 	if(flag == 1)
-		xpow2[1] = complex.(x[nnlags+1]) # zero lag
+		xpow2[1] = complex(x[nnlags+1]) # zero lag
 		# +ve lags
 		if (nplags > 0) 
-			xpow2[2:nplags+1]= complex.(x[nnlags+2:nnlags+1+nplags])
+			xpow2[2:nplags+1]= complex(x[nnlags+2:nnlags+1+nplags])
 		end
 		# -ve lags
 		if(nnlags != 0) 
 			for i=1:nnlags
-				xpow2[npow2-i+1] = complex.(x[nnlags+1-i])
+				xpow2[npow2-i+1] = complex(x[nnlags+1-i])
 			end
 		end
 		return xpow2

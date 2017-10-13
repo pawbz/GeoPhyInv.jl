@@ -39,25 +39,16 @@ end
 
 ## dot product test for fast filt
 
-function filt_loop(func, n2; inplaceflag=false)
-	if(inplaceflag)
-		nwvec=[1024,1024]
-		nrvec=[1024,1024]
-		nsvec=[1024,1024]
-	else
-		nwvec=[101, 100]
-		nrvec=[1000, 1001]
-		nsvec=[1500, 901]
-	end
-	np2=1024;
+function filt_loop(func, n2; )
+	nwvec=[101, 100]
+	nrvec=[1000, 1001]
+	nsvec=[1500, 901]
+	np2=2024;
 	for nw in nwvec, nr in nrvec, ns in nsvec, nrp in [0, 500], nsp in [0, 501], nwp in [0, 50]
 
-		if(inplaceflag)
-			r=complex(randn(nr, n2...))
-			s=complex(randn(ns, n2...))
-			w=randn(nw, n2...)
-		else
-		end
+		r=randn(nr, n2...)
+		s=randn(ns, n2...)
+		w=randn(nw, n2...)
 		func(s,r,w,:s, nrplags=nrp, nsplags=nsp, nwplags=nwp, np2=np2)
 
 		sa=randn(ns, n2...);
@@ -85,3 +76,43 @@ end
 n2=128
 @time filt_loop(JuMIT.DSP.fast_filt!, n2)
 @time filt_loop(JuMIT.DSP.fast_filt!, n2)
+
+
+# check memory for 2,D
+for itimes in 1:4
+	# check if fast_filt will not have any allocations
+			println("====================")
+	for n in [2, 2^2, 2^3]
+		s=zeros(n,n)
+		r=zeros(n,n)
+		w=zeros(n,n)
+		spow2=complex.(zeros(n,n))
+		rpow2=complex.(zeros(n,n))
+		wpow2=complex.(zeros(n,n))
+		fftplan = plan_fft!(complex.(zeros(n,n)),[1],flags=FFTW.PATIENT)
+		ifftplan = plan_ifft!(complex.(zeros(n,n)),[1],flags=FFTW.PATIENT)
+
+		@time JuMIT.DSP.fast_filt_vec!(s,r,w,spow2,rpow2, wpow2,
+			:s,0,n-1,0,n-1,0,n-1,n,fftplan, ifftplan)
+
+	end
+end
+
+for itimes in 1:4
+	# check if fast_filt will not have any allocations
+			println("====================")
+	for n in [16, 160, 1600]
+		s=zeros(n)
+		r=zeros(n)
+		w=zeros(n)
+		spow2=complex.(zeros(n))
+		rpow2=complex.(zeros(n))
+		wpow2=complex.(zeros(n))
+		fftplan = plan_fft!(complex.(zeros(n)),[1],flags=FFTW.PATIENT)
+		ifftplan = plan_ifft!(complex.(zeros(n)),[1],flags=FFTW.PATIENT)
+
+		@time JuMIT.DSP.fast_filt_vec!(s,r,w,spow2,rpow2, wpow2,
+			:s,0,n-1,0,n-1,0,n-1,n,fftplan, ifftplan)
+
+	end
+end

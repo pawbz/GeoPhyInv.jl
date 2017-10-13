@@ -20,7 +20,7 @@ S = hcat(s1, s2)';
 A = complex.(randn(recv_n, 2), randn(recv_n, 2));
 X = A * S;
 
-ica=JuMIT.CICA.ICA(X, 2, nbins=10)
+ica=JuMIT.CICA.ICA(X, 2, nbins=2)
 @time Sout=JuMIT.CICA.fastica!(ica, A=A);
 err = Sout[2]
 @test all(err.<1e-1)

@@ -45,7 +45,7 @@ type ICA{T}
 	"tolerance"
 	tol::Float64
 	"bins"
-	bins
+	bins::Array{UnitRange{Int64}}
 end
 
 function ICA(x,
@@ -271,9 +271,9 @@ function fastica!(ica::ICA; verbose::Bool=false, A=nothing)
 		end
 	end
 
-	fix_scaling!(W, bins)
+	fix_permutation!(W, EG)
 
-	fix_permutation!(W, EG, bins)
+	fix_scaling!(ica)
 
 	# store error in the unmixing matrix -- only for testing (commented)
 	SSE = (!(A === nothing)) ? error_unmixing(ica, A) : zeros(nbins)
@@ -289,6 +289,7 @@ function error_unmixing(ica, A)
 	nbins=length(ica.bins)     
 	Q=ica.Q        
 	W=ica.W        
+	SSE=zeros(nbins)
 	for ib=1:nbins                 
 		QQ=view(Q,:,:,ib)                 
 		WW=view(W,:,:,ib)                 
@@ -297,25 +298,42 @@ function error_unmixing(ica, A)
 	return SSE
 end
 
-function fix_scaling!(W, bins, magic_recv)
-	nbins=length(bins)
+"""
+Minimum Distortion Principle
+"""
+function fix_scaling!(ica, magic_recv=1)
+	nbins=length(ica.bins)
+	ns=ica.ns
+	W=ica.W
+	Q=ica.Q
+	WQ=zeros(eltype(W),size(W,1),size(W,2))
 	for ib in 1:nbins
+		WW=view(W,:,:,ib)
+		QQ=view(Q,:,:,ib)
 
-		WW = transpose(W[:,:,ib]);
-		A = inv(WW);
+		Ac_mul_Bc!(WQ, QQ, WW)
+
+		A = inv(WQ);
 		A[:,1] /= A[magic_recv,1];
 		A[:,2] /= A[magic_recv,2];
-		W[:,:,ib] = transpose(inv(A));
+		copy!(WQ, (inv(A)));
+
+		copy!(WW, WQ'*inv(QQ))
 	end
 end
 
-function fix_permutation!(s, EG, bins)
-	nbins=length(bins)
+"""
+Order the components according to the EG values.
+EG measures Gaussianity and hence, we are ordering sources 
+in each bin according to their distance from Gaussian.
+"""
+function fix_permutation!(W, EG)
+	nbins=size(W,3)
 	for ib=1:nbins
-		ss=view(s,:,bins[ib])
+		WW=view(W,:,:,ib)
 		# permutation order
 		ord = sortperm(EG[:,ib]; rev=true)
-		copy!(ss, ss[ord,:])
+		copy!(WW, WW[:,ord])
 	end
 end
 

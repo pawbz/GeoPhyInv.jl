@@ -26,6 +26,8 @@ include("Analytic.jl")
 include("Fdtd.jl")
 include("Misfits.jl")
 include("Inversion.jl")
+include("CICA.jl")
+include("Decon.jl")
 include("Plots.jl")
 
 end # module

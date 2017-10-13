@@ -23,12 +23,13 @@ type Param
 	nr::Int64
 	attrib_inv::Symbol
 	verbose::Bool
-	fftplan
-	ifftplan
+	fftplan::Base.DFT.FFTW.cFFTWPlan
+	ifftplan::Base.DFT.ScaledPlan
 end
 
-function Param(ntgf, nt, nr, gfobs, wavobs; verbose=false, attrib_inv=:gf,) 
-	dobs=zeros(nt, nr)
+function Param(ntgf, nt, nr; 
+	       dobs=nothing, gfobs=nothing, wavobs=nothing, verbose=false, attrib_inv=:gf,) 
+	(dobs===nothing) && (dobs=zeros(nt, nr))
 	dcal=zeros(nt, nr)
 	ddcal=zeros(nt, nr)
 	
@@ -56,7 +57,10 @@ function Param(ntgf, nt, nr, gfobs, wavobs; verbose=false, attrib_inv=:gf,)
 	     spow2, rpow2, wpow2,
 	     nt, nr, attrib_inv, verbose, fftplan, ifftplan)
 
-	F!(pa, mattrib=:gfwav, dattrib=:dobs, gf=gfobs, wav=wavobs)
+	if iszero(pa.dobs) 
+		((gfobs===nothing) | (wavobs===nothing)) && error("need gfobs and wavobs")
+		F!(pa, mattrib=:gfwav, dattrib=:dobs, gf=gfobs, wav=wavobs)
+	end
 
 	return pa
 end
@@ -163,7 +167,13 @@ function Fadj!(pa, storage, dcal)
 		  np2=size(pa.fftplan,1), fftplan=pa.fftplan, ifftplan=pa.ifftplan,
 		  spow2=pa.spow2, rpow2=pa.rpow2, wpow2=pa.wpow2,
 			)
-		copy!(storage, sum(pa.wavmat,2))
+		storage[:] = 0.
+		# copy!(storage, sum(pa.wavmat,2))
+		for i in 1:size(pa.wavmat,2)
+			for j in 1:size(pa.wavmat,1)
+				storage[j] += pa.wavmat[j,i]
+			end
+		end
 	else(pa.attrib_inv == :gf)
 		for ir in 1:pa.nr
 			pa.wavmat[:,ir]=pa.wav
@@ -179,7 +189,8 @@ function Fadj!(pa, storage, dcal)
 end
 
 # core algorithm
-function update!(pa::Param, x, last_x, df; store_trace::Bool=true, extended_trace::Bool=false, 
+function update!(pa::Param, x, last_x, df; store_trace::Bool=false, 
+		 extended_trace::Bool=false, 
 	     time_limit=Float64=2.0*60., 
 	     f_tol::Float64=1e-8, g_tol::Float64=1e-8, x_tol::Float64=1e-8)
 
@@ -194,15 +205,29 @@ function update!(pa::Param, x, last_x, df; store_trace::Bool=true, extended_trac
 		       Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
 		       iterations = 200, store_trace = store_trace,
 		       extended_trace=extended_trace, show_trace = false))
-	pa.verbose && println(res)
+	# pa.verbose && println(res)
 
 	x_to_model!(Optim.minimizer(res), pa)
 
 	return res
 end
 
+function update_gf!(pa, xgf, last_xgf, dfgf)
+	pa.attrib_inv=:gf    
+	resgf = update!(pa, xgf, last_xgf, dfgf)
+	fgf = Optim.minimum(resgf)
+	return fgf
+end
 
-function update_all!(pa)
+function update_wav!(pa, xwav, last_xwav, dfwav)
+	pa.attrib_inv=:wav    
+	reswav = update!(pa, xwav, last_xwav, dfwav)
+	fwav = Optim.minimum(reswav)
+	return fwav
+end
+
+
+function update_all!(pa, rtol=1e-3)
 
 	# convert initial model to the inversion variable
 	pa.attrib_inv=:gf    
@@ -225,13 +250,17 @@ function update_all!(pa)
 	converged_all=false
 	itr_all=0
 	maxitr_all=10
+
+	pa.verbose && println("Blind Decon")  
+
 	while !converged_all && itr_all < maxitr_all
 		itr_all += 1
+		pa.verbose && println("============================================")  
 		pa.verbose && (itr_all > 1) && println("\t", "failed to converge.. reintializing round trips")
-		# starting models
-		randn!(pa.wav)
-		randn!(pa.gf)
+
 	
+		initialize!(pa)
+
 		fgfmin=Inf
 		fgfmax=0.0
 		fwavmin=Inf
@@ -240,28 +269,35 @@ function update_all!(pa)
 		maxitr=1000
 		itr=0
 		converged=false
-		tol=1e-8
+		tol=1e-3
+
+		pa.verbose && println("round trip\tfgf\tfwav\tconvergence",) 
 		while !converged && itr < maxitr
-			pa.verbose && (itr > 1) && println("\t", "round trip: ", itr)
 			itr += 1
-			pa.attrib_inv=:gf    
-			resgf = update!(pa, xgf, last_xgf, dfgf)
-			fgf = Optim.minimum(resgf)
+			fgf = update_gf!(pa, xgf, last_xgf, dfgf)
+
 			fgfmin = min(fgfmin, fgf) 
 			fgfmax = max(fgfmax, fgf) 
-			pa.attrib_inv=:wav    
-			reswav = update!(pa, xwav, last_xwav, dfwav)
-			fwav = Optim.minimum(reswav)
+
+			fwav = update_wav!(pa, xwav, last_xwav, dfwav)
 			fwavmin = min(fwavmin, fwav) 
 			fwavmax = max(fwavmax, fwav) 
 
-			converged = ((abs(fwav-fgf)) < tol)
+			rf = abs(fwav-fgf)/fwav
+			pa.verbose && println(itr,"\t",fgfmin/fgfmax,"\t", fwavmin/fwavmax, "\t",rf)
+
+			converged = (rf < tol)
 		end
-		converged_all = (fgfmin/fgfmax < 1e-3) & (fwavmin/fwavmax < 1e-3)
+		converged_all = (fgfmin/fgfmax < rtol) & (fwavmin/fwavmax < rtol)
 	end
 end
 
 
+function initialize!(pa)
+	# starting models
+	randn!(pa.wav)
+	randn!(pa.gf)
+end
 
 
 # initialize gf and ssf 

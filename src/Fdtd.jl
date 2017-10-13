@@ -630,7 +630,7 @@ end
 end
 
 
-@inline @inbounds @fastmath function advance!(
+@inbounds @fastmath function advance!(
 		  p::Array{Float64}, pp::Array{Float64}, ppp::Array{Float64},  dpdx::Array{Float64}, dpdz::Array{Float64},  
 		  memory_dp_dx::Array{Float64}, memory_dp_dz::Array{Float64}, memory_dvx_dx::Array{Float64}, memory_dvz_dz::Array{Float64},
 		  modttI::Array{Float64}, modrrvx::Array{Float64}, modrrvz::Array{Float64},
@@ -648,39 +648,17 @@ end
 	"""
 	compute dpdx and dpdz at [it-1] for all propagating fields
 	"""
+	update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz)
+	update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz)
+
+	"""
+	update velocity at [it-1/2] using 
+	velocity at [it-3/2] and dpdx and dpdz at [it-1] 
+	"""
+	update_vx!(p, dpdx, δt, modrrvx, nx, nz)
+	update_vz!(p, dpdz, δt, modrrvz, nx, nz)
+
 	for ipropwav = 1:size(p,4)
-		for ix = 3:nx-2
-		@simd for iz = 3:nz-2
-			@inbounds dpdx[iz,ix,1,ipropwav] = (27.e0*p[iz,ix+1,1,ipropwav]-27.e0*p[iz,ix,1,ipropwav]-p[iz,ix+2,1,ipropwav]+p[iz,ix-1,1,ipropwav]) * (δx24I)
-			@inbounds memory_dp_dx[iz,ix,ipropwav] = b_x_half[ix] * memory_dp_dx[iz,ix,ipropwav] + a_x_half[ix] * dpdx[iz,ix,1,ipropwav] # pml
-			@inbounds dpdx[iz,ix,1,ipropwav] = dpdx[iz,ix,1,ipropwav] * k_x_halfI[ix] + memory_dp_dx[iz,ix,ipropwav] # pml
-		end
-		end
-
-		for ix = 3:nx-2
-		@simd for iz = 3:nz-2
-			@inbounds dpdz[iz,ix,1,ipropwav] = (27.e0*p[iz+1,ix,1,ipropwav]-27.e0*p[iz,ix,1,ipropwav]-p[iz+2,ix,1,ipropwav]+p[iz-1,ix,1,ipropwav]) * (δz24I)
-			@inbounds memory_dp_dz[iz,ix,ipropwav] = b_z_half[iz] * memory_dp_dz[iz,ix,ipropwav] + a_z_half[iz] * dpdz[iz,ix,1,ipropwav] # pml
-			@inbounds dpdz[iz,ix,1,ipropwav] = dpdz[iz,ix,1,ipropwav] * k_z_halfI[iz] + memory_dp_dz[iz,ix,ipropwav] # pml
-		end
-		end
-
-
-		"""
-		update velocity at [it-1/2] using 
-		velocity at [it-3/2] and dpdx and dpdz at [it-1] 
-		"""
-		for ix=3:nx-2
-		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,2,ipropwav] += (dpdx[iz,ix,1,ipropwav]) * δt * modrrvx[iz,ix] #* boundary_vx(iz,ix)
-		end
-		end
-
-		for ix=3:nx-2
-		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,3,ipropwav] +=  (dpdz[iz,ix,1,ipropwav]) * δt * modrrvz[iz,ix] #* boundary_vz(iz,ix)
-		end
-		end
 
 		"""
 		compute p[it] using p[it-1] and velocity [it-1/2]
@@ -699,6 +677,50 @@ end
 			and dvzdz at [it-1/2]
 			"""
 			@inbounds p[iz,ix,1,ipropwav] += (modttI[iz,ix] * (dpdx[iz,ix,2,ipropwav] + dpdz[iz,ix,3,ipropwav])) * δt #* boundary_p(iz,ix)
+		end
+		end
+	end
+end
+
+@inbounds @fastmath function update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz)
+	for ipropwav = 1:size(p,4)
+		for ix = 3:nx-2
+		@simd for iz = 3:nz-2
+			@inbounds dpdx[iz,ix,1,ipropwav] = (27.e0*p[iz,ix+1,1,ipropwav]-27.e0*p[iz,ix,1,ipropwav]-p[iz,ix+2,1,ipropwav]+p[iz,ix-1,1,ipropwav]) * (δx24I)
+			@inbounds memory_dp_dx[iz,ix,ipropwav] = b_x_half[ix] * memory_dp_dx[iz,ix,ipropwav] + a_x_half[ix] * dpdx[iz,ix,1,ipropwav] # pml
+			@inbounds dpdx[iz,ix,1,ipropwav] = dpdx[iz,ix,1,ipropwav] * k_x_halfI[ix] + memory_dp_dx[iz,ix,ipropwav] # pml
+		end
+		end
+	end
+end
+
+@inbounds @fastmath function update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz)
+	for ipropwav = 1:size(p,4)
+		for ix = 3:nx-2
+		@simd for iz = 3:nz-2
+			@inbounds dpdz[iz,ix,1,ipropwav] = (27.e0*p[iz+1,ix,1,ipropwav]-27.e0*p[iz,ix,1,ipropwav]-p[iz+2,ix,1,ipropwav]+p[iz-1,ix,1,ipropwav]) * (δz24I)
+			@inbounds memory_dp_dz[iz,ix,ipropwav] = b_z_half[iz] * memory_dp_dz[iz,ix,ipropwav] + a_z_half[iz] * dpdz[iz,ix,1,ipropwav] # pml
+			@inbounds dpdz[iz,ix,1,ipropwav] = dpdz[iz,ix,1,ipropwav] * k_z_halfI[iz] + memory_dp_dz[iz,ix,ipropwav] # pml
+		end
+		end
+	end
+end
+
+@inbounds @fastmath function update_vx!(p, dpdx, δt, modrrvx,  nx, nz)
+	for ipropwav = 1:size(p,4)
+		for ix=3:nx-2
+		@simd for iz=3:nz-2
+			@inbounds p[iz,ix,2,ipropwav] += (dpdx[iz,ix,1,ipropwav]) * δt * modrrvx[iz,ix] #* boundary_vx(iz,ix)
+		end
+		end
+	end
+end
+
+@inbounds @fastmath function update_vz!(p, dpdz, δt,  modrrvz, nx, nz)
+	for ipropwav = 1:size(p,4)
+		for ix=3:nx-2
+		@simd for iz=3:nz-2
+			@inbounds p[iz,ix,3,ipropwav] +=  (dpdz[iz,ix,1,ipropwav]) * δt * modrrvz[iz,ix] #* boundary_vz(iz,ix)
 		end
 		end
 	end
