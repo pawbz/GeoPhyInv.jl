@@ -115,20 +115,14 @@ type Paramc
 end 
 
 """
-Modelling parameters per supersource
+Modelling parameters per every supersource for each worker
 """
 type Paramss
-	boundary
-	snaps_out
-	illum_all
-	born_svalue_stack::Array{Float64} 
-
+	sseq_vec::UnitRange{Int64}
 	src_wav_mat::Array{Array{Float64,3},2}
 	src_spray_weights::Array{Float64}
-
 	recv_out::AbstractArray{Float64} 
 	rec_interpolate_weights::Array{Float64}
-
 	issmulx1::Array{Int64} 
 	issmulx2::Array{Int64}
 	issmulz1::Array{Int64} 
@@ -137,6 +131,13 @@ type Paramss
 	irecx2::Array{Int64}
 	irecz1::Array{Int64}
 	irecz2::Array{Int64}
+        boundary::Array{Array{Array{Float64,3},1},1}
+	snaps_out::Array{Float64}
+	illum_all::Array{Float64}
+	born_svalue_stack::Array{Float64} 
+	grad_modtt::Array{Float64} 
+	grad_modrrvx::Array{Float64}
+	grad_modrrvz::Array{Float64}
 end
 
 """
@@ -144,21 +145,16 @@ Parameters per every worker, not necessarily for every supersource.
 Note that a single worker can take care of multiple supersources.
 """
 type Paramp
-
+	pass::Paramss
 	p::Array{Float64}
 	pp::Array{Float64}
 	ppp::Array{Float64}
 	dpdx::Array{Float64}
 	dpdz::Array{Float64}
-
 	memory_dp_dx::Array{Float64}
 	memory_dp_dz::Array{Float64}
 	memory_dvx_dx::Array{Float64}
 	memory_dvz_dz::Array{Float64}
-
-	grad_modtt::Array{Float64} 
-	grad_modrrvx::Array{Float64}
-	grad_modrrvz::Array{Float64}
 end
 
 
@@ -229,6 +225,7 @@ function Param(;
 	# at every unique receiver position
 	acqgeom_urpos = Acquisition.Geom_get(acqgeom,:geomurpos);
 	recv_n = acqgeom_urpos[1].nr[1] # same for all sources
+	recv_ifields = findin([:P, :Vx, :Vz], recv_fields)
 
 	# same number of sources for all super sources
 	acqgeom_uspos = Acquisition.Geom_get(acqgeom,:geomuspos);
@@ -250,47 +247,55 @@ function Param(;
 	δt = tgridmod.δx 
 	tim_nt=tgridmod.nx
 
+	δx24I, δz24I = (δx * 24.0)^(-1.0), (δz * 24.0)^(-1.0)
+	δxI, δzI = (δx)^(-1.0), (δz)^(-1.0)
+	δt = tgridmod.δx 
+	δtI = (δt)^(-1.0)
+	tim_nt=tgridmod.nx
+	ibx0, ibz0=model.mgrid.npml-2, model.mgrid.npml-2 
+	ibx1, ibz1=model.mgrid.nx+model.mgrid.npml+3, model.mgrid.nz+model.mgrid.npml+3
+	mesh_x, mesh_z = exmodel.mgrid.x, exmodel.mgrid.z
 
 	
 	
-	pass = 
-	pass DArray((nss,), work, [nwork]) do I
-		[Paramss() for is in 1:nss]
-	end
-	 [zeros(3,nx+6,nt),
-				  zeros(nz+6,3,nt),
-				  zeros(3,nx+6,nt),
-				  zeros(nz+6,3,nt),
-				  zeros(nz+2*npml,nx+2*npml,3)
-							    ] for is in 1:nss]
+	#pass = 
+	#pass DArray((nss,), work, [nwork]) do I
+	#	[Paramss() for is in 1:nss]
+	#end
+	# [zeros(3,nx+6,nt),
+	#			  zeros(nz+6,3,nt),
+	#			  zeros(3,nx+6,nt),
+	#			  zeros(nz+6,3,nt),
+	#			  zeros(nz+2*npml,nx+2*npml,3)
+	#						    ] for is in 1:nss]
 
 
-	# all localparts of DArrays are input to this method
-	@sync begin
-		for (ip, p) in enumerate(procs(boundary))
-			@async remotecall_wait(p) do 
-				Paramss_update_locals!(localindexes(boundary)[1], localpart(boundary),  
-			  	               localpart(grad_modtt), localpart(grad_modrrvx), localpart(grad_modrrvz),
-					       localpart(recv_out),  
-					       localpart(snaps_out), localpart(illum_all),
-					       snaps_flag,
-					       illum_flag, backprop_flag, gmodel_flag, verbose, recv_n, recv_ifields, npropwav, src_nsmul, 
-					       exmodel, model, tgridmod,
-					       acqgeom_uspos, acqgeom_urpos,
-					       modttI, modrrvx, modrrvz,
-				               vpmax, vpmin, freqmin, freqmax, 
-					       abs_trbl, tsnaps, src_wav_mat, src_ifields, 
-					       born_flag,
-					       localpart(born_svalue_stack), δmodtt,
-					       δmodrrvx, δmodrrvz)
-			end
-		end
-	end
+	## all localparts of DArrays are input to this method
+	#@sync begin
+	#	for (ip, p) in enumerate(procs(boundary))
+	#		@async remotecall_wait(p) do 
+	#			Paramss_update_locals!(localindexes(boundary)[1], localpart(boundary),  
+	#		  	               localpart(grad_modtt), localpart(grad_modrrvx), localpart(grad_modrrvz),
+	#				       localpart(recv_out),  
+	#				       localpart(snaps_out), localpart(illum_all),
+	#				       snaps_flag,
+	#				       illum_flag, backprop_flag, gmodel_flag, verbose, recv_n, recv_ifields, npropwav, src_nsmul, 
+	#				       exmodel, model, tgridmod,
+	#				       acqgeom_uspos, acqgeom_urpos,
+	#				       modttI, modrrvx, modrrvz,
+	#			               vpmax, vpmin, freqmin, freqmax, 
+	#				       abs_trbl, tsnaps, src_wav_mat, src_ifields, 
+	#				       born_flag,
+	#				       localpart(born_svalue_stack), δmodtt,
+	#				       δmodrrvx, δmodrrvz)
+	#		end
+	#	end
+	#end
 
 end
 
 
-function Paramc()
+function Paramc(hh)
 	# find maximum and minimum frequencies in the source wavelets
 	freqmin = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
 	freqmax = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
@@ -348,17 +353,16 @@ function Paramc()
 	nwork = min(src_nseq, nworkers())
 	work = workers()[1:nwork]
 
-	return Paramc(ibx0, ibz0, exmodel, exmodel_pert, modrrvx, modrrvz, modttI, modtt, δmodtt, δmodrrvx, δmodrrvz,
+	return Paramc(
 	       freqmin, freqmax, vpmin, vpmax, a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI,
+	       ibx0, ibz0, exmodel, exmodel_pert, modrrvx, modrrvz, modttI, modtt, δmodtt, δmodrrvx, δmodrrvz,
 	       a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI
 	       )
 end
 
-function Paramss()
+function Paramp(pac::Paramc)
+	nx=pac.nx; nz=pac.nz; npropwav=pac.npropwav
 
-	"""
-	allocation of private variables
-	"""
 	p=zeros(nz,nx,3,npropwav); pp=zeros(p); ppp=zeros(p)
 	dpdx=zeros(p); dpdz=zeros(p)
 
@@ -368,12 +372,22 @@ function Paramss()
 	memory_dvz_dz=zeros(memory_dvx_dx)
 	memory_dp_dx=zeros(memory_dvx_dx)
 	memory_dp_dz=zeros(memory_dvx_dx)
+	
+	pass=Paramss(sseqvec, pac)
+
+	pap=Paramp(pass,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz)
+
+	return pap
+end
 
 
-function Paramss_update_locals!(sseqvec::UnitRange{Int64}, pass::Array{Paramss})
+function Paramss(sseqvec::UnitRange{Int64}, pac::Paramc)
+
+	recv_ifields=pac.recv_ifields
+	src_ifields=pac.src_ifields
+	src_nseq=length(sseqvec)
 
 	# records_output, distributed array among different procs
-	recv_ifields = findin([:P, :Vx, :Vz], recv_fields)
 	recv_out = zeros(recv_n,length(recv_ifields),npropwav,tim_nt,src_nseq)
 
 
@@ -384,19 +398,18 @@ function Paramss_update_locals!(sseqvec::UnitRange{Int64}, pass::Array{Paramss})
 
 
 	"saving illum"
-	illum_all =  (illum_flag) ? dzeros((nz, nx, src_nseq), work, [1,1,nwork]) : [0.0]
+	illum_all =  (illum_flag) ? zeros(nz, nx, src_nseq) : [0.0]
 
 	snaps_out = (snaps_flag) ? dzeros(size(snaps), work, [1,1,1,nwork]) : [0.0]
 
 
-	src_nseq=length(sseqvec)
 	# source wavelets
 	src_wav_mat = [zeros(src_nsmul,length(src_ifields[ipropwav]),tim_nt) for ipropwav in 1:npropwav, isseq in 1:src_nseq]
 	fill_src_wav_mat!(src_wav_mat, acqsrc_uspos, src_flags)
 
 
-	if(born_flag)
-		born_svalue_stack = dzeros((exmodel.mgrid.nz, exmodel.mgrid.nx, src_nseq), work, [1,1,nwork])
+	if(pac.born_flag)
+		born_svalue_stack = zeros(exmodel.mgrid.nz, exmodel.mgrid.nx, src_nseq)
 	else
 		born_svalue_stack = [0.0]
 	end
@@ -435,10 +448,15 @@ function Paramss_update_locals!(sseqvec::UnitRange{Int64}, pass::Array{Paramss})
 				    mesh_x, mesh_z, acqgeom_urpos[ipropwav].rx[isseq][irec], acqgeom_urpos[ipropwav].rz[isseq][irec])
 			end
 		end
+	end
 
 
+	pass=Paramss(sseq_vec,src_wav_mat,src_spray_weights,recv_out,rec_interpolation_weights,
+	      issmulx1,issmulx2,issmulz1,issmulz2,irecx1,irecx2,irecz1,irecz2,boundary,snaps,illum,born_svalue_stack,
+	      grad_modtt,grad_modrrvx,grad_modrrvz)
 
 
+	return pass
 end
 
 """
@@ -509,7 +527,7 @@ Author: Pawan Bharadwaj
 * rewritten in Julia: June 2017
 * added parrallelization over supersources in Julia: July 2017
 """
-@fastmath function mod!(;
+@fastmath function mod!(
 	jobname::AbstractString = "Hello",
 	npropwav::Int64=1, 
 	model::Models.Seismic=Gallery.Seismic(:acou_homo1),
@@ -610,7 +628,6 @@ end
 
 # modelling for each processor
 function mod_per_proc!(sseqvec::UnitRange{Int64}, pass::Array{Paramss}) 
-		       boundary::Array{Array{Array{Float64,3},1},1},
 		       grad_modtt::Array{Float64}, grad_modrrvx::Array{Float64}, grad_modrrvz::Array{Float64},
 		       recv_out::Array{Float64}, 
 		       snaps_out::Array{Float64}, illum_all::Array{Float64}, snaps_flag::Bool,
