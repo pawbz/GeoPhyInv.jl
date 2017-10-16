@@ -55,6 +55,7 @@ type Paramc
 	src_flags::Vector{Int64} 
 	src_nsmul::Int64
 	recv_ifields::Vector{Int64}
+	recv_flags::Vector{Int64}
 	recv_n::Int64
 	δt::Float64
 	δxI::Float64
@@ -86,11 +87,13 @@ type Paramc
 	grad_modtt_stack::Array{Float64}
 	grad_modrrvx_stack::Array{Float64}
 	grad_modrrvz_stack::Array{Float64}
+	grad_modrr_stack::Array{Float64}
 	illum_flag::Bool
 	backprop_flag::Int64
 	snaps_flag::Bool
 	itsnaps::Vector{Int64}
 	born_flag::Bool
+	gmodel::Models.Seismic
 	gmodel_flag::Bool
 	ibx0::Int64
 	ibz0::Int64
@@ -98,6 +101,7 @@ type Paramc
 	ibz1::Int64
 	isx0::Int64
 	isz0::Int64
+	data::Vector{Data.TD}
 	verbose::Bool
 end 
 
@@ -165,7 +169,6 @@ function Param(;
 	src_flags::Vector{Int64}=fill(2,npropwav), 
 	recv_flags::Vector{Int64}=fill(1,npropwav),
 	recv_fields::Vector{Symbol}=[:P], 
-	TDout::Vector{Data.TD}=[Data.TD_zeros(recv_fields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags)) ],
 	backprop_flag::Int64=0,  
 	boundary::DistributedArrays.DArray{Array{Array{Float64,3},1},1,Array{Array{Array{Float64,3},1},1}}=
 			initialize_boundary(model.mgrid.nx, model.mgrid.nz, model.mgrid.npml, acqgeom[1].nss, tgridmod.nx),
@@ -179,14 +182,14 @@ function Param(;
 	verbose::Bool=false)
 
 	# check sizes and errors based on input
-	(length(TDout) ≠ length(findn(recv_flags))) && error("TDout dimension")
+	#(length(TDout) ≠ length(findn(recv_flags))) && error("TDout dimension")
 	(length(acqgeom) ≠ npropwav) && error("acqgeom dimension")
 	(length(acqsrc) ≠ npropwav) && error("acqsrc dimension")
 	(length(src_flags) ≠ npropwav) && error("src_flags dimension")
 	(length(recv_flags) ≠ npropwav) && error("recv_flags dimension")
 	(maximum(tgridmod.x) < maximum(acqsrc[1].tgrid.x)) && error("modeling time is less than source time")
-	(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
-	any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod.x) for ip=1:length(TDout)]) && error("output time > modeling time")
+	#(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
+	#any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod.x) for ip=1:length(TDout)]) && error("output time > modeling time")
 
 	#! no modeling if source wavelet is zero
 	#if(maxval(abs(src_wavelets)) .lt. tiny(rzero_de)) 
@@ -300,22 +303,28 @@ function Param(;
 	grad_modtt_stack=zeros(nzd,nxd)
 	grad_modrrvx_stack=zeros(nzd,nxd)
 	grad_modrrvz_stack=zeros(nzd,nxd)
+	grad_modrr_stack=zeros(nzd,nxd)
 
 	itsnaps = [indmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
 
+	data=[Data.TD_zeros(recv_fields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags))]
+
 	pac=Paramc(jobname,npropwav,
 	    exmodel,model,
-	    acqgeom_uspos,acqgeom_urpos,acqsrc_uspos,abs_trbl,src_ifields,src_flags,src_nsmul,recv_ifields,recv_n,δt,δxI,δzI,
+	    acqgeom_uspos,acqgeom_urpos,acqsrc_uspos,abs_trbl,src_ifields,src_flags,src_nsmul,
+	    recv_ifields,recv_flags,recv_n,δt,δxI,δzI,
             nx,nz,tim_nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modttI,modrrvx,modrrvz,
 	    δmodtt,δmodrrvx,δmodrrvz,
-	    grad_modtt_stack,grad_modrrvx_stack,grad_modrrvz_stack,illum_flag,
+	    grad_modtt_stack,grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,illum_flag,
 	    backprop_flag,
 	    snaps_flag,
 	    itsnaps,born_flag,
+	    gmodel,
 	    gmodel_flag,
 	    ibx0,ibz0,ibx1,ibz1,
 	    isx0,isz0,
+	    data,
 	    verbose)	
 
 	nwork = min(src_nseq, nworkers())
@@ -402,7 +411,6 @@ function Paramss(iss::Int64, pac::Paramc)
 	src_nsmul=pac.src_nsmul
 	src_flags=pac.src_flags
 	mesh_x, mesh_z = pac.exmodel.mgrid.x, pac.exmodel.mgrid.z
-	npml=pac.model.mgrid.npml
 
 	# records_output, distributed array among different procs
 	recv_out = zeros(recv_n,length(recv_ifields),npropwav,tim_nt)
@@ -432,11 +440,13 @@ function Paramss(iss::Int64, pac::Paramc)
 	end
 
 
-	boundary=[zeros(3,nx+6,tim_nt),
-	  zeros(nz+6,3,tim_nt),
-	  zeros(3,nx+6,tim_nt),
-	  zeros(nz+6,3,tim_nt),
-	  zeros(nz+2*npml,nx+2*npml,3)
+	nx1, nz1=pac.model.mgrid.nx, pac.model.mgrid.nz
+	npml=pac.model.mgrid.npml
+	boundary=[zeros(3,nx1+6,tim_nt),
+	  zeros(nz1+6,3,tim_nt),
+	  zeros(3,nx1+6,tim_nt),
+	  zeros(nz1+6,3,tim_nt),
+	  zeros(nz1+2*npml,nx1+2*npml,3)
 				    ]
 
 		
@@ -549,62 +559,117 @@ Author: Pawan Bharadwaj
 @fastmath function mod!(pa::Param=Param())
 	
 
-	# all localparts of DArrays are input to this method
+	# all localparts of DArray are input to this method
+	# parallelization over shots
 	@sync begin
 		for (ip, p) in enumerate(procs(pa.p))
 			@async remotecall_wait(p) do 
-				mod_per_proc!(pac, localpart(pa.p))
+				mod_per_proc!(pa.c, localpart(pa.p))
 			end
 		end
 	end
 
-	"summing gradient over all the sources after truncation in PML"
-	grad_modtt_stack = Models.pml_pad_trun(squeeze(sum(Array(grad_modtt),3),3),model.mgrid.npml,-1);
-	grad_modrrvx_stack = Models.pml_pad_trun(squeeze(sum(Array(grad_modrrvx),3),3),model.mgrid.npml,-1);
-	grad_modrrvz_stack = Models.pml_pad_trun(squeeze(sum(Array(grad_modrrvz),3),3),model.mgrid.npml,-1);
-
-	grad_modrr_stack = (grad_modrrvx_stack .+ grad_modrrvz_stack) .* (0.5)
-
-	for ix=2:size(grad_modrr_stack,2)-1
-		for iz=2:size(grad_modrr_stack,1)-1
-			@inbounds grad_modrr_stack[iz,ix+1] +=  0.5e0 * grad_modrrvx_stack[iz,ix]
-			@inbounds grad_modrr_stack[iz+1,ix] +=  0.5e0 * grad_modrrvz_stack[iz,ix]
-		end
+	# stack gradients and illum over sources
+	for (ip, p) in enumerate(procs(pa.p))
+		(pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
+		(pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
 	end
-
 
 	# update gradient model using grad_modtt_stack, grad_modrr_stack
-	Models.Seismic_chainrule!(gmodel, model, 
-				     vec(Models.χg(grad_modtt_stack, Models.Seismic_get(model,:KI0),1)),
-				     vec(Models.χg(grad_modrr_stack, Models.Seismic_get(model,:ρI0),1)),
-				     [:χKI, :χρI], 1
-				     )
-	# output illum
-	(illum_flag) && (illum[:] = Models.pml_pad_trun(squeeze(sum(Array(illum_all),3),3),model.mgrid.npml,-1)) 
+	update_gmodel!(pa.c)
 
-	# output snaps
-	(snaps_flag) && (snaps[:] = Array(snaps_out))
-
-	# update TDout after forming a vector and resampling
-	ipropout=0;
-	for iprop in 1:npropwav
-		if(recv_flags[iprop] ≠ 0)
-			ipropout += 1
-			Data.TD_resamp!(TDout[ipropout], Data.TD_urpos((Array(recv_out[:,:,iprop,:,:])), recv_fields, tgridmod, acqgeom[iprop],
-				acqgeom_urpos[1].nr[1],
-				(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
-				)) 
-		end
+	for (ip, p) in enumerate(procs(pa.p))
+		update_data!(pa.c, localpart(pa.p))
 	end
 
+	return pa
+
 	
-
 	# return data depending on the receiver flags
-	return TDout, boundary, gmodel, snaps
+	# return TDout, boundary, gmodel, snaps
+end
 
+function update_data!(pac::Paramc, pap::Paramp)
+# update TDout after forming a vector and resampling
+	ipropout=0;
+	for iprop in 1:pac.npropwav
+		if(pac.recv_flags[iprop] ≠ 0)
+			ipropout += 1
+#			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(recv_out[:,:,iprop,:,:])), recv_fields, tgridmod, acqgeom[iprop],
+#				acqgeom_urpos[1].nr[1],
+#				(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
+#				)) 
+		end
+	end
 	# return without resampling for testing
 	#return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),
 	#		       tgridmod, acqgeom[1]) for iprop in 1:npropwav]
+
+end
+	
+
+function grad_modrr!(pac::Paramc)
+	@. pac.grad_modrr_stack = (pac.grad_modrrvx_stack + pac.grad_modrrvz_stack) * (0.5)
+	grad_modrr_sprayrrvx!(pac.grad_modrr_stack,pac.grad_modrrvx_stack)
+	grad_modrr_sprayrrvz!(pac.grad_modrr_stack,pac.grad_modrrvz_stack)
+end
+function grad_modrr_sprayrrvx!(grad_modrr_stack,grad_modrrvx_stack)
+	for ix=2:size(grad_modrr_stack,2)-1
+		for iz=2:size(grad_modrr_stack,1)-1
+			@inbounds grad_modrr_stack[iz,ix+1] +=  0.5e0 * grad_modrrvx_stack[iz,ix]
+		end
+	end
+end
+function grad_modrr_sprayrrvz!(grad_modrr_stack,grad_modrrvz_stack)
+	for ix=2:size(grad_modrr_stack,2)-1
+		for iz=2:size(grad_modrr_stack,1)-1
+			@inbounds grad_modrr_stack[iz+1,ix] +=  0.5e0 * grad_modrrvz_stack[iz,ix]
+		end
+	end
+end
+
+function stack_grads!(pac::Paramc, pap::Paramp)
+	np=pac.model.mgrid.npml
+	nx, nz=pac.nx, pac.nz
+
+	gmodtt=pac.grad_modtt_stack
+	gmodrrvx=pac.grad_modrrvx_stack
+	gmodrrvz=pac.grad_modrrvz_stack
+	pass=pap.ss
+	for isp in 1:length(pass)
+		gs=pass[isp].grad_modtt
+		gss=view(gs,np+1:nz-np,np+1:nx-np)
+		sum!(gmodtt,gss)
+		gs=pass[isp].grad_modrrvx
+		gss=view(gs,np+1:nz-np,np+1:nx-np)
+		sum!(gmodrrvx,gss)
+		gs=pass[isp].grad_modrrvz
+		gss=view(gs,np+1:nz-np,np+1:nx-np)
+		sum!(gmodrrvz,gss)
+	end
+	# combine rrvx and rrvz
+	grad_modrr!(pac::Paramc)
+end
+
+function stack_illums!(pac::Paramc, pap::Paramp)
+	np=pac.model.mgrid.npml
+	nx, nz=pac.nx, pac.nz
+	illums=pac.illum_stack
+	pass=pap.ss
+	for isp in 1:length(pass)
+		gs=pass[isp].illum
+		gss=view(gs,np+1:nz-np,np+1:nx-np)
+		sum!(illums,gss)
+	end
+end
+
+
+function update_gmodel!(pac::Paramc)
+	Models.Seismic_chainrule!(pac.gmodel, pac.model, 
+				     vec(Models.χg(pac.grad_modtt_stack, Models.Seismic_get(pac.model,:KI0),1)),
+				     vec(Models.χg(pac.grad_modrr_stack, Models.Seismic_get(pac.model,:ρI0),1)),
+				     [:χKI, :χρI], 1
+				     )
 end
 
 # modelling for each processor
@@ -968,7 +1033,7 @@ function add_born_sources!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap:
 
 	born_stacktt!(born_svalue_stack,p,pp,ppp,δmodtt,nx,nz,δtI,δt)
 	born_stackrrvx!(born_svalue_stack,dpdx,δmodrrvx,nx,nz,δx24I,δt)
-	born_stackrrvx!(born_svalue_stack,dpdz,δmodrrvz,nx,nz,δz24I,δt)
+	born_stackrrvz!(born_svalue_stack,dpdz,δmodrrvz,nx,nz,δz24I,δt)
 	born_stack!(p,born_svalue_stack,modttI,nx,nz,δt)
 end
 @inbounds @fastmath function born_stacktt!(born_svalue_stack,p,pp,ppp,δmodtt,nx,nz,δtI,δt)
@@ -988,7 +1053,7 @@ end
 	end
 
 end
-@inbounds @fastmath function born_stackrrvx!(born_svalue_stack,dpdz,δmodrrvz,nx,nz,δz24I,δt)
+@inbounds @fastmath function born_stackrrvz!(born_svalue_stack,dpdz,δmodrrvz,nx,nz,δz24I,δt)
 	for ix=3:nx-2
 		@simd for iz=3:nz-2
 			born_svalue_stack[iz,ix] += 
@@ -1007,28 +1072,21 @@ end
 
 @inbounds @fastmath function boundary_force_snap_p!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
 	p=pap.p
-	boundary=pass[issp].boundary
-	# initial conditions from boundary for first propagating field only
-	for ix in 1:pac.nx
-		@simd for iz in 1:pac.nz
-			p[iz,ix,1,1]=boundary[5][iz,ix,1]
-		end
-	end
+	boundary=pass[issp].boundary[5]
+	ps=view(p,:,:,1,1)
+	bs=view(boundary,:,:,1)
+	copy!(ps,bs)
 end
 @inbounds @fastmath function boundary_force_snap_vxvz!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
-	p=pap.p
-	boundary=pass[issp].boundary
 	# initial conditions from boundary for first propagating field only
-	for ix in 1:pac.nx
-		@simd for iz in 1:pac.nz
-			p[iz,ix,2,1]=boundary[5][iz,ix,2]
-		end
-	end
-	for ix in 1:pac.nx
-		@simd for iz in 1:pac.nz
-			p[iz,ix,3,1]=boundary[5][iz,ix,3]
-		end
-	end
+	p=pap.p
+	boundary=pass[issp].boundary[5]
+	ps=view(p,:,:,2,1)
+	bs=view(boundary,:,:,2)
+	copy!(ps,bs)
+	ps=view(p,:,:,3,1)
+	bs=view(boundary,:,:,3)
+	copy!(ps,bs)
 end
 @fastmath @inbounds function boundary_force!(it::Int64,issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
 	boundary=pass[issp].boundary
@@ -1071,28 +1129,24 @@ end
 
 @inbounds @fastmath function boundary_save_snap_p!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
 	p=pap.p
-	boundary=pass[issp].boundary
-	# save last snap of pressure field
-	for ix in 1:pac.nx
-		@simd for iz in 1:pac.nz
-			boundary[5][iz,ix,1]=p[iz,ix,1,1]
-		end
-	end
+	boundary=pass[issp].boundary[5]
+	ps=view(p,:,:,1,1)
+	bs=view(boundary,:,:,1)
+	copy!(bs, ps)
 end
 @inbounds @fastmath function boundary_save_snap_vxvz!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
 	p=pap.p
-	boundary=pass[issp].boundary
-	# save last snap of velocity fields with opposite sign for adjoint propagation
-	for ix in 1:pac.nx
-		@simd for iz in 1:pac.nz
-			boundary[5][iz,ix,2] = (-1.0 * p[iz,ix,2,1])
-		end
-	end
-	for ix in 1:pac.nx
-		@simd for iz in 1:pac.nz
-			boundary[5][iz,ix,3] = (-1.0 * p[iz,ix,3,1])
-		end
-	end
+	boundary=pass[issp].boundary[5]
+	#vx
+	bs=view(boundary,:,:,2)
+	ps=view(p,:,:,2,1)
+	copy!(bs, ps)
+	scale!(bs,-1.)
+	# vz
+	bs=view(boundary,:,:,3)
+	ps=view(p,:,:,3,1)
+	copy!(bs, ps)
+	scale!(bs,-1.)
 end
 @fastmath @inbounds function boundary_save!(it::Int64,issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
 	boundary=pass[issp].boundary
