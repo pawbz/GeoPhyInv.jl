@@ -242,8 +242,8 @@ with respect to KI and ρI.
 function Seismic_chainrule!(
 		      gmod::Seismic,
 		      mod::Seismic,
-		      g1::Vector{Float64},
-		      g2::Vector{Float64},
+		      g1::AbstractVector{Float64},
+		      g2::AbstractVector{Float64},
 		      attribs::Vector{Symbol}=[:χKI, :χρI],
 		      flag::Int64=1
 		      )
@@ -251,48 +251,83 @@ function Seismic_chainrule!(
 	if(flag == 1)
 		if(attribs == [:χKI, :χρI]) 
 			vp0 = mod.vp0;	vs0 = mod.vs0;	ρ0 = mod.ρ0
-			ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
-			Zp = Seismic_get(mod,:Zp)
+			ρ=view(mod.χρ,:); χ!(ρ, mod.ρ0,-1) # undo it later
+			vp=view(mod.χvp,:); χ!(vp, mod.vp0,-1) # undo it later
+			KI0=Seismic_get(mod,:KI0)
+			ρI0=Seismic_get(mod,:ρI0)
+			χg!(g1,KI0,-1)
+			χg!(g2,ρI0,-1)
 
-			gKI = χg(reshape(g1, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:KI0), -1)
-			gρI = χg(reshape(g2, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:ρI0), -1)
-
+			gχρ=view(gmod.χρ,:)
+			gχvp=view(gmod.χvp,:)
 			# gradient w.r.t  χρ
-			gmod.χρ = copy(χg((-1. .* ρI.^2 .* gρI - (Zp).^(-2) .* gKI), ρ0, 1))
+			@. gχρ = -1.*inv(ρ)^2*g2-inv(vp*vp*ρ*ρ)*g1
 			# gradient w.r.t χvp
-			gmod.χvp = copy(χg((-2. .* (vp).^(-3) .* ρI .* gKI), vp0, 1))
-			# to be implemented later
-			gmod.χvs = copy(zeros(gmod.χvp))
-			gmod.mgrid = deepcopy(mod.mgrid);	gmod.vp0 = copy(mod.vp0);	gmod.ρ0 = copy(mod.ρ0)
+			@. gχvp = -2.*inv(vp^3)*inv(ρ)*g1
+			χg!(gχρ,ρ0,1)
+			χg!(gχvp,vp0,1)
+			# are these necessary?
+			#gmod.χvs = copy(zeros(gmod.χvp))
+			#gmod.mgrid = deepcopy(mod.mgrid);	
+			#gmod.vp0 = copy(mod.vp0);	gmod.ρ0 = copy(mod.ρ0)
+			χ!(ρ, mod.ρ0,1)
+			χ!(vp, mod.vp0,1)
+			χg!(g1,KI0,1)
+			χg!(g2,ρI0,1)
 		else
 			error("invalid attribs")
 		end
 	elseif(flag == -1)
-		gvp = vec(χg(gmod.χvp, mod.vp0, -1))
-		gρ = vec(χg(gmod.χρ, mod.ρ0, -1))
+		χg!(gmod.χvp, mod.vp0, -1) # undo it later
+		χg!(gmod.χρ, mod.ρ0, -1) # undo it later
+		gvp = view(gmod.χvp, :)
+		gρ = view(gmod.χρ, :)
 		K0 = mean(Seismic_get(mod, :K0))
 		KI0 = mean(Seismic_get(mod, :KI0))
 		ρ0 = mean(mod.ρ0)
 		ρI0 = mean(Seismic_get(mod, :ρI0))
-		ρI = vec(Seismic_get(mod,:ρI));	vp = vec(Seismic_get(mod,:vp))
-		ρ = vec(Seismic_get(mod,:ρ)); ρ0 = mean(mod.ρ0)
+		ρ0 = mean(mod.ρ0)
+		ρ=view(mod.χρ,:); χ!(ρ, mod.ρ0,-1) # undo it later
+		vp=view(mod.χvp,:); χ!(vp, mod.vp0,-1) # undo it later
 
 		nznx = mod.mgrid.nz * mod.mgrid.nx;
 		if(attribs == [:χK, :χρ])
-			g1[1:nznx] = copy(0.5 .* K0 * gvp .* ρI .* vp.^(-1))
-			g2[1:nznx] = copy((gρ .* ρ0) - (0.5 .* ρ0 .* (gvp) .* (vp) ./ (ρ) ))
+			@. g1 = gvp * inv(ρ) * inv(vp) 
+			scale!(gmod.χvp, 0.5*K0)
+			@. g2 = gp
+			@. g2 = gvp * vp * inv(ρ)
+			scale!(g2,-0.5)
+			@. g2 += gρ
+			scale!(g2,ρ0)
 		elseif(attribs == [:χKI, :χρI])
-			g1[1:nznx] =  copy(-0.5 .* KI0 .* gvp .* ρ .*  vp.^(3.))
-			g2[1:nznx] = copy((gρ .* ρI0 .* (-1.) .*  (ρ.^(2))) +
-			    (0.5 * ρI0 .* (gvp) .*  (vp) .* (ρ)))
+			chain_g1!(g1,gvp,ρ,vp,KI0)
+			chain_g2!(g2,gρ,ρI0,ρ,gvp,vp)
 		else
 			error("invalid attribs")
 		end
+		χg!(gvp,mod.vp0,1)
+		χg!(gρ,mod.ρ0,1)
+		χ!(ρ, mod.ρ0,1)
+		χ!(vp, mod.vp0,1)
 	else
 		error("invalid flag")
 	end
 
 end
+
+function chain_g1!(g1,gvp,ρ,vp,KI0)
+	@simd for i in eachindex(g1)
+		g1[i] = -0.5 * KI0 * gvp[i] * ρ[i] *  vp[i]^3
+	end
+end
+function chain_g2!(g2,gρ,ρI0,ρ,gvp,vp)
+	@simd for i in eachindex(g2)
+		g2[i] = (gρ[i] * ρI0 * -1. * ρ[i]*ρ[i]) + 
+			(0.5 * ρI0 .* gvp[i] .*  vp[i] .* ρ[i])
+	end
+end
+
+
 
 
 """
@@ -304,30 +339,52 @@ reference value.
 * `mod0::Vector{Float64}` : reference value is mean of this vector
 * `flag::Int64=1` : 
 """
-function χ(mod::Array{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+function χ(mod::AbstractArray{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+	mod_out=copy(mod)
+	χ!(mod_out, mod0, flag)
+	return mod_out
+end
+function χ!(mod::AbstractArray{Float64}, mod0::Vector{Float64}, flag::Int64=1)
 	m0 = mean(mod0)
 	if(flag == 1)
-		# return zero when m0 is zero
-		return	(m0 == 0.0) ? 0.0 : ((mod - m0) * m0^(-1.0))
+		if(iszero(m0))
+			return nothing
+		else
+			@simd for i in eachindex(mod)
+				mod[i] = ((mod[i] - m0) * inv(m0))
+			end
+			return mod 
+		end
 	elseif(flag == -1)
-		return  (mod .* m0 + m0)
+		@simd for i in eachindex(mod)
+			mod[i] = mod[i] * m0 + m0
+		end
+		return mod 
 	end
 end
+
 
 """
 Gradients
 Return contrast model parameter using the
 reference value.
 """
-function χg(mod::Array{Float64}, mod0::Vector{Float64}, flag::Int64=1)
-	m0 = mean(mod0)
-	if(flag == 1)
-		return  mod * m0
-	elseif(flag == -1)
-		# return zero when m0 is zero
-		return	(m0 == 0.0) ? 0.0 : mod * m0^(-1.0)
-	end
+function χg(mod::AbstractArray{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+	mod_out=copy(mod)
+	χg!(mod_out, mod0, flag)
+	return mod_out
 end
+function χg!(mod::AbstractArray{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+	if(flag == 1)
+		m0 = mean(mod0)
+		scale!(mod, m0)
+	elseif(flag == -1)
+		m0 = inv(mean(mod0))
+		scale!(mod, m0)
+	end
+	return mod
+end
+
 
 
 """

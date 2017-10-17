@@ -44,25 +44,22 @@ Modelling parameters common for all supersources
 """
 type Paramc
 	jobname::AbstractString
-	npropwav::Int64 
+	npw::Int64 
 	exmodel::Models.Seismic
 	model::Models.Seismic
-	acqgeom_uspos::Vector{Acquisition.Geom}
-	acqgeom_urpos::Vector{Acquisition.Geom}
-	acqsrc_uspos::Vector{Acquisition.Src}
+	acqgeom::Vector{Acquisition.Geom}
+	acqsrc::Vector{Acquisition.Src}
 	abs_trbl::Vector{Symbol}
-	src_ifields::Vector{Vector{Int64}}
-	src_flags::Vector{Int64} 
-	src_nsmul::Int64
-	recv_ifields::Vector{Int64}
-	recv_flags::Vector{Int64}
-	recv_n::Int64
+	isfields::Vector{Vector{Int64}}
+	sflags::Vector{Int64} 
+	irfields::Vector{Int64}
+	rflags::Vector{Int64}
 	δt::Float64
 	δxI::Float64
 	δzI::Float64
 	nx::Int64
 	nz::Int64
-	tim_nt::Int64
+	nt::Int64
 	δtI::Float64 
 	δx24I::Float64
 	δz24I::Float64
@@ -89,6 +86,7 @@ type Paramc
 	grad_modrrvz_stack::Array{Float64}
 	grad_modrr_stack::Array{Float64}
 	illum_flag::Bool
+	illum_stack::Array{Float64}
 	backprop_flag::Int64
 	snaps_flag::Bool
 	itsnaps::Vector{Int64}
@@ -110,18 +108,18 @@ Modelling parameters per every supersource for each worker
 """
 type Paramss
 	iss::Int64
-	src_wav_mat::Array{Array{Float64,3},1}
-	src_spray_weights::Array{Float64}
-	recv_out::AbstractArray{Float64} 
-	recv_interpolate_weights::Array{Float64}
-	issmulx1::Array{Int64} 
-	issmulx2::Array{Int64}
-	issmulz1::Array{Int64} 
-	issmulz2::Array{Int64}
-	irecx1::Array{Int64}
-	irecx2::Array{Int64}
-	irecz1::Array{Int64}
-	irecz2::Array{Int64}
+	wavelets::Array{Array{Float64}}
+	ssprayw::Array{Array{Float64}}
+	records::Array{Array{Float64}}
+	rinterpolatew::Array{Array{Float64}}
+	isx1::Array{Array{Int64}} 
+	isx2::Array{Array{Int64}}
+	isz1::Array{Array{Int64}} 
+	isz2::Array{Array{Int64}}
+	irx1::Array{Array{Int64}}
+	irx2::Array{Array{Int64}}
+	irz1::Array{Array{Int64}}
+	irz2::Array{Array{Int64}}
         boundary::Array{Array{Float64,3},1}
 	snaps::Array{Float64}
 	illum::Array{Float64}
@@ -158,17 +156,17 @@ end
 
 function Param(;
 	jobname::AbstractString = "Hello",
-	npropwav::Int64=1, 
+	npw::Int64=1, 
 	model::Models.Seismic=Gallery.Seismic(:acou_homo1),
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
 	born_flag::Bool=false,
 	model_pert::Models.Seismic = model,
 	tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
-	acqgeom::Vector{Acquisition.Geom} = fill(Gallery.Geom(model.mgrid,:surf,nss=1),npropwav),
-	acqsrc::Array{Acquisition.Src} = fill(Gallery.Src(:acou_homo1),npropwav),
-	src_flags::Vector{Int64}=fill(2,npropwav), 
-	recv_flags::Vector{Int64}=fill(1,npropwav),
-	recv_fields::Vector{Symbol}=[:P], 
+	acqgeom::Vector{Acquisition.Geom} = fill(Gallery.Geom(model.mgrid,:surf,nss=1),npw),
+	acqsrc::Array{Acquisition.Src} = fill(Gallery.Src(:acou_homo1),npw),
+	sflags::Vector{Int64}=fill(2,npw), 
+	rflags::Vector{Int64}=fill(1,npw),
+	rfields::Vector{Symbol}=[:P], 
 	backprop_flag::Int64=0,  
 	boundary::DistributedArrays.DArray{Array{Array{Float64,3},1},1,Array{Array{Array{Float64,3},1},1}}=
 			initialize_boundary(model.mgrid.nx, model.mgrid.nz, model.mgrid.npml, acqgeom[1].nss, tgridmod.nx),
@@ -182,11 +180,11 @@ function Param(;
 	verbose::Bool=false)
 
 	# check sizes and errors based on input
-	#(length(TDout) ≠ length(findn(recv_flags))) && error("TDout dimension")
-	(length(acqgeom) ≠ npropwav) && error("acqgeom dimension")
-	(length(acqsrc) ≠ npropwav) && error("acqsrc dimension")
-	(length(src_flags) ≠ npropwav) && error("src_flags dimension")
-	(length(recv_flags) ≠ npropwav) && error("recv_flags dimension")
+	#(length(TDout) ≠ length(findn(rflags))) && error("TDout dimension")
+	(length(acqgeom) ≠ npw) && error("acqgeom dimension")
+	(length(acqsrc) ≠ npw) && error("acqsrc dimension")
+	(length(sflags) ≠ npw) && error("sflags dimension")
+	(length(rflags) ≠ npw) && error("rflags dimension")
 	(maximum(tgridmod.x) < maximum(acqsrc[1].tgrid.x)) && error("modeling time is less than source time")
 	#(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
 	#any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod.x) for ip=1:length(TDout)]) && error("output time > modeling time")
@@ -201,37 +199,28 @@ function Param(;
 	# check dimension of model and model_pert
 
 	# check if all sources are receivers are inside model
-	any(.![Acquisition.Geom_check(acqgeom[ip], model.mgrid) for ip=1:npropwav]) ? error("sources or receivers not inside model") : nothing
+	any(.![Acquisition.Geom_check(acqgeom[ip], model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
 
 
 
-	length(acqgeom) != npropwav ? error("acqgeom size") : nothing
-	length(acqsrc) != npropwav ? error("acqsrc size") : nothing
-	any([getfield(acqgeom[ip],:nss) != getfield(acqsrc[ip],:nss) for ip=1:npropwav])  ? error("different supersources") : nothing
-	any([getfield(acqgeom[ip],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npropwav])  ? error("different sources") : nothing
+	length(acqgeom) != npw ? error("acqgeom size") : nothing
+	length(acqsrc) != npw ? error("acqsrc size") : nothing
+	any([getfield(acqgeom[ip],:nss) != getfield(acqsrc[ip],:nss) for ip=1:npw])  ? error("different supersources") : nothing
+	any([getfield(acqgeom[ip],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npw])  ? error("different sources") : nothing
 
 	# necessary that nss and fields should be same for all nprop
-	src_nseq = acqgeom[1].nss;
-	src_fields = [acqsrc[ipropwav].fields for ipropwav in 1:npropwav]
-	src_ifields = [findin([:P, :Vx, :Vz], acqsrc[ipropwav].fields) for ipropwav in 1:npropwav]
-	fill(src_nseq, npropwav) != [getfield(acqgeom[ip],:nss) for ip=1:npropwav] ? error("different supersources") : nothing
+	nss = acqgeom[1].nss;
+	sfields = [acqsrc[ipw].fields for ipw in 1:npw]
+	isfields = [findin([:P, :Vx, :Vz], acqsrc[ipw].fields) for ipw in 1:npw]
+	fill(nss, npw) != [getfield(acqgeom[ip],:nss) for ip=1:npw] ? error("different supersources") : nothing
 
 	# create acquisition geometry with each source shooting 
 	# at every unique receiver position
-	acqgeom_urpos = Acquisition.Geom_get(acqgeom,:geomurpos);
-	recv_n = acqgeom_urpos[1].nr[1] # same for all sources
-	recv_ifields = findin([:P, :Vx, :Vz], recv_fields)
-
-	# same number of sources for all super sources
-	acqgeom_uspos = Acquisition.Geom_get(acqgeom,:geomuspos);
-	acqsrc_uspos = Acquisition.Src_uspos(acqsrc,acqgeom);
-	src_nsmul = acqsrc_uspos[1].ns[1]; # same number of sources in all
+	irfields = findin([:P, :Vx, :Vz], rfields)
 
 
 	if(verbose)
-		println(string("number of receivers:\t",recv_n))	
-		println(string("number of sources:\t",src_nsmul))	
-		println(string("number of super sources:\t",src_nseq))	
+		println(string("number of super sources:\t",nss))	
 	end
 
 	# find maximum and minimum frequencies in the source wavelets
@@ -284,13 +273,13 @@ function Param(;
 	nxd, nzd = model.mgrid.nx, model.mgrid.nz
 	δx, δz = exmodel.mgrid.δx, exmodel.mgrid.δz
 	δt = tgridmod.δx 
-	tim_nt=tgridmod.nx
+	nt=tgridmod.nx
 
 	δx24I, δz24I = (δx * 24.0)^(-1.0), (δz * 24.0)^(-1.0)
 	δxI, δzI = (δx)^(-1.0), (δz)^(-1.0)
 	δt = tgridmod.δx 
 	δtI = (δt)^(-1.0)
-	tim_nt=tgridmod.nx
+	nt=tgridmod.nx
 	mesh_x, mesh_z = exmodel.mgrid.x, exmodel.mgrid.z
 
 
@@ -304,19 +293,21 @@ function Param(;
 	grad_modrrvx_stack=zeros(nzd,nxd)
 	grad_modrrvz_stack=zeros(nzd,nxd)
 	grad_modrr_stack=zeros(nzd,nxd)
+	illum_stack=zeros(nzd, nxd)
 
 	itsnaps = [indmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
 
-	data=[Data.TD_zeros(recv_fields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags))]
+	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]
 
-	pac=Paramc(jobname,npropwav,
+	pac=Paramc(jobname,npw,
 	    exmodel,model,
-	    acqgeom_uspos,acqgeom_urpos,acqsrc_uspos,abs_trbl,src_ifields,src_flags,src_nsmul,
-	    recv_ifields,recv_flags,recv_n,δt,δxI,δzI,
-            nx,nz,tim_nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
+	    acqgeom,acqsrc,abs_trbl,isfields,sflags,
+	    irfields,rflags,δt,δxI,δzI,
+            nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modttI,modrrvx,modrrvz,
 	    δmodtt,δmodrrvx,δmodrrvz,
-	    grad_modtt_stack,grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,illum_flag,
+	    grad_modtt_stack,grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,
+	    illum_flag,illum_stack,
 	    backprop_flag,
 	    snaps_flag,
 	    itsnaps,born_flag,
@@ -327,9 +318,9 @@ function Param(;
 	    data,
 	    verbose)	
 
-	nwork = min(src_nseq, nworkers())
+	nwork = min(nss, nworkers())
 	work = workers()[1:nwork]
-	ssi=[round(Int, s) for s in linspace(1,src_nseq,nwork+1)]
+	ssi=[round(Int, s) for s in linspace(1,nss,nwork+1)]
 	sschunks=Array{UnitRange{Int64}}(nwork)
 	for ib in 1:nwork       
 		sschunks[ib]=ssi[ib]:ssi[ib+1]
@@ -356,15 +347,15 @@ function Param(;
 	#		@async remotecall_wait(p) do 
 	#			Paramss_update_locals!(localindexes(boundary)[1], localpart(boundary),  
 	#		  	               localpart(grad_modtt), localpart(grad_modrrvx), localpart(grad_modrrvz),
-	#				       localpart(recv_out),  
+	#				       localpart(records),  
 	#				       localpart(snaps_out), localpart(illum_all),
 	#				       snaps_flag,
-	#				       illum_flag, backprop_flag, gmodel_flag, verbose, recv_n, recv_ifields, npropwav, src_nsmul, 
+	#				       illum_flag, backprop_flag, gmodel_flag, verbose, recv_n, irfields, npw, src_nsmul, 
 	#				       exmodel, model, tgridmod,
 	#				       acqgeom_uspos, acqgeom_urpos,
 	#				       modttI, modrrvx, modrrvz,
 	#			               vpmax, vpmin, freqmin, freqmax, 
-	#				       abs_trbl, tsnaps, src_wav_mat, src_ifields, 
+	#				       abs_trbl, tsnaps, wavelets, isfields, 
 	#				       born_flag,
 	#				       localpart(born_svalue_stack), δmodtt,
 	#				       δmodrrvx, δmodrrvz)
@@ -377,12 +368,12 @@ end
 
 
 function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
-	nx=pac.nx; nz=pac.nz; npropwav=pac.npropwav
+	nx=pac.nx; nz=pac.nz; npw=pac.npw
 
-	p=zeros(nz,nx,3,npropwav); pp=zeros(p); ppp=zeros(p)
+	p=zeros(nz,nx,3,npw); pp=zeros(p); ppp=zeros(p)
 	dpdx=zeros(p); dpdz=zeros(p)
 
-	memory_dvx_dx=zeros(nz,nx,npropwav)
+	memory_dvx_dx=zeros(nz,nx,npw)
 	memory_dvx_dz=zeros(memory_dvx_dx)
 	memory_dvz_dx=zeros(memory_dvx_dx)
 	memory_dvz_dz=zeros(memory_dvx_dx)
@@ -399,21 +390,18 @@ end
 
 function Paramss(iss::Int64, pac::Paramc)
 
-	recv_ifields=pac.recv_ifields
-	src_ifields=pac.src_ifields
-	recv_n=pac.recv_n
-	npropwav=pac.npropwav
-	tim_nt=pac.tim_nt
+	irfields=pac.irfields
+	isfields=pac.isfields
+	npw=pac.npw
+	nt=pac.nt
 	nx=pac.nx; nz=pac.nz
-	acqgeom_urpos=pac.acqgeom_urpos
-	acqgeom_uspos=pac.acqgeom_uspos
-	acqsrc_uspos=pac.acqsrc_uspos
-	src_nsmul=pac.src_nsmul
-	src_flags=pac.src_flags
+	acqgeom=pac.acqgeom
+	acqsrc=pac.acqsrc
+	sflags=pac.sflags
 	mesh_x, mesh_z = pac.exmodel.mgrid.x, pac.exmodel.mgrid.z
 
 	# records_output, distributed array among different procs
-	recv_out = zeros(recv_n,length(recv_ifields),npropwav,tim_nt)
+	records = [zeros(pac.acqgeom[ipw].nr[iss],length(irfields)) for ipw in 1:npw, it in 1:nt]
 
 
 	# gradient outputs
@@ -429,8 +417,8 @@ function Paramss(iss::Int64, pac::Paramc)
 
 
 	# source wavelets
-	src_wav_mat = [zeros(src_nsmul,length(src_ifields[ipropwav]),tim_nt) for ipropwav in 1:npropwav]
-	fill_src_wav_mat!(iss, src_wav_mat, acqsrc_uspos, src_flags)
+	wavelets = [zeros(pac.acqgeom[ipw].ns[iss],length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
+	fill_wavelets!(iss, wavelets, acqsrc, sflags)
 
 
 	if(pac.born_flag)
@@ -442,46 +430,54 @@ function Paramss(iss::Int64, pac::Paramc)
 
 	nx1, nz1=pac.model.mgrid.nx, pac.model.mgrid.nz
 	npml=pac.model.mgrid.npml
-	boundary=[zeros(3,nx1+6,tim_nt),
-	  zeros(nz1+6,3,tim_nt),
-	  zeros(3,nx1+6,tim_nt),
-	  zeros(nz1+6,3,tim_nt),
+	boundary=[zeros(3,nx1+6,nt),
+	  zeros(nz1+6,3,nt),
+	  zeros(3,nx1+6,nt),
+	  zeros(nz1+6,3,nt),
 	  zeros(nz1+2*npml,nx1+2*npml,3)
 				    ]
 
 		
 	"source_spray_weights per sequential source"
-	src_spray_weights = zeros(4,src_nsmul,npropwav)
-	denomsrcI = zeros(src_nsmul,npropwav)
-	issmulx1 = fill(0,src_nsmul,npropwav); issmulx2=fill(0,src_nsmul,npropwav);
-	issmulz1 = fill(0,src_nsmul,npropwav); issmulz2=fill(0,src_nsmul,npropwav);
-	for ipropwav=1:npropwav
-		for issmul=1:src_nsmul
-			Interpolation.get_spray_weights!(view(src_spray_weights, :,issmul,ipropwav), view(denomsrcI,issmul,ipropwav), 
-			    view(issmulx1,issmul,ipropwav), view(issmulx2,issmul,ipropwav),
-			    view(issmulz1,issmul,ipropwav), view(issmulz2,issmul,ipropwav),
-			    mesh_x, mesh_z, acqgeom_uspos[ipropwav].sx[iss][issmul], acqgeom_uspos[ipropwav].sz[iss][issmul])
+	ssprayw = [zeros(4,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
+	denomsI = [zeros(acqgeom[ipw].ns[iss]) for ipw in 1:npw]
+	isx1=[zeros(Int64,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
+	isx2=[zeros(Int64,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
+	isz1=[zeros(Int64,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
+	isz2=[zeros(Int64,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
+	for ipw=1:npw
+		for is=1:acqgeom[ipw].ns[iss]
+			weights=ssprayw[ipw]
+			denom=denomsI[ipw]
+			Interpolation.get_spray_weights!(view(weights, :,is), view(denom,is), 
+				    view(isx1[ipw],is), view(isx2[ipw],is),
+				    view(isz1[ipw],is), view(isz2[ipw],is),
+			    mesh_x, mesh_z, acqgeom[ipw].sx[iss][is], acqgeom[ipw].sz[iss][is])
 		end
 	end
 
 	"receiver interpolation weights per sequential source"
-	recv_interpolate_weights = zeros(4,recv_n,npropwav)
-	denomrecI = zeros(recv_n,npropwav)
-	irecx1 = fill(0,recv_n,npropwav); irecx2=fill(0,recv_n,npropwav);
-	irecz1 = fill(0,recv_n,npropwav); irecz2=fill(0,recv_n,npropwav);
-	for ipropwav=1:npropwav
-		for irec=1:recv_n
-			Interpolation.get_interpolate_weights!(view(recv_interpolate_weights, :,irec,ipropwav), view(denomrecI,irec,ipropwav), 
-			    view(irecx1,irec,ipropwav), view(irecx2,irec,ipropwav),
-			    view(irecz1,irec,ipropwav), view(irecz2,irec,ipropwav),
-			    mesh_x, mesh_z, acqgeom_urpos[ipropwav].rx[iss][irec], acqgeom_urpos[ipropwav].rz[iss][irec])
+	rinterpolatew = [zeros(4,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
+	denomrI = [zeros(acqgeom[ipw].nr[iss]) for ipw in 1:npw]
+	irx1=[zeros(Int64,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
+	irx2=[zeros(Int64,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
+	irz1=[zeros(Int64,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
+	irz2=[zeros(Int64,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
+	for ipw=1:npw
+		for ir=1:acqgeom[ipw].nr[iss]
+			weights=rinterpolatew[ipw]
+			denom=denomrI[ipw]
+			Interpolation.get_interpolate_weights!(view(weights, :,ir), view(denom, ir), 
+				  view(irx1[ipw],ir), view(irx2[ipw],ir),
+				  view(irz1[ipw],ir), view(irz2[ipw],ir),
+			    mesh_x, mesh_z, acqgeom[ipw].rx[iss][ir], acqgeom[ipw].rz[iss][ir])
 		end
 	end
 
 
 
-	pass=Paramss(iss,src_wav_mat,src_spray_weights,recv_out,recv_interpolate_weights,
-	      issmulx1,issmulx2,issmulz1,issmulz2,irecx1,irecx2,irecz1,irecz2,boundary,snaps,illum,born_svalue_stack,
+	pass=Paramss(iss,wavelets,ssprayw,records,rinterpolatew,
+	      isx1,isx2,isz1,isz2,irx1,irx2,irz1,irz2,boundary,snaps,illum,born_svalue_stack,
 	      grad_modtt,grad_modrrvx,grad_modrrvz)
 
 
@@ -494,22 +490,22 @@ end
 ```
 # Keyword Arguments
 
-* `npropwav::Int64=1` : number of independently propagating wavefields in `model`
+* `npw::Int64=1` : number of independently propagating wavefields in `model`
 * `model::Models.Seismic=Gallery.Seismic(:acou_homo1)` : seismic medium parameters 
 * `model_pert::Models.Seismic=model` : perturbed model, i.e., model + δmodel, used only for Born modeling 
 * `tgridmod::Grid.M1D=Gallery.M1D(:acou_homo1)` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
 * `tgrid::Grid.M1D=tgridmod` : output records are resampled on this time grid
-* `acqgeom::Vector{Acquisition.Geom}=fill(Gallery.Geom(:acou_homo1),npropwav)` :  acquisition geometry for each independently propagating wavefield
-* `acqsrc::Vector{Acquisition.Src}=fill(Gallery.Src(:acou_homo1),npropwav)` : source acquisition parameters for each independently propagating wavefield
-* `src_flags::Vector{Int64}=fill(2,npropwav)` : source related flags for each propagating wavefield
+* `acqgeom::Vector{Acquisition.Geom}=fill(Gallery.Geom(:acou_homo1),npw)` :  acquisition geometry for each independently propagating wavefield
+* `acqsrc::Vector{Acquisition.Src}=fill(Gallery.Src(:acou_homo1),npw)` : source acquisition parameters for each independently propagating wavefield
+* `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
   * `=[0]` inactive sources
   * `=[1]` sources with injection rate
   * `=[2]` volume injection sources
   * `=[3]` sources input after time reversal (use only during backpropagation) 
-* `recv_flags::Vector{Int64}=fill(1,npropwav)` : receiver related flags for each propagating wavefield
+* `rflags::Vector{Int64}=fill(1,npw)` : receiver related flags for each propagating wavefield
   * `=[0]` receivers do not record (or) inactive receivers
   * `=[0,1]` receivers are active only for the second propagating wavefield
-* `recv_fields::Vector{Symbol}=[:P]` : multi-component receiver flag; types fields the receivers record (to be changed later)
+* `rfields::Vector{Symbol}=[:P]` : multi-component receiver flag; types fields the receivers record (to be changed later)
 * `backprop_flag::Bool=Int64` : save final state variables and the boundary conditions for later use
   * `=1` save boundary and final values in `boundary` 
   * `=-1` use stored values in `boundary` for back propagation
@@ -526,7 +522,7 @@ end
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
 * `gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
-* `TDout::Vector{Data.TD}=[Data.TD_zeros(recv_fields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(recv_flags))]`
+* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]`
 * `illum::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx)` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
 * `snaps::Array{Float64,4}=zeros(model.mgrid.nz,model.mgrid.nx,length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
@@ -571,18 +567,22 @@ Author: Pawan Bharadwaj
 
 	# stack gradients and illum over sources
 	for (ip, p) in enumerate(procs(pa.p))
-		(pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
-		(pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
+		remotecall_wait(p) do 
+			(pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
+			(pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
+		end
 	end
 
 	# update gradient model using grad_modtt_stack, grad_modrr_stack
 	update_gmodel!(pa.c)
 
 	for (ip, p) in enumerate(procs(pa.p))
-		update_data!(pa.c, localpart(pa.p))
+		remotecall_wait(p) do 
+			update_data!(pa.c, localpart(pa.p))
+		end
 	end
 
-	return pa
+	return nothing
 
 	
 	# return data depending on the receiver flags
@@ -590,23 +590,40 @@ Author: Pawan Bharadwaj
 end
 
 function update_data!(pac::Paramc, pap::Paramp)
-# update TDout after forming a vector and resampling
-	ipropout=0;
-	for iprop in 1:pac.npropwav
-		if(pac.recv_flags[iprop] ≠ 0)
-			ipropout += 1
-#			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(recv_out[:,:,iprop,:,:])), recv_fields, tgridmod, acqgeom[iprop],
-#				acqgeom_urpos[1].nr[1],
-#				(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
-#				)) 
-		end
-	end
-	# return without resampling for testing
-	#return [Data.TD(reshape(recv_out[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,src_nseq),
-	#		       tgridmod, acqgeom[1]) for iprop in 1:npropwav]
-
+        pass=pap.ss
+        for ipw in 1:pac.npw
+                for ifield in 1:length(pac.irfields)
+                        for issp in 1:length(pass)
+                                iss=pass[issp].iss
+                                records=pass[issp].records
+                                for ir in 1:pac.acqgeom[ipw].nr[iss]
+                                        dat=pac.data[ipw].d[iss,ifield]
+                                        datr=view(dat,:,ir)
+                                                for it in 1:pac.nt
+                                                        datr[it]=records[ipw,it][ir,ifield]
+                                                end
+                                end
+                        end
+                end
+        end
 end
-	
+
+
+# update TDout after forming a vector and resampling
+#	ipropout=0;
+#	for iprop in 1:pac.npw
+#		if(pac.rflags[iprop] ≠ 0)
+#			ipropout += 1
+##			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, acqgeom[iprop],
+##				acqgeom_urpos[1].nr[1],
+##				(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
+##				)) 
+#		end
+#	end
+	# return without resampling for testing
+	#return [Data.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
+	#		       tgridmod, acqgeom[1]) for iprop in 1:npw]
+
 
 function grad_modrr!(pac::Paramc)
 	@. pac.grad_modrr_stack = (pac.grad_modrrvx_stack + pac.grad_modrrvz_stack) * (0.5)
@@ -636,16 +653,16 @@ function stack_grads!(pac::Paramc, pap::Paramp)
 	gmodrrvx=pac.grad_modrrvx_stack
 	gmodrrvz=pac.grad_modrrvz_stack
 	pass=pap.ss
-	for isp in 1:length(pass)
-		gs=pass[isp].grad_modtt
+	for issp in 1:length(pass)
+		gs=pass[issp].grad_modtt
 		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		sum!(gmodtt,gss)
-		gs=pass[isp].grad_modrrvx
+		@. gmodtt += gss
+		gs=pass[issp].grad_modrrvx
 		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		sum!(gmodrrvx,gss)
-		gs=pass[isp].grad_modrrvz
+		@. gmodrrvx += gss
+		gs=pass[issp].grad_modrrvz
 		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		sum!(gmodrrvz,gss)
+		@. gmodrrvz += gss
 	end
 	# combine rrvx and rrvz
 	grad_modrr!(pac::Paramc)
@@ -656,20 +673,28 @@ function stack_illums!(pac::Paramc, pap::Paramp)
 	nx, nz=pac.nx, pac.nz
 	illums=pac.illum_stack
 	pass=pap.ss
-	for isp in 1:length(pass)
-		gs=pass[isp].illum
+	for issp in 1:length(pass)
+		gs=pass[issp].illum
 		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		sum!(illums,gss)
+		@. illums += gss
 	end
 end
 
 
 function update_gmodel!(pac::Paramc)
-	Models.Seismic_chainrule!(pac.gmodel, pac.model, 
-				     vec(Models.χg(pac.grad_modtt_stack, Models.Seismic_get(pac.model,:KI0),1)),
-				     vec(Models.χg(pac.grad_modrr_stack, Models.Seismic_get(pac.model,:ρI0),1)),
-				     [:χKI, :χρI], 1
-				     )
+	KI0=Models.Seismic_get(pac.model,:KI0)
+	ρI0=Models.Seismic_get(pac.model,:ρI0)
+	gmodtt=view(pac.grad_modtt_stack,:)
+	gmodrr=view(pac.grad_modrr_stack,:)
+	
+	Models.χg!(gmodtt,KI0,1)
+	Models.χg!(gmodrr,ρI0,1)
+
+	Models.Seismic_chainrule!(pac.gmodel, pac.model,gmodtt, gmodrr, [:χKI, :χρI], 1)
+
+
+	Models.χg!(gmodtt,KI0,-1)
+	Models.χg!(gmodrr,ρI0,-1)
 end
 
 # modelling for each processor
@@ -692,21 +717,21 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 		"""
 		* don't use shared arrays inside this time loop, for speed when using multiple procs
 		"""
-		for it=1:pac.tim_nt
+		for it=1:pac.nt
 
 			advance!(pac,pap)
 		
 			# force p[1] on boundaries
 			(pac.backprop_flag==-1) && boundary_force!(it,issp,pac,pap.ss,pap)
 	 
-			add_source!(it, issp, pac, pap.ss, pap)
+			add_source!(it, issp, iss, pac, pap.ss, pap)
 
 			(pac.born_flag) && add_born_sources!(issp, pac, pap.ss, pap)
 
 			# record boundaries after time reversal already
-			(pac.backprop_flag==1) && boundary_save!(tim_nt-it+1,issp,pac,pap.ss,pap)
+			(pac.backprop_flag==1) && boundary_save!(pac.nt-it+1,issp,pac,pap.ss,pap)
 
-			record!(it, issp, pac, pap.ss, pap)
+			record!(it, issp, iss, pac, pap.ss, pap)
 
 			(pac.gmodel_flag) && compute_gradient!(issp, pac, pap.ss, pap)
 
@@ -718,15 +743,15 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 			end
 
 		end # time_loop
-		"now pressure is at [tim_nt], velocities are at [tim_nt-1/2]"	
+		"now pressure is at [nt], velocities are at [nt-1/2]"	
 
-		"one more propagating step to save pressure at [tim_nt+1] -- for time revarsal"
+		"one more propagating step to save pressure at [nt+1] -- for time revarsal"
 		advance!(pac,pap)
 
 		"save last snap of pressure field"
 		boundary_save_snap_p!(issp,pac,pap.ss,pap)
 
-		"one more propagating step to save velocities at [tim_nt+3/2] -- for time reversal"
+		"one more propagating step to save velocities at [nt+3/2] -- for time reversal"
 		advance!(pac,pap)
 
 		"save last snap of velocity fields with opposite sign for adjoint propagation"
@@ -740,48 +765,49 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 end # mod_per_shot
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function add_source!(it::Int64, issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
+@inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
 	# aliases
 	p=pap.p;
-	src_wav_mat=pass[issp].src_wav_mat
-	issmulx1=pass[issp].issmulx1
-	issmulx2=pass[issp].issmulx2
-	issmulz1=pass[issp].issmulz1
-	issmulz2=pass[issp].issmulz2
-	src_spray_weights=pass[issp].src_spray_weights
+	wavelets=pass[issp].wavelets
+	acqgeom=pac.acqgeom
+	isx1=pass[issp].isx1
+	isx2=pass[issp].isx2
+	isz1=pass[issp].isz1
+	isz2=pass[issp].isz2
+	ssprayw=pass[issp].ssprayw
 	modttI=pac.modttI
 	"""
 	adding source to pressure field at [it] 
 	"""
-	for ipropwav = 1:pac.npropwav
-	for (ifieldsrc, ifield) in enumerate(pac.src_ifields[ipropwav])
-	@simd for issmul = 1:pac.src_nsmul
+	for ipw = 1:pac.npw
+	for (ifields, ifield) in enumerate(pac.isfields[ipw])
+	@simd for is = 1:acqgeom[ipw].ns[iss]
 		"""
-		use src_wav_mat at [it], i.e., sum of source terms
+		use wavelets at [it], i.e., sum of source terms
 		until [it-1]
 		division of source term with δx and δz (see Jan's fdelmodc manual)
 		"""
-		source_term = src_wav_mat[ipropwav][issmul, ifieldsrc, it] * pac.δt * pac.δxI * pac.δzI
+		source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
 		
 		"""
 		multiplication with modttI
 		"""
-		p[issmulz1[issmul,ipropwav], issmulx1[issmul,ipropwav],ifield, ipropwav] += 
+		p[isz1[ipw][is], isx1[ipw][is],ifield, ipw] += 
 			source_term * 
-			src_spray_weights[1,issmul,ipropwav] * 
-			modttI[issmulz1[issmul,ipropwav], issmulx1[issmul,ipropwav]]  
-		p[issmulz1[issmul,ipropwav], issmulx2[issmul,ipropwav],ifield, ipropwav] += 
+			ssprayw[ipw][1,is] * 
+			modttI[isz1[ipw][is], isx1[ipw][is]]  
+		p[isz1[ipw][is], isx2[ipw][is],ifield, ipw] += 
 			source_term * 
-			src_spray_weights[2,issmul,ipropwav] * 
-			modttI[issmulz1[issmul,ipropwav], issmulx2[issmul,ipropwav]]
-		p[issmulz2[issmul,ipropwav], issmulx1[issmul,ipropwav],ifield, ipropwav] += 
+			ssprayw[ipw][2,is] * 
+			modttI[isz1[ipw][is], isx2[ipw][is]]
+		p[isz2[ipw][is], isx1[ipw][is],ifield, ipw] += 
 			source_term * 
-			src_spray_weights[3,issmul,ipropwav] * 
-			modttI[issmulz2[issmul,ipropwav], issmulx1[issmul,ipropwav]]
-		p[issmulz2[issmul,ipropwav], issmulx2[issmul,ipropwav],ifield, ipropwav] += 
+			ssprayw[ipw][3,is] * 
+			modttI[isz2[ipw][is], isx1[ipw][is]]
+		p[isz2[ipw][is], isx2[ipw][is],ifield, ipw] += 
 			source_term * 
-			src_spray_weights[4,issmul,ipropwav] * 
-			modttI[issmulz2[issmul,ipropwav], issmulx2[issmul,ipropwav]]
+			ssprayw[ipw][4,is] * 
+			modttI[isz2[ipw][is], isx2[ipw][is]]
 	end
 	end
 	end
@@ -789,37 +815,36 @@ end
 
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inline @inbounds @fastmath function record!(it::Int64, issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
-	recv_out=pass[issp].recv_out
+@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
 	p=pap.p
-	recv_interpolate_weights=pass[issp].recv_interpolate_weights
-	irecx1=pass[issp].irecx1
-	irecx2=pass[issp].irecx2
-	irecz1=pass[issp].irecz1
-	irecz2=pass[issp].irecz2
+	rinterpolatew=pass[issp].rinterpolatew
+	irx1=pass[issp].irx1
+	irx2=pass[issp].irx2
+	irz1=pass[issp].irz1
+	irz2=pass[issp].irz2
 
-	for ipropwav = 1:pac.npropwav
-	for (ifieldrecv, ifield) in enumerate(pac.recv_ifields)
-	@simd for irec = 1:pac.recv_n
-			recv_out[irec,ifieldrecv,ipropwav,it] = 
-			(
-			p[irecz1[irec,ipropwav],irecx1[irec,ipropwav],ifield,ipropwav]*
-			recv_interpolate_weights[1,irec,ipropwav]+
-			p[irecz1[irec,ipropwav],irecx2[irec,ipropwav],ifield,ipropwav]*
-			recv_interpolate_weights[2,irec,ipropwav]+
-			p[irecz2[irec,ipropwav],irecx1[irec,ipropwav],ifield,ipropwav]*
-			recv_interpolate_weights[3,irec,ipropwav]+
-			p[irecz2[irec,ipropwav],irecx2[irec,ipropwav],ifield,ipropwav]*
-			recv_interpolate_weights[4,irec,ipropwav]
-			)
+	for ipw = 1:pac.npw
+		recs=pass[issp].records[ipw, it]
+		for (ifieldr, ifield) in enumerate(pac.irfields)
+			@simd for ir = 1:pac.acqgeom[ipw].nr[iss]
+				recs[ir,ifieldr]= 
+				(
+				p[irz1[ipw][ir],irx1[ipw][ir],ifield,ipw]*
+				rinterpolatew[ipw][1,ir]+
+				p[irz1[ipw][ir],irx2[ipw][ir],ifield,ipw]*
+				rinterpolatew[ipw][2,ir]+
+				p[irz2[ipw][ir],irx1[ipw][ir],ifield,ipw]*
+				rinterpolatew[ipw][3,ir]+
+				p[irz2[ipw][ir],irx2[ipw][ir],ifield,ipw]*
+				rinterpolatew[ipw][4,ir]
+				)
+		end
 	end
 	end
-	end
-
 end
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inline @inbounds @fastmath function compute_gradient!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
+@inbounds @fastmath function compute_gradient!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
 	# aliases
 	p=pap.p
 	pp=pap.pp
@@ -917,97 +942,93 @@ end
 end
 
 @inbounds @fastmath function dvdx!(dpdx,p,memory_dvx_dx,b_x,a_x,k_xI,nz,nx,δx24I)
-	for ipropwav = 1:size(p,4)
+	for ipw = 1:size(p,4)
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds dpdx[iz,ix,2,ipropwav] = (27.e0*p[iz,ix,2,ipropwav]-27.e0*p[iz,ix-1,2,ipropwav]-p[iz,ix+1,2,ipropwav]+p[iz,ix-2,2,ipropwav]) * (δx24I)
-			@inbounds memory_dvx_dx[iz,ix,ipropwav] = b_x[ix] * memory_dvx_dx[iz,ix,ipropwav] + a_x[ix] * dpdx[iz,ix,2,ipropwav] # pml 
-			@inbounds dpdx[iz,ix,2,ipropwav] = dpdx[iz,ix,2,ipropwav] * k_xI[ix] + memory_dvx_dx[iz,ix,ipropwav] # pml
+			@inbounds dpdx[iz,ix,2,ipw] = (27.e0*p[iz,ix,2,ipw]-27.e0*p[iz,ix-1,2,ipw]-p[iz,ix+1,2,ipw]+p[iz,ix-2,2,ipw]) * (δx24I)
+			@inbounds memory_dvx_dx[iz,ix,ipw] = b_x[ix] * memory_dvx_dx[iz,ix,ipw] + a_x[ix] * dpdx[iz,ix,2,ipw] # pml 
+			@inbounds dpdx[iz,ix,2,ipw] = dpdx[iz,ix,2,ipw] * k_xI[ix] + memory_dvx_dx[iz,ix,ipw] # pml
 		end
 		end
 	end
 end
 
 @inbounds @fastmath function dvdz!(dpdz,p,memory_dvz_dz,b_z,a_z,k_zI,nz,nx,δz24I)
-	for ipropwav = 1:size(p,4)
+	for ipw = 1:size(p,4)
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds dpdz[iz,ix,3,ipropwav] = (27.e0*p[iz,ix,3,ipropwav]-27.e0*p[iz-1,ix,3,ipropwav]-p[iz+1,ix,3,ipropwav]+p[iz-2,ix,3,ipropwav]) * (δz24I)
-			@inbounds memory_dvz_dz[iz,ix,ipropwav] = b_z[iz] * memory_dvz_dz[iz,ix,ipropwav] + a_z[iz] * dpdz[iz,ix,3,ipropwav] # pml
-			@inbounds dpdz[iz,ix,3,ipropwav] = dpdz[iz,ix,3,ipropwav] * k_zI[iz] + memory_dvz_dz[iz,ix,ipropwav] # pml
+			@inbounds dpdz[iz,ix,3,ipw] = (27.e0*p[iz,ix,3,ipw]-27.e0*p[iz-1,ix,3,ipw]-p[iz+1,ix,3,ipw]+p[iz-2,ix,3,ipw]) * (δz24I)
+			@inbounds memory_dvz_dz[iz,ix,ipw] = b_z[iz] * memory_dvz_dz[iz,ix,ipw] + a_z[iz] * dpdz[iz,ix,3,ipw] # pml
+			@inbounds dpdz[iz,ix,3,ipw] = dpdz[iz,ix,3,ipw] * k_zI[iz] + memory_dvz_dz[iz,ix,ipw] # pml
 		end
 		end
 	end
 end
 
 @inbounds @fastmath function pvzvx!(p,dpdx,dpdz,modttI,nz,nx,δt)
-	for ipropwav = 1:size(p,4)
+	for ipw = 1:size(p,4)
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,1,ipropwav] += (modttI[iz,ix] * (dpdx[iz,ix,2,ipropwav] + dpdz[iz,ix,3,ipropwav])) * δt #* boundary_p(iz,ix)
+			@inbounds p[iz,ix,1,ipw] += (modttI[iz,ix] * (dpdx[iz,ix,2,ipw] + dpdz[iz,ix,3,ipw])) * δt #* boundary_p(iz,ix)
 		end
 		end
 	end
 end
 
 @inbounds @fastmath function update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz)
-	for ipropwav = 1:size(p,4)
+	for ipw = 1:size(p,4)
 		for ix = 3:nx-2
 		@simd for iz = 3:nz-2
-			@inbounds dpdx[iz,ix,1,ipropwav] = (27.e0*p[iz,ix+1,1,ipropwav]-27.e0*p[iz,ix,1,ipropwav]-p[iz,ix+2,1,ipropwav]+p[iz,ix-1,1,ipropwav]) * (δx24I)
-			@inbounds memory_dp_dx[iz,ix,ipropwav] = b_x_half[ix] * memory_dp_dx[iz,ix,ipropwav] + a_x_half[ix] * dpdx[iz,ix,1,ipropwav] # pml
-			@inbounds dpdx[iz,ix,1,ipropwav] = dpdx[iz,ix,1,ipropwav] * k_x_halfI[ix] + memory_dp_dx[iz,ix,ipropwav] # pml
+			@inbounds dpdx[iz,ix,1,ipw] = (27.e0*p[iz,ix+1,1,ipw]-27.e0*p[iz,ix,1,ipw]-p[iz,ix+2,1,ipw]+p[iz,ix-1,1,ipw]) * (δx24I)
+			@inbounds memory_dp_dx[iz,ix,ipw] = b_x_half[ix] * memory_dp_dx[iz,ix,ipw] + a_x_half[ix] * dpdx[iz,ix,1,ipw] # pml
+			@inbounds dpdx[iz,ix,1,ipw] = dpdx[iz,ix,1,ipw] * k_x_halfI[ix] + memory_dp_dx[iz,ix,ipw] # pml
 		end
 		end
 	end
 end
 
 @inbounds @fastmath function update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz)
-	for ipropwav = 1:size(p,4)
+	for ipw = 1:size(p,4)
 		for ix = 3:nx-2
 		@simd for iz = 3:nz-2
-			@inbounds dpdz[iz,ix,1,ipropwav] = (27.e0*p[iz+1,ix,1,ipropwav]-27.e0*p[iz,ix,1,ipropwav]-p[iz+2,ix,1,ipropwav]+p[iz-1,ix,1,ipropwav]) * (δz24I)
-			@inbounds memory_dp_dz[iz,ix,ipropwav] = b_z_half[iz] * memory_dp_dz[iz,ix,ipropwav] + a_z_half[iz] * dpdz[iz,ix,1,ipropwav] # pml
-			@inbounds dpdz[iz,ix,1,ipropwav] = dpdz[iz,ix,1,ipropwav] * k_z_halfI[iz] + memory_dp_dz[iz,ix,ipropwav] # pml
+			@inbounds dpdz[iz,ix,1,ipw] = (27.e0*p[iz+1,ix,1,ipw]-27.e0*p[iz,ix,1,ipw]-p[iz+2,ix,1,ipw]+p[iz-1,ix,1,ipw]) * (δz24I)
+			@inbounds memory_dp_dz[iz,ix,ipw] = b_z_half[iz] * memory_dp_dz[iz,ix,ipw] + a_z_half[iz] * dpdz[iz,ix,1,ipw] # pml
+			@inbounds dpdz[iz,ix,1,ipw] = dpdz[iz,ix,1,ipw] * k_z_halfI[iz] + memory_dp_dz[iz,ix,ipw] # pml
 		end
 		end
 	end
 end
 
 @inbounds @fastmath function update_vx!(p, dpdx, δt, modrrvx,  nx, nz)
-	for ipropwav = 1:size(p,4)
+	for ipw = 1:size(p,4)
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,2,ipropwav] += (dpdx[iz,ix,1,ipropwav]) * δt * modrrvx[iz,ix] #* boundary_vx(iz,ix)
+			@inbounds p[iz,ix,2,ipw] += (dpdx[iz,ix,1,ipw]) * δt * modrrvx[iz,ix] #* boundary_vx(iz,ix)
 		end
 		end
 	end
 end
 
 @inbounds @fastmath function update_vz!(p, dpdz, δt,  modrrvz, nx, nz)
-	for ipropwav = 1:size(p,4)
+	for ipw = 1:size(p,4)
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,3,ipropwav] +=  (dpdz[iz,ix,1,ipropwav]) * δt * modrrvz[iz,ix] #* boundary_vz(iz,ix)
+			@inbounds p[iz,ix,3,ipw] +=  (dpdz[iz,ix,1,ipw]) * δt * modrrvz[iz,ix] #* boundary_vz(iz,ix)
 		end
 		end
 	end
 end
 
 
-"""
-Need illumination to estimate the approximate diagonal of Hessian
-"""
-@inline function compute_illum!(issp::Int64, pass::Vector{Paramss}, pap::Paramp)
+# Need illumination to estimate the approximate diagonal of Hessian
+@inbounds @fastmath function compute_illum!(issp::Int64, pass::Vector{Paramss}, pap::Paramp)
+	# saving illumination to be used as preconditioner 
 	p=pap.p
 	illum=pass[issp].illum
-	for ix=1:size(illum,2)
-		@simd for iz=1:size(illum,1)
-			# saving illumination to be used as preconditioner 
-			illum[iz,ix] += (p[iz,ix,1,1] * p[iz,ix,1,1])
-		end
-	end
+	pp=view(p,:,:,1,1)
+	@. illum += pp * pp
 end
+
 
 function add_born_sources!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
 
@@ -1227,55 +1248,56 @@ function get_rhovzI(rhoI::Array{Float64})
 end # get_rhovzI
 
 
-function fill_src_wav_mat!(iss::Int64, src_wav_mat::Array{Array{Float64, 3}, 1}, acqsrc_uspos::Array{Acquisition.Src},src_flags::Vector{Int64})
+function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc::Array{Acquisition.Src}, sflags::Vector{Int64})
 
-	npropwav = size(src_wav_mat,1)
-	δt = acqsrc_uspos[1].tgrid.δx
-	for ipropwav=1:npropwav
-		src_nsmul, src_nfield, tim_nt = size(src_wav_mat[ipropwav])
-		for ifield=1:src_nfield, issmul=1:src_nsmul
-			src_tim_nt = acqsrc_uspos[ipropwav].tgrid.nx;
-			if(src_flags[ipropwav] == 0)
+	npw = size(wavelets,1)
+	nt = size(wavelets,2)
+	δt = acqsrc[1].tgrid.δx
+	for ipw=1:npw
+		ns, snfield = size(wavelets[ipw])
+		for ifield=1:snfield, is=1:ns
+			snt = acqsrc[ipw].tgrid.nx;
+			if(sflags[ipw] == 0)
 				nothing # just put zeros, no sources added
-			elseif(src_flags[ipropwav] == 1)
+			elseif(sflags[ipw] == 1)
 				"ϕ[t] = s[t]"
-				for it=1:src_tim_nt
-					source_term = acqsrc_uspos[ipropwav].wav[iss,ifield][it,issmul]
-					src_wav_mat[ipropwav][issmul,ifield,it] = source_term
+				for it=1:snt
+					source_term = acqsrc[ipw].wav[iss,ifield][it,is]
+					wavelets[ipw,it][is,ifield] = source_term
 				end
-			elseif(src_flags[ipropwav] == 2)
+			elseif(sflags[ipw] == 2)
 				"ϕ[t] = ∑₁ᵗ⁻¹ s[t]"
 				source_term_stack = 0.0;
 				if(ifield == 1)
-					for it=1:src_tim_nt-1
-						source_term_stack += (acqsrc_uspos[ipropwav].wav[iss,ifield][it,issmul] .* δt)
-						src_wav_mat[ipropwav][issmul,ifield,it+1] = source_term_stack
+					for it=1:snt-1
+						source_term_stack += (acqsrc[ipw].wav[iss,ifield][it,is] .* δt)
+						wavelets[ipw,it+1][is,ifield] = source_term_stack
 					end
 				else
-					for it=2:src_tim_nt-1
-						source_term_stack += (((acqsrc_uspos[ipropwav].wav[iss,ifield][it,issmul] .* δt) +
-						   (acqsrc_uspos[ipropwav].wav[iss,ifield][it-1,issmul] .* δt)) * 0.5)
-						src_wav_mat[ipropwav][issmul,ifield,it+1] = source_term_stack
+					for it=2:snt-1
+						source_term_stack += (((acqsrc[ipw].wav[iss,ifield][it,is] .* δt) +
+						   (acqsrc[ipw].wav[iss,ifield][it-1,is] .* δt)) * 0.5)
+						wavelets[ipw,it+1][is,ifield] = source_term_stack
 					end
 
 				end
-				if(tim_nt > src_tim_nt)
-					src_wav_mat[ipropwav][issmul,ifield,src_tim_nt+1:end] = src_wav_mat[ipropwav][issmul,ifield,src_tim_nt]
+				if(nt > snt)
+					wavelets[ipw,snt+1:end][is,ifield] = wavelets[ipw,snt][is,ifield]
 				end
-			elseif(src_flags[ipropwav] == 3)
+			elseif(sflags[ipw] == 3)
 				"use this to add source sink: need during adjoint propagation from boundary"
 				"multiplication with -1 for subtraction"
 				"time reversal"
 				"as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
 				"ϕ[t] = "
 				source_term_stack = 0.0;
-				for it=1:src_tim_nt-1
-					source_term_stack += (acqsrc_uspos[ipropwav].wav[iss,ifield][it,issmul] .* δt)
-					src_wav_mat[ipropwav][issmul,ifield,tim_nt-it+1] = -1.0 * source_term_stack
+				for it=1:snt-1
+					source_term_stack += (acqsrc[ipw].wav[iss,ifield][it,is] .* δt)
+					wavelets[ipw,nt-it+1][is,ifield] = -1.0 * source_term_stack
 				end
-				if(tim_nt > src_tim_nt)
-					tim_nt_diff = tim_nt-src_tim_nt
-					src_wav_mat[ipropwav][issmul,ifield,1:tim_nt_diff+1] = src_wav_mat[ipropwav][issmul,ifield,tim_nt_diff+2]
+				if(nt > snt)
+					nt_diff = nt-snt
+					wavelets[ipw,1:nt_diff+1][is,ifield] = wavelets[ipw,nt_diff+2][is,ifield]
 				end
 			end
 		end

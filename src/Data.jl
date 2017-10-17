@@ -79,14 +79,16 @@ function TD_resamp!(dataout::TD, data::TD)
 	# check if datasets are similar
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
-	for ifield = 1:length(data.fields), iss = 1:nss, ir = 1:nr[iss]
-		din = data.d[iss, ifield][:, ir]
-		xin = data.tgrid.x
-		xout = dataout.tgrid.x
-		dout = similar(xout)
-		Interpolation.interp_spray!(xin, din, xout, dout, :interp, :B1 )
-
-		dataout.d[iss, ifield][:,ir] = copy(dout)
+	for ifield = 1:length(data.fields), iss = 1:nss
+		dat=view(data.d,iss,ifield)
+		dato=view(dataout.d,iss,ifield)
+		for ir = 1:nr[iss]
+			din=view(dat,:,ir)
+			dout=view(dato,:,ir)
+			xin=data.tgrid.x
+			xout=dataout.tgrid.x
+			Interpolation.interp_spray!(xin, din, xout, dout, :interp, :B1 )
+		end
 	end
 	return dataout
 end
