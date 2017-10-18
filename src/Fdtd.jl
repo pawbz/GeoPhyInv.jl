@@ -25,25 +25,13 @@ using DistributedArrays
 # + {\partial_z \vz}[\tph]  + \dt\sum_{0}^{\tzero}\sfo\right)
 # ```
 
-function initialize_boundary(nx::Int64, nz::Int64, npml::Int64, nss::Int64, nt::Int64)
-	nwork = min(nss, nworkers())
-	work = workers()[1:nwork]
-	return DArray((nss,), work,[nwork]) do I
-	    			[[zeros(3,nx+6,nt),
-				  zeros(nz+6,3,nt),
-				  zeros(3,nx+6,nt),
-				  zeros(nz+6,3,nt),
-				  zeros(nz+2*npml,nx+2*npml,3)
-							    ] for is in 1:nss]
-				end
-end
 
 
 """
 Modelling parameters common for all supersources
 """
 type Paramc
-	jobname::AbstractString
+	jobname::Symbol
 	npw::Int64 
 	exmodel::Models.Seismic
 	model::Models.Seismic
@@ -75,18 +63,18 @@ type Paramc
 	a_z_half::Vector{Float64}
 	b_z_half::Vector{Float64}
 	k_z_halfI::Vector{Float64}
-	modttI::Array{Float64}
-	modrrvx::Array{Float64}
-	modrrvz::Array{Float64}
-	δmodtt::Array{Float64}
-	δmodrrvx::Array{Float64}
-	δmodrrvz::Array{Float64}
-	grad_modtt_stack::Array{Float64}
-	grad_modrrvx_stack::Array{Float64}
-	grad_modrrvz_stack::Array{Float64}
-	grad_modrr_stack::Array{Float64}
+	modttI::Matrix{Float64}
+	modrrvx::Matrix{Float64}
+	modrrvz::Matrix{Float64}
+	δmodtt::Matrix{Float64}
+	δmodrrvx::Matrix{Float64}
+	δmodrrvz::Matrix{Float64}
+	grad_modtt_stack::Matrix{Float64}
+	grad_modrrvx_stack::Matrix{Float64}
+	grad_modrrvz_stack::Matrix{Float64}
+	grad_modrr_stack::Matrix{Float64}
 	illum_flag::Bool
-	illum_stack::Array{Float64}
+	illum_stack::Matrix{Float64}
 	backprop_flag::Int64
 	snaps_flag::Bool
 	itsnaps::Vector{Int64}
@@ -108,25 +96,25 @@ Modelling parameters per every supersource for each worker
 """
 type Paramss
 	iss::Int64
-	wavelets::Array{Array{Float64}}
-	ssprayw::Array{Array{Float64}}
-	records::Array{Array{Float64}}
-	rinterpolatew::Array{Array{Float64}}
-	isx1::Array{Array{Int64}} 
-	isx2::Array{Array{Int64}}
-	isz1::Array{Array{Int64}} 
-	isz2::Array{Array{Int64}}
-	irx1::Array{Array{Int64}}
-	irx2::Array{Array{Int64}}
-	irz1::Array{Array{Int64}}
-	irz2::Array{Array{Int64}}
-        boundary::Array{Array{Float64,3},1}
-	snaps::Array{Float64}
-	illum::Array{Float64}
-	born_svalue_stack::Array{Float64} 
-	grad_modtt::Array{Float64} 
-	grad_modrrvx::Array{Float64}
-	grad_modrrvz::Array{Float64}
+	wavelets::Matrix{Matrix{Float64}}
+	ssprayw::Vector{Matrix{Float64}}
+	records::Matrix{Matrix{Float64}}
+	rinterpolatew::Vector{Matrix{Float64}}
+	isx1::Vector{Vector{Int64}} 
+	isx2::Vector{Vector{Int64}}
+	isz1::Vector{Vector{Int64}} 
+	isz2::Vector{Vector{Int64}}
+	irx1::Vector{Vector{Int64}}
+	irx2::Vector{Vector{Int64}}
+	irz1::Vector{Vector{Int64}}
+	irz2::Vector{Vector{Int64}}
+        boundary::Vector{Array{Float64,3}}
+	snaps::Array{Float64,3}
+	illum::Matrix{Float64}
+	born_svalue_stack::Matrix{Float64} 
+	grad_modtt::Matrix{Float64} 
+	grad_modrrvx::Matrix{Float64}
+	grad_modrrvz::Matrix{Float64}
 end
 
 """
@@ -135,15 +123,15 @@ Note that a single worker can take care of multiple supersources.
 """
 type Paramp
 	ss::Vector{Paramss}
-	p::Array{Float64}
-	pp::Array{Float64}
-	ppp::Array{Float64}
-	dpdx::Array{Float64}
-	dpdz::Array{Float64}
-	memory_dp_dx::Array{Float64}
-	memory_dp_dz::Array{Float64}
-	memory_dvx_dx::Array{Float64}
-	memory_dvz_dz::Array{Float64}
+	p::Array{Float64,4}
+	pp::Array{Float64,4}
+	ppp::Array{Float64,4}
+	dpdx::Array{Float64,4}
+	dpdz::Array{Float64,4}
+	memory_dp_dx::Array{Float64,3}
+	memory_dp_dz::Array{Float64,3}
+	memory_dvx_dx::Array{Float64,3}
+	memory_dvz_dz::Array{Float64,3}
 end
 
 type Param
@@ -155,7 +143,7 @@ end
 
 
 function Param(;
-	jobname::AbstractString = "Hello",
+	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
 	model::Models.Seismic=Gallery.Seismic(:acou_homo1),
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
@@ -168,14 +156,9 @@ function Param(;
 	rflags::Vector{Int64}=fill(1,npw),
 	rfields::Vector{Symbol}=[:P], 
 	backprop_flag::Int64=0,  
-	boundary::DistributedArrays.DArray{Array{Array{Float64,3},1},1,Array{Array{Array{Float64,3},1},1}}=
-			initialize_boundary(model.mgrid.nx, model.mgrid.nz, model.mgrid.npml, acqgeom[1].nss, tgridmod.nx),
 	gmodel_flag::Bool=false,
-	gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid),
 	illum_flag::Bool=false,
-	illum::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx),
 	tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1),
-	snaps::Array{Float64,4}=zeros(model.mgrid.nz,model.mgrid.nx,length(tsnaps),acqgeom[1].nss),
 	snaps_flag::Bool=false,
 	verbose::Bool=false)
 
@@ -293,6 +276,7 @@ function Param(;
 	grad_modrrvx_stack=zeros(nzd,nxd)
 	grad_modrrvz_stack=zeros(nzd,nxd)
 	grad_modrr_stack=zeros(nzd,nxd)
+	gmodel=Models.Seismic_zeros(model.mgrid)
 	illum_stack=zeros(nzd, nxd)
 
 	itsnaps = [indmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
@@ -329,39 +313,6 @@ function Param(;
 
 	return Param(papa, pac)
 
-	#pass = 
-#pass DArray((nwork,), work, [nwork]) do I
-#	[Paramss() for is in 1:nss]
-#end
-	# [zeros(3,nx+6,nt),
-	#			  zeros(nz+6,3,nt),
-	#			  zeros(3,nx+6,nt),
-	#			  zeros(nz+6,3,nt),
-	#			  zeros(nz+2*npml,nx+2*npml,3)
-	#						    ] for is in 1:nss]
-
-
-	## all localparts of DArrays are input to this method
-	#@sync begin
-	#	for (ip, p) in enumerate(procs(boundary))
-	#		@async remotecall_wait(p) do 
-	#			Paramss_update_locals!(localindexes(boundary)[1], localpart(boundary),  
-	#		  	               localpart(grad_modtt), localpart(grad_modrrvx), localpart(grad_modrrvz),
-	#				       localpart(records),  
-	#				       localpart(snaps_out), localpart(illum_all),
-	#				       snaps_flag,
-	#				       illum_flag, backprop_flag, gmodel_flag, verbose, recv_n, irfields, npw, src_nsmul, 
-	#				       exmodel, model, tgridmod,
-	#				       acqgeom_uspos, acqgeom_urpos,
-	#				       modttI, modrrvx, modrrvz,
-	#			               vpmax, vpmin, freqmin, freqmax, 
-	#				       abs_trbl, tsnaps, wavelets, isfields, 
-	#				       born_flag,
-	#				       localpart(born_svalue_stack), δmodtt,
-	#				       δmodrrvx, δmodrrvz)
-	#		end
-	#	end
-	#end
 
 end
 
@@ -395,6 +346,8 @@ function Paramss(iss::Int64, pac::Paramc)
 	npw=pac.npw
 	nt=pac.nt
 	nx=pac.nx; nz=pac.nz
+	nxd=pac.model.mgrid.nx
+	nzd=pac.model.mgrid.nz
 	acqgeom=pac.acqgeom
 	acqsrc=pac.acqsrc
 	sflags=pac.sflags
@@ -411,9 +364,9 @@ function Paramss(iss::Int64, pac::Paramc)
 
 
 	"saving illum"
-	illum =  (pac.illum_flag) ? zeros(nz, nx) : [0.0]
+	illum =  (pac.illum_flag) ? zeros(nz, nx) : zeros(1,1)
 
-	snaps = (pac.snaps_flag) ? zeros(nz,nx,length(pac.itsnaps)) : [0.0]
+	snaps = (pac.snaps_flag) ? zeros(nzd,nxd,length(pac.itsnaps)) : zeros(1,1,1)
 
 
 	# source wavelets
@@ -692,7 +645,6 @@ function update_gmodel!(pac::Paramc)
 
 	Models.Seismic_chainrule!(pac.gmodel, pac.model,gmodtt, gmodrr, [:χKI, :χρI], 1)
 
-
 	Models.χg!(gmodtt,KI0,-1)
 	Models.χg!(gmodrr,ρI0,-1)
 end
@@ -738,8 +690,8 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 			(pac.illum_flag) && compute_illum!(issp, pap.ss, pap)
 
 			if(pac.snaps_flag)
-				itsnap = findin(itsnaps,it)
-				(itsnapssave ≠ []) && (snaps_save!(itsnap[1],issp,pac,pap.ss,pap))
+				itsnap = findin(pac.itsnaps,it)
+				(itsnap ≠ []) && (snaps_save!(itsnap[1],issp,pac,pap.ss,pap))
 			end
 
 		end # time_loop
@@ -758,7 +710,7 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 		boundary_save_snap_vxvz!(issp,pac,pap.ss,pap)
 
 		"scale gradients for each issp"
-		(pac.gmodel_flag) && scale_gradient!(issp, pap.ss, δx*δz)
+		(pac.gmodel_flag) && scale_gradient!(issp, pap.ss, pac.model.mgrid.δx*pac.model.mgrid.δz)
 		
 
 	end # source_loop

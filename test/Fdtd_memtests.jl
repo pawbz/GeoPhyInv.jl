@@ -1,12 +1,14 @@
-addprocs(4)
+#addprocs(4)
 using JuMIT
 reload("JuMIT")
 using DistributedArrays
 
 model=JuMIT.Gallery.Seismic(:acou_homo1)
-acqgeom =JuMIT.Acquisition.Geom_circ(nss=4,nr=100,rad=[700.,700.]);
+acqgeom =JuMIT.Acquisition.Geom_circ(nss=1,nr=100,rad=[700.,700.]);
 acqsrc=JuMIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=0.7)
 @time pa=JuMIT.Fdtd.Param(born_flag=true,npw=2, tgridmod=acqsrc.tgrid,
+        gmodel_flag=true,
+        snaps_flag=true,
         backprop_flag=1,
         illum_flag=true,acqgeom=[acqgeom,acqgeom], acqsrc=[acqsrc,acqsrc],
         model=model);
@@ -53,4 +55,12 @@ for i in 1:3
         print("mod\t")
         @time JuMIT.Fdtd.mod!(pa);
         println("=============================")
+end
+
+
+for nloop in [4,8,16]
+        print("looping mod! for:\t",nloop)
+        @time for iloop in 1:nloop
+                JuMIT.Fdtd.mod!(pa)
+        end
 end

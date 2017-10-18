@@ -141,52 +141,56 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 	"note that: mean(K0) ≠ 1/mean(KI0)"
 	ρ0 = mod.ρ0; ρI0 = flipdim(ρ0.^(-1.0),1);
 	μ0 = mod.vs0 .* mod.vs0 .* mod.ρ0;
-	vp = χ(mod.χvp, mod.vp0, -1)
-	vs = χ(mod.χvs, mod.vs0, -1)
-	ρ = χ(mod.χρ, mod.ρ0, -1)
+	ρ=mod.χρ; χ!(ρ, mod.ρ0,-1) # undo it later
+	vp=mod.χvp; χ!(vp, mod.vp0,-1) # undo it later
+	vs=mod.χvs; χ!(vs, mod.vs0,-1) # undo it later
 	if(attrib == :ρI)
-		return ρ.^(-1.0);
+		rout= ρ.^(-1.0);
 	elseif(attrib == :ρ)
-		return ρ;
+		rout= ρ;
 	elseif(attrib == :vp)
-		return vp;
+		rout= vp;
 	elseif(attrib == :vs)
-		return vs;
+		rout= vs;
 	elseif(attrib == :ρ0)
-		return mod.ρ0;
+		rout= mod.ρ0;
 	elseif(attrib == :vp0)
-		return mod.vp0;
+		rout= mod.vp0;
 	elseif(attrib == :vs0)
-		return mod.vs0;
+		rout= mod.vs0;
 	elseif(attrib == :ρI0)
-		return ρI0
+		rout= ρI0
 	elseif(attrib == :χρI)
-		return χ(ρ.^(-1.0), ρI0);
+		rout= χ(ρ.^(-1.0), ρI0);
 	elseif(attrib == :χρ)
-		return mod.χρ;
+		rout= mod.χρ;
 	elseif(attrib == :χvp)
-		return mod.χvp;
+		rout= mod.χvp;
 	elseif(attrib == :χK)
-		return χ(vp .* vp .* ρ, K0);
+		rout= χ(vp .* vp .* ρ, K0);
 	elseif(attrib == :χμ)
-		return χ(vs .* vs .* ρ, μ0);
+		rout= χ(vs .* vs .* ρ, μ0);
 	elseif(attrib == :K0)
-		return K0
+		rout= K0
 	elseif(attrib == :μ0)
-		return μ0
+		rout= μ0
 	elseif(attrib == :KI0)
-		return KI0
+		rout= KI0
 	elseif(attrib == :χKI)
-		return χ((vp .* vp .* ρ).^(-1), KI0); 
+		rout= χ((vp .* vp .* ρ).^(-1), KI0); 
 	elseif(attrib == :KI)
-		return (vp .* vp .* ρ).^(-1);
+		rout= (vp .* vp .* ρ).^(-1);
 	elseif(attrib == :K)
-		return (vp .* vp .* ρ);
+		rout= (vp .* vp .* ρ);
 	elseif(attrib == :Zp)
-		return (vp .* ρ);
+		rout= (vp .* ρ);
 	else
 		error("invalid attrib")
 	end
+	χ!(ρ, mod.ρ0,1) 
+	χ!(vp, mod.vp0,1)
+	χ!(vs, mod.vp0,1)
+	return rout
 end
 
 """
