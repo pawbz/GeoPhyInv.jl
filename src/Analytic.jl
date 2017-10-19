@@ -55,7 +55,7 @@ function mod(;
 	# npow2 grid for time
 	tnpow2grid = Grid.M1D_fft(np2, tgridmod.δx);
 	# corresponding npow2 frequency grid 
-	fnpow2grid = Grid.M1D_fft_tf(tnpow2grid);
+	fnpow2grid = Grid.M1D_fft(tnpow2grid);
 
 	nss = acqgeom.nss
 	nr = acqgeom.nr

@@ -26,7 +26,7 @@ Time domain representation of Seismic Data.
 * `acqgeom::Acquisition.Geom` : acquisition geometry used to generate the data
 """
 type TD
-	d::Array{Array{Float64,2},2}
+	d::Matrix{Matrix{Float64}}
 	fields::Vector{Symbol}
 	tgrid::Grid.M1D
 	acqgeom::Acquisition.Geom
@@ -111,6 +111,7 @@ function TD_zeros(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.
 	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],fields,
 	   deepcopy(tgrid),deepcopy(acqgeom)) 
 end
+
 "Same as `TD_zeros`, except for returning ones"
 function TD_ones(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.Geom) 
 	return TD([ones(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],

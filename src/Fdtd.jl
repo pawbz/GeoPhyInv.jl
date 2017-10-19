@@ -69,12 +69,12 @@ type Paramc
 	δmodtt::Matrix{Float64}
 	δmodrrvx::Matrix{Float64}
 	δmodrrvz::Matrix{Float64}
-	grad_modtt_stack::Matrix{Float64}
-	grad_modrrvx_stack::Matrix{Float64}
-	grad_modrrvz_stack::Matrix{Float64}
+	grad_modtt_stack::SharedMatrix{Float64}
+	grad_modrrvx_stack::SharedMatrix{Float64}
+	grad_modrrvz_stack::SharedMatrix{Float64}
 	grad_modrr_stack::Matrix{Float64}
 	illum_flag::Bool
-	illum_stack::Matrix{Float64}
+	illum_stack::SharedMatrix{Float64}
 	backprop_flag::Int64
 	snaps_flag::Bool
 	itsnaps::Vector{Int64}
@@ -87,6 +87,7 @@ type Paramc
 	ibz1::Int64
 	isx0::Int64
 	isz0::Int64
+	datavec::SharedVector{Float64}
 	data::Vector{Data.TD}
 	verbose::Bool
 end 
@@ -98,7 +99,7 @@ type Paramss
 	iss::Int64
 	wavelets::Matrix{Matrix{Float64}}
 	ssprayw::Vector{Matrix{Float64}}
-	records::Matrix{Matrix{Float64}}
+	records::Vector{Array{Float64,3}}
 	rinterpolatew::Vector{Matrix{Float64}}
 	isx1::Vector{Vector{Int64}} 
 	isx2::Vector{Vector{Int64}}
@@ -272,15 +273,16 @@ function Param(;
 	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax,
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
-	grad_modtt_stack=zeros(nzd,nxd)
-	grad_modrrvx_stack=zeros(nzd,nxd)
-	grad_modrrvz_stack=zeros(nzd,nxd)
+	grad_modtt_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
+	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
+	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	grad_modrr_stack=zeros(nzd,nxd)
 	gmodel=Models.Seismic_zeros(model.mgrid)
-	illum_stack=zeros(nzd, nxd)
+	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
 	itsnaps = [indmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
 
+	datavec=SharedVector{Float64}(nt)
 	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]
 
 	pac=Paramc(jobname,npw,
@@ -299,6 +301,7 @@ function Param(;
 	    gmodel_flag,
 	    ibx0,ibz0,ibx1,ibz1,
 	    isx0,isz0,
+	    datavec,
 	    data,
 	    verbose)	
 
@@ -354,7 +357,7 @@ function Paramss(iss::Int64, pac::Paramc)
 	mesh_x, mesh_z = pac.exmodel.mgrid.x, pac.exmodel.mgrid.z
 
 	# records_output, distributed array among different procs
-	records = [zeros(pac.acqgeom[ipw].nr[iss],length(irfields)) for ipw in 1:npw, it in 1:nt]
+	records = [zeros(nt,pac.acqgeom[ipw].nr[iss],length(irfields)) for ipw in 1:npw]
 
 
 	# gradient outputs
@@ -543,18 +546,20 @@ Author: Pawan Bharadwaj
 end
 
 function update_data!(pac::Paramc, pap::Paramp)
+	datavec=pac.datavec
         pass=pap.ss
         for ipw in 1:pac.npw
-                for ifield in 1:length(pac.irfields)
-                        for issp in 1:length(pass)
-                                iss=pass[issp].iss
-                                records=pass[issp].records
+		for issp in 1:length(pass)
+			iss=pass[issp].iss
+			records=pass[issp].records[ipw]
+			for ifield in 1:length(pac.irfields)
                                 for ir in 1:pac.acqgeom[ipw].nr[iss]
-                                        dat=pac.data[ipw].d[iss,ifield]
-                                        datr=view(dat,:,ir)
-                                                for it in 1:pac.nt
-                                                        datr[it]=records[ipw,it][ir,ifield]
-                                                end
+					for it in 1:pac.nt
+						datavec[it]=records[it,ir,ifield]
+					end
+					dat=pac.data[ipw].d[iss,ifield]
+					dvec=view(dat,:,ir)
+					@. dvec = datavec
                                 end
                         end
                 end
@@ -579,7 +584,9 @@ end
 
 
 function grad_modrr!(pac::Paramc)
-	@. pac.grad_modrr_stack = (pac.grad_modrrvx_stack + pac.grad_modrrvz_stack) * (0.5)
+	@simd for i in eachindex(pac.grad_modrr_stack)
+		@inbounds pac.grad_modrr_stack[i] = (pac.grad_modrrvx_stack[i] + pac.grad_modrrvz_stack[i]) * (0.5)
+	end
 	grad_modrr_sprayrrvx!(pac.grad_modrr_stack,pac.grad_modrrvx_stack)
 	grad_modrr_sprayrrvz!(pac.grad_modrr_stack,pac.grad_modrrvz_stack)
 end
@@ -602,6 +609,7 @@ function stack_grads!(pac::Paramc, pap::Paramp)
 	np=pac.model.mgrid.npml
 	nx, nz=pac.nx, pac.nz
 
+	# theses are SharedArrays
 	gmodtt=pac.grad_modtt_stack
 	gmodrrvx=pac.grad_modrrvx_stack
 	gmodrrvz=pac.grad_modrrvz_stack
@@ -776,10 +784,10 @@ end
 	irz2=pass[issp].irz2
 
 	for ipw = 1:pac.npw
-		recs=pass[issp].records[ipw, it]
+		recs=pass[issp].records[ipw]
 		for (ifieldr, ifield) in enumerate(pac.irfields)
 			@simd for ir = 1:pac.acqgeom[ipw].nr[iss]
-				recs[ir,ifieldr]= 
+				recs[it,ir,ifieldr]= 
 				(
 				p[irz1[ipw][ir],irx1[ipw][ir],ifield,ipw]*
 				rinterpolatew[ipw][1,ir]+
@@ -864,9 +872,7 @@ end
 	a_x=pac.a_x; b_x=pac.b_x; k_xI=pac.k_xI; a_x_half=pac.a_x_half; b_x_half=pac.b_x_half; k_x_halfI=pac.k_x_halfI 
 	a_z=pac.a_z; b_z=pac.b_z; k_zI=pac.k_zI; a_z_half=pac.a_z_half; b_z_half=pac.b_z_half; k_z_halfI=pac.k_z_halfI
 
-
-	ppp .= pp
-	pp .=  p
+	pppppp!(p,pp,ppp)
 
 	"""
 	compute dpdx and dpdz at [it-1] for all propagating fields
@@ -891,6 +897,12 @@ end
 	"""
 	pvzvx!(p,dpdx,dpdz,modttI,nz,nx,δt)
 
+end
+function pppppp!(p,pp,ppp)
+	@simd for i in eachindex(p)
+		@inbounds ppp[i]=pp[i]
+		@inbounds pp[i]=p[i]
+	end
 end
 
 @inbounds @fastmath function dvdx!(dpdx,p,memory_dvx_dx,b_x,a_x,k_xI,nz,nx,δx24I)

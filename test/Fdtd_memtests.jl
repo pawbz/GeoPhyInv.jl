@@ -58,9 +58,9 @@ for i in 1:3
 end
 
 
-for nloop in [4,8,16]
-        print("looping mod! for:\t",nloop)
-        @time for iloop in 1:nloop
-                JuMIT.Fdtd.mod!(pa)
-        end
-end
+#for nloop in [4,8,16]
+#        print("looping mod! for:\t",nloop,"\t")
+#        @time for iloop in 1:nloop
+#                JuMIT.Fdtd.mod!(pa)
+#        end
+#end
