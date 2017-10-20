@@ -61,8 +61,8 @@ end
 #	return sort(ivec)
 #end
 
-function interp_spray!(xin::Vector{Float64}, yin::Vector{Float64},
-					   xout::Vector{Float64}, yout::Vector{Float64},
+function interp_spray!(xin::Vector{Float64}, yin::AbstractVector{Float64},
+					   xout::Vector{Float64}, yout::AbstractVector{Float64},
 					   attrib::Symbol,
 					   Battrib::Symbol=:B1
 					  )

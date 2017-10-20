@@ -62,7 +62,8 @@ function mod(;
 	ns = acqgeom.ns
 	data = Data.TD(
 	      [zeros(nt,nr[iss]) for iss=1:nss, ifield=1:1],
-	      1,tgridmod,acqgeom)
+	      [:P],
+	      tgridmod,acqgeom)
 
 	for ifield = 1:length(data.fields), iss = 1:nss
 		sx = acqgeom.sx[iss][:]

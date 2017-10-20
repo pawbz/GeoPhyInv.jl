@@ -61,7 +61,7 @@ function TD_resamp(data::TD,
 	nr = data.acqgeom.nr
 	dataout = TD(
 	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:length(data.fields)],
-	      length(data.fields),tgrid,data.acqgeom)
+	      data.fields,tgrid,data.acqgeom)
 	TD_resamp!(dataout, data)
 	return dataout
 end
@@ -79,15 +79,15 @@ function TD_resamp!(dataout::TD, data::TD)
 	# check if datasets are similar
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
+	xin=data.tgrid.x
+	xout=dataout.tgrid.x
 	for ifield = 1:length(data.fields), iss = 1:nss
-		dat=view(data.d,iss,ifield)
-		dato=view(dataout.d,iss,ifield)
+		dat=data.d[iss,ifield]
+		dato=dataout.d[iss,ifield]
 		for ir = 1:nr[iss]
 			din=view(dat,:,ir)
 			dout=view(dato,:,ir)
-			xin=data.tgrid.x
-			xout=dataout.tgrid.x
-			Interpolation.interp_spray!(xin, din, xout, dout, :interp, :B1 )
+			Interpolation.interp_spray!(xin, din, xout, dout,:interp,:B1)
 		end
 	end
 	return dataout

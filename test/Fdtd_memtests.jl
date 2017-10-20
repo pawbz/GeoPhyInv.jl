@@ -51,7 +51,7 @@ for i in 1:3
         print("update gmodel\t")
         @time JuMIT.Fdtd.update_gmodel!(pac)
         print("update data\t")
-        @time JuMIT.Fdtd.update_data!(pac,localpart(pa.p))
+        @time JuMIT.Fdtd.update_datamat!(pac,localpart(pa.p))
         print("mod\t")
         @time JuMIT.Fdtd.mod!(pa);
         println("=============================")

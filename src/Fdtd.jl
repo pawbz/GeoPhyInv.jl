@@ -87,7 +87,7 @@ type Paramc
 	ibz1::Int64
 	isx0::Int64
 	isz0::Int64
-	datavec::SharedVector{Float64}
+	datamat::SharedArray{Float64,3}
 	data::Vector{Data.TD}
 	verbose::Bool
 end 
@@ -140,7 +140,36 @@ type Param
 	c::Paramc # common parameters
 end
 
+function initialize!(pap::Paramp)
+	reset_per_ss!(pap)
+	for issp in 1:length(pap.ss)
+		pass=pap.ss[issp]
+		for i in 1:length(pass.boundary)
+			pass.boundary[i][:]=0.0
+		end
+		for i in 1:length(pass.records)
+			pass.records[i][:]=0.0
+		end
+		pass.snaps[:]=0.0
+		pass.illum[:]=0.0
+		pass.grad_modtt[:]=0.0
+		pass.grad_modrrvx[:]=0.0
+		pass.grad_modrrvz[:]=0.0
+		pass.born_svalue_stack[:]=0.0
+	end
+end
 
+function reset_per_ss!(pap::Paramp)
+	pap.p[:]=0.0
+	pap.pp[:]=0.0
+	pap.ppp[:]=0.0
+	pap.dpdx[:]=0.0
+	pap.dpdz[:]=0.0
+	pap.memory_dp_dz[:]=0.0
+	pap.memory_dp_dx[:]=0.0
+	pap.memory_dvx_dx[:]=0.0
+	pap.memory_dvz_dz[:]=0.0
+end
 
 
 function Param(;
@@ -247,7 +276,7 @@ function Param(;
 		"inverse Bulk Modulus contrasts for Born Modelling"
 		δmodtt = Models.Seismic_get(exmodel_pert, :KI) - Models.Seismic_get(exmodel, :KI)
 	else
-		δmodtt, δmodrrvx, δmodrrvz = [0.0], [0.0], [0.0]
+		δmodtt, δmodrrvx, δmodrrvz = zeros(1,1), zeros(1,1), zeros(1,1)
 	end
 
 
@@ -282,7 +311,8 @@ function Param(;
 
 	itsnaps = [indmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
 
-	datavec=SharedVector{Float64}(nt)
+	nrmat=[acqgeom[ipw].nr[iss] for ipw in 1:npw, iss in 1:acqgeom[1].nss]
+	datamat=SharedArray{Float64}(nt,maximum(nrmat),acqgeom[1].nss)
 	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]
 
 	pac=Paramc(jobname,npw,
@@ -301,16 +331,16 @@ function Param(;
 	    gmodel_flag,
 	    ibx0,ibz0,ibx1,ibz1,
 	    isx0,isz0,
-	    datavec,
+	    datamat,
 	    data,
 	    verbose)	
 
 	nwork = min(nss, nworkers())
 	work = workers()[1:nwork]
-	ssi=[round(Int, s) for s in linspace(1,nss,nwork+1)]
+	ssi=[round(Int, s) for s in linspace(0,nss,nwork+1)]
 	sschunks=Array{UnitRange{Int64}}(nwork)
 	for ib in 1:nwork       
-		sschunks[ib]=ssi[ib]:ssi[ib+1]
+		sschunks[ib]=ssi[ib]+1:ssi[ib+1]
 	end
 	papa=ddata(T=Paramp, init=I->Paramp(sschunks[I...][1],pac), pids=work);
 
@@ -380,7 +410,7 @@ function Paramss(iss::Int64, pac::Paramc)
 	if(pac.born_flag)
 		born_svalue_stack = zeros(nz, nx)
 	else
-		born_svalue_stack = [0.0]
+		born_svalue_stack = zeros(1,1)
 	end
 
 
@@ -510,6 +540,14 @@ Author: Pawan Bharadwaj
 """
 @fastmath function mod!(pa::Param=Param())
 	
+	@sync begin
+		for (ip, p) in enumerate(procs(pa.p))
+			@async remotecall_wait(p) do 
+				initialize!(localpart(pa.p))
+			end
+		end
+	end
+
 
 	# all localparts of DArray are input to this method
 	# parallelization over shots
@@ -522,48 +560,60 @@ Author: Pawan Bharadwaj
 	end
 
 	# stack gradients and illum over sources
-	for (ip, p) in enumerate(procs(pa.p))
-		remotecall_wait(p) do 
-			(pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
-			(pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
+	@sync begin
+		for (ip, p) in enumerate(procs(pa.p))
+			@sync remotecall_wait(p) do 
+				(pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
+				(pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
+			end
 		end
 	end
 
 	# update gradient model using grad_modtt_stack, grad_modrr_stack
 	update_gmodel!(pa.c)
 
-	for (ip, p) in enumerate(procs(pa.p))
-		remotecall_wait(p) do 
-			update_data!(pa.c, localpart(pa.p))
+	for ipw in 1:pa.c.npw
+		for ifield in 1:length(pa.c.irfields)
+
+			pa.c.datamat[:]=0.0
+			@sync begin
+				for (ip, p) in enumerate(procs(pa.p))
+					@sync remotecall_wait(p) do 
+						update_datamat!(ifield, ipw, pa.c, localpart(pa.p))
+					end
+				end
+			end
+			update_data!(ifield, ipw, pa.c)
 		end
 	end
 
 	return nothing
-
-	
-	# return data depending on the receiver flags
-	# return TDout, boundary, gmodel, snaps
 end
 
-function update_data!(pac::Paramc, pap::Paramp)
-	datavec=pac.datavec
+function update_datamat!(ifield, ipw, pac::Paramc, pap::Paramp)
+	datamat=pac.datamat
         pass=pap.ss
-        for ipw in 1:pac.npw
-		for issp in 1:length(pass)
-			iss=pass[issp].iss
-			records=pass[issp].records[ipw]
-			for ifield in 1:length(pac.irfields)
-                                for ir in 1:pac.acqgeom[ipw].nr[iss]
-					for it in 1:pac.nt
-						datavec[it]=records[it,ir,ifield]
-					end
-					dat=pac.data[ipw].d[iss,ifield]
-					dvec=view(dat,:,ir)
-					@. dvec = datavec
-                                end
-                        end
-                end
+	for issp in 1:length(pass)
+		iss=pass[issp].iss
+		records=pass[issp].records[ipw]
+		for ir in 1:pac.acqgeom[ipw].nr[iss]
+			for it in 1:pac.nt
+				datamat[it,ir,iss]=records[it,ir,ifield]
+			end
+		end
         end
+end
+
+function update_data!(ifield, ipw, pac::Paramc)
+	datamat=pac.datamat
+	for iss in 1:pac.acqgeom[1].nss
+		data=pac.data[ipw].d[iss,ifield]
+		for ir in 1:pac.acqgeom[ipw].nr[iss]
+			for it in 1:pac.nt
+				data[it,ir]=datamat[it,ir,iss]
+			end
+		end
+	end
 end
 
 
@@ -661,6 +711,8 @@ end
 function mod_per_proc!(pac::Paramc, pap::Paramp) 
 	# source_loop
 	for issp in 1:length(pap.ss)
+		reset_per_ss!(pap)
+
 		iss=pap.ss[issp].iss
 
 		if(pac.verbose)
