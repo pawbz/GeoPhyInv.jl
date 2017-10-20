@@ -26,7 +26,7 @@ Time domain representation of Seismic Data.
 * `acqgeom::Acquisition.Geom` : acquisition geometry used to generate the data
 """
 type TD
-	d::Array{Array{Float64,2},2}
+	d::Matrix{Matrix{Float64}}
 	fields::Vector{Symbol}
 	tgrid::Grid.M1D
 	acqgeom::Acquisition.Geom
@@ -61,7 +61,7 @@ function TD_resamp(data::TD,
 	nr = data.acqgeom.nr
 	dataout = TD(
 	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:length(data.fields)],
-	      length(data.fields),tgrid,data.acqgeom)
+	      data.fields,tgrid,data.acqgeom)
 	TD_resamp!(dataout, data)
 	return dataout
 end
@@ -79,14 +79,16 @@ function TD_resamp!(dataout::TD, data::TD)
 	# check if datasets are similar
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
-	for ifield = 1:length(data.fields), iss = 1:nss, ir = 1:nr[iss]
-		din = data.d[iss, ifield][:, ir]
-		xin = data.tgrid.x
-		xout = dataout.tgrid.x
-		dout = similar(xout)
-		Interpolation.interp_spray!(xin, din, xout, dout, :interp, :B1 )
-
-		dataout.d[iss, ifield][:,ir] = copy(dout)
+	xin=data.tgrid.x
+	xout=dataout.tgrid.x
+	for ifield = 1:length(data.fields), iss = 1:nss
+		dat=data.d[iss,ifield]
+		dato=dataout.d[iss,ifield]
+		for ir = 1:nr[iss]
+			din=view(dat,:,ir)
+			dout=view(dato,:,ir)
+			Interpolation.interp_spray!(xin, din, xout, dout,:interp,:B1)
+		end
 	end
 	return dataout
 end
@@ -109,6 +111,12 @@ function TD_zeros(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.
 	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],fields,
 	   deepcopy(tgrid),deepcopy(acqgeom)) 
 end
+function TD_zeros!(data::TD)
+	for iss=1:data.acqgeom.nss, ifield=1:length(data.fields)
+		data.d[iss,ifield][:]=0.0 
+	end
+end
+
 "Same as `TD_zeros`, except for returning ones"
 function TD_ones(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.Geom) 
 	return TD([ones(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],

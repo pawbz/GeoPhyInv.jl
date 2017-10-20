@@ -47,6 +47,10 @@ Inversion Parameters
 TODO: add an extra attribute for coupling functions inversion and modelling
 """
 type Param
+	"forward modelling parameters for"
+	paf::Fdtd.Param
+	"adjoint modelling parameters"
+	pafa::Fdtd.Param
 	"base source wavelet"
 	acqsrc::Acquisition.Src
 	"adjoint source functions"
@@ -164,6 +168,74 @@ function Param(
 	(attrib == :synthetic) &&
 	(Models.Seismic_isequal(modm0, modm_obs)) && error("change background model used for Born modelling")
 
+	# generating forward modelling parameters
+	# generate modelled data, border values, etc.
+	if(attrib_mod == :fdtd)
+		paf=Fdtd.Param(model=model, acqgeom=[acqgeom], 
+		    acqsrc=[acqsrc],sflags=[2],illum_flag=illum_out, 
+		    backprop_flag=1,tgridmod=tgrid) 
+	elseif(attrib_mod == :fdtd_born)
+		# Two propagating fields, both in the background model.
+		backprop_flag = pa.buffer_update_flag ? 1 : 0
+
+		paf=Fdtd.Param(born_flag=true, npw=2, model=modm0, 
+		    model_pert=model, 
+		    acqgeom=[acqgeom, acqgeom], acqsrc=[acqsrc, acqsrc], 
+		    illum_flag=illum_out,
+		    backprop_flag=backprop_flag,
+		    sflags=[2, 0], rflags = [0, 1], 
+		    tgridmod=tgrid);
+
+		# switch off buffer update from now on (because the buffer doesn't change with x)
+		pa.buffer_update_flag = false
+	elseif(attrib_mod == :fdtd_hborn)
+		if(pa.buffer_update_flag)
+			# storing boundary values 
+			paf=Fdtd.mod!(model=pa.modm0, acqgeom=[pa.acqgeom], 
+					 acqsrc=[acqsrc], 
+					 backprop_flag=1,
+					 tgridmod=tgrid, 
+					 sflags=[2], rflags=[0], verbose=verbose)
+			# switch off buffer update from now on (because the buffer doesn't change with x)
+			pa.buffer_update_flag = false
+		end
+
+		paf=Fdtd.Param(backprop_flag=-1, 
+		    npw=2, model=pa.modm0, model_pert=model, 
+		    acqgeom=[acqgeom, acqgeom], 
+		    illum_flag=illum_out,
+		    acqsrc=[acqsrc, acqsrc], sflags=[3, 0], 
+		    rflags=[0, 1],
+		    tgridmod=tgrid, born_flag=true, verbose=pa.verbose);
+
+	else
+		error("invalid pa.attrib_mod")
+	end
+
+	# generating adjoint modelling parameters
+	if(pa.attrib_mod == :fdtd)
+		# adjoint simulation
+		pafa=Fdtd.Param(npw=2, model=pa.modm,
+			acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], sflags=[3, 2],
+			backprop_flag=-1, 
+			tgridmod=tgrid, gmodel_flag=true, verbose=verbose)
+
+	elseif(pa.attrib_mod == :fdtd_born)
+		# adjoint simulation
+		pafa=Fdtd.Param(npw=2, model=pa.modm0,  
+			acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], sflags=[3, 2], 
+			backprop_flag=-1, 
+			tgridmod=tgrid, gmodel_flag=true, verbose=verbose)
+
+	elseif(pa.attrib_mod == :fdtd_hborn)
+		# adjoint simulation
+		pafa=Fdtd.Param(npw=2, model=pa.modm0,  
+			acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], sflags=[2, 2], 
+			tgridmod=tgrid, gmodel_flag=true, verbose=verbose)
+	else
+		error("invalid pa.attrib_mod")
+	end
+
 
 	pa = Param(deepcopy(acqsrc), 
 	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
@@ -185,7 +257,7 @@ function Param(
 	     nothing, true)
 
 	# buffer allocation
-	forward_simulation_allocate_buffer!(pa)
+	F_allocate_buffer!(pa)
 
 	# update pdcal
 	update_dcal!(pa, mprecon_factor)
@@ -193,7 +265,7 @@ function Param(
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic) & Data.TD_iszero(pa.dobs))
 		# change source wavelets for modelling observed data
-		forward_simulation!(pa, modm=modm_obs, mattrib=:modm,acqsrc=acqsrc_obs, dattrib=:dobs) # x is dummy here
+		F!(pa, modm=modm_obs, mattrib=:modm,acqsrc=acqsrc_obs, dattrib=:dobs) # x is dummy here
 	end
 	Data.TD_iszero(pa.dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
 
@@ -206,7 +278,7 @@ Use to update `dcal` in pa (only for testing)
 function update_dcal!(pa, mprecon_factor=1.0)
 	illum_out = (mprecon_factor == 1.0) ? false : true
 	# intial modelling dcal
-	illum = forward_simulation!(pa, modm=pa.modm, mattrib=:modm, illum_out=illum_out) # x is dummy here, since actually using pa.modm
+	illum = F!(pa, modm=pa.modm, mattrib=:modm, illum_out=illum_out) # x is dummy here, since actually using pa.modm
 
 	# build precon based on illum
 	build_mprecon!(pa, illum, mprecon_factor)
@@ -373,7 +445,7 @@ end
 """
 Allocations necessary for forward simulations
 """
-function forward_simulation_allocate_buffer!(pa::Param)
+function F_allocate_buffer!(pa::Param)
 	nx = pa.modm.mgrid.nx
 	nz = pa.modm.mgrid.nz
 	npml = pa.modm.mgrid.npml
@@ -395,7 +467,7 @@ and boundary values for adjoint calculation.
 * `pa::Param` : parameters that are constant during the inversion 
 * `modm::Models.Seismic` : 
 """
-function forward_simulation!(
+function F!(
 			pa::Param,
 			x::Vector{Float64}=zeros(xfwi_ninv(pa)),
 			last_x::Vector{Float64}=ones(xfwi_ninv(pa));
@@ -420,56 +492,6 @@ function forward_simulation!(
 		end
 
 		illum=ones(pa.modm.mgrid.nz, pa.modm.mgrid.nx)
-		# generate modelled data, border values, etc.
-		if(pa.attrib_mod == :fdtd)
-			Fdtd.mod!(model=model, acqgeom=[pa.acqgeom], 
-			    acqsrc=[acqsrc],src_flags=[2], 
-			    TDout=pa.dtemp,illum=illum, illum_flag=illum_out,
-			    backprop_flag=1,
-			    boundary=pa.buffer, 
-			    tgridmod=pa.dcal.tgrid) 
-		elseif(pa.attrib_mod == :fdtd_born)
-			"""
-			Two propagating fields, both in the background model.
-			"""
-			backprop_flag = pa.buffer_update_flag ? 1 : 0
-
-			Fdtd.mod!(born_flag=true, npropwav=2, model=pa.modm0, model_pert=model, 
-	    		    acqgeom=[pa.acqgeom, pa.acqgeom], acqsrc=[acqsrc, acqsrc], 
-			    TDout=pa.dtemp, 
-			    illum=illum, illum_flag=illum_out,
-			    backprop_flag=backprop_flag,
-			    boundary=pa.buffer,
-			    src_flags=[2, 0], recv_flags = [0, 1], 
-			    tgridmod=pa.dcal.tgrid);
-
-			# switch off buffer update from now on (because the buffer doesn't change with x)
-			pa.buffer_update_flag = false
-		elseif(pa.attrib_mod == :fdtd_hborn)
-			if(pa.buffer_update_flag)
-				# storing boundary values 
-				Fdtd.mod!(model=pa.modm0, acqgeom=[pa.acqgeom], 
-						 acqsrc=[acqsrc], 
-						 backprop_flag=1,
-						 boundary=pa.buffer,
-						 tgridmod=pa.dcal.tgrid, 
-						 src_flags=[2], recv_flags=[0], verbose=pa.verbose)
-				# switch off buffer update from now on (because the buffer doesn't change with x)
-				pa.buffer_update_flag = false
-			end
-
-			Fdtd.mod!(backprop_flag=-1, boundary=pa.buffer,
-			    npropwav=2, model=pa.modm0, model_pert=model, 
-			    acqgeom=[pa.acqgeom, pa.acqgeom], 
-			    illum=illum, illum_flag=illum_out,
-			    acqsrc=[acqsrc, acqsrc], src_flags=[3, 0], 
-			    TDout=pa.dtemp,
-			    recv_flags=[0, 1],
-			    tgridmod=pa.dcal.tgrid, born_flag=true, verbose=pa.verbose);
-
-		else
-			error("invalid pa.attrib_mod")
-		end
 		setfield!(pa, dattrib, deepcopy(pa.dtemp[1]))
 		!(illum_out) && (illum[:] = 1.0)  # illum is ones when absent
 		return illum
@@ -512,7 +534,7 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 
 	pa.verbose && println("computing gradient...")
 
-	forward_simulation!(pa, x, last_x)
+	F!(pa, x, last_x)
 
 	# apply coupling to the modeled data
 	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
@@ -536,31 +558,7 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 		Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
 
 		
-		if(pa.attrib_mod == :fdtd)
-			# adjoint simulation
-			Fdtd.mod!(npropwav=2, model=pa.modm,
-				acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[3, 2],
-				backprop_flag=-1, boundary=pa.buffer, 
-				gmodel=pa.gmodm, 
-				tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
-
-		elseif(pa.attrib_mod == :fdtd_born)
-			# adjoint simulation
-			Fdtd.mod!(npropwav=2, model=pa.modm0,  
-				acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[3, 2], 
-				backprop_flag=-1, boundary=pa.buffer, 
-				gmodel=pa.gmodm, 
-				tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
-
-		elseif(pa.attrib_mod == :fdtd_hborn)
-			# adjoint simulation
-			Fdtd.mod!(npropwav=2, model=pa.modm0,  
-				acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[2, 2], 
-				gmodel=pa.gmodm, 
-				tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
-		else
-			error("invalid pa.attrib_mod")
-		end
+		# do adjoint modelling here
 
 		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
 
@@ -586,12 +584,12 @@ function hessian_xfwi!(loc, pa)
 	Seismic_x!(model_pert, model_perti, x, pa, -1)		
 
 	# generate Born Data
-	Fdtd.mod!(born_flag=true, npropwav=2, model=pa.modm0, model_pert=model_pert, 
+	Fdtd.mod!(born_flag=true, npw=2, model=pa.modm0, model_pert=model_pert, 
 	    acqgeom=[pa.acqgeom, pa.acqgeom], acqsrc=[pa.acqsrc, pa.acqsrc], 
 	    TDout=pa.dtemp, 
 	    backprop_flag=1,
 	    boundary=pa.buffer,
-	    src_flags=[2, 0], recv_flags = [0, 1], 
+	    sflags=[2, 0], rflags = [0, 1], 
 	    tgridmod=pa.dcal.tgrid);
 
 	setfield!(pa, :dcal, deepcopy(pa.dtemp[1]))
@@ -607,8 +605,8 @@ function hessian_xfwi!(loc, pa)
 	update_adjsrc!(pa.dcal, pa)
 
 	# adjoint simulation
-	Fdtd.mod!(npropwav=2, model=pa.modm0,
-		acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], src_flags=[3, 2],
+	Fdtd.mod!(npw=2, model=pa.modm0,
+		acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], sflags=[3, 2],
 		backprop_flag=-1, boundary=pa.buffer, 
 		gmodel=pa.gmodm, 
 		tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)

@@ -131,7 +131,7 @@ Plot time-domain data of type `Data.TD`
 * `tr_flag::Bool=false` : plot time-reversed data when true
 * `attrib::Symbol=:wav` : specify type of plot
 """
-function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(td)), 
+function TD(td::Vector{Data.TD}; ssvec::Vector{AbstractVector{Int64}}=fill([1], length(td)), 
 	    fields::Vector{Symbol}=[:P],
 	    tr_flag::Bool=false, attrib::Symbol=:wav, 
 	    wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],

@@ -102,6 +102,11 @@ function Seismic_zeros(mgrid::Grid.M2D)
 		zeros(mgrid.nz, mgrid.nx), zeros(mgrid.nz, mgrid.nx),
 		zeros(mgrid.nz, mgrid.nx), deepcopy(mgrid))
 end
+function Seismic_zeros!(mod::Seismic)
+	mod.χvp[:]=0.0
+	mod.χρ[:]=0.0
+	mod.χvs[:]=0.0
+end
 
 function Seismic_iszero(mod::Seismic)
 	return any((mod.vp0 .* mod.ρ0) .== 0.0) ? true : false
@@ -109,6 +114,19 @@ end
 
 "Logical operation for `Seismic`"
 function Seismic_isequal(mod1::Seismic, mod2::Seismic)
+	fnames = fieldnames(Seismic)
+	pop!(fnames) # last one has different isequal
+	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
+	push!(vec, Grid.M2D_isequal(mod1.mgrid, mod2.mgrid))
+	return all(vec)
+end
+
+function Seismic_issimilar(mod1::Seismic, mod2::Seismic)
+	vec=([(mod1.vp0==mod2.vp0), (mod1.vs0==mod2.vs0), (mod1.ρ0==mod2.ρ0), 
+       		(size(mod1.χvp)==size(mod2.χvp)), 
+       		(size(mod1.χvs)==size(mod2.χvs)), 
+       		(size(mod1.χρ)==size(mod2.χρ)), 
+		])
 	fnames = fieldnames(Seismic)
 	pop!(fnames) # last one has different isequal
 	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
@@ -141,52 +159,56 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 	"note that: mean(K0) ≠ 1/mean(KI0)"
 	ρ0 = mod.ρ0; ρI0 = flipdim(ρ0.^(-1.0),1);
 	μ0 = mod.vs0 .* mod.vs0 .* mod.ρ0;
-	vp = χ(mod.χvp, mod.vp0, -1)
-	vs = χ(mod.χvs, mod.vs0, -1)
-	ρ = χ(mod.χρ, mod.ρ0, -1)
+	ρ=mod.χρ; χ!(ρ, mod.ρ0,-1) # undo it later
+	vp=mod.χvp; χ!(vp, mod.vp0,-1) # undo it later
+	vs=mod.χvs; χ!(vs, mod.vs0,-1) # undo it later
 	if(attrib == :ρI)
-		return ρ.^(-1.0);
+		rout= ρ.^(-1.0);
 	elseif(attrib == :ρ)
-		return ρ;
+		rout= ρ;
 	elseif(attrib == :vp)
-		return vp;
+		rout= vp;
 	elseif(attrib == :vs)
-		return vs;
+		rout= vs;
 	elseif(attrib == :ρ0)
-		return mod.ρ0;
+		rout= mod.ρ0;
 	elseif(attrib == :vp0)
-		return mod.vp0;
+		rout= mod.vp0;
 	elseif(attrib == :vs0)
-		return mod.vs0;
+		rout= mod.vs0;
 	elseif(attrib == :ρI0)
-		return ρI0
+		rout= ρI0
 	elseif(attrib == :χρI)
-		return χ(ρ.^(-1.0), ρI0);
+		rout= χ(ρ.^(-1.0), ρI0);
 	elseif(attrib == :χρ)
-		return mod.χρ;
+		rout= mod.χρ;
 	elseif(attrib == :χvp)
-		return mod.χvp;
+		rout= mod.χvp;
 	elseif(attrib == :χK)
-		return χ(vp .* vp .* ρ, K0);
+		rout= χ(vp .* vp .* ρ, K0);
 	elseif(attrib == :χμ)
-		return χ(vs .* vs .* ρ, μ0);
+		rout= χ(vs .* vs .* ρ, μ0);
 	elseif(attrib == :K0)
-		return K0
+		rout= K0
 	elseif(attrib == :μ0)
-		return μ0
+		rout= μ0
 	elseif(attrib == :KI0)
-		return KI0
+		rout= KI0
 	elseif(attrib == :χKI)
-		return χ((vp .* vp .* ρ).^(-1), KI0); 
+		rout= χ((vp .* vp .* ρ).^(-1), KI0); 
 	elseif(attrib == :KI)
-		return (vp .* vp .* ρ).^(-1);
+		rout= (vp .* vp .* ρ).^(-1);
 	elseif(attrib == :K)
-		return (vp .* vp .* ρ);
+		rout= (vp .* vp .* ρ);
 	elseif(attrib == :Zp)
-		return (vp .* ρ);
+		rout= (vp .* ρ);
 	else
 		error("invalid attrib")
 	end
+	χ!(ρ, mod.ρ0,1) 
+	χ!(vp, mod.vp0,1)
+	χ!(vs, mod.vp0,1)
+	return rout
 end
 
 """
@@ -242,8 +264,8 @@ with respect to KI and ρI.
 function Seismic_chainrule!(
 		      gmod::Seismic,
 		      mod::Seismic,
-		      g1::Vector{Float64},
-		      g2::Vector{Float64},
+		      g1::AbstractVector{Float64},
+		      g2::AbstractVector{Float64},
 		      attribs::Vector{Symbol}=[:χKI, :χρI],
 		      flag::Int64=1
 		      )
@@ -251,48 +273,83 @@ function Seismic_chainrule!(
 	if(flag == 1)
 		if(attribs == [:χKI, :χρI]) 
 			vp0 = mod.vp0;	vs0 = mod.vs0;	ρ0 = mod.ρ0
-			ρI = Seismic_get(mod,:ρI);	vp = Seismic_get(mod,:vp)
-			Zp = Seismic_get(mod,:Zp)
+			ρ=view(mod.χρ,:); χ!(ρ, mod.ρ0,-1) # undo it later
+			vp=view(mod.χvp,:); χ!(vp, mod.vp0,-1) # undo it later
+			KI0=Seismic_get(mod,:KI0)
+			ρI0=Seismic_get(mod,:ρI0)
+			χg!(g1,KI0,-1)
+			χg!(g2,ρI0,-1)
 
-			gKI = χg(reshape(g1, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:KI0), -1)
-			gρI = χg(reshape(g2, mod.mgrid.nz, mod.mgrid.nx), Seismic_get(mod,:ρI0), -1)
-
+			gχρ=view(gmod.χρ,:)
+			gχvp=view(gmod.χvp,:)
 			# gradient w.r.t  χρ
-			gmod.χρ = copy(χg((-1. .* ρI.^2 .* gρI - (Zp).^(-2) .* gKI), ρ0, 1))
+			@. gχρ = -1.*inv(ρ)^2*g2-inv(vp*vp*ρ*ρ)*g1
 			# gradient w.r.t χvp
-			gmod.χvp = copy(χg((-2. .* (vp).^(-3) .* ρI .* gKI), vp0, 1))
-			# to be implemented later
-			gmod.χvs = copy(zeros(gmod.χvp))
-			gmod.mgrid = deepcopy(mod.mgrid);	gmod.vp0 = copy(mod.vp0);	gmod.ρ0 = copy(mod.ρ0)
+			@. gχvp = -2.*inv(vp^3)*inv(ρ)*g1
+			χg!(gχρ,ρ0,1)
+			χg!(gχvp,vp0,1)
+			# are these necessary?
+			#gmod.χvs = copy(zeros(gmod.χvp))
+			#gmod.mgrid = deepcopy(mod.mgrid);	
+			#gmod.vp0 = copy(mod.vp0);	gmod.ρ0 = copy(mod.ρ0)
+			χ!(ρ, mod.ρ0,1)
+			χ!(vp, mod.vp0,1)
+			χg!(g1,KI0,1)
+			χg!(g2,ρI0,1)
 		else
 			error("invalid attribs")
 		end
 	elseif(flag == -1)
-		gvp = vec(χg(gmod.χvp, mod.vp0, -1))
-		gρ = vec(χg(gmod.χρ, mod.ρ0, -1))
+		χg!(gmod.χvp, mod.vp0, -1) # undo it later
+		χg!(gmod.χρ, mod.ρ0, -1) # undo it later
+		gvp = view(gmod.χvp, :)
+		gρ = view(gmod.χρ, :)
 		K0 = mean(Seismic_get(mod, :K0))
 		KI0 = mean(Seismic_get(mod, :KI0))
 		ρ0 = mean(mod.ρ0)
 		ρI0 = mean(Seismic_get(mod, :ρI0))
-		ρI = vec(Seismic_get(mod,:ρI));	vp = vec(Seismic_get(mod,:vp))
-		ρ = vec(Seismic_get(mod,:ρ)); ρ0 = mean(mod.ρ0)
+		ρ0 = mean(mod.ρ0)
+		ρ=view(mod.χρ,:); χ!(ρ, mod.ρ0,-1) # undo it later
+		vp=view(mod.χvp,:); χ!(vp, mod.vp0,-1) # undo it later
 
 		nznx = mod.mgrid.nz * mod.mgrid.nx;
 		if(attribs == [:χK, :χρ])
-			g1[1:nznx] = copy(0.5 .* K0 * gvp .* ρI .* vp.^(-1))
-			g2[1:nznx] = copy((gρ .* ρ0) - (0.5 .* ρ0 .* (gvp) .* (vp) ./ (ρ) ))
+			@. g1 = gvp * inv(ρ) * inv(vp) 
+			scale!(gmod.χvp, 0.5*K0)
+			@. g2 = gp
+			@. g2 = gvp * vp * inv(ρ)
+			scale!(g2,-0.5)
+			@. g2 += gρ
+			scale!(g2,ρ0)
 		elseif(attribs == [:χKI, :χρI])
-			g1[1:nznx] =  copy(-0.5 .* KI0 .* gvp .* ρ .*  vp.^(3.))
-			g2[1:nznx] = copy((gρ .* ρI0 .* (-1.) .*  (ρ.^(2))) +
-			    (0.5 * ρI0 .* (gvp) .*  (vp) .* (ρ)))
+			chain_g1!(g1,gvp,ρ,vp,KI0)
+			chain_g2!(g2,gρ,ρI0,ρ,gvp,vp)
 		else
 			error("invalid attribs")
 		end
+		χg!(gvp,mod.vp0,1)
+		χg!(gρ,mod.ρ0,1)
+		χ!(ρ, mod.ρ0,1)
+		χ!(vp, mod.vp0,1)
 	else
 		error("invalid flag")
 	end
 
 end
+
+function chain_g1!(g1,gvp,ρ,vp,KI0)
+	@simd for i in eachindex(g1)
+		g1[i] = -0.5 * KI0 * gvp[i] * ρ[i] *  vp[i]^3
+	end
+end
+function chain_g2!(g2,gρ,ρI0,ρ,gvp,vp)
+	@simd for i in eachindex(g2)
+		g2[i] = (gρ[i] * ρI0 * -1. * ρ[i]*ρ[i]) + 
+			(0.5 * ρI0 .* gvp[i] .*  vp[i] .* ρ[i])
+	end
+end
+
+
 
 
 """
@@ -304,30 +361,52 @@ reference value.
 * `mod0::Vector{Float64}` : reference value is mean of this vector
 * `flag::Int64=1` : 
 """
-function χ(mod::Array{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+function χ(mod::AbstractArray{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+	mod_out=copy(mod)
+	χ!(mod_out, mod0, flag)
+	return mod_out
+end
+function χ!(mod::AbstractArray{Float64}, mod0::Vector{Float64}, flag::Int64=1)
 	m0 = mean(mod0)
 	if(flag == 1)
-		# return zero when m0 is zero
-		return	(m0 == 0.0) ? 0.0 : ((mod - m0) * m0^(-1.0))
+		if(iszero(m0))
+			return nothing
+		else
+			@simd for i in eachindex(mod)
+				mod[i] = ((mod[i] - m0) * inv(m0))
+			end
+			return mod 
+		end
 	elseif(flag == -1)
-		return  (mod .* m0 + m0)
+		@simd for i in eachindex(mod)
+			mod[i] = mod[i] * m0 + m0
+		end
+		return mod 
 	end
 end
+
 
 """
 Gradients
 Return contrast model parameter using the
 reference value.
 """
-function χg(mod::Array{Float64}, mod0::Vector{Float64}, flag::Int64=1)
-	m0 = mean(mod0)
-	if(flag == 1)
-		return  mod * m0
-	elseif(flag == -1)
-		# return zero when m0 is zero
-		return	(m0 == 0.0) ? 0.0 : mod * m0^(-1.0)
-	end
+function χg(mod::AbstractArray{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+	mod_out=copy(mod)
+	χg!(mod_out, mod0, flag)
+	return mod_out
 end
+function χg!(mod::AbstractArray{Float64}, mod0::Vector{Float64}, flag::Int64=1)
+	if(flag == 1)
+		m0 = mean(mod0)
+		scale!(mod, m0)
+	elseif(flag == -1)
+		m0 = inv(mean(mod0))
+		scale!(mod, m0)
+	end
+	return mod
+end
+
 
 
 """
@@ -477,36 +556,72 @@ end
 Extend a seismic model into PML layers
 """
 function Seismic_pml_pad_trun(mod::Seismic)
+	modex=Seismic_zeros(Grid.M2D_pml_pad_trun(mod.mgrid))
+	copy!(modex.vp0, mod.vp0)
+	copy!(modex.vs0, mod.vs0)
+	copy!(modex.ρ0, mod.ρ0)
+	Seismic_pml_pad_trun!(modex, mod)
 
-	vpex = pml_pad_trun(χ(mod.χvp, mod.vp0, -1),mod.mgrid.npml);
-	vsex = pml_pad_trun(χ(mod.χvs, mod.vs0, -1),mod.mgrid.npml);
-	ρex = pml_pad_trun(χ(mod.χρ, mod.ρ0, -1),mod.mgrid.npml);
-	return Seismic(mod.vp0,
-		 mod.vs0,
-		 mod.ρ0,
-		 χ(vpex,mod.vp0),
-		 χ(vsex,mod.vs0),
-		 χ(ρex,mod.ρ0),
-		 Grid.M2D_pml_pad_trun(mod.mgrid))
+	return modex
 end
+
+"only padding implemented"
+function Seismic_pml_pad_trun!(modex::Seismic, mod::Seismic)
+	vp=mod.χvp; χ!(vp,mod.vp0,-1)
+	vs=mod.χvs; χ!(vs,mod.vs0,-1)
+	ρ=mod.χρ; χ!(ρ,mod.ρ0,-1)
+
+	vpex=modex.χvp; vsex=modex.χvs; ρex=modex.χρ;
+	pml_pad_trun!(vpex,vp,1);	pml_pad_trun!(vsex,vs,1);	pml_pad_trun!(ρex,ρ,1)
+	χ!(vpex,modex.vp0,1);	χ!(vsex,modex.vs0,1);	χ!(ρex,modex.ρ0,1)
+	χ!(vp,mod.vp0,1);	χ!(vs,mod.vs0,1);	χ!(ρ,mod.ρ0,1)
+end
+
+function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
+	if(isequal(flag,1)) 
+		nz = size(mod,1); nx = size(mod,2)
+		modo = zeros(nz + 2*np, nx + 2*np)
+		pml_pad_trun!(modo,mod,1)
+	elseif(isequal(flag,-1))
+		nz = size(mod,1); nx = size(mod,2)
+		modo = zeros(nz - 2*np, nx - 2*np)
+		pml_pad_trun!(mod,modo,-1)
+	end
+	return modo
+end
+
 
 """
 PML Extend a model on all four sides
 """
-function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
+function pml_pad_trun!(modex::Array{Float64,2}, mod::Array{Float64,2}, flag::Int64=1)
+	np=(size(modex,1)-size(mod,1) == size(modex,2)-size(mod,2)) ? 
+			div(size(modex,2)-size(mod,2),2): error("modex size")
 	if(isequal(flag,1)) 
 		nz = size(mod,1); nx = size(mod,2)
-		modex = zeros(nz + 2*np, nx + 2*np)
-
-		modex[np+1:np+nz,np+1:np+nx] .= mod 
-		modex[1:np,:] = repeat(modex[np+1,:], inner=np);
-		modex[nz+1+np:end,:] = repeat(modex[nz+np,:],inner=np);
-		modex[:,1:np] = repeat(modex[:,np+1], outer=np);
-		modex[:,nx+1+np:end] = repeat(modex[:,nx+np], outer=np);
+		modexc=view(modex,np+1:np+nz,np+1:np+nx)
+		@. modexc = mod
+		for ix in 1:size(modex,2)
+			for iz in 1:np
+				modex[iz,ix] = modex[np+1,ix]
+			end
+			for iz in nz+1+np:size(modex,1)
+				modex[iz,ix] = modex[nz+np,ix];
+			end
+		end
+		for iz in 1:size(modex,1)
+			for ix in 1:np
+				modex[iz,ix] = modex[iz,np+1]
+			end
+			for ix in nx+1+np:size(modex,2)
+				modex[iz,ix] = modex[iz,nx+np]
+			end
+		end
 		return modex
 	elseif(isequal(flag,-1)) 
-		nz = size(mod,1); nx = size(mod,2)
-		return mod[np+1:nz-np,np+1:nx-np]
+		nz = size(modex,1); nx = size(modex,2)
+		modexc=view(modex,np+1:nz-np,np+1:nx-np)
+		@. mod=modexc
 	else
 		error("invalid flag")
 	end

@@ -16,9 +16,9 @@ type Param
 	wav::Vector{Float64}
 	wavmat::Array{Float64,2}
 	dwavmat::Array{Float64,2}
-	spow2::Array{Complex{Float64}}
-	rpow2::Array{Complex{Float64}}
-	wpow2::Array{Complex{Float64}}
+	spow2::Array{Complex{Float64},2}
+	rpow2::Array{Complex{Float64},2}
+	wpow2::Array{Complex{Float64},2}
 	nt::Int64
 	nr::Int64
 	attrib_inv::Symbol
