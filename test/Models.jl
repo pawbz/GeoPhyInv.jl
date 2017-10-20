@@ -48,14 +48,13 @@ end
 @test gχKI ≈ g1
 @test gχρI ≈ g2
 
-a=ones(100,10)
-b=zeros(1000);
-c=zeros(1000);
 
-@time copy!(a,b.*c)
-@time copy!(b,a)
-@time for i in eachindex(b)
-	a[i]=b[i]
-end
+# testing pad_trun
+a=randn(200,300)
+np=50
+b=zeros(200+2*np,300+2*np)
+@time JuMIT.Models.pml_pad_trun!(b, a,1);
+aa=similar(a);
+@time JuMIT.Models.pml_pad_trun!(b, aa,-1);
 
-copy!(a,b)
+@test aa==a

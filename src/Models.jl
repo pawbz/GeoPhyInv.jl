@@ -102,6 +102,11 @@ function Seismic_zeros(mgrid::Grid.M2D)
 		zeros(mgrid.nz, mgrid.nx), zeros(mgrid.nz, mgrid.nx),
 		zeros(mgrid.nz, mgrid.nx), deepcopy(mgrid))
 end
+function Seismic_zeros!(mod::Seismic)
+	mod.χvp[:]=0.0
+	mod.χρ[:]=0.0
+	mod.χvs[:]=0.0
+end
 
 function Seismic_iszero(mod::Seismic)
 	return any((mod.vp0 .* mod.ρ0) .== 0.0) ? true : false
@@ -109,6 +114,19 @@ end
 
 "Logical operation for `Seismic`"
 function Seismic_isequal(mod1::Seismic, mod2::Seismic)
+	fnames = fieldnames(Seismic)
+	pop!(fnames) # last one has different isequal
+	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
+	push!(vec, Grid.M2D_isequal(mod1.mgrid, mod2.mgrid))
+	return all(vec)
+end
+
+function Seismic_issimilar(mod1::Seismic, mod2::Seismic)
+	vec=([(mod1.vp0==mod2.vp0), (mod1.vs0==mod2.vs0), (mod1.ρ0==mod2.ρ0), 
+       		(size(mod1.χvp)==size(mod2.χvp)), 
+       		(size(mod1.χvs)==size(mod2.χvs)), 
+       		(size(mod1.χρ)==size(mod2.χρ)), 
+		])
 	fnames = fieldnames(Seismic)
 	pop!(fnames) # last one has different isequal
 	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
@@ -538,36 +556,72 @@ end
 Extend a seismic model into PML layers
 """
 function Seismic_pml_pad_trun(mod::Seismic)
+	modex=Seismic_zeros(Grid.M2D_pml_pad_trun(mod.mgrid))
+	copy!(modex.vp0, mod.vp0)
+	copy!(modex.vs0, mod.vs0)
+	copy!(modex.ρ0, mod.ρ0)
+	Seismic_pml_pad_trun!(modex, mod)
 
-	vpex = pml_pad_trun(χ(mod.χvp, mod.vp0, -1),mod.mgrid.npml);
-	vsex = pml_pad_trun(χ(mod.χvs, mod.vs0, -1),mod.mgrid.npml);
-	ρex = pml_pad_trun(χ(mod.χρ, mod.ρ0, -1),mod.mgrid.npml);
-	return Seismic(mod.vp0,
-		 mod.vs0,
-		 mod.ρ0,
-		 χ(vpex,mod.vp0),
-		 χ(vsex,mod.vs0),
-		 χ(ρex,mod.ρ0),
-		 Grid.M2D_pml_pad_trun(mod.mgrid))
+	return modex
 end
+
+"only padding implemented"
+function Seismic_pml_pad_trun!(modex::Seismic, mod::Seismic)
+	vp=mod.χvp; χ!(vp,mod.vp0,-1)
+	vs=mod.χvs; χ!(vs,mod.vs0,-1)
+	ρ=mod.χρ; χ!(ρ,mod.ρ0,-1)
+
+	vpex=modex.χvp; vsex=modex.χvs; ρex=modex.χρ;
+	pml_pad_trun!(vpex,vp,1);	pml_pad_trun!(vsex,vs,1);	pml_pad_trun!(ρex,ρ,1)
+	χ!(vpex,modex.vp0,1);	χ!(vsex,modex.vs0,1);	χ!(ρex,modex.ρ0,1)
+	χ!(vp,mod.vp0,1);	χ!(vs,mod.vs0,1);	χ!(ρ,mod.ρ0,1)
+end
+
+function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
+	if(isequal(flag,1)) 
+		nz = size(mod,1); nx = size(mod,2)
+		modo = zeros(nz + 2*np, nx + 2*np)
+		pml_pad_trun!(modo,mod,1)
+	elseif(isequal(flag,-1))
+		nz = size(mod,1); nx = size(mod,2)
+		modo = zeros(nz - 2*np, nx - 2*np)
+		pml_pad_trun!(mod,modo,-1)
+	end
+	return modo
+end
+
 
 """
 PML Extend a model on all four sides
 """
-function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
+function pml_pad_trun!(modex::Array{Float64,2}, mod::Array{Float64,2}, flag::Int64=1)
+	np=(size(modex,1)-size(mod,1) == size(modex,2)-size(mod,2)) ? 
+			div(size(modex,2)-size(mod,2),2): error("modex size")
 	if(isequal(flag,1)) 
 		nz = size(mod,1); nx = size(mod,2)
-		modex = zeros(nz + 2*np, nx + 2*np)
-
-		modex[np+1:np+nz,np+1:np+nx] .= mod 
-		modex[1:np,:] = repeat(modex[np+1,:], inner=np);
-		modex[nz+1+np:end,:] = repeat(modex[nz+np,:],inner=np);
-		modex[:,1:np] = repeat(modex[:,np+1], outer=np);
-		modex[:,nx+1+np:end] = repeat(modex[:,nx+np], outer=np);
+		modexc=view(modex,np+1:np+nz,np+1:np+nx)
+		@. modexc = mod
+		for ix in 1:size(modex,2)
+			for iz in 1:np
+				modex[iz,ix] = modex[np+1,ix]
+			end
+			for iz in nz+1+np:size(modex,1)
+				modex[iz,ix] = modex[nz+np,ix];
+			end
+		end
+		for iz in 1:size(modex,1)
+			for ix in 1:np
+				modex[iz,ix] = modex[iz,np+1]
+			end
+			for ix in nx+1+np:size(modex,2)
+				modex[iz,ix] = modex[iz,nx+np]
+			end
+		end
 		return modex
 	elseif(isequal(flag,-1)) 
-		nz = size(mod,1); nx = size(mod,2)
-		return mod[np+1:nz-np,np+1:nx-np]
+		nz = size(modex,1); nx = size(modex,2)
+		modexc=view(modex,np+1:nz-np,np+1:nx-np)
+		@. mod=modexc
 	else
 		error("invalid flag")
 	end

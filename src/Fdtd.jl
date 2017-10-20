@@ -29,6 +29,23 @@ using DistributedArrays
 
 """
 Modelling parameters common for all supersources
+# Keyword Arguments that are modified by the method (some of them are returned as well)
+
+* `gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
+* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]`
+* `illum::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx)` : source energy if `illum_flag`
+* `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
+* `snaps::Array{Float64,4}=zeros(model.mgrid.nz,model.mgrid.nx,length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
+
+# Return (in order)
+
+* modelled data for each propagating wavefield as `Vector{TD}`
+* stored boundary values of the first propagating wavefield as `Array{Array{Float64,4},1}` (use for backpropagation)
+* final conditions of the first propagating wavefield as `Array{Float64,4}` (use for back propagation)
+* gradient model as `Seismic`
+* stored snaps shots at tsnaps as Array{Float64,4} 
+
+
 """
 type Paramc
 	jobname::Symbol
@@ -136,7 +153,7 @@ type Paramp
 end
 
 type Param
-	p::DistributedArrays.DArray{Paramp,1,Paramp} # for each workers
+	p::DistributedArrays.DArray{Paramp,1,Paramp} # distributed parameters among workers
 	c::Paramc # common parameters
 end
 
@@ -159,6 +176,20 @@ function initialize!(pap::Paramp)
 	end
 end
 
+function initialize!(pac::Paramc)
+	pac.grad_modtt_stack[:]=0.0
+	pac.grad_modrrvx_stack[:]=0.0
+	pac.grad_modrrvz_stack[:]=0.0
+	pac.grad_modrr_stack[:]=0.0
+	pac.illum_stack[:]=0.0
+	for ipw=1:pac.npw
+		dat=pac.data[ipw]
+		Data.TD_zeros!(dat)
+	end
+	pac.datamat[:]=0.0
+	Models.Seismic_zeros!(pac.gmodel)
+end
+
 function reset_per_ss!(pap::Paramp)
 	pap.p[:]=0.0
 	pap.pp[:]=0.0
@@ -172,6 +203,62 @@ function reset_per_ss!(pap::Paramp)
 end
 
 
+"""
+Method to create `Fdtd` modeling parameters.
+The output of this method can be used as an input to `mod!`, where the actual 
+finite-difference modeling is performed.
+
+# Keyword Arguments
+
+* `npw::Int64=1` : number of independently propagating wavefields in `model`
+* `model::Models.Seismic=Gallery.Seismic(:acou_homo1)` : seismic medium parameters 
+* `model_pert::Models.Seismic=model` : perturbed model, i.e., model + δmodel, used only for Born modeling 
+* `tgridmod::Grid.M1D=Gallery.M1D(:acou_homo1)` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
+* `tgrid::Grid.M1D=tgridmod` : output records are resampled on this time grid
+* `acqgeom::Vector{Acquisition.Geom}=fill(Gallery.Geom(:acou_homo1),npw)` :  acquisition geometry for each independently propagating wavefield
+* `acqsrc::Vector{Acquisition.Src}=fill(Gallery.Src(:acou_homo1),npw)` : source acquisition parameters for each independently propagating wavefield
+* `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
+  * `=[0]` inactive sources
+  * `=[1]` sources with injection rate
+  * `=[2]` volume injection sources
+  * `=[3]` sources input after time reversal (use only during backpropagation) 
+* `rflags::Vector{Int64}=fill(1,npw)` : receiver related flags for each propagating wavefield
+  * `=[0]` receivers do not record (or) inactive receivers
+  * `=[0,1]` receivers are active only for the second propagating wavefield
+* `rfields::Vector{Symbol}=[:P]` : multi-component receiver flag; types fields the receivers record (to be changed later)
+* `backprop_flag::Bool=Int64` : save final state variables and the boundary conditions for later use
+  * `=1` save boundary and final values in `boundary` 
+  * `=-1` use stored values in `boundary` for back propagation
+* `abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left]` : use absorbing PML boundary conditions or not
+  * `=[:top, :bottom]` apply PML conditions only at the top and bottom of the model 
+  * `=[:bottom, :right, :left]` top is reflecting
+* `born_flag::Bool=false` : do only Born modeling instead of full wavefield modelling (to be updated soon)
+* `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
+* `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
+* `tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1)` : store snaps at these modelling times
+* `snaps_flag::Bool=false` : return snaps or not
+* `verbose::Bool=false` : verbose flag
+
+# Example
+
+```julia
+pa = JuMIT.Fdtd.Param(acqgeom=acqgeom, acqsrc=acqsrc, model=model, tgridmod=tgridmod);
+JuMIT.Fdtd.mod!(pa);
+```
+# Credits 
+
+Author: Pawan Bharadwaj 
+        (bharadwaj.pawan@gmail.com)
+
+* original code in FORTRAN90: March 2013
+* modified: 11 Sept 2013
+* major update: 25 July 2014
+* code optimization with help from Jan Thorbecke: Dec 2015
+* rewritten in Julia: June 2017
+* added parrallelization over supersources in Julia: July 2017
+* efficient parrallelization using distributed arrays: Sept 2017
+* optimized memory allocation: Oct 2017
+"""
 function Param(;
 	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
@@ -215,7 +302,6 @@ function Param(;
 	any(.![Acquisition.Geom_check(acqgeom[ip], model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
 
 
-
 	length(acqgeom) != npw ? error("acqgeom size") : nothing
 	length(acqsrc) != npw ? error("acqsrc size") : nothing
 	any([getfield(acqgeom[ip],:nss) != getfield(acqsrc[ip],:nss) for ip=1:npw])  ? error("different supersources") : nothing
@@ -247,7 +333,6 @@ function Param(;
 
 
 	check_fd_stability(vpmin, vpmax, model.mgrid.δx, model.mgrid.δz, freqmin, freqmax, tgridmod.δx, verbose)
-
 
 
 	# some constants for boundary
@@ -335,6 +420,7 @@ function Param(;
 	    data,
 	    verbose)	
 
+	# dividing the supersources to workers
 	nwork = min(nss, nworkers())
 	work = workers()[1:nwork]
 	ssi=[round(Int, s) for s in linspace(0,nss,nwork+1)]
@@ -342,15 +428,19 @@ function Param(;
 	for ib in 1:nwork       
 		sschunks[ib]=ssi[ib]+1:ssi[ib+1]
 	end
+
+	# a distributed array of Paramp --- note that the parameters for each super source are efficiently distributed here
 	papa=ddata(T=Paramp, init=I->Paramp(sschunks[I...][1],pac), pids=work);
 
 	return Param(papa, pac)
-
-
 end
 
 
-
+"""
+Create modeling parameters for each worker.
+Each worker performs the modeling of supersources in `sschunks`.
+The parameters common to all workers are stored in `pac`.
+"""
 function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 	nx=pac.nx; nz=pac.nz; npw=pac.npw
 
@@ -371,7 +461,18 @@ function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 	return pap
 end
 
+"""
+update the `Seismic` model in `Paramc`
+"""
+function update_model!(pac::Paramc, model::Models.Seismic)
 
+
+end 
+
+"""
+Create modeling parameters for each supersource. 
+Every worker models one or more supersources.
+"""
 function Paramss(iss::Int64, pac::Paramc)
 
 	irfields=pac.irfields
@@ -389,23 +490,19 @@ function Paramss(iss::Int64, pac::Paramc)
 	# records_output, distributed array among different procs
 	records = [zeros(nt,pac.acqgeom[ipw].nr[iss],length(irfields)) for ipw in 1:npw]
 
-
 	# gradient outputs
 	grad_modtt = zeros(nz, nx)
 	grad_modrrvx = zeros(nz, nx)
 	grad_modrrvz = zeros(nz, nx)
 
-
-	"saving illum"
+	# saving illum
 	illum =  (pac.illum_flag) ? zeros(nz, nx) : zeros(1,1)
 
 	snaps = (pac.snaps_flag) ? zeros(nzd,nxd,length(pac.itsnaps)) : zeros(1,1,1)
 
-
 	# source wavelets
 	wavelets = [zeros(pac.acqgeom[ipw].ns[iss],length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
 	fill_wavelets!(iss, wavelets, acqsrc, sflags)
-
 
 	if(pac.born_flag)
 		born_svalue_stack = zeros(nz, nx)
@@ -413,7 +510,7 @@ function Paramss(iss::Int64, pac::Paramc)
 		born_svalue_stack = zeros(1,1)
 	end
 
-
+	# storing boundary values for back propagation
 	nx1, nz1=pac.model.mgrid.nx, pac.model.mgrid.nz
 	npml=pac.model.mgrid.npml
 	boundary=[zeros(3,nx1+6,nt),
@@ -422,9 +519,7 @@ function Paramss(iss::Int64, pac::Paramc)
 	  zeros(nz1+6,3,nt),
 	  zeros(nz1+2*npml,nx1+2*npml,3)
 				    ]
-
-		
-	"source_spray_weights per sequential source"
+	# source_spray_weights per supersource
 	ssprayw = [zeros(4,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
 	denomsI = [zeros(acqgeom[ipw].ns[iss]) for ipw in 1:npw]
 	isx1=[zeros(Int64,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
@@ -442,7 +537,7 @@ function Paramss(iss::Int64, pac::Paramc)
 		end
 	end
 
-	"receiver interpolation weights per sequential source"
+	# receiver interpolation weights per sequential source
 	rinterpolatew = [zeros(4,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
 	denomrI = [zeros(acqgeom[ipw].nr[iss]) for ipw in 1:npw]
 	irx1=[zeros(Int64,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
@@ -461,7 +556,6 @@ function Paramss(iss::Int64, pac::Paramc)
 	end
 
 
-
 	pass=Paramss(iss,wavelets,ssprayw,records,rinterpolatew,
 	      isx1,isx2,isz1,isz2,irx1,irx2,irz1,irz2,boundary,snaps,illum,born_svalue_stack,
 	      grad_modtt,grad_modrrvx,grad_modrrvz)
@@ -471,75 +565,36 @@ function Paramss(iss::Int64, pac::Paramc)
 end
 
 """
-```math
-\alpha=2
-```
-# Keyword Arguments
+This method updated the input `Fdtd.Param` after the wave propagation.
 
-* `npw::Int64=1` : number of independently propagating wavefields in `model`
-* `model::Models.Seismic=Gallery.Seismic(:acou_homo1)` : seismic medium parameters 
-* `model_pert::Models.Seismic=model` : perturbed model, i.e., model + δmodel, used only for Born modeling 
-* `tgridmod::Grid.M1D=Gallery.M1D(:acou_homo1)` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
-* `tgrid::Grid.M1D=tgridmod` : output records are resampled on this time grid
-* `acqgeom::Vector{Acquisition.Geom}=fill(Gallery.Geom(:acou_homo1),npw)` :  acquisition geometry for each independently propagating wavefield
-* `acqsrc::Vector{Acquisition.Src}=fill(Gallery.Src(:acou_homo1),npw)` : source acquisition parameters for each independently propagating wavefield
-* `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
-  * `=[0]` inactive sources
-  * `=[1]` sources with injection rate
-  * `=[2]` volume injection sources
-  * `=[3]` sources input after time reversal (use only during backpropagation) 
-* `rflags::Vector{Int64}=fill(1,npw)` : receiver related flags for each propagating wavefield
-  * `=[0]` receivers do not record (or) inactive receivers
-  * `=[0,1]` receivers are active only for the second propagating wavefield
-* `rfields::Vector{Symbol}=[:P]` : multi-component receiver flag; types fields the receivers record (to be changed later)
-* `backprop_flag::Bool=Int64` : save final state variables and the boundary conditions for later use
-  * `=1` save boundary and final values in `boundary` 
-  * `=-1` use stored values in `boundary` for back propagation
-* `abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left]` : use absorbing PML boundary conditions or not
-  * `=[:top, :bottom]` apply PML conditions only at the top and bottom of the model 
-  * `=[:bottom, :right, :left]` top is reflecting
-* `born_flag::Bool=false` : do only Born modeling instead of full wavefield modelling (to be updated soon)
-* `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
-* `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
-* `tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1)` : store snaps at these modelling times
-* `snaps_flag::Bool=false` : return snaps or not
-* `verbose::Bool=false` : verbose flag
+# Arguments
 
-# Keyword Arguments that are modified by the method (some of them are returned as well)
+* `pa::Param` : modelling parameters
 
-* `gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
-* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]`
-* `illum::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx)` : source energy if `illum_flag`
-* `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
-* `snaps::Array{Float64,4}=zeros(model.mgrid.nz,model.mgrid.nx,length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
+# Useful fields in `pa` that are modified by the method
 
-# Return (in order)
-
-* modelled data for each propagating wavefield as `Vector{TD}`
-* stored boundary values of the first propagating wavefield as `Array{Array{Float64,4},1}` (use for backpropagation)
-* final conditions of the first propagating wavefield as `Array{Float64,4}` (use for back propagation)
-* gradient model as `Seismic`
-* stored snaps shots at tsnaps as Array{Float64,4} 
+* `pa.c.TDout::Vector{Data.TD}` : seismic data at receivers after modeling, for each propagating wavefield
+* `pa.c.snaps::Array{Float64,4}` : snaps with size `(nz,nx,length(tsnaps),nss)` saved at `tsnaps`
+* `pa.c.gmodel::Models.Seismic` : gradient model modified only if `gmodel_flag`
+* `pa.c.illum_stack::Array{Float64,2}` source energy of size `(nz,nx)` if `illum_flag`
 
 # Example
 
 ```julia
-records, boundary, gmodel, snaps = mod(acqgeom=acqgeom, acqsrc=acqsrc, model=model, tgridmod=tgridmod);
+JuMIT.Fdtd.mod!(pa)
 ```
 # Credits 
 
 Author: Pawan Bharadwaj 
         (bharadwaj.pawan@gmail.com)
 
-* original code in FORTRAN90: March 2013
-* modified: 11 Sept 2013
-* major update: 25 July 2014
-* code optimization with help from Jan Thorbecke: Dec 2015
-* rewritten in Julia: June 2017
-* added parrallelization over supersources in Julia: July 2017
 """
 @fastmath function mod!(pa::Param=Param())
+
+	# zero out all the results stored in pa.c
+	initialize!(pa.c)
 	
+	# zero out results stored per worker
 	@sync begin
 		for (ip, p) in enumerate(procs(pa.p))
 			@async remotecall_wait(p) do 

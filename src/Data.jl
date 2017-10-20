@@ -111,6 +111,11 @@ function TD_zeros(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.
 	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],fields,
 	   deepcopy(tgrid),deepcopy(acqgeom)) 
 end
+function TD_zeros!(data::TD)
+	for iss=1:data.acqgeom.nss, ifield=1:length(data.fields)
+		data.d[iss,ifield][:]=0.0 
+	end
+end
 
 "Same as `TD_zeros`, except for returning ones"
 function TD_ones(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.Geom) 
