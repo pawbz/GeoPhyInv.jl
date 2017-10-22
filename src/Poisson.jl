@@ -96,7 +96,7 @@ end
 
 
 
- for j = 2 : nx - 1 # interior x (column) loop:
+for j = 2 : nx - 1 # interior x (column) loop:
     k = 1 + nz*(j - 1);# initial boundary z for this x (k = i + m*(j - 1))
     for i = [1 nz]  # % north & south boundary z (row) loop:
         o = k - Int(sign(i - .5*nz)); #% sign function determines correct direction to: inward from north or south boundary # to define direction(from boundary down or up)
@@ -105,7 +105,7 @@ end
         src[k] = 0; # 0 to equate boundary values in source term ... (?)
         k = k + nz - 1; #% from north to south boundary
     end
- end
+end
 
 
 # Create A for the east and west boundaries without corner points

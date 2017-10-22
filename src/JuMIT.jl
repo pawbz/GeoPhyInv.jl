@@ -11,6 +11,7 @@ module JuMIT
 
 # include modules (note: due to dependencies, order is important!)
 include("Grid.jl")
+include("Poisson.jl")
 include("Interpolation.jl")
 include("DSP.jl")
 include("Wavelets.jl")

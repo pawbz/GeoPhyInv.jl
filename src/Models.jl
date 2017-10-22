@@ -127,10 +127,6 @@ function Seismic_issimilar(mod1::Seismic, mod2::Seismic)
        		(size(mod1.χvs)==size(mod2.χvs)), 
        		(size(mod1.χρ)==size(mod2.χρ)), 
 		])
-	fnames = fieldnames(Seismic)
-	pop!(fnames) # last one has different isequal
-	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
-	push!(vec, Grid.M2D_isequal(mod1.mgrid, mod2.mgrid))
 	return all(vec)
 end
 

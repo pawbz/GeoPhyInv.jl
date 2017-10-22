@@ -6,16 +6,13 @@
 #Date: October, 2017
 #Contact: ngrobbe@gmail.com
 
-# Add these packages if not yet installed 
-#Pkg.add("PyPlot")
-#Pkg.add("IJulia")
-#Pkg.add("Polynomials")
 
+using JuMIT
 using PyPlot
-using IJulia
+#using IJulia
 using Polynomials
+using Base.Test
 
-include("/math/home/ngrobbe/research/julia_dev/Niels_dev/Poisson.jl")  # the actual Poisson.jl module
 
 ############################################    
 # for manual random or uniform sigma testing
@@ -70,7 +67,7 @@ for i = 1 : ntst
     psi_ref = psi_ref./sigma;
 println("Solving Poisson equation, testrun number:",i)
 
-    psi = Poisson.solve(src,sigma,1) # call forward solver
+    psi = JuMIT.Poisson.solve(src,sigma,1) # call forward solver
 
 # subtract mean for DC
     psi_ref=psi_ref-mean(psi_ref);
@@ -105,16 +102,19 @@ end # end i-loop
 
 # Test passed?
 
-if(chk<=-0.8 && err[end,3]/err[1,3] < 0.2 && err[end,4]/err[1,4] < 0.2 ) # first pass interior points, then also include boundary points
-	println("tests successfully passed!")
-	println("log-log slope <=-0.8? slope=",chk)
-	println("Normalized RMSE interior < 0.2? err[end,3]/err[1,3]=",err[end,3]/err[1,3])
-	println("Normalized RMSE int.+boundary < 0.2? err[end,4]/err[1,4]=",err[end,4]/err[1,4])
+# first pass interior points, then also include boundary points
+@test chk<=-0.8
+@test (err[end,3]/err[1,3]) < 0.2
+@test (err[end,4]/err[1,4]) < 0.2 
 
-else
-	println("log-log slope 'chk' <=-0.8? slope=",chk)
-	println("iteration=",collect(1:length(err[:,3])));
-	println("Normalized RMSE interior < 0.5? err[:,3]=",err[:,3])
-	println("Normalized RMSE int.+boundary points < 0.5? err[:,4]=",err[:,4])
-	error("ERROR: RMSE and/or log-log slope too large: try another run, or try increasing amount of gridpoints via ntst")
-end # end if statement
+#if(chk<=-0.8 && err[end,3]/err[1,3] < 0.2 && err[end,4]/err[1,4] < 0.2 ) i
+#println("tests successfully passed!")
+#println("log-log slope <=-0.8? slope=",chk)
+#println("Normalized RMSE interior < 0.2? err[end,3]/err[1,3]=",err[end,3]/err[1,3])
+#println("Normalized RMSE int.+boundary < 0.2? err[end,4]/err[1,4]=",err[end,4]/err[1,4])
+#
+#println("log-log slope 'chk' <=-0.8? slope=",chk)
+#println("iteration=",collect(1:length(err[:,3])));
+#println("Normalized RMSE interior < 0.5? err[:,3]=",err[:,3])
+#println("Normalized RMSE int.+boundary points < 0.5? err[:,4]=",err[:,4])
+#error("ERROR: RMSE and/or log-log slope too large: try another run, or try increasing amount of gridpoints via ntst")
