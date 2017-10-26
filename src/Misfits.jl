@@ -39,7 +39,7 @@ function TD!(dfdx,
 	fields = x.fields;
 	nss = acq.nss;
 
-	normfact = Data.TD_dot(y, y)
+	normfact = dot(y, y)
 	(normfact == 0.0) && error("y cannot be zero")
 
 	f = 0.0;

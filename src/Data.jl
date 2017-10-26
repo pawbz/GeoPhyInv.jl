@@ -41,6 +41,48 @@ type TD
 
 end
 
+"Compare if two `TD`'s  are equal"
+function Base.isequal(dat1::TD, dat2::TD)
+	fnames = fieldnames(TD)
+	vec=[(isequal(getfield(dat1, name),getfield(dat2, name))) for name in fnames]
+	return all(vec)
+end
+
+"""
+Return if two `Seismic` models have same dimensions and bounds.
+"""
+function Base.isapprox(dat1::TD, dat2::TD)
+	vec=([ 
+		isequal(dat1.tgrid, dat2.tgrid),
+		isequal(dat1.fields, dat2.fields),
+		isequal(dat1.acqgeom, dat2.acqgeom),
+       		(size(dat1.d)==size(dat2.d)), 
+		])
+	vec2=[size(dat1.d[iss,ifield])==size(dat2.d[iss,ifield]) for iss=1:dat1.acqgeom.nss, ifield=1:length(dat1.fields)]
+	return (all(vec) & all(vec2))
+end
+
+
+
+"""
+Copy `TD`'s, which are similar.
+"""
+function Base.copy!(dataout::TD, data::TD)
+	if(isapprox(dataout, data))
+		dout=getfield(dataout, :d)
+		din=getfield(data, :d)
+		for iss=1:data.acqgeom.nss, ifield=1:length(data.fields)
+			ddout=dout[iss,ifield]
+			ddin=din[iss,ifield]
+			copy!(ddout,ddin)
+		end
+		return dataout
+	else
+		error("attempt to copy dissimilar data")
+	end
+end
+
+
 
 """
 Method to resample data in time.
@@ -111,9 +153,9 @@ function TD_zeros(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.
 	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],fields,
 	   deepcopy(tgrid),deepcopy(acqgeom)) 
 end
-function TD_zeros!(data::TD)
+function Base.fill!(data::TD, k::Float64)
 	for iss=1:data.acqgeom.nss, ifield=1:length(data.fields)
-		data.d[iss,ifield][:]=0.0 
+		data.d[iss,ifield][:]=k 
 	end
 end
 
@@ -127,7 +169,7 @@ end
 """
 Returns bool depending on if input `data::TD` has all zeros or not.
 """
-function TD_iszero(data::TD)
+function Base.iszero(data::TD)
 	return maximum(broadcast(maximum,abs,data.d)) == 0.0 ? true : false
 end
 
@@ -154,12 +196,18 @@ Returns dot product of data.
 
 * dot product as `Float64`
 """
-function TD_dot(data1::TD, data2::TD)
-	dotd = 0.0;
-	for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss, ir = 1:data1.acqgeom.nr[iss]
-		dotd += dot(data1.d[iss, ifield][:, ir],data2.d[iss, ifield][:, ir])
+function Base.dot(data1::TD, data2::TD)
+	if(isapprox(data1, data2))
+		dotd = 0.0;
+		for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
+			for ir = 1:data1.acqgeom.nr[iss], it = 1:data1.tgrid.nx
+				dotd += data1.d[iss, ifield][it, ir] * data2.d[iss, ifield][it, ir]
+			end
+		end
+		return dotd
+	else
+		error("cannot dot dissimilar datasets")
 	end
-	return dotd
 end
 
 

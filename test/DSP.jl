@@ -15,6 +15,17 @@ z = complex.(zeros(np,n2),zeros(np,n2));
 	@test x ≈ xa
 end
 
+np=1000
+n=777
+x = randn(n); xa = similar(x)
+z = complex.(zeros(np),zeros(np));
+@time for i in [0, 2, 4, n-1]
+	JuMIT.DSP.nlag_npow2_pad_truncate!(x, z, n-i-1,i,np,1)
+	JuMIT.DSP.nlag_npow2_pad_truncate!(xa, z, n-i-1,i,np,-1)
+	@test x ≈ xa
+end
+
+
 # fast_filt
 # note that this test works for only some delta functions
 for nw in [7, 8], nr in [20, 10], ns in [11, 10]

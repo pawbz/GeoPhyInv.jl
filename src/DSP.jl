@@ -242,17 +242,6 @@ function fast_filt!{T<:Real,N}(
 	(rpow2===nothing) && (rpow2=complex.(zeros(T,np2,dim...))) 
 	(wpow2===nothing) && (wpow2=complex.(zeros(T,np2,dim...)))
 
-#	if(mode==1)
-#		for id in CartesianRange(size(s)[2:end])
-#			sv=view(s,:,id)
-#			rv=view(r,:,id)
-#			wv=view(w,:,id)
-#			fast_filt_vec!(sv,rv,wv,spow2,rpow2,wpow2,attrib,
-#				   nsplags,nsnlags,nrplags,nrnlags,
-#				   nwplags,nwnlags,np2,fftplan, ifftplan)
-#
-#		end
-#	else
 	fast_filt_vec!(s,r,w,spow2,rpow2,wpow2,attrib,
 		   nsplags,nsnlags,nrplags,nrnlags,
 		   nwplags,nwnlags,np2, fftplan, ifftplan)
@@ -321,68 +310,52 @@ end
 * `flag` : = 1 means xpow2 is returned using x
 	   = -1 means x is returned using xpow2
 """
-function nlag_npow2_pad_truncate!{T1, T2}(
-				  x::AbstractVector{T1}, 
-				  xpow2::AbstractVector{T2}, 
+function nlag_npow2_pad_truncate!{T}(
+				  x::AbstractArray{T}, 
+				  xpow2::AbstractArray{Complex{T}}, 
 				  nplags::Integer, 
 				  nnlags::Integer, 
 				  npow2::Integer, 
 				  flag::Integer
 				  )
-	(length(x) ≠ nplags + nnlags + 1) && error("size x")
-	(length(xpow2) ≠ npow2) && error("size xpow2")
+	(size(x,1) ≠ nplags + nnlags + 1) && error("size x")
+	(size(xpow2,1) ≠ npow2) && error("size xpow2")
 
-	if(flag == 1)
-		xpow2[1] = complex(x[nnlags+1]) # zero lag
-		# +ve lags
-		if (nplags > 0) 
-			xpow2[2:nplags+1]= complex(x[nnlags+2:nnlags+1+nplags])
-		end
-		# -ve lags
-		if(nnlags != 0) 
-			for i=1:nnlags
-				xpow2[npow2-i+1] = complex(x[nnlags+1-i])
+	for id in 1:size(x,2)
+		if(flag == 1)
+			xpow2[1,id] = complex(x[nnlags+1,id]) # zero lag
+			# +ve lags
+			if (nplags > 0) 
+				for i=1:nplags
+					xpow2[i+1,id]= complex(x[nnlags+1+i,id])
+				end
 			end
-		end
-		return xpow2
-	elseif(flag == -1)
-		x[nnlags+1] = real.(xpow2[1]); # zero lag
-		if(nplags != 0) 
-			for i=1:nplags
-				x[nnlags+1+i] = real.(xpow2[1+i]);
+			# -ve lags
+			if(nnlags != 0) 
+				for i=1:nnlags
+					xpow2[npow2-i+1,id] = complex(x[nnlags+1-i,id])
+				end
 			end
-		end
-		if(nnlags != 0)
-			for i=1:nnlags
-				x[nnlags+1-i] = real.(xpow2[npow2-i+1])
+		elseif(flag == -1)
+			x[nnlags+1,id] = real.(xpow2[1,id]); # zero lag
+			if(nplags != 0) 
+				for i=1:nplags
+					x[nnlags+1+i,id] = real.(xpow2[1+i,id]);
+				end
 			end
+			if(nnlags != 0)
+				for i=1:nnlags
+					x[nnlags+1-i,id] = real.(xpow2[npow2-i+1,id])
+				end
+			end
+		else
+			error("invalid flag")
 		end
-		return x
-	else
-		error("invalid flag")
 	end
+	return nothing
 end
 
 
-"""
-When `x` and `xpow2` are matrices, loop over the second dimension.
-"""
-function nlag_npow2_pad_truncate!{T<:Number,N}(
-				  x::AbstractArray{T, N}, 
-				  xpow2::AbstractArray{Complex{T},N}, 
-				  nplags::Integer, 
-				  nnlags::Integer, 
-				  npow2::Integer, 
-				  flag::Integer
-				  )
-	(size(x)[2:end] ≠ size(xpow2)[2:end]) && error("dimension of x and xpow2")
-	for id in CartesianRange(size(x)[2:end])
-		xv=view(x,:,id)
-		xpow2v=view(xpow2,:,id)
-		nlag_npow2_pad_truncate!(xv, xpow2v, nplags, nnlags, npow2, flag)
-	end
-
-end
 
 """
 A bandpass butterworth filter using `fmin` and `fmax` in the frequency domain.

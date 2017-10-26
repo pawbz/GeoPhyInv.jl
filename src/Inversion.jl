@@ -102,6 +102,23 @@ end
 
 
 """
+Convert the data `TD` to `Src` after time reversal.
+"""
+function update_adjsrc!(adjsrc, δdat::Data.TD, adjacqgeom)
+	for i in 1:adjacqgeom.nss, j in 1:length(δdat.fields)
+		adjsrc.wav[i,j] = (flipdim(δdat.d[i,j],1))
+	end
+	return nothing
+end
+
+function generate_adjsrc(δdat::Data.TD, adjacqgeom)
+	adjsrc=Acquisition.Src_zeros(adjacqgeom, δdat.fields, δdat.tgrid)
+	update_adjsrc!(adjsrc, δdat, adjacqgeom)
+	return adjsrc
+end
+
+
+"""
 Constructor for `Param`
 
 # Arguments
@@ -166,12 +183,13 @@ function Param(
 	#
 	((attrib_mod == :fdtd_hborn) | (attrib_mod == :fdtd_born)) && 
 	(attrib == :synthetic) &&
-	(Models.Seismic_isequal(modm0, modm_obs)) && error("change background model used for Born modelling")
+	(isequal(modm0, modm_obs)) && error("change background model used for Born modelling")
 
 	# generating forward modelling parameters
 	# generate modelled data, border values, etc.
+	illum_out=false
 	if(attrib_mod == :fdtd)
-		paf=Fdtd.Param(model=model, acqgeom=[acqgeom], 
+		paf=Fdtd.Param(model=modm, acqgeom=[acqgeom], 
 		    acqsrc=[acqsrc],sflags=[2],illum_flag=illum_out, 
 		    backprop_flag=1,tgridmod=tgrid) 
 	elseif(attrib_mod == :fdtd_born)
@@ -179,7 +197,7 @@ function Param(
 		backprop_flag = pa.buffer_update_flag ? 1 : 0
 
 		paf=Fdtd.Param(born_flag=true, npw=2, model=modm0, 
-		    model_pert=model, 
+		    model_pert=modm, 
 		    acqgeom=[acqgeom, acqgeom], acqsrc=[acqsrc, acqsrc], 
 		    illum_flag=illum_out,
 		    backprop_flag=backprop_flag,
@@ -212,24 +230,26 @@ function Param(
 		error("invalid pa.attrib_mod")
 	end
 
+	adjsrc=generate_adjsrc(paf.c.data[1], adjacqgeom)
+
 	# generating adjoint modelling parameters
-	if(pa.attrib_mod == :fdtd)
+	if(attrib_mod == :fdtd)
 		# adjoint simulation
-		pafa=Fdtd.Param(npw=2, model=pa.modm,
+		pafa=Fdtd.Param(npw=2, model=modm,
 			acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], sflags=[3, 2],
 			backprop_flag=-1, 
 			tgridmod=tgrid, gmodel_flag=true, verbose=verbose)
 
-	elseif(pa.attrib_mod == :fdtd_born)
+	elseif(attrib_mod == :fdtd_born)
 		# adjoint simulation
-		pafa=Fdtd.Param(npw=2, model=pa.modm0,  
+		pafa=Fdtd.Param(npw=2, model=modm0,  
 			acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], sflags=[3, 2], 
 			backprop_flag=-1, 
 			tgridmod=tgrid, gmodel_flag=true, verbose=verbose)
 
-	elseif(pa.attrib_mod == :fdtd_hborn)
+	elseif(attrib_mod == :fdtd_hborn)
 		# adjoint simulation
-		pafa=Fdtd.Param(npw=2, model=pa.modm0,  
+		pafa=Fdtd.Param(npw=2, model=modm0,  
 			acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], sflags=[2, 2], 
 			tgridmod=tgrid, gmodel_flag=true, verbose=verbose)
 	else
@@ -237,7 +257,8 @@ function Param(
 	end
 
 
-	pa = Param(deepcopy(acqsrc), 
+	pa = Param(paf, pafa,
+	     deepcopy(acqsrc), 
 	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
@@ -256,8 +277,6 @@ function Param(
 	     Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, recv_fields, acqgeom), verbose, attrib,
 	     nothing, true)
 
-	# buffer allocation
-	F_allocate_buffer!(pa)
 
 	# update pdcal
 	update_dcal!(pa, mprecon_factor)
@@ -342,8 +361,8 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	last_x = rand(size(x)) # reset last_x
 
 	# replace x and modi with initial model (pa.modm)
-	if(Models.Seismic_iszero(pa.modi)) # then use modm
-		Models.Seismic_iszero(pa.modm) ? error("no initial model present in pa") :	Seismic_x!(pa.modm, pa.modi, x, pa, 1)
+	if(iszero(pa.modi)) # then use modm
+		iszero(pa.modm) ? error("no initial model present in pa") :	Seismic_x!(pa.modm, pa.modi, x, pa, 1)
 	else
 		# use modi as starting model without disturbing modm
 		Seismic_x!(nothing, pa.modi, x, pa, 1)
@@ -442,16 +461,6 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	end
 end
 
-"""
-Allocations necessary for forward simulations
-"""
-function F_allocate_buffer!(pa::Param)
-	nx = pa.modm.mgrid.nx
-	nz = pa.modm.mgrid.nz
-	npml = pa.modm.mgrid.npml
-	pa.buffer = (Fdtd.initialize_boundary(nx, nz, npml, pa.acqgeom.nss, pa.dcal.tgrid.nx))
-end
-
 
 """
 Perform a forward simulation.
@@ -485,7 +494,7 @@ function F!(
 			Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
 			model = pa.modm
 		elseif(mattrib == :modm)
-			(Models.Seismic_iszero(modm)) && error("need modm")
+			(iszero(modm)) && error("need modm")
 			model = modm
 		else
 			error("invalid mattrib")
@@ -679,12 +688,12 @@ function Seismic_x!(
 		    flag::Int64)
 	if(flag ==1) # convert modm or modi to x
 		if(modm===nothing)
-			all([Models.Seismic_iszero(modi)]) && error("input modi") 
+			all([iszero(modi)]) && error("input modi") 
 		else
-			all([Models.Seismic_iszero(modm), Models.Seismic_iszero(modi)]) && error("input modi or modm")
+			all([iszero(modm), iszero(modi)]) && error("input modi or modm")
 
 			# 1. get modi using interpolation and modm
-			!(Models.Seismic_iszero(modm)) && Models.Seismic_interp_spray!(modm, modi, :interp)
+			!(iszero(modm)) && Models.Seismic_interp_spray!(modm, modi, :interp)
 		end
 
 		nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
@@ -773,17 +782,17 @@ function Seismic_gx!(gmodm::Models.Seismic,
 		      )
 	nznx=modi.mgrid.nz*modi.mgrid.nx
 	g1=zeros(nznx); g2 =zeros(nznx)
-	Models.Seismic_issimilar(gmodm, modm) ? nothing : error("gmodm, modm dimensions")
-	Models.Seismic_issimilar(gmodi, modi) ? nothing : error("gmodi, modi dimensions")
+	isapprox(gmodm, modm) ? nothing : error("gmodm, modm dimensions")
+	isapprox(gmodi, modi) ? nothing : error("gmodi, modi dimensions")
 	length(gx) == xfwi_ninv(pa) ? nothing : error("gx dimensions")
 	if(flag ==1) # convert gmod to gx
 
 		# either gmodi or gmodm should be nonzero
-		all([Models.Seismic_iszero(gmodm), Models.Seismic_iszero(gmodi)]) ? 
+		all([iszero(gmodm), iszero(gmodi)]) ? 
 					error("input gmodi or gmodm") : nothing
 
 		# 1. update gmodi by spraying gmodm
-		Models.Seismic_iszero(gmodm) ? nothing : Models.Seismic_interp_spray!(gmodm, gmodi, :spray)
+		iszero(gmodm) ? nothing : Models.Seismic_interp_spray!(gmodm, gmodi, :spray)
 
 		# 2. chain rule on gmodi 
 		Models.Seismic_chainrule!(gmodi, modi, g1, g2, pa.parameterization,-1)
@@ -812,15 +821,6 @@ function Seismic_gx!(gmodm::Models.Seismic,
 		Models.Seismic_interp_spray!(gmodi, gmodm, :interp)
 	else
 		error("invalid flag")
-	end
-end
-
-"""
-Convert the data `TD` to `Src` after time reversal.
-"""
-function update_adjsrc!(δdat::Data.TD, pa::Param)
-	for i in 1:pa.adjacqgeom.nss, j in 1:length(δdat.fields)
-		pa.adjsrc.wav[i,j] = (flipdim(δdat.d[i,j],1))
 	end
 end
 

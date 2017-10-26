@@ -30,7 +30,7 @@ type M2D
 end
 
 "Logical operation for `M2D`"
-function M2D_isequal(grid1::M2D, grid2::M2D)
+function Base.isequal(grid1::M2D, grid2::M2D)
 	return all([(isequal(getfield(grid1, name),getfield(grid2, name))) for name in fieldnames(M2D)])
 end
 
@@ -201,7 +201,7 @@ type M1D
 end
 
 "Logical operation for `M1D`"
-function M1D_isequal(grid1::M1D, grid2::M1D)
+function Base.isequal(grid1::M1D, grid2::M1D)
 	return all([(isequal(getfield(grid1, name),getfield(grid2, name))) for name in fieldnames(M1D)])
 end
 

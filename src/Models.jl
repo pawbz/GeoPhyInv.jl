@@ -51,7 +51,7 @@ end
 """
 Print information about `Seismic`
 """
-function print(mod::Seismic, name::String="")
+function Base.print(mod::Seismic, name::String="")
 	println("\tSeismic Model:\t",name)
 	println("\t> number of samples:\t","x\t",mod.mgrid.nx,"\tz\t",mod.mgrid.nz)
 	println("\t> sampling intervals:\t","x\t",mod.mgrid.δx,"\tz\t",mod.mgrid.δz)
@@ -102,44 +102,53 @@ function Seismic_zeros(mgrid::Grid.M2D)
 		zeros(mgrid.nz, mgrid.nx), zeros(mgrid.nz, mgrid.nx),
 		zeros(mgrid.nz, mgrid.nx), deepcopy(mgrid))
 end
-function Seismic_zeros!(mod::Seismic)
-	mod.χvp[:]=0.0
-	mod.χρ[:]=0.0
-	mod.χvs[:]=0.0
+
+function Base.fill!(mod::Seismic, k::Float64=0.0)
+	mod.χvp[:]=k
+	mod.χρ[:]=k
+	mod.χvs[:]=k
 end
 
-function Seismic_iszero(mod::Seismic)
+"""
+Return true if a `Seismic` model is just allocated with zeros.
+"""
+function Base.iszero(mod::Seismic)
 	return any((mod.vp0 .* mod.ρ0) .== 0.0) ? true : false
 end
 
-"Logical operation for `Seismic`"
-function Seismic_isequal(mod1::Seismic, mod2::Seismic)
+"Compare if two `Seismic` models are equal"
+function Base.isequal(mod1::Seismic, mod2::Seismic)
 	fnames = fieldnames(Seismic)
-	pop!(fnames) # last one has different isequal
 	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
-	push!(vec, Grid.M2D_isequal(mod1.mgrid, mod2.mgrid))
 	return all(vec)
 end
 
-function Seismic_issimilar(mod1::Seismic, mod2::Seismic)
+"""
+Return if two `Seismic` models have same dimensions and bounds.
+"""
+function Base.isapprox(mod1::Seismic, mod2::Seismic)
 	vec=([(mod1.vp0==mod2.vp0), (mod1.vs0==mod2.vs0), (mod1.ρ0==mod2.ρ0), 
        		(size(mod1.χvp)==size(mod2.χvp)), 
        		(size(mod1.χvs)==size(mod2.χvs)), 
        		(size(mod1.χρ)==size(mod2.χρ)), 
+		isequal(mod1.mgrid, mod2.mgrid),
 		])
 	return all(vec)
 end
 
-"Logical operation for `Seismic`"
-function Seismic_issimilar(mod1::Seismic, mod2::Seismic)
-	return Grid.M2D_isequal(mod1.mgrid, mod2.mgrid)
+"""
+Copy for `Seismic` models. The models should have same bounds and sizes.
+"""
+function Base.copy!(modo::Seismic, mod::Seismic)
+	if(isapprox(modo, mod))
+		for f in [:χvp, :χρ, :χvs]
+			setfield!(modo, f, getfield(mod, f))
+		end
+		return mod
+	else
+		error("attempt to copy dissimilar models")
+	end
 end
-
-"Logical operation for `Seismic`"
-function Seismic_issimilar(mod1::Seismic, grid::Grid.M2D)
-	return Grid.M2D_isequal(mod1.mgrid, grid)
-end
-
 
 
 """

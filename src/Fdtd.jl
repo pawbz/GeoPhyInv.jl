@@ -184,10 +184,10 @@ function initialize!(pac::Paramc)
 	pac.illum_stack[:]=0.0
 	for ipw=1:pac.npw
 		dat=pac.data[ipw]
-		Data.TD_zeros!(dat)
+		fill!(dat, 0.0)
 	end
 	pac.datamat[:]=0.0
-	Models.Seismic_zeros!(pac.gmodel)
+	fill!(pac.gmodel, 0.0)
 end
 
 function reset_per_ss!(pap::Paramp)
@@ -221,7 +221,7 @@ finite-difference modeling is performed.
   * `=[0]` inactive sources
   * `=[1]` sources with injection rate
   * `=[2]` volume injection sources
-  * `=[3]` sources input after time reversal (use only during backpropagation) 
+  * `=[3]` sources input after time reversal (use only during backpropagation)
 * `rflags::Vector{Int64}=fill(1,npw)` : receiver related flags for each propagating wavefield
   * `=[0]` receivers do not record (or) inactive receivers
   * `=[0,1]` receivers are active only for the second propagating wavefield
@@ -465,6 +465,11 @@ end
 update the `Seismic` model in `Paramc`
 """
 function update_model!(pac::Paramc, model::Models.Seismic)
+
+	copy!(pac.model, model)
+
+	Seismic_pml_pad_trun!(pac.exmodel, pac.model)
+
 
 
 end 

@@ -170,7 +170,11 @@ The sources and receivers are not placed anywhere on the edges of the mesh.
   * `=:rvsp`  reverse vertical seismic profiling
   * `=:downhole` downhole sources and receivers 
 
-* `rand_flags::Vector{Bool}=[false, false]` : randomly or equally spaced?
+# Keyword Arguments
+
+* `nss=2` : number of supersources
+* `nr=2` : number of receivers per supersource
+* `rand_flags::Vector{Bool}=[false, false]` : randomly or equally spaced supersources and receivers.
 """
 function Geom(mgrid::Grid.M2D, attrib::Symbol; nss=2, nr=2, rand_flags=[false, false])
 	otx=(0.9*mgrid.x[1]+0.1*mgrid.x[end]); ntx=(0.1*mgrid.x[1]+0.9*mgrid.x[end]);

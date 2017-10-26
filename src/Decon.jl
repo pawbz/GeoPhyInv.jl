@@ -25,6 +25,12 @@ type Param
 	verbose::Bool
 	fftplan::Base.DFT.FFTW.cFFTWPlan
 	ifftplan::Base.DFT.ScaledPlan
+	xgf::Vector{Float64}
+	last_xgf::Vector{Float64}
+	dfgf::Optim.UninitializedOnceDifferentiable{Void}
+	xwav::Vector{Float64}
+	last_xwav::Vector{Float64}
+	dfwav::Optim.UninitializedOnceDifferentiable{Void}
 end
 
 function Param(ntgf, nt, nr; 
@@ -53,17 +59,38 @@ function Param(ntgf, nt, nr;
 	rpow2=complex.(zeros(np2,nr))
 	wpow2=complex.(zeros(np2,nr))
 
+	
+	# convert initial model to the inversion variable
+	xgf = zeros(ntgf*nr);
+	last_xgf = randn(size(xgf)) # reset last_x
+
+	# create df for optimization
+	dfgf = OnceDifferentiable(x -> func_grad!(nothing, x, last_xgf, pa),
+	  (storage, x) -> func_grad!(storage, x, last_xgf, pa))
+
+	xwav = zeros(nt);
+	last_xwav = randn(size(xwav)) # reset last_x
+
+	# create df for optimization
+	dfwav = OnceDifferentiable(x -> func_grad!(nothing, x, last_xwav, pa),
+	  (storage, x) -> func_grad!(storage, x, last_xwav, pa))
+
 	pa = Param(gf, dgf, ntgf, dobs, dcal, ddcal, wav, wavmat, dwavmat,
 	     spow2, rpow2, wpow2,
-	     nt, nr, attrib_inv, verbose, fftplan, ifftplan)
+	     nt, nr, attrib_inv, verbose, fftplan, ifftplan,
+	     xgf,last_xgf,dfgf,
+	     xwav,last_xwav,dfwav)
 
 	if iszero(pa.dobs) 
 		((gfobs===nothing) | (wavobs===nothing)) && error("need gfobs and wavobs")
-		F!(pa, mattrib=:gfwav, dattrib=:dobs, gf=gfobs, wav=wavobs)
+		F!(pa, 
+     		pa.xwav, pa.last_xwav, # dummy
+     		mattrib=:gfwav, dattrib=:dobs, gf=gfobs, wav=wavobs)
 	end
 
 	return pa
 end
+
 function ninv(pa)
 	if(pa.attrib_inv == :wav)
 		return pa.nt
@@ -71,6 +98,9 @@ function ninv(pa)
 		return pa.ntgf*pa.nr
 	end
 end
+
+
+
 
 function model_to_x!(x, pa)
 	if(pa.attrib_inv == :wav)
@@ -93,8 +123,8 @@ end
 
 function F!(
 			pa::Param,
-			x::Vector{Float64}=zeros(ninv(pa)),
-			last_x::Vector{Float64}=ones(ninv(pa));
+			x::Vector{Float64},
+			last_x::Vector{Float64};
 			gf=nothing,
 			wav=nothing,
 			mattrib::Symbol=:x,
@@ -168,7 +198,6 @@ function Fadj!(pa, storage, dcal)
 		  spow2=pa.spow2, rpow2=pa.rpow2, wpow2=pa.wpow2,
 			)
 		storage[:] = 0.
-		# copy!(storage, sum(pa.wavmat,2))
 		for i in 1:size(pa.wavmat,2)
 			for j in 1:size(pa.wavmat,1)
 				storage[j] += pa.wavmat[j,i]
@@ -176,7 +205,9 @@ function Fadj!(pa, storage, dcal)
 		end
 	else(pa.attrib_inv == :gf)
 		for ir in 1:pa.nr
-			pa.wavmat[:,ir]=pa.wav
+			for it in 1:size(pa.wavmat,1)
+				pa.wavmat[it,ir]=pa.wav[it]
+			end
 		end
 		DSP.fast_filt!(dcal, pa.dgf, pa.wavmat, :r, nwplags=pa.nt-1,
 		 nwnlags=0,nsplags=pa.nt-1,nsnlags=0,nrplags=pa.ntgf-1,nrnlags=0,
@@ -229,23 +260,6 @@ end
 
 function update_all!(pa, rtol=1e-3)
 
-	# convert initial model to the inversion variable
-	pa.attrib_inv=:gf    
-	xgf = zeros(ninv(pa));
-	last_xgf = randn(size(xgf)) # reset last_x
-
-	# create df for optimization
-	dfgf = OnceDifferentiable(x -> func_grad!(nothing, x, last_xgf, pa),
-	  (storage, x) -> func_grad!(storage, x, last_xgf, pa))
-
-	pa.attrib_inv=:wav    
-	xwav = zeros(ninv(pa));
-	last_xwav = randn(size(xwav)) # reset last_x
-
-	# create df for optimization
-	dfwav = OnceDifferentiable(x -> func_grad!(nothing, x, last_xwav, pa),
-	  (storage, x) -> func_grad!(storage, x, last_xwav, pa))
-
 
 	converged_all=false
 	itr_all=0
@@ -274,12 +288,12 @@ function update_all!(pa, rtol=1e-3)
 		pa.verbose && println("round trip\tfgf\tfwav\tconvergence",) 
 		while !converged && itr < maxitr
 			itr += 1
-			fgf = update_gf!(pa, xgf, last_xgf, dfgf)
+			fgf = update_gf!(pa, pa.xgf, pa.last_xgf, pa.dfgf)
 
 			fgfmin = min(fgfmin, fgf) 
 			fgfmax = max(fgfmax, fgf) 
 
-			fwav = update_wav!(pa, xwav, last_xwav, dfwav)
+			fwav = update_wav!(pa, pa.xwav, pa.last_xwav, pa.dfwav)
 			fwavmin = min(fwavmin, fwav) 
 			fwavmax = max(fwavmax, fwav) 
 
@@ -299,9 +313,5 @@ function initialize!(pa)
 	randn!(pa.gf)
 end
 
-
-# initialize gf and ssf 
-
-# create unknown vector
 
 end # module

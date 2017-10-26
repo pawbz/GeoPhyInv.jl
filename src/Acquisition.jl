@@ -56,10 +56,17 @@ type Geom
 		error("Geom construct") : new(sx, sz, rx, rz, nss, ns, nr)
 end # type
 
+"Compare if two `TD`'s  are equal"
+function Base.isequal(geom1::Geom, geom2::Geom)
+	fnames = fieldnames(Geom)
+	vec=[(isequal(getfield(geom1, name),getfield(geom2, name))) for name in fnames]
+	return all(vec)
+end
+
 """
 Print information about `Geom`
 """
-function print(geom::Geom, name::String="")
+function Base.print(geom::Geom, name::String="")
 	println("\tAcquisition Geometry:\t",name)
 	println("\t> number of supersources:\t",geom.nss)
 	println("\t> sources per supersource:\t","min\t",minimum(geom.ns[:]), "\tmax\t", maximum(geom.ns[:]))
@@ -445,9 +452,9 @@ function Src_zeros(acqgeom::Geom,  fields::Vector{Symbol}, tgrid::Grid.M1D)
 end
 
 """
-Print information about `Src`
+Priiiint information about `Src`
 """
-function print(src::Src, name::String="")
+function Base.print(src::Src, name::String="")
 	println("\tSource Acquisition:\t",name)
 	println("\t> number of supersources:\t",src.nss)
 	println("\t> sources per supersource:\t","min\t",minimum(src.ns[:]), "\tmax\t", maximum(src.ns[:]))
