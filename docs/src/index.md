@@ -87,6 +87,12 @@ Modules = [JuMIT.CICA]
 Order   = [:module, :type, :function]
 ```
 
+# Poisson
+```@autodocs
+Modules = [JuMIT.Poisson]
+Order   = [:module, :type, :function]
+```
+
 # Plots
 ```@autodocs
 Modules = [JuMIT.Plots]

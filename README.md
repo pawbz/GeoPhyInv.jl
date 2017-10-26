@@ -3,6 +3,9 @@
 ## Installation
 * `Pkg.clone("https://github.com/pawbz/JuMIT.jl.git")` 
 
+## Tutorials
+Various tutorials that demonstrate the use of this software are available [here](https://github.com/pawbz/JuMITtutorials)
+
 
 [![Build Status](https://travis-ci.org/pawbz/JuMIT.jl.svg?branch=master)](https://travis-ci.org/pawbz/JuMIT.jl)
 
