@@ -142,14 +142,45 @@ Copy for `Seismic` models. The models should have same bounds and sizes.
 function Base.copy!(modo::Seismic, mod::Seismic)
 	if(isapprox(modo, mod))
 		for f in [:χvp, :χρ, :χvs]
-			setfield!(modo, f, getfield(mod, f))
+			modof=getfield(modo,f)
+			modf=getfield(mod,f)
+			for i in eachindex(modf)
+				modof[i]=modf[i]
+			end
 		end
-		return mod
+		return modo
 	else
 		error("attempt to copy dissimilar models")
 	end
 end
 
+function Seismic_get(mod::Seismic, attrib::Symbol)
+	K0 = mod.vp0 .* mod.vp0 .* mod.ρ0; 
+	KI0 = flipdim(K0.^(-1.0),1);
+	"note that: mean(K0) ≠ 1/mean(KI0)"
+	ρ0 = mod.ρ0; ρI0 = flipdim(ρ0.^(-1.0),1);
+	μ0 = mod.vs0 .* mod.vs0 .* mod.ρ0;
+	if(attrib == :ρ0)
+		return mod.ρ0;
+	elseif(attrib == :vp0)
+		return mod.vp0;
+	elseif(attrib == :vs0)
+		return mod.vs0;
+	elseif(attrib == :ρI0)
+		return ρI0
+	elseif(attrib == :K0)
+		return K0
+	elseif(attrib == :μ0)
+		return μ0
+	elseif(attrib == :KI0)
+		return KI0
+	else
+		# allocate
+		rout=zeros(mod.mgrid.nz, mod.mgrid.nx)
+		Seismic_get!(rout, mod, attrib)
+		return rout
+	end
+end
 
 """
 Get other dependent model parameters of a seismic model
@@ -158,7 +189,7 @@ that are not present in `Seismic`.
 * `:ρI` : inverse of density
 * `:Zp` : P-wave impedance
 """
-function Seismic_get(mod::Seismic, attrib::Symbol)
+function Seismic_get!(modmat::Array{Float64,2}, mod::Seismic, attrib::Symbol)
 	K0 = mod.vp0 .* mod.vp0 .* mod.ρ0; 
 	KI0 = flipdim(K0.^(-1.0),1);
 	"note that: mean(K0) ≠ 1/mean(KI0)"
@@ -168,52 +199,60 @@ function Seismic_get(mod::Seismic, attrib::Symbol)
 	vp=mod.χvp; χ!(vp, mod.vp0,-1) # undo it later
 	vs=mod.χvs; χ!(vs, mod.vs0,-1) # undo it later
 	if(attrib == :ρI)
-		rout= ρ.^(-1.0);
+		for i in eachindex(modmat)
+			modmat[i]=inv(ρ[i])
+		end
 	elseif(attrib == :ρ)
-		rout= ρ;
+		copy!(modmat, ρ)
 	elseif(attrib == :vp)
-		rout= vp;
+		copy!(modmat, vp)
 	elseif(attrib == :vs)
-		rout= vs;
-	elseif(attrib == :ρ0)
-		rout= mod.ρ0;
-	elseif(attrib == :vp0)
-		rout= mod.vp0;
-	elseif(attrib == :vs0)
-		rout= mod.vs0;
-	elseif(attrib == :ρI0)
-		rout= ρI0
+		copy!(modmat, vs)
 	elseif(attrib == :χρI)
-		rout= χ(ρ.^(-1.0), ρI0);
+		for i in eachindex(modmat)
+			modmat[i]=inv(ρ[i])
+		end
+		χ!(modmat, ρI0, 1)
 	elseif(attrib == :χρ)
-		rout= mod.χρ;
+		copy!(modmat, ρ)
+		χ!(modmat, mod.ρ0, 1)
 	elseif(attrib == :χvp)
-		rout= mod.χvp;
+		copy!(modmat, vp)
+		χ!(modmat, mod.vp0, 1)
 	elseif(attrib == :χK)
-		rout= χ(vp .* vp .* ρ, K0);
+		for i in eachindex(modmat)
+			modmat[i]= vp[i]*vp[i]*ρ[i]
+		end
+		χ!(modmat, mod.K0, 1)
 	elseif(attrib == :χμ)
-		rout= χ(vs .* vs .* ρ, μ0);
-	elseif(attrib == :K0)
-		rout= K0
-	elseif(attrib == :μ0)
-		rout= μ0
-	elseif(attrib == :KI0)
-		rout= KI0
+		for i in eachindex(modmat)
+			modmat[i]= vs[i]*vs[i]*ρ[i]
+		end
+		χ!(modmat, mod.μ0, 1)
 	elseif(attrib == :χKI)
-		rout= χ((vp .* vp .* ρ).^(-1), KI0); 
+		for i in eachindex(modmat)
+			modmat[i]=inv(vp[i]*vp[i]*ρ[i])
+		end
+		χ!(modmat, KI0, 1)
 	elseif(attrib == :KI)
-		rout= (vp .* vp .* ρ).^(-1);
+		for i in eachindex(modmat)
+			modmat[i]=inv(vp[i]*vp[i]*ρ[i])
+		end
 	elseif(attrib == :K)
-		rout= (vp .* vp .* ρ);
+		for i in eachindex(modmat)
+			modmat[i]= vp[i]*vp[i]*ρ[i]
+		end
 	elseif(attrib == :Zp)
-		rout= (vp .* ρ);
+		for i in eachindex(modmat)
+			modmat[i]= vp[i]*ρ[i]
+		end
 	else
 		error("invalid attrib")
 	end
 	χ!(ρ, mod.ρ0,1) 
 	χ!(vp, mod.vp0,1)
 	χ!(vs, mod.vp0,1)
-	return rout
+	return modmat
 end
 
 """

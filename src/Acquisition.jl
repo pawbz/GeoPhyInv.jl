@@ -443,6 +443,31 @@ type Src
 		error("error in Src construction") : new(nss, ns, fields, wav, tgrid)
 end
 
+function Base.isapprox(src1::Src, src2::Src)
+	vec=([(src1.nss==src2.nss), (src1.fields==src2.fields), (src1.ns==src2.ns), 
+       		(isequal(src1.tgrid, src2.tgrid)),
+		])
+	return all(vec)
+end
+
+function Base.copy!(srco::Src, src::Src)
+	if(isapprox(srco, src))
+		for f in [:wav]
+			srcowav=getfield(srco, f)
+			srcwav=getfield(src, f)
+			for iss=1:src.nss, ifield=1:length(src.fields) 
+				srcowavv=srcowav[iss,ifield]
+				srcwavv=srcwav[iss,ifield]
+				copy!(srcowavv, srcwavv)
+			end
+		end
+		return srco
+	else
+		error("attempt to copy dissimilar sources")
+	end
+end
+
+
 """
 Allocate `Src` with zeros depending on the acquisition geometry.
 """

@@ -51,7 +51,9 @@ type Paramc
 	jobname::Symbol
 	npw::Int64 
 	exmodel::Models.Seismic
+	exmodel_pert::Models.Seismic
 	model::Models.Seismic
+	model_pert::Models.Seismic
 	acqgeom::Vector{Acquisition.Geom}
 	acqsrc::Vector{Acquisition.Src}
 	abs_trbl::Vector{Symbol}
@@ -81,9 +83,11 @@ type Paramc
 	b_z_half::Vector{Float64}
 	k_z_halfI::Vector{Float64}
 	modttI::Matrix{Float64}
+	modrr::Matrix{Float64}
 	modrrvx::Matrix{Float64}
 	modrrvz::Matrix{Float64}
 	δmodtt::Matrix{Float64}
+	modrr_pert::Matrix{Float64}
 	δmodrrvx::Matrix{Float64}
 	δmodrrvz::Matrix{Float64}
 	grad_modtt_stack::SharedMatrix{Float64}
@@ -348,18 +352,29 @@ function Param(;
 
 
 	"density values on vx and vz stagerred grids"
-	modrrvx = get_rhovxI(Models.Seismic_get(exmodel, :ρI))
-	modrrvz = get_rhovzI(Models.Seismic_get(exmodel, :ρI))
+	modrr=Models.Seismic_get(exmodel, :ρI)
+	modrrvx = get_rhovxI(modrr)
+	modrrvz = get_rhovzI(modrr)
 
 	modttI = Models.Seismic_get(exmodel, :K) 
 	modtt = Models.Seismic_get(exmodel, :KI)
 
 	if(born_flag)
+		isapprox(exmodel, exmodel_pert) || error("pertrubed model should be similar to background model")
 		"inverse density contrasts for Born Modelling"
-		δmodrrvx = get_rhovxI(Models.Seismic_get(exmodel_pert, :ρI)) - get_rhovxI(Models.Seismic_get(exmodel, :ρI))
-		δmodrrvz = get_rhovzI(Models.Seismic_get(exmodel_pert, :ρI)) - get_rhovzI(Models.Seismic_get(exmodel, :ρI))
+		modrr_pert = Models.Seismic_get(exmodel_pert, :ρI)
+		δmodrrvx = get_rhovxI(modrr_pert)
+		δmodrrvz = get_rhovzI(modrr_pert)
+		for i in eachindex(δmodrrvx)
+			δmodrrvx[i] -= modrrvx[i]
+			δmodrrvz[i] -= modrrvz[i]
+		end
+
 		"inverse Bulk Modulus contrasts for Born Modelling"
-		δmodtt = Models.Seismic_get(exmodel_pert, :KI) - Models.Seismic_get(exmodel, :KI)
+		δmodtt = Models.Seismic_get(exmodel_pert, :KI)
+		for i in eachindex(δmodtt)
+			δmodtt[i] -= modtt[i]
+		end
 	else
 		δmodtt, δmodrrvx, δmodrrvz = zeros(1,1), zeros(1,1), zeros(1,1)
 	end
@@ -401,12 +416,12 @@ function Param(;
 	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]
 
 	pac=Paramc(jobname,npw,
-	    exmodel,model,
+	    exmodel,exmodel_pert,model,model_pert,
 	    acqgeom,acqsrc,abs_trbl,isfields,sflags,
 	    irfields,rflags,δt,δxI,δzI,
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
-	    modttI,modrrvx,modrrvz,
-	    δmodtt,δmodrrvx,δmodrrvz,
+	    modttI,modrr,modrrvx,modrrvz,
+	    δmodtt,modrr_pert,δmodrrvx,δmodrrvz,
 	    grad_modtt_stack,grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,
 	    illum_flag,illum_stack,
 	    backprop_flag,
@@ -462,17 +477,59 @@ function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 end
 
 """
-update the `Seismic` model in `Paramc`
+Update the `Seismic` models in `Paramc` without additional memory allocation.
+This routine is used during FWI, where medium parameters are itertively updated. 
 """
-function update_model!(pac::Paramc, model::Models.Seismic)
+function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 
 	copy!(pac.model, model)
 
-	Seismic_pml_pad_trun!(pac.exmodel, pac.model)
+	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model)
 
+	Models.Seismic_get!(pac.modttI, pac.exmodel, :K) 
+	Models.Seismic_get!(pac.modtt, pac.exmodel, :KI)
 
+	Models.Seismic_get!(pac.modrr, pac.exmodel, :ρI)
+	get_rhovxI!(pac.modrrvx, pac.modrr)
+	get_rhovzI!(pac.modrrvz, pac.modrr)
 
+	if(pac.born_flag && !(model_pert === nothing))
+		copy!(pac.model_pert, model_pert)
+		Models.Seismic_pml_pad_trun!(pac.exmodel_pert, pac.model_pert);
+		Models.Seismic_get!(pac.modrr_pert, pac.exmodel_pert, :ρI)
+		get_rhovxI!(pac.δmodrrvx, pac.modrr_pert)
+		get_rhovzI!(pac.δmodrrvz, pac.modrr_pert)
+		for i in eachindex(δmodrrvx)
+			pac.δmodrrvx[i] -= pac.modrrvx[i]
+			pac.δmodrrvz[i] -= pac.modrrvz[i]
+		end
+
+		Models.Seismic_get!(pac.δmodtt, pac.exmodel_pert, :KI)
+		for i in eachindex(δmodtt)
+			pac.δmodtt[i] -= pac.modtt[i]
+		end
+	end
 end 
+
+function update_acqsrc!(pa::Param, acqsrc, sflags=nothing)
+	# update acqsrc in pa.c
+	copy!(pa.c.acqsrc, acqsrc)
+	if(!(sflags===nothing))
+		copy!(pa.c.sflags, sflags)
+	end
+
+	# fill_wavelets for each supersource
+	@sync begin
+		for (ip, p) in enumerate(procs(pa.p))
+			@async remotecall_wait(p) do 
+				pap=localpart(pa.p)
+				for is in 1:length(pap.ss)
+					fill_wavelets!(pap.ss.iss, pap.ss.wavelets, pa.c.acqsrc, pa.c.sflags)
+				end
+			end
+		end
+	end
+end
 
 """
 Create modeling parameters for each supersource. 
@@ -1300,14 +1357,19 @@ end
 """
 Project density on to a staggerred grid using simple interpolation
 """
+
 function get_rhovxI(rhoI::Array{Float64})
 	rhovxI = zeros(rhoI);
+	get_rhovxI!(rhovxI, rhoI)
+	return rhovxI
+end
+function get_rhovxI!(rhovxI, rhoI::Array{Float64})
 	for ix = 1:size(rhoI, 2)-1
 		for iz = 1:size(rhoI,1)
 			rhovxI[iz, ix] = 0.5e0 *(rhoI[iz,ix+1] + rhoI[iz,ix])
 		end
 	end
-	return rhovxI
+	return nothing
 end # get_rhovxI
 
 """
@@ -1315,12 +1377,16 @@ Project density on to a staggerred grid using simple interpolation
 """
 function get_rhovzI(rhoI::Array{Float64})
 	rhovzI = zeros(rhoI);
+	get_rhovzI!(rhovzI, rhoI)
+	return rhovzI
+end
+function get_rhovzI!(rhovzI, rhoI::Array{Float64})
 	for ix = 1: size(rhoI, 2)
 		for iz = 1: size(rhoI, 1)-1
-				rhovzI[iz, ix] =  0.5e0 * (rhoI[iz+1,ix] + rhoI[iz,ix])
+			rhovzI[iz, ix] =  0.5e0 * (rhoI[iz+1,ix] + rhoI[iz,ix])
 		end
 	end
-	return rhovzI
+	return nothing
 end # get_rhovzI
 
 
