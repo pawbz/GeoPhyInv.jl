@@ -27,7 +27,6 @@ m=["or","vk"];
 
 err=zeros(ntst,4);  
 for i = 1 : ntst
-    clf()
     sigma=ones(floor(2^(4+2.5*(i - 1)/(ntst - 3))),floor(2^(4+2.5*(i - 1)/(ntst - 3))));
 
     global fields # to make it a global variable
