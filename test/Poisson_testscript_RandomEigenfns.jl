@@ -8,8 +8,6 @@
 
 
 using JuMIT
-using PyPlot
-#using IJulia
 using Polynomials
 using Base.Test
 
