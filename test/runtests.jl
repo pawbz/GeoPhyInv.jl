@@ -1,5 +1,6 @@
 
-tests = ["Fdtd_accuracy", "Poisson_testscript_RandomEigenfns", "Smooth"]
+tests = ["Fdtd_accuracy", "Poisson_testscript_RandomEigenfns", "Smooth", "Decon", "Misfits", "DSP",
+	"Interpolation", "Models", ]
 
 println("Running tests:")
 

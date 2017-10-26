@@ -275,7 +275,7 @@ function Seismic_reparameterize!(
 		      x2::Array{Float64,2},
 		      attribs::Vector{Symbol}=[:χKI, :χρI]
 		      )
-	Seismic_iszero(mod) ? error("mod cannot be zero") : nothing
+	iszero(mod) ? error("mod cannot be zero") : nothing
 	size(x1) == (mod.mgrid.nz, mod.mgrid.nx) ? nothing : error("size x1")
 	size(x2) == (mod.mgrid.nz, mod.mgrid.nx) ? nothing : error("size x2")
 	if(attribs == [:χKI, :χρI]) 

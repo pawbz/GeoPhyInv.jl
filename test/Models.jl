@@ -25,8 +25,8 @@ model0.vs0 = [-1.0, -1.0];
 JuMIT.Models.Seismic_reparameterize!(model0, JuMIT.Models.Seismic_get(model,:χKI),
 				   JuMIT.Models.Seismic_get(model,:χρI),[:χKI,:χρI]);
 
-@test_approx_eq model.χvp model0.χvp
-@test_approx_eq model.χρ model0.χρ
+@test model.χvp ≈ model0.χvp
+@test model.χρ ≈ model0.χρ
 
 
 nznx = model.mgrid.nz * model.mgrid.nx;

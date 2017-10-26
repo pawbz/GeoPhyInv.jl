@@ -57,7 +57,6 @@ for i in 1:4
 	@time JuMIT.Decon.x_to_model!(pa.xgf, pa);
 	@time JuMIT.Decon.model_to_x!(pa.xgf, pa);
 	@time JuMIT.Decon.update_gf!(pa, pa.xgf, pa.last_xgf, pa.dfgf)
-	@time JuMIT.Decon.update_wav!(pa, pa.xwav, pa.last_xwav, pa.dfwav)
 	@time JuMIT.Decon.func_grad!(storagegf, pa.xgf, pa.last_xgf, pa)
 end
 
