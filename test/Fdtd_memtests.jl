@@ -1,10 +1,10 @@
-#addprocs(4)
+addprocs(4)
 using JuMIT
 reload("JuMIT")
-using DistributedArrays
+@everywhere using DistributedArrays
 
 model=JuMIT.Gallery.Seismic(:acou_homo1)
-acqgeom =JuMIT.Acquisition.Geom_circ(nss=1,nr=100,rad=[700.,700.]);
+acqgeom =JuMIT.Acquisition.Geom_circ(nss=4,nr=100,rad=[700.,700.]);
 acqsrc=JuMIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=0.7)
 @time pa=JuMIT.Fdtd.Param(born_flag=true,npw=2, tgridmod=acqsrc.tgrid,
         gmodel_flag=true,
@@ -15,6 +15,9 @@ acqsrc=JuMIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmax
 pac=pa.c;
 pass=JuMIT.Fdtd.Paramss(1, pac)
 
+@sync begin
+for (ip, p) in enumerate(procs(pa.p))
+@sync remotecall_wait(p) do
 # check memory of all these methods
 for i in 1:3
         println("=============================")
@@ -48,15 +51,25 @@ for i in 1:3
         @time JuMIT.Fdtd.stack_grads!(pac, localpart(pa.p))
         print("stack illums\t")
         @time JuMIT.Fdtd.stack_illums!(pac, localpart(pa.p))
-        print("update gmodel\t")
-        @time JuMIT.Fdtd.update_gmodel!(pac)
         print("update data\t")
         @time JuMIT.Fdtd.update_datamat!(1,1,pac,localpart(pa.p))
-        print("mod\t")
-        @time JuMIT.Fdtd.mod!(pa);
         println("=============================")
 end
+end
+end
+end
 
+
+for i in 1:3
+        print("update gmodel\t")
+        @time JuMIT.Fdtd.update_gmodel!(pac)
+        print("update model\t")
+        @time JuMIT.Fdtd.update_model!(pac, pac.model)
+        print("update acqsrc\t")
+        @time JuMIT.Fdtd.update_acqsrc!(pa, pac.acqsrc);
+        print("mod\t")
+        @time JuMIT.Fdtd.mod!(pa);
+end
 
 #for nloop in [4,8,16]
 #        print("looping mod! for:\t",nloop,"\t")

@@ -377,6 +377,7 @@ function Param(;
 		end
 	else
 		δmodtt, δmodrrvx, δmodrrvz = zeros(1,1), zeros(1,1), zeros(1,1)
+		modrr_pert = zeros(1,1)
 	end
 
 
@@ -487,7 +488,6 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model)
 
 	Models.Seismic_get!(pac.modttI, pac.exmodel, :K) 
-	Models.Seismic_get!(pac.modtt, pac.exmodel, :KI)
 
 	Models.Seismic_get!(pac.modrr, pac.exmodel, :ρI)
 	get_rhovxI!(pac.modrrvx, pac.modrr)
@@ -524,7 +524,9 @@ function update_acqsrc!(pa::Param, acqsrc, sflags=nothing)
 			@async remotecall_wait(p) do 
 				pap=localpart(pa.p)
 				for is in 1:length(pap.ss)
-					fill_wavelets!(pap.ss.iss, pap.ss.wavelets, pa.c.acqsrc, pa.c.sflags)
+					iss=pap.ss[is].iss
+					wavelets=pap.ss[is].wavelets
+					fill_wavelets!(iss, wavelets, pa.c.acqsrc, pa.c.sflags)
 				end
 			end
 		end

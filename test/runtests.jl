@@ -1,5 +1,5 @@
 
-tests = ["f90tests"]
+tests = ["Fdtd_accuracy", "Poisson_testscript_RandomEigenfns", "Smooth"]
 
 println("Running tests:")
 

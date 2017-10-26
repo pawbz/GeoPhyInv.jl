@@ -31,7 +31,7 @@ JuMIT.Fdtd.mod!(pa);
 err = JuMIT.Misfits.TD!(nothing,rec1, pa.c.data[1])
 
 # normalization
-error = err[1]/JuMIT.Data.TD_dot(rec1, rec1)
+error = err[1]/dot(rec1, rec1)
 
 # desired accuracy?
 @test error<1e-2

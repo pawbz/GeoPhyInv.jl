@@ -279,29 +279,33 @@ function Param(
 
 
 	# update pdcal
-	update_dcal!(pa, mprecon_factor)
+	Fdtd.mod!(pa.paf)
+	
+#	build_mprecon!(pa, illum, mprecon_factor)
+	copy!(pa.dcal, pa.paf.c.data)
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic) & Data.TD_iszero(pa.dobs))
-		# change source wavelets for modelling observed data
-		F!(pa, modm=modm_obs, mattrib=:modm,acqsrc=acqsrc_obs, dattrib=:dobs) # x is dummy here
+		# update model in the same forward engine
+		Fdtd.update_model!(paf.c, modm_obs)
+		# update sources in the forward engine
+		Fdtd.update_acqsrc!(paf, acqsrc_obs)
+		# F
+		Fdtd.mod!(pa.paf);
+		copy!(pa.dobs, pa.paf.c.data);
+
+
+	        Fdtd.initialize!(paf.c)  # clear everything
+
+		# put back model and sources
+		Fdtd.update_model!(paf.c, modm)
+		Fdtd.update_acqsrc!(paf, acqsrc)
 	end
 	Data.TD_iszero(pa.dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
 
 	return pa
 end
 
-"""
-Use to update `dcal` in pa (only for testing)
-"""
-function update_dcal!(pa, mprecon_factor=1.0)
-	illum_out = (mprecon_factor == 1.0) ? false : true
-	# intial modelling dcal
-	illum = F!(pa, modm=pa.modm, mattrib=:modm, illum_out=illum_out) # x is dummy here, since actually using pa.modm
-
-	# build precon based on illum
-	build_mprecon!(pa, illum, mprecon_factor)
-end
 
 """
 Return the number of inversion variables for FWI corresponding to `Param`.
@@ -476,34 +480,19 @@ and boundary values for adjoint calculation.
 * `pa::Param` : parameters that are constant during the inversion 
 * `modm::Models.Seismic` : 
 """
-function F!(
-			pa::Param,
-			x::Vector{Float64}=zeros(xfwi_ninv(pa)),
-			last_x::Vector{Float64}=ones(xfwi_ninv(pa));
-			modm::Models.Seismic=Models.Seismic_zeros(pa.modm.mgrid),
-			acqsrc::Acquisition.Src=pa.acqsrc,
-			mattrib::Symbol=:x,
-			dattrib::Symbol=:dcal,
-			illum_out::Bool=false
-			   )
+function F!(pa::Param, x, last_x=[0.0])
 	if(x!=last_x)
 		pa.verbose && println("updating buffer")
-		last_x[:] = x[:]
+		(size(last_x)==size(x)) && (last_x[:] = x[:])
 
-		if(mattrib == :x)
+		if(!(x===nothing))
 			Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
-			model = pa.modm
-		elseif(mattrib == :modm)
-			(iszero(modm)) && error("need modm")
-			model = modm
-		else
-			error("invalid mattrib")
+			# update model in the forward engine
+			Fdtd.update_model!(pa.paf.c, pa.modm)
 		end
 
-		illum=ones(pa.modm.mgrid.nz, pa.modm.mgrid.nx)
-		setfield!(pa, dattrib, deepcopy(pa.dtemp[1]))
-		!(illum_out) && (illum[:] = 1.0)  # illum is ones when absent
-		return illum
+		JuMIT.Fdtd.mod!(pa.paf);
+		copy!(pa.dcal,pa.paf.c.data)
 	end
 end
 
