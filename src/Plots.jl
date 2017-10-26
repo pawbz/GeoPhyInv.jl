@@ -1,6 +1,5 @@
 module Plots
 
-using PyPlot
 import JuMIT.Interpolation
 import JuMIT.Acquisition
 import JuMIT.Grid
@@ -99,7 +98,7 @@ function Src(acqsrc::Acquisition.Src; )
 	fgrid= Grid.M1D_fft(tgrid)
 	subplot(2,1,1)
 	plot(tgrid.x, wav)
-	xlabel(L"$t$ (s)");
+	xlabel("\$t\$ (s)");
 	subplot(2,1,2)
 	plot(fgrid.x[1:div(fgrid.nx,2)], powwavdb[1:div(fgrid.nx,2)])
 	ylabel("power (dB)");
@@ -147,7 +146,7 @@ function TD(td::Vector{Data.TD}; ssvec::Vector{AbstractVector{Int64}}=fill([1], 
 			imshow(dp, cmap="gray",aspect="auto", extent=extent, vmin=bclip[id], vmax=wclip[id])
 			title("common shot gather")
 			xlabel("receiver index");
-			ylabel(L"$t$ (s)");
+			ylabel("\$t\$ (s)");
 			colorbar();
 			tight_layout()
 		elseif(attrib == :wav)
@@ -196,8 +195,8 @@ function Seismic(model::Models.Seismic;
 		vmin = use_bounds ? Models.Seismic_get(model, f0)[1] : minimum(m)
 		vmax = use_bounds ? Models.Seismic_get(model, f0)[2] : maximum(m)
 		ax = imshow(m,		     cmap="gray", 		     extent=ext, vmin=vmin, vmax=vmax)
-			 xlabel(L"$x$ (m)");
-			 ylabel(L"$z$ (m)");
+			 xlabel("\$x\$ (m)");
+			 ylabel("\$z\$ (m)");
 			 title(string(fields[i]))
 			 (length(fields) ≠1) && colorbar(ax, fraction=0.046, pad=0.04);
 		
