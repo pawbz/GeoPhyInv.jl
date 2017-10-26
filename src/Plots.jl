@@ -1,6 +1,6 @@
 module Plots
 
-using PyCall
+#using PyCall
 using PyPlot
 #import PyCall: @pyimport
 #import PyPlot: pygui
@@ -11,45 +11,40 @@ import JuMIT.Grid
 import JuMIT.Data
 import JuMIT.Models
 
-export printfig
 
-if !PyPlot.isdisplayok()
-pygui(false)
-end
-
-"""
-save current fig using matlab2tikz
-"""
-function printfig(fig; filename::String = "FIG")
-	if filename == "FIG"
-		temp = 1;
-		file = join([filename string(temp) ".tex"])
-		while isfile(file)
-			temp += 1;
-			file = join([filename string(temp) ".tex"])
-		end
-		tikzfile = join([file[1:end-4] ".tikz"]);
-	else
-		file = filename;
-		tikzfile = join([file[1:end-4] ".tikz"]);
-	end			
-	matplotlib2tikz.save(tikzfile,fig);
-	fin = open(tikzfile,"r");
-	fout = open(file,"w");
-	lines = readlines(fin);
-	close(fin);
-	rm(tikzfile);
-	lines_old = ["\\documentclass[tikz]{standalone}\n";
-	"\\usepackage{pgfplots}\n";
-	"\\pgfplotsset{compat=newest}\n";
-	"\\usepackage{amsmath}\n";
-	"\\usepackage{siunitx}\n";
-	"\\begin{document}\n";lines;"\n\\end{document}\n"];
-
-	lines = ["% Generated from Julia\n";"\\begin{center}\n";lines;"\\end{center}"]
-	write(fout,lines)
-	close(fout)
-end
+#"""
+#save current fig using matlab2tikz
+#"""
+#function printfig(fig; filename::String = "FIG")
+#	if filename == "FIG"
+#		temp = 1;
+#		file = join([filename string(temp) ".tex"])
+#		while isfile(file)
+#			temp += 1;
+#			file = join([filename string(temp) ".tex"])
+#		end
+#		tikzfile = join([file[1:end-4] ".tikz"]);
+#	else
+#		file = filename;
+#		tikzfile = join([file[1:end-4] ".tikz"]);
+#	end			
+#	#matplotlib2tikz.save(tikzfile,fig);
+#	fin = open(tikzfile,"r");
+#	fout = open(file,"w");
+#	lines = readlines(fin);
+#	close(fin);
+#	rm(tikzfile);
+#	lines_old = ["\\documentclass[tikz]{standalone}\n";
+#	"\\usepackage{pgfplots}\n";
+#	"\\pgfplotsset{compat=newest}\n";
+#	"\\usepackage{amsmath}\n";
+#	"\\usepackage{siunitx}\n";
+#	"\\begin{document}\n";lines;"\n\\end{document}\n"];
+#
+#	lines = ["% Generated from Julia\n";"\\begin{center}\n";lines;"\\end{center}"]
+#	write(fout,lines)
+#	close(fout)
+#end
 
 """
 Plot acquisition geometry `Acquisition.Geom` on 
