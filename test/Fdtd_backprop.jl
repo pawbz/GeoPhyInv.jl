@@ -1,78 +1,38 @@
-#addprocs(10)
-using SIT
+addprocs(4)
+using JuMIT
 using Base.Test
-reload("SIT")
+reload("JuMIT")
 
+model=JuMIT.Gallery.Seismic(:acou_homo1)
+acqgeom =JuMIT.Acquisition.Geom_circ(nss=4,nr=100,rad=[700.,700.]);
+acqsrc=JuMIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=0.7)
+@time pa=JuMIT.Fdtd.Param(born_flag=false,npw=1, tgridmod=acqsrc.tgrid,
+        gmodel_flag=true,
+		sflags=[2],
+        snaps_flag=true,
+        backprop_flag=1,
+        illum_flag=true,acqgeom=[acqgeom], acqsrc=[acqsrc],
+        model=model);
 
-"""
-for single source
-"""
-model = SIT.Gallery.Seismic(:acou_homo1);
-tgrid = SIT.Gallery.M1D(:acou_homo1_long);
+JuMIT.Fdtd.mod!(pa);
+rec1=deepcopy(pa.c.data[1])
 
-#acqgeom = SIT.Gallery.Geom(:acou_homo1);
-acqgeom = SIT.Gallery.Geom(model.mgrid,:surf);
-
-#src_n =2;
-acqsrc=SIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,1,model,3)
-
-@time rec1, b1,  gg = SIT.Fdtd.mod!(model=model,  acqgeom=[acqgeom], acqsrc=[acqsrc], 
-		     backprop_flag=1,
-		    tgridmod=tgrid, verbose=true, src_flags=[2], recv_flags=[2]);
-
-@time rec2, b2,  gg = SIT.Fdtd.mod!( model=model, boundary=b1,
-		     backprop_flag=-1,
-		    acqgeom=[acqgeom], acqsrc=[acqsrc], src_flags=[3], recv_flags=[1],
-			     tgridmod=tgrid, verbose=true);
+pa.c.sflags=[3];
+pa.c.backprop_flag=-1
+JuMIT.Fdtd.mod!(pa);
+rec2=deepcopy(pa.c.data[1])
 
 # compare results
 
 # time reverse
-SIT.Data.TD_tr!(rec2[1]);
+JuMIT.Data.TD_tr!(rec2);
 # least-squares misfit
-err = SIT.Misfits.TD!(rec1[1], rec2[1])
+err = JuMIT.Misfits.TD!(nothing, rec1, rec2)
 
 # normalization
-error = err[1]/SIT.Data.TD_dot(rec1[1], rec1[1])
+error = err/dot(rec1, rec1)
 
 println("error:\t", error)
 
-# desired accuracy? 
-@test error<1e-10
-
-exit()
-
-"""
-for multiple source in parallel
-"""
-model = SIT.Gallery.Seismic(:acou_homo1);
-tgrid = SIT.Gallery.M1D(:acou_homo1_long);
-
-#acqgeom = SIT.Gallery.Geom(:acou_homo1);
-acqgeom = SIT.Gallery.Geom(model.mgrid,:tentenv);
-
-#src_n =2;
-acqsrc = SIT.Gallery.Src(:acou_homo1, 10);
-
-alloc = SIT.Fdtd.mod_alloc(model=model, acqgeom=[acqgeom], npropwav=1, tgridmod=tgrid)
-
-rec1 = SIT.Fdtd.mod(model=model,  acqgeom=[acqgeom], acqsrc=[acqsrc], 
-		    tgridmod=tgrid, verbose=true, boundary_save_flag=true, src_flags=[1], recv_flags=[1]);
-
-rec2 = SIT.Fdtd.mod(boundary_in = rec1[2], model=model, 
-		    acqgeom=[acqgeom], acqsrc=[acqsrc], src_flags=[3], recv_flags=[1],
-			     tgridmod=tgrid, verbose=true);
-
-# compare results
-
-# time reverse
-SIT.Data.TD_tr!(rec2[1][1]);
-# least-squares misfit
-err = SIT.Misfits.TD(rec1[1][1], rec2[1][1])
-
-# normalization
-error = err[1]/SIT.Data.TD_dot(rec1[1][1], rec1[1][1])
-
-# desired accuracy? 
-@test error<1e-10
-
+# desired accuracy?
+@test error<1e-9

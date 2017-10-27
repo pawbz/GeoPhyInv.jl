@@ -116,6 +116,16 @@ function Base.iszero(mod::Seismic)
 	return any((mod.vp0 .* mod.ρ0) .== 0.0) ? true : false
 end
 
+"""
+Return a similar model to the input model, used for allocation.
+"""
+function Base.similar(mod::Seismic)
+	modout=deepcopy(mod)
+	fill!(modout, 0.0)
+	return modout
+end
+
+
 "Compare if two `Seismic` models are equal"
 function Base.isequal(mod1::Seismic, mod2::Seismic)
 	fnames = fieldnames(Seismic)

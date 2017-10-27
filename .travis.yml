@@ -8,9 +8,11 @@ julia:
 notifications:
   email: pawbz@mit.edu
 # uncomment the following lines to override the default test script
+install:
+  - pip install matplotlib    
 script:
 #  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia --check-bounds=yes --color=yes -e 'ENV["PYTHON"]=""; Pkg.add("PyCall"); Pkg.clone(pwd()); Pkg.build("JuMIT"); Pkg.test("JuMIT"; coverage=true)'
+  - julia --check-bounds=yes --color=yes -e 'Pkg.add("PyCall"); Pkg.clone(pwd()); Pkg.build("JuMIT"); Pkg.test("JuMIT"; coverage=true)'
 after_success:
   - julia -e 'Pkg.add("Documenter")'
   - julia -e 'cd(Pkg.dir("JuMIT")); include(joinpath("docs", "make.jl"))'

@@ -50,6 +50,7 @@ Modelling parameters common for all supersources
 type Paramc
 	jobname::Symbol
 	npw::Int64 
+	activepw::Vector{Int64}
 	exmodel::Models.Seismic
 	exmodel_pert::Models.Seismic
 	model::Models.Seismic
@@ -165,9 +166,6 @@ function initialize!(pap::Paramp)
 	reset_per_ss!(pap)
 	for issp in 1:length(pap.ss)
 		pass=pap.ss[issp]
-		for i in 1:length(pass.boundary)
-			pass.boundary[i][:]=0.0
-		end
 		for i in 1:length(pass.records)
 			pass.records[i][:]=0.0
 		end
@@ -177,6 +175,15 @@ function initialize!(pap::Paramp)
 		pass.grad_modrrvx[:]=0.0
 		pass.grad_modrrvz[:]=0.0
 		pass.born_svalue_stack[:]=0.0
+	end
+end
+
+function initialize_boundary!(pap::Paramp)
+	for issp in 1:length(pap.ss)
+		pass=pap.ss[issp]
+		for i in 1:length(pass.boundary)
+			pass.boundary[i][:]=0.0
+		end
 	end
 end
 
@@ -407,7 +414,7 @@ function Param(;
 	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	grad_modrr_stack=zeros(nzd,nxd)
-	gmodel=Models.Seismic_zeros(model.mgrid)
+	gmodel=similar(model)
 	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
 	itsnaps = [indmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
@@ -416,7 +423,9 @@ function Param(;
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),acqgeom[1].nss)
 	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]
 
-	pac=Paramc(jobname,npw,
+	# default is all prpagating wavefields are active
+	activepw=[ipw for ipw in 1:npw]
+	pac=Paramc(jobname,npw,activepw,
 	    exmodel,exmodel_pert,model,model_pert,
 	    acqgeom,acqsrc,abs_trbl,isfields,sflags,
 	    irfields,rflags,δt,δxI,δzI,
@@ -511,9 +520,12 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 	end
 end 
 
-function update_acqsrc!(pa::Param, acqsrc, sflags=nothing)
+function update_acqsrc!(pa::Param, acqsrc::Vector{Acquisition.Src}, sflags=nothing)
 	# update acqsrc in pa.c
-	copy!(pa.c.acqsrc, acqsrc)
+	(length(acqsrc) ≠ pa.c.npw) && error("cannot update")
+	for i in 1:length(acqsrc)
+		copy!(pa.c.acqsrc[i], acqsrc[i])
+	end
 	if(!(sflags===nothing))
 		copy!(pa.c.sflags, sflags)
 	end
@@ -691,21 +703,22 @@ Author: Pawan Bharadwaj
 	# update gradient model using grad_modtt_stack, grad_modrr_stack
 	update_gmodel!(pa.c)
 
-	for ipw in 1:pa.c.npw
-		for ifield in 1:length(pa.c.irfields)
+	for ipw in pa.c.activepw
+		if(pa.c.rflags[ipw] ≠ 0) # record only if rflags is non-zero
+			for ifield in 1:length(pa.c.irfields)
 
-			pa.c.datamat[:]=0.0
-			@sync begin
-				for (ip, p) in enumerate(procs(pa.p))
-					@sync remotecall_wait(p) do 
-						update_datamat!(ifield, ipw, pa.c, localpart(pa.p))
+				pa.c.datamat[:]=0.0
+				@sync begin
+					for (ip, p) in enumerate(procs(pa.p))
+						@sync remotecall_wait(p) do 
+							update_datamat!(ifield, ipw, pa.c, localpart(pa.p))
+						end
 					end
 				end
+				update_data!(ifield, ipw, pa.c)
 			end
-			update_data!(ifield, ipw, pa.c)
 		end
 	end
-
 	return nothing
 end
 
@@ -910,7 +923,7 @@ end # mod_per_shot
 	"""
 	adding source to pressure field at [it] 
 	"""
-	for ipw = 1:pac.npw
+	for ipw in pac.activepw
 	for (ifields, ifield) in enumerate(pac.isfields[ipw])
 	@simd for is = 1:acqgeom[ipw].ns[iss]
 		"""
@@ -954,7 +967,7 @@ end
 	irz1=pass[issp].irz1
 	irz2=pass[issp].irz2
 
-	for ipw = 1:pac.npw
+	for ipw in pac.activepw
 		recs=pass[issp].records[ipw]
 		for (ifieldr, ifield) in enumerate(pac.irfields)
 			@simd for ir = 1:pac.acqgeom[ipw].nr[iss]
@@ -1043,41 +1056,43 @@ end
 	a_x=pac.a_x; b_x=pac.b_x; k_xI=pac.k_xI; a_x_half=pac.a_x_half; b_x_half=pac.b_x_half; k_x_halfI=pac.k_x_halfI 
 	a_z=pac.a_z; b_z=pac.b_z; k_zI=pac.k_zI; a_z_half=pac.a_z_half; b_z_half=pac.b_z_half; k_z_halfI=pac.k_z_halfI
 
-	pppppp!(p,pp,ppp)
+	pppppp!(p,pp,ppp,pac.activepw)
 
 	"""
 	compute dpdx and dpdz at [it-1] for all propagating fields
 	"""
-	update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz)
-	update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz)
+	update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz,pac.activepw)
+	update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz,pac.activepw)
 
 	"""
 	update velocity at [it-1/2] using 
 	velocity at [it-3/2] and dpdx and dpdz at [it-1] 
 	"""
-	update_vx!(p, dpdx, δt, modrrvx, nx, nz)
-	update_vz!(p, dpdz, δt, modrrvz, nx, nz)
+	update_vx!(p, dpdx, δt, modrrvx, nx, nz,pac.activepw)
+	update_vz!(p, dpdz, δt, modrrvz, nx, nz,pac.activepw)
 
 
-	dvdx!(dpdx,p,memory_dvx_dx,b_x,a_x,k_xI,nz,nx,δx24I)
-	dvdz!(dpdz,p,memory_dvz_dz,b_z,a_z,k_zI,nz,nx,δz24I)
+	dvdx!(dpdx,p,memory_dvx_dx,b_x,a_x,k_xI,nz,nx,δx24I,pac.activepw)
+	dvdz!(dpdz,p,memory_dvz_dz,b_z,a_z,k_zI,nz,nx,δz24I,pac.activepw)
 
 	"""
 	compute pressure at [it] using p at [it-1] and dvxdx
 	and dvzdz at [it-1/2]
 	"""
-	pvzvx!(p,dpdx,dpdz,modttI,nz,nx,δt)
+	pvzvx!(p,dpdx,dpdz,modttI,nz,nx,δt,pac.activepw)
 
 end
-function pppppp!(p,pp,ppp)
-	@simd for i in eachindex(p)
-		@inbounds ppp[i]=pp[i]
-		@inbounds pp[i]=p[i]
+function pppppp!(p,pp,ppp,activepw)
+	for ipw in activepw, ifi in 1:size(p,3), ix in 1:size(p,2)
+		@simd for iz in 1:size(p,1)
+			@inbounds ppp[iz,ix,ifi,ipw]=pp[iz,ix,ifi,ipw]
+			@inbounds pp[iz,ix,ifi,ipw]=p[iz,ix,ifi,ipw]
+		end
 	end
 end
 
-@inbounds @fastmath function dvdx!(dpdx,p,memory_dvx_dx,b_x,a_x,k_xI,nz,nx,δx24I)
-	for ipw = 1:size(p,4)
+@inbounds @fastmath function dvdx!(dpdx,p,memory_dvx_dx,b_x,a_x,k_xI,nz,nx,δx24I,activepw)
+	for ipw in activepw
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
 			@inbounds dpdx[iz,ix,2,ipw] = (27.e0*p[iz,ix,2,ipw]-27.e0*p[iz,ix-1,2,ipw]-p[iz,ix+1,2,ipw]+p[iz,ix-2,2,ipw]) * (δx24I)
@@ -1088,8 +1103,8 @@ end
 	end
 end
 
-@inbounds @fastmath function dvdz!(dpdz,p,memory_dvz_dz,b_z,a_z,k_zI,nz,nx,δz24I)
-	for ipw = 1:size(p,4)
+@inbounds @fastmath function dvdz!(dpdz,p,memory_dvz_dz,b_z,a_z,k_zI,nz,nx,δz24I,activepw)
+	for ipw in activepw
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
 			@inbounds dpdz[iz,ix,3,ipw] = (27.e0*p[iz,ix,3,ipw]-27.e0*p[iz-1,ix,3,ipw]-p[iz+1,ix,3,ipw]+p[iz-2,ix,3,ipw]) * (δz24I)
@@ -1100,8 +1115,8 @@ end
 	end
 end
 
-@inbounds @fastmath function pvzvx!(p,dpdx,dpdz,modttI,nz,nx,δt)
-	for ipw = 1:size(p,4)
+@inbounds @fastmath function pvzvx!(p,dpdx,dpdz,modttI,nz,nx,δt,activepw)
+	for ipw in activepw
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
 			@inbounds p[iz,ix,1,ipw] += (modttI[iz,ix] * (dpdx[iz,ix,2,ipw] + dpdz[iz,ix,3,ipw])) * δt #* boundary_p(iz,ix)
@@ -1110,8 +1125,8 @@ end
 	end
 end
 
-@inbounds @fastmath function update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz)
-	for ipw = 1:size(p,4)
+@inbounds @fastmath function update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz,activepw)
+	for ipw in activepw
 		for ix = 3:nx-2
 		@simd for iz = 3:nz-2
 			@inbounds dpdx[iz,ix,1,ipw] = (27.e0*p[iz,ix+1,1,ipw]-27.e0*p[iz,ix,1,ipw]-p[iz,ix+2,1,ipw]+p[iz,ix-1,1,ipw]) * (δx24I)
@@ -1122,8 +1137,8 @@ end
 	end
 end
 
-@inbounds @fastmath function update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz)
-	for ipw = 1:size(p,4)
+@inbounds @fastmath function update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz,activepw)
+	for ipw in activepw
 		for ix = 3:nx-2
 		@simd for iz = 3:nz-2
 			@inbounds dpdz[iz,ix,1,ipw] = (27.e0*p[iz+1,ix,1,ipw]-27.e0*p[iz,ix,1,ipw]-p[iz+2,ix,1,ipw]+p[iz-1,ix,1,ipw]) * (δz24I)
@@ -1134,8 +1149,8 @@ end
 	end
 end
 
-@inbounds @fastmath function update_vx!(p, dpdx, δt, modrrvx,  nx, nz)
-	for ipw = 1:size(p,4)
+@inbounds @fastmath function update_vx!(p, dpdx, δt, modrrvx,  nx, nz,activepw)
+	for ipw in activepw
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
 			@inbounds p[iz,ix,2,ipw] += (dpdx[iz,ix,1,ipw]) * δt * modrrvx[iz,ix] #* boundary_vx(iz,ix)
@@ -1144,8 +1159,8 @@ end
 	end
 end
 
-@inbounds @fastmath function update_vz!(p, dpdz, δt,  modrrvz, nx, nz)
-	for ipw = 1:size(p,4)
+@inbounds @fastmath function update_vz!(p, dpdz, δt,  modrrvz, nx, nz,activepw)
+	for ipw in activepw
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
 			@inbounds p[iz,ix,3,ipw] +=  (dpdz[iz,ix,1,ipw]) * δt * modrrvz[iz,ix] #* boundary_vz(iz,ix)
