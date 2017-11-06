@@ -269,7 +269,23 @@ end
 
 
 "grid after FFT"
-M1D_fft(grid::M1D) = M1D_fft(grid.nx, 1.0/grid.nx/grid.δx)
+M1D_fft(grid::M1D) = M1D_fft(grid.nx, inv(grid.nx*grid.δx))
+M1D_rfft(grid::M1D) = M1D_rfft(grid.nx, inv(grid.nx*grid.δx))
+
+"""
+Frequency grid after rfft
+"""
+function M1D_rfft(nx::Int64, δ::Float64)
+	vec = zeros(div(nx,2)+1);
+	# zero lag
+	vec[1] = 0.0;
+
+	# +ve
+	for i = 1: div(nx,2)
+		vec[1+i] = δ * i
+	end
+	return M1D(vec, length(vec), δ)
+end
 
 
 function M1D_fft(nx::Int64, δ::Float64)

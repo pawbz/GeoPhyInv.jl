@@ -214,6 +214,24 @@ function Geom_check(geom::Geom, mgrid::Grid.M2D)
 end
 
 """
+Check if the input acquisition geometry is fixed spread.
+"""
+function Geom_isfixed(geom::Geom)
+	isfixed=false
+	# can have different source positions, but also different number of sources? 
+	for field in [:rx, :rz, :nr, :ns]
+		f=getfield(geom, field)
+		if(all(f .== f[1:1]))
+			isfixed=true
+		else
+			isfixed=false
+			return isfixed
+		end
+	end
+	return isfixed
+end
+
+"""
 A fixed spread acquisition has same set of sources and 
 receivers for each supersource.
 This method constructs a 
@@ -583,12 +601,19 @@ end
 """
 Generate band-limited random source signals 
 """
-function Src_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol}, fmin::Float64, fmax::Float64, tgrid::Grid.M1D, tmax::Float64=tgrid.x[end] )
+function Src_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol}; 
+			  distvec=[Uniform(-2.0, 2.0) for iss in 1:nss],
+			  sparsepvec=[1. for iss in 1:nss],
+			  fmin::Float64=0.0, 
+			  fmax::Float64=0.0, 
+			  tgrid::Grid.M1D=nothing, 
+			  tmax::Float64=tgrid.x[end])
 	wavsrc = [repeat(zeros(tgrid.nx),inner=(1,ns)) for iss=1:nss, ifield=1:length(fields)] 
 	for ifield in 1:length(fields), iss in 1:nss, is in 1:ns
-		wavsrc[iss, ifield][:,is] = DSP.get_tapered_random_tmax_signal(tgrid, fmin, fmax, tmax)
+		wavsrc[iss, ifield][:,is] = DSP.get_tapered_random_tmax_signal(tgrid, fmin=fmin, fmax=fmax, tmax=tmax, dist=distvec[iss], 
+								 sparsep=sparsepvec[iss])
 	end
-	src= Src(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
+	src=Src(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
 	print(src)
 	return src
 end

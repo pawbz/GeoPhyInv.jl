@@ -589,12 +589,15 @@ function Paramss(iss::Int64, pac::Paramc)
 	# storing boundary values for back propagation
 	nx1, nz1=pac.model.mgrid.nx, pac.model.mgrid.nz
 	npml=pac.model.mgrid.npml
-	boundary=[zeros(3,nx1+6,nt),
-	  zeros(nz1+6,3,nt),
-	  zeros(3,nx1+6,nt),
-	  zeros(nz1+6,3,nt),
-	  zeros(nz1+2*npml,nx1+2*npml,3)
-				    ]
+	if(pac.backprop_flag ≠ 0)
+		boundary=[zeros(3,nx1+6,nt),
+		  zeros(nz1+6,3,nt),
+		  zeros(3,nx1+6,nt),
+		  zeros(nz1+6,3,nt),
+		  zeros(nz1+2*npml,nx1+2*npml,3)]
+	else
+		boundary=[zeros(1,1,1) for ii in 1:5]
+	end
 	# source_spray_weights per supersource
 	ssprayw = [zeros(4,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
 	denomsI = [zeros(acqgeom[ipw].ns[iss]) for ipw in 1:npw]
@@ -893,13 +896,13 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 		advance!(pac,pap)
 
 		"save last snap of pressure field"
-		boundary_save_snap_p!(issp,pac,pap.ss,pap)
+		(pac.backprop_flag==1) && boundary_save_snap_p!(issp,pac,pap.ss,pap)
 
 		"one more propagating step to save velocities at [nt+3/2] -- for time reversal"
 		advance!(pac,pap)
 
 		"save last snap of velocity fields with opposite sign for adjoint propagation"
-		boundary_save_snap_vxvz!(issp,pac,pap.ss,pap)
+		(pac.backprop_flag==1) && boundary_save_snap_vxvz!(issp,pac,pap.ss,pap)
 
 		"scale gradients for each issp"
 		(pac.gmodel_flag) && scale_gradient!(issp, pap.ss, pac.model.mgrid.δx*pac.model.mgrid.δz)
@@ -1471,14 +1474,14 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 	δs_max = maximum([δx, δz])
 	all(δs_max .> δs_temp) ? 
 			warn(string("spatial sampling\t",δs_max,"\ndecrease spatial sampling below:\t",δs_temp), once=true) :
-			verbose ? println("spatial sampling\t",δs_max,"\tcan be as high as:\t",δs_temp) : nothing 
+			(verbose && println("spatial sampling\t",δs_max,"\tcan be as high as:\t",δs_temp))
 
 	# check time sampling
 	δs_min = minimum([δx, δz])
 	δt_temp=0.5*δs_min/vpmax
 	all(δt .> δt_temp) ? 
 			warn(string("time sampling\t",δt,"\ndecrease time sampling below:\t",δt_temp), once=true) :
-			verbose ? println("time sampling\t",δt,"\tcan be as high as:\t",δt_temp) : nothing
+			(verbose &&  println("time sampling\t",δt,"\tcan be as high as:\t",δt_temp))
 
 end
 

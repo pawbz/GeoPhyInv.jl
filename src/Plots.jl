@@ -91,20 +91,33 @@ Plot the source wavelet used for acquisition.
 
 * `acqsrc::Acquisition.Src` : source acquisition parameters
 """
-function Src(acqsrc::Acquisition.Src; )
-	wav = acqsrc.wav[1,1][:,:]
-	powwav = (abs.(fft(wav)).^2)
-	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing 
-	tgrid= acqsrc.tgrid
-	fgrid= Grid.M1D_fft(tgrid)
+function Src(acqsrc::Acquisition.Src; ssvec=[1,])
+	for iss in ssvec
+		wav = acqsrc.wav[iss,1][:,:]
+		tgrid= acqsrc.tgrid
+		tspectra(tgrid,wav)
+	end
+end
+
+function tspectra(tgrid,wav)
 	subplot(2,1,1)
 	plot(tgrid.x, wav)
 	xlabel("\$t\$ (s)");
 	subplot(2,1,2)
-	plot(fgrid.x[1:div(fgrid.nx,2)], powwavdb[1:div(fgrid.nx,2)])
+	spectra(tgrid, wav)
+	tight_layout()
+end
+
+"""
+Plot the amplitude spectra of the time series on tgrid.
+"""
+function spectra(tgrid, wav)
+	powwav = (abs.(rfft(wav, [1])).^2)
+	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing 
+	fgrid= Grid.M1D_rfft(tgrid)
 	ylabel("power (dB)");
 	xlabel("frequency (Hz)");
-	tight_layout()
+	plot(fgrid.x, powwavdb)
 end
 
 
@@ -151,7 +164,7 @@ function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(t
 			colorbar();
 			tight_layout()
 		elseif(attrib == :wav)
-			plot(td[id].tgrid.x,dp)
+			tspectra(td[id].tgrid,dp)
 		else
 			error("invalid attrib")
 		end

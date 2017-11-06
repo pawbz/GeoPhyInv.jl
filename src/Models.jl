@@ -78,7 +78,7 @@ end
 Adjust the bounds and hence the reference values.
 Since the reference values are adjust the χ fields should also be changed
 """
-function adjust_bounds!(mod::Seismic, frac::Float64)
+function adjust_bounds!(mod::Seismic, frac::Float64=0.1)
 	for f in [:χvp, :χρ, :χvs]
 		f0 = Symbol((replace("$(f)", "χ", "")),0)
 		fm = Symbol((replace("$(f)", "χ", "")))

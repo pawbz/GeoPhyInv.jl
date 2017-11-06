@@ -12,10 +12,10 @@ Normalization is done with respect to the
 norm of y.
 """
 function error_after_scaling{T}(
-			     x::Array{T},
-			     y::Array{T}
+			     x::AbstractArray{T},
+			     y::AbstractArray{T}
 			    )
-	(size(x) ≠ size(y)) && error("x and y different sizes") 
+	any(size(x) ≠ size(y)) && error("x and y different sizes") 
 	α = sum(x.*y)/sum(x.*x)
 	J = norm(y-α*x)/norm(y)
 

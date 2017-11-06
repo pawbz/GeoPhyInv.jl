@@ -8,21 +8,44 @@ using DistributedArrays
 using DSP # from julia
 
 
-function get_tapered_random_tmax_signal(tgrid::Grid.M1D, fmin::Float64, fmax::Float64, tmax::Float64)
+"""
+Tapering is necessary to be able to input random signal into finite-difference code
+Filtering tapering are applied only if the length of the time series is greater than 10
+"""
+function get_tapered_random_tmax_signal(tgrid::Grid.M1D; 
+					fmin=nothing,
+					fmax=nothing,
+					tmax::Float64=tgrid.x[end],
+					dist=Uniform(-2.0, 2.0),
+					sparsep=1.0,
+					taperperc=20.
+					)
+	filt_flag=(tgrid.nx > 5) && (!(fmin === nothing)) && (!(fmax===nothing))
 
 	fs = 1/ tgrid.δx;
-	designmethod = Butterworth(6);
-	filtsource = Bandpass(fmin, fmax; fs=fs);
+	if(filt_flag)
+		designmethod = Butterworth(6);
+		filtsource = Bandpass(fmin, fmax; fs=fs);
+	end
 
 	itmax = indmin(abs.(tgrid.x-tmax))
 	# 20% taper window
-	twin = taper(ones(itmax),20.) 
+	twin = taper(ones(itmax),taperperc) 
 	X = zeros(itmax)
 	wavsrc = zeros(tgrid.nx) 
-	X[:] = rand(Uniform(-1.0, 1.0), itmax) .* twin
+	if(filt_flag) 
+		X[:] = rand(dist, itmax) .* twin
+	else
+		X[:] = rand(dist, itmax)
+	end
+	if(sparsep ≠ 1.0)
+		Xs=sprandn(length(X), sparsep)
+		X[findn(Xs.==0.0)]=0.0
+	end
 	# band limit
-	filt!(X, digitalfilter(filtsource, designmethod), X);
+	(filt_flag) && (filt!(X, digitalfilter(filtsource, designmethod), X))
 	
+	(length(X) ≠ 1) && normalize!(X)
 	#wavsrc[1:itmax] = X.*twin
 	wavsrc[1:itmax] = X
 	return wavsrc
@@ -231,10 +254,8 @@ function fast_filt!{T<:Real,N}(
 
 	if(fftplan===nothing)
 		#FFTW.set_num_threads(Sys.CPU_CORES)
-		fftplan=plan_fft!(complex.(zeros(np2,dim...)),
-		    		flags=FFTW.PATIENT,timelimit=30)
-		ifftplan=plan_ifft!(complex.(zeros(np2,dim...)),
-				flags=FFTW.PATIENT,timelimit=30)
+		fftplan=plan_fft!(complex.(zeros(np2,dim...)),)
+		ifftplan=plan_ifft!(complex.(zeros(np2,dim...)),)
 	end
 
 	# allocate if not preallocated
