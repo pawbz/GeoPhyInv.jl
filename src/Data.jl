@@ -49,13 +49,13 @@ function Base.isequal(dat1::TD, dat2::TD)
 end
 
 """
-Return if two `Seismic` models have same dimensions and bounds.
+Return if two `TD`'s have same dimensions and bounds.
 """
 function Base.isapprox(dat1::TD, dat2::TD)
 	vec=([ 
 		isequal(dat1.tgrid, dat2.tgrid),
 		isequal(dat1.fields, dat2.fields),
-		isequal(dat1.acqgeom, dat2.acqgeom),
+		isequal(dat1.acqgeom, dat2.acqgeom, :receivers), # only receivers have to be the same
        		(size(dat1.d)==size(dat2.d)), 
 		])
 	vec2=[size(dat1.d[iss,ifield])==size(dat2.d[iss,ifield]) for iss=1:dat1.acqgeom.nss, ifield=1:length(dat1.fields)]

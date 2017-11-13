@@ -15,7 +15,7 @@ Filtering tapering are applied only if the length of the time series is greater 
 function get_tapered_random_tmax_signal(tgrid::Grid.M1D; 
 					fmin=nothing,
 					fmax=nothing,
-					tmax::Float64=tgrid.x[end],
+					tmaxfrac::Float64=1.0,
 					dist=Uniform(-2.0, 2.0),
 					sparsep=1.0,
 					taperperc=20.
@@ -28,7 +28,7 @@ function get_tapered_random_tmax_signal(tgrid::Grid.M1D;
 		filtsource = Bandpass(fmin, fmax; fs=fs);
 	end
 
-	itmax = indmin(abs.(tgrid.x-tmax))
+	itmax = indmin(abs.(tgrid.x-tmaxfrac*tgrid.x[end]))
 	# 20% taper window
 	twin = taper(ones(itmax),taperperc) 
 	X = zeros(itmax)

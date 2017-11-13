@@ -57,10 +57,18 @@ type Geom
 end # type
 
 "Compare if two `TD`'s  are equal"
-function Base.isequal(geom1::Geom, geom2::Geom)
-	fnames = fieldnames(Geom)
-	vec=[(isequal(getfield(geom1, name),getfield(geom2, name))) for name in fnames]
-	return all(vec)
+function Base.isequal(geom1::Geom, geom2::Geom, attrib=:all)
+	srcfnames = [:sx, :sz, :nss, :ns]
+	recfnames = [:rx, :rz, :nr, :nss]
+	srcvec=[(isequal(getfield(geom1, name),getfield(geom2, name))) for name in srcfnames]
+	recvec=[(isequal(getfield(geom1, name),getfield(geom2, name))) for name in recfnames]
+	if(attrib == :sources)
+		return all(srcvec)
+	elseif(attrib == :receivers)
+		return all(recvec)
+	else
+		return all(vcat(srcvec, recvec))
+	end
 end
 
 """

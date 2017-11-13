@@ -618,12 +618,37 @@ function ConvMix(nt0, nt, nr;α=0.5, sdistvec=[Normal(), Uniform(-2.0, 2.0)], ss
 		end
 	end
 
-	d=zeros(nr,tgrids.nx)
-	for ir in 1:nr
-		d[ir,:]=α*dd[:,ir,1]+dd[:,ir,2]*(1-α)
-	end
-	x=rfft(d, [2])
+	uni=Uniform(-2, 2)
+	s1=rand(uni, nt)
+	s2=randn(nt)
+
+	unip = Uniform(-pi, pi)
+
+
+	#s1 = s1 .* exp.(im*rand(unip,nt))
+	#s2 = s2 .* exp.(im*rand(unip,nt))
+
+	s1=rfft(s1)
+	s2=rfft(s2)
+
+	S = hcat(s1, s2)';
+
+
+	#A = complex.(randn(nr, 2), randn(nr, 2));
+	A = complex.(randn(nr, 2) );
+	x=A*S
+	d=real.(x)
+	#d=zeros(nr,tgrids.nx)
+	#for ir in 1:nr
+	#	d[ir,:]=α*dd[:,ir,1]+dd[:,ir,2]*(1-α)
+	#end
+	#x=rfft(d, [2])
 	ica=ica_func(x, 2)
+
+
+	Sout=fastica!(ica, A=A);
+	err = Sout[2]    
+	println("RRRRRR",err)
 
 	return ConvMix(tgrids, tgridg,nr,g,similar(g), similar(g), s, d, dd, similar(dd),
 		zeros(nr, 2), zeros(nr,2), ica)

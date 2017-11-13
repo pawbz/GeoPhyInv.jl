@@ -23,7 +23,7 @@ import JuMIT.Models
 #	else
 #		file = filename;
 #		tikzfile = join([file[1:end-4] ".tikz"]);
-#	end			
+#	end
 #	#matplotlib2tikz.save(tikzfile,fig);
 #	fin = open(tikzfile,"r");
 #	fout = open(file,"w");
@@ -43,10 +43,10 @@ import JuMIT.Models
 #end
 
 """
-Plot acquisition geometry `Acquisition.Geom` on 
+Plot acquisition geometry `Acquisition.Geom` on
 and model grid `M2D`.
 
-`attrib::Symbol=:unique` : default; plots unique source and receiver positions 
+`attrib::Symbol=:unique` : default; plots unique source and receiver positions
 `ssvec::Vector{Int64}` : plot source and receivers of only these supersources
 """
 function Geom(geom::Acquisition.Geom; ssvec=nothing, fields=[:s, :r])
@@ -113,7 +113,7 @@ Plot the amplitude spectra of the time series on tgrid.
 """
 function spectra(tgrid, wav)
 	powwav = (abs.(rfft(wav, [1])).^2)
-	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing 
+	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
 	fgrid= Grid.M1D_rfft(tgrid)
 	ylabel("power (dB)");
 	xlabel("frequency (Hz)");
@@ -135,9 +135,9 @@ Plot time-domain data of type `Data.TD`
 * `tr_flag::Bool=false` : plot time-reversed data when true
 * `attrib::Symbol=:wav` : specify type of plot
 """
-function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(td)), 
+function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(td)),
 	    fields::Vector{Symbol}=[:P],
-	    tr_flag::Bool=false, attrib::Symbol=:wav, 
+	    tr_flag::Bool=false, attrib::Symbol=:wav,
 	    wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
 	    bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
 	    )
@@ -183,16 +183,16 @@ Plot the velocity and density seismic models.
 
 * `xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]]` : minimum and maximum limits of the second dimension while plotting
 * `zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]]` : minimum and maximum limits of the first dimension while plotting
-* `fields::Vector{Symbol}=[:vp, :ρ]` : fields that are to be plotted, see Models.Seismic_get 
+* `fields::Vector{Symbol}=[:vp, :ρ]` : fields that are to be plotted, see Models.Seismic_get
 * `overlay_model=nothing` : use a overlay model
 * `use_bounds=false` : impose bounds from the model or not?
 
 """
-function Seismic(model::Models.Seismic; 
+function Seismic(model::Models.Seismic;
 		 xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]],
 		 zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]],
 		 fields::Vector{Symbol}=[:vp, :ρ],
-		 overlay_model=nothing, 
+		 overlay_model=nothing,
 		 use_bounds=false,
 		 )
 	#indices
@@ -213,7 +213,7 @@ function Seismic(model::Models.Seismic;
 			 ylabel("\$z\$ (m)");
 			 title(string(fields[i]))
 			 (length(fields) ≠1) && colorbar(ax, fraction=0.046, pad=0.04);
-		
+
 		if(!(overlay_model ===  nothing))
 			# remove mean in the backgroud model
 			mbg = Models.Seismic_get(overlay_model, fields[i])[izmin:izmax,ixmin:ixmax]
@@ -225,6 +225,99 @@ function Seismic(model::Models.Seismic;
 	 tight_layout()
 	 subplots_adjust(top=0.88)
 
+end
+
+
+function Decon(pa; rvec=collect(1:pa.nr))
+	fig=figure(figsize=(10,8))
+	subplot(621)
+	plot(pa.wavobs)
+	title("Actual S")
+	subplot(622)
+	plot(pa.gfobs[:,rvec])
+	title("Actual G")
+	subplot(623)
+	plot(pa.wav)
+	title("Estimated S")
+	subplot(624)
+	plot(pa.gf[:,rvec])
+	title("Estimated G")
+	subplot(625)
+	plot(pa.dobs[:,rvec])
+	title("Actual D")
+	subplot(626)
+	plot(pa.dcal[:,rvec])
+	title("Estimated D")
+	subplot(627)
+	mscatter(pa.wavobs, pa.wav, "S")
+	subplot(628)
+	mscatter(pa.gfobs, pa.gf, "G")
+	subplot(629)
+	mscatter(pa.dobs, pa.dcal, "D")
+	subplot(6,2,10)
+	plot(pa.gfprecon)
+	title("GFPRECON")
+	subplot(6,2,11)
+	plot(pa.wavprecon)
+	title("WAVPRECON")
+	tight_layout()
+
+end
+
+function mscatter(x, y, titname="", axla=["",""])
+    fact=1 
+    x=x[1:fact:end]
+    x[:] /= norm(x) # normalize inputs before scatter
+    y=y[1:fact:end]
+    y[:] /= norm(y) # normalize inputs before scatter 
+    scatter(x,y,marker="x",s=0.5,color="gray")
+    ax=gca()
+    ax[:set_aspect]("equal")
+    ax[:spines]["top"][:set_visible](false)
+    ax[:spines]["right"][:set_visible](false)
+    ax[:spines]["left"][:set_position]("center")
+    ax[:spines]["bottom"][:set_position]("center")
+    setp(ax[:get_yticklabels](false),color="none")
+    setp(ax[:get_xticklabels](false),color="none")
+    xmax = maximum(abs, x)
+    ymax = maximum(abs, y)
+    li = 1.2*max(xmax, ymax)
+    xlim(-li, li)
+    ylim(-li, li)
+    xlabel(axla[1])
+    ylabel(axla[2])
+    title(titname)
+    return nothing
+end
+
+function myhist(s, dist)
+    fact=1
+    x=s[1,1:fact:end]
+    y=s[2,1:fact:end]
+    nbins=div(length(x), 10)
+    h1 = normalize(fit(Histogram, x, nbins=200, closed=:right))
+    h2 = normalize(fit(Histogram, y, nbins=200, closed=:right))
+
+#    h = PyPlot.plt[:hist](x, 200, color="red", histtype="barstacked", normed=true)
+ #   h = PyPlot.plt[:hist](y, 200, color="blue",histtype="barstacked", normed=true)
+    plot(h1.edges[1][2:end], h1.weights,color="red", linewidth=0.7)
+    plot(h2.edges[1][2:end], h2.weights,color="blue", linewidth=0.7)
+    ax=gca()
+    xmax = 1.2*maximum(abs, x)
+    xx=linspace(-xmax, xmax, 300)
+    xlim(-xmax, xmax)
+    yymax=0.
+    for idist in 1:length(dist)
+        yy = pdf(dist[idist], xx)
+        yymax=maximum([maximum(yy), yymax])
+        ax[:plot](xx, yy, color="black",linestyle="--", linewidth=1)
+    end
+    (yymax ≠ 0.) &&    ylim([0, 1.2*yymax])
+    setp(ax[:get_yticklabels](),color="none")
+    setp(ax[:get_xticklabels](),color="none")
+    #setp(ax[:tick_params](false), labelbottom="off")
+    title("Marginal Densities")
+    return nothing
 end
 
 end # module

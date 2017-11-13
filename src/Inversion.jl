@@ -165,6 +165,7 @@ function Param(
 	       modm_obs::Models.Seismic=modm,
 	       modm0::Models.Seismic=modm,
 	       mod_inv_parameterization::Vector{Symbol}=[:χKI, :χρI],
+	       born_flag::Bool=false,
 	       verbose::Bool=false,
 	       attrib::Symbol=:synthetic
 	       )
@@ -190,7 +191,7 @@ function Param(
 	# generating forward and adjoint modelling engines
 	# generate modelled data, border values, etc.
 	if(attrib_mod == :fdtd)
-		paf=Fdtd.Param(npw=2, model=modm,
+		paf=Fdtd.Param(npw=2, model=modm, born_flag=born_flag,
 			acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], sflags=[3, 2],
 			backprop_flag=1, 
 			tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=true)
@@ -529,39 +530,25 @@ function F!(pa::Param, x, last_x=[0.0])
 	end
 end
 
-function Fborn!(pa::Param, x, last_x=[0.0])
-	if(x!=last_x)
-		pa.verbose && println("updating buffer")
-		(size(last_x)==size(x)) && (last_x[:] = x[:])
+function Fborn!(pa::Param, model_pert)
+	# update model in the forward engine
+	Fdtd.update_model!(pa.paf.c, pa.modm0, model_pert)
 
-		if(!(x===nothing))
-			Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
-			# update model in the forward engine
-			Fdtd.update_model!(pa.paf.c, pa.modm)
-		end
+	pa.paf.c.activepw=[1,2]
+	pa.paf.c.illum_flag=false
+	pa.paf.c.sflags=[2, 0]
+	pa.paf.c.rflags=[0, 1]
 
-		pa.paf.c.activepw=[1,2]
-		pa.paf.c.illum_flag=false
-		pa.paf.c.sflags=[2, 0]
-		Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
-		pa.paf.c.backprop_flag=1
-		pa.paf.c.gmodel_flag=false
-
-		Fdtd.mod!(pa.paf);
-		dcal=pa.paf.c.data[1]
-		copy!(pa.dcal,dcal)
-
-Fdtd.mod!(born_flag=true, npw=2, model=pa.modm0, model_pert=model_pert, 
-	    acqgeom=[pa.acqgeom, pa.acqgeom], acqsrc=[pa.acqsrc, pa.acqsrc], 
-	    TDout=pa.dtemp, 
-	    backprop_flag=1,
-	    boundary=pa.buffer,
-	    sflags=[2, 0], rflags = [0, 1], 
-	    tgridmod=pa.dcal.tgrid);
+	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
+	pa.paf.c.backprop_flag=1
+	pa.paf.c.gmodel_flag=false
+	pa.paf.c.born_flag=true
 
 
+	Fdtd.mod!(pa.paf);
+	dcal=pa.paf.c.data[2]
+	copy!(pa.dcal,dcal)
 
-	end
 end
 "build a model precon"
 function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
@@ -620,7 +607,13 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 		update_adjsrc!(pa.adjsrc, pa.dfdcal, pa.adjacqgeom)
 		Fdtd.update_acqsrc!(pa.paf, [pa.acqsrc, pa.adjsrc])
 
-		Fadj!(pa, x)	
+		# x to model
+		Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
+
+		# do adjoint modelling here
+		Fdtd.update_model!(pa.paf.c, pa.modm)
+
+		Fadj!(pa)	
 	
 		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
 
@@ -632,13 +625,8 @@ end # func_grad_xfwi!
 * use x and update model in pa
 * compute gradient
 """
-function Fadj!(pa::Param, x)
+function Fadj!(pa::Param)
 
-	# x to model
-	Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
-
-	# do adjoint modelling here
-	Fdtd.update_model!(pa.paf.c, pa.modm)
 	pa.paf.c.activepw=[1,2]
 	pa.paf.c.illum_flag=false
 	pa.paf.c.sflags=[3, 2]
@@ -670,33 +658,11 @@ function hessian_xfwi!(loc, pa)
 	Seismic_x!(model_pert, model_perti, x, pa, -1)		
 
 	# generate Born Data
-	(pa.paf.born_flag==false) && error("need born flag")
-	sflags=[2,0]
-	rflags=[0,1]
+	(pa.paf.c.born_flag==false) && error("need born flag")
 	
-	Fdtd.update_model!(pa.paf.c, pa.modm0, model_pert)
-	pa.paf.c.activepw=[1,2]
-	pa.paf.c.illum_flag=false
-	pa.paf.c.sflags=[2, 0]
-	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.acqsrc])
-	pa.paf.c.backprop_flag=1
-	pa.paf.c.gmodel_flag=false
-	pa.paf.born_flag=true
 
+	Fborn!(pa, model_pert)
 
-	Fdtd.
-
-	Fdtd.mod!(born_flag=true, npw=2, model=pa.modm0, model_pert=model_pert, 
-	    acqgeom=[pa.acqgeom, pa.acqgeom], acqsrc=[pa.acqsrc, pa.acqsrc], 
-	    TDout=pa.dtemp, 
-	    backprop_flag=1,
-	    boundary=pa.buffer,
-	    sflags=[2, 0], rflags = [0, 1], 
-	    tgridmod=pa.dcal.tgrid);
-
-
-	dcal=pa.paf.c.data[1]
-	copy!(pa.dcal,dcal)
 	
 	# apply coupling to the modeled data
 	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
@@ -931,8 +897,11 @@ function AdjGeom(geomin::Acquisition.Geom)
 	geomout.sx = geomin.rx; geomout.sz = geomin.rz;
 	geomout.ns = geomin.nr; 
 
-	geomout.rx = geomin.sx; geomout.rz = geomin.sz;
-	geomout.nr = geomin.ns; 
+#	geomout.rx = geomin.sx; geomout.rz = geomin.sz;
+#	geomout.nr = geomin.ns; 
+
+	geomout.rx = geomin.rx; geomout.rz = geomin.rz;
+	geomout.nr = geomin.nr; 
 
 	return geomout
 end

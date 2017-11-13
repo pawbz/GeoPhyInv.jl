@@ -7,13 +7,17 @@ import JuMIT.Misfits
 using Optim, LineSearches
 
 type Param
+	gfobs::Array{Float64,2}
 	gf::Array{Float64,2}
+	gfprecon::Array{Float64,2}
 	dgf::Array{Float64,2}
 	ntgf::Int64
 	dobs::Array{Float64,2}
 	dcal::Array{Float64,2}
 	ddcal::Array{Float64,2}
+	wavobs::Vector{Float64}
 	wav::Vector{Float64}
+	wavprecon::Vector{Float64}
 	wavmat::Array{Float64,2}
 	dwavmat::Array{Float64,2}
 	spow2::Array{Complex{Float64},2}
@@ -31,9 +35,16 @@ type Param
 	xwav::Vector{Float64}
 	last_xwav::Vector{Float64}
 	dfwav::Optim.UninitializedOnceDifferentiable{Void}
+	func_max_save::Vector{Float64}
+	α::Vector{Float64}
 end
 
+"""
+`gfprecon` : a preconditioner applied to each Greens functions [ntgf]
+"""
 function Param(ntgf, nt, nr; 
+	       gfprecon=nothing,
+	       wavprecon=nothing,
 	       dobs=nothing, gfobs=nothing, wavobs=nothing, verbose=false, attrib_inv=:gf,) 
 	(dobs===nothing) && (dobs=zeros(nt, nr))
 	dcal=zeros(nt, nr)
@@ -47,7 +58,7 @@ function Param(ntgf, nt, nr;
 	dgf=similar(gf)
 
 	# use maximum threads for fft
-	#FFTW.set_num_threads(Sys.CPU_CORES)
+	# FFTW.set_num_threads(Sys.CPU_CORES)
 	# fft dimension for plan
 	np2=nextpow2(maximum([2*nt, 2*ntgf]))
 	# create plan
@@ -75,11 +86,22 @@ function Param(ntgf, nt, nr;
 	dfwav = OnceDifferentiable(x -> func_grad!(nothing, x, last_xwav, pa),
 	  (storage, x) -> func_grad!(storage, x, last_xwav, pa))
 
-	pa = Param(gf, dgf, ntgf, dobs, dcal, ddcal, wav, wavmat, dwavmat,
+	# create dummy gfobs if necessary
+	(gfobs===nothing) && (gfobs=zeros(gf))
+	# create dummy wavobs if necessary
+	(wavobs===nothing) && (wavobs=zeros(wav))
+
+	# create gf precon
+	(gfprecon===nothing) && (gfprecon=ones(gf))
+
+	# create gf precon
+	(wavprecon===nothing) && (wavprecon=ones(wav))
+
+	pa = Param(gfobs, gf, gfprecon, dgf, ntgf, dobs, dcal, ddcal, wavobs, wav, wavprecon, wavmat, dwavmat,
 	     spow2, rpow2, wpow2,
 	     nt, nr, attrib_inv, verbose, fftplan, ifftplan,
 	     xgf,last_xgf,dfgf,
-	     xwav,last_xwav,dfwav)
+	     xwav,last_xwav,dfwav, zeros(3), [1., 0.0, 0.0])
 
 	if iszero(pa.dobs) 
 		((gfobs===nothing) | (wavobs===nothing)) && error("need gfobs and wavobs")
@@ -100,13 +122,24 @@ function ninv(pa)
 end
 
 
+function error(pa) 
+	fwav, α = Misfits.error_after_autocorr_scaling(pa.wav, pa.wavobs)
+	fgf, α = Misfits.error_after_autocorr_scaling(pa.gf, pa.gfobs)
+	f = Misfits.fg_cls!(nothing, pa.dcal, pa.dobs)
+
+	return fwav, fgf, f
+end 
 
 
 function model_to_x!(x, pa)
 	if(pa.attrib_inv == :wav)
-		copy!(x, pa.wav)
+		for i in eachindex(x)
+			x[i]=pa.wav[i]*pa.wavprecon[i]
+		end
 	else(pa.attrib_inv == :gf)
-		copy!(x, pa.gf)
+		for i in eachindex(x)
+			x[i]=pa.gf[i]*pa.gfprecon[i] 		# multiply by gfprecon
+		end
 	end
 	return x
 end
@@ -114,9 +147,23 @@ end
 
 function x_to_model!(x, pa)
 	if(pa.attrib_inv == :wav)
-		copy!(pa.wav, x)
+		xn=vecnorm(x)
+		for i in eachindex(pa.wav)
+			if(iszero(pa.wavprecon[i]))
+				pa.wav[i]=0.0
+			else
+				pa.wav[i]=x[i]/pa.wavprecon[i]
+			end
+		end
+		scale!(pa.wav, inv(xn))
 	else(pa.attrib_inv == :gf)
-		copy!(pa.gf, x)
+		for i in eachindex(pa.gf)
+			if(iszero(pa.gfprecon[i]))
+				pa.gf[i]=0.0
+			else
+				pa.gf[i]=x[i]/pa.gfprecon[i]
+			end
+		end
 	end
 	return pa
 end
@@ -169,6 +216,8 @@ function func_grad!(storage, x::Vector{Float64},
 			last_x::Vector{Float64}, 
 			pa)
 
+	α=1e-3
+
 	#pa.verbose && println("computing gradient...")
 
 	# x to w 
@@ -178,19 +227,58 @@ function func_grad!(storage, x::Vector{Float64},
 
 	if(storage === nothing)
 		# compute misfit and δdcal
-		f = Misfits.fg_cls!(nothing, pa.dcal, pa.dobs)
-		return f
+		f1 = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing)
 	else
-		f = Misfits.fg_cls!(pa.ddcal, pa.dcal, pa.dobs)
-		Fadj!(pa, storage, pa.ddcal)
-		return f
+		f1 = Misfits.error_squared_euclidean!(pa.ddcal, pa.dcal, pa.dobs, nothing)
+		Fadj!(pa, x, storage, pa.ddcal)
 	end
+
+	if(pa.func_max_save[1] == 0.0) 
+		pa.func_max_save[1]=f1 # store first value of f
+	end
+#
+	fac1=pa.α[1]/pa.func_max_save[1]
+#
+#
+	if((pa.attrib_inv == :gf) && !(storage === nothing))
+		f2 = Misfits.error_weighted_norm!(pa.dgf,pa.gf, pa.gfprecon)
+	else
+		f2 = Misfits.error_weighted_norm!(nothing,pa.gf, pa.gfprecon)
+	end
+	if(pa.func_max_save[2] == 0.0) 
+		pa.func_max_save[2]=f2 # store first value of f
+	end
+
+	fac2=pa.α[2]/pa.func_max_save[2]
+
+	if(!(storage === nothing) && (pa.attrib_inv == :gf))
+		for i in eachindex(storage)
+			storage[i] = fac1*storage[i]+fac2*pa.dgf[i]
+		end
+	end
+#
+	J = f1*fac1 + f2*fac2
+
+
+	return J
+
 end
+
+
+# add model based constraints here
+
+# all the greens' functions have to be correlated
+
+# exponential-weighted norm for the green functions
+
+#  
+
+
 
 """
 Apply Fadj to 
 """
-function Fadj!(pa, storage, dcal)
+function Fadj!(pa, x, storage, dcal)
 	if(pa.attrib_inv == :wav)
 		DSP.fast_filt!(dcal, pa.gf, pa.wavmat, :w, nwplags=pa.nt-1, 
 		 nwnlags=0,nsplags=pa.nt-1,nsnlags=0,nrplags=pa.ntgf-1,nrnlags=0,
@@ -203,6 +291,16 @@ function Fadj!(pa, storage, dcal)
 				storage[j] += pa.wavmat[j,i]
 			end
 		end
+		# factor, because wav was divided by norm of x
+		xn=vecnorm(x)
+		for i in eachindex(storage)
+			if(iszero(pa.wavprecon[i]))
+				storage[i]=0.0
+			else
+				storage[i] = storage[i]*(xn-x[i]*x[i]/xn)/xn/xn/pa.wavprecon[i]
+			end
+		end
+
 	else(pa.attrib_inv == :gf)
 		for ir in 1:pa.nr
 			for it in 1:size(pa.wavmat,1)
@@ -215,6 +313,14 @@ function Fadj!(pa, storage, dcal)
 		  spow2=pa.spow2, rpow2=pa.rpow2, wpow2=pa.wpow2,
 			)
 		copy!(storage, pa.dgf)
+		for i in eachindex(storage)
+			if(iszero(pa.gfprecon[i]))
+				storage[i]=0.0
+			else
+				storage[i]=pa.dgf[i]/pa.gfprecon[i]
+			end
+		end
+
 	end
 	return storage
 end
@@ -257,36 +363,46 @@ function update_wav!(pa, xwav, last_xwav, dfwav)
 	return fwav
 end
 
+#function remove_gfprecon(pa)
+#	for i in eachindex(pa.gfprecon)
+#		if(pa.gfprecon[i]≠0.0)
+#			pa.gfprecon[i]=1.0
+#		end
+#	end
+#end
 
-function update_all!(pa, rtol=1e-3)
+"""
+* re_init_flag :: re-initialize inversions with random input or not?
+"""
+function update_all!(pa; rtol=1e-3, tol=1e-3, maxitr_all=10, re_init_flag=true, maxitr=1000)
 
 
 	converged_all=false
 	itr_all=0
-	maxitr_all=10
 
 	pa.verbose && println("Blind Decon")  
 
-	while !converged_all && itr_all < maxitr_all
+	while ((!converged_all && itr_all < maxitr_all))
 		itr_all += 1
-		pa.verbose && println("============================================")  
-		pa.verbose && (itr_all > 1) && println("\t", "failed to converge.. reintializing round trips")
+		pa.verbose && println("===============================================================================")  
+		pa.verbose && (itr_all > 1) && println("\t", "failed to converge.. reintializing (",itr_all,"/",maxitr_all,")")
 
 	
-		initialize!(pa)
+		re_init_flag && initialize!(pa)
 
 		fgfmin=Inf
 		fgfmax=0.0
 		fwavmin=Inf
 		fwavmax=0.0
 
-		maxitr=1000
 		itr=0
 		converged=false
-		tol=1e-3
 
-		pa.verbose && println("round trip\tfgf\tfwav\tconvergence",) 
+		pa.verbose && println("trip\t|\tfgf(<",rtol,"?)\t|\tfwav(<",rtol,"?)\t|\tconvergence(<",tol,"?)",) 
 		while !converged && itr < maxitr
+
+			pa.func_max_save[:]=0.0 # reset functional scales
+
 			itr += 1
 			fgf = update_gf!(pa, pa.xgf, pa.last_xgf, pa.dfgf)
 
@@ -298,7 +414,7 @@ function update_all!(pa, rtol=1e-3)
 			fwavmax = max(fwavmax, fwav) 
 
 			rf = abs(fwav-fgf)/fwav
-			pa.verbose && println(itr,"\t",fgfmin/fgfmax,"\t", fwavmin/fwavmax, "\t",rf)
+			pa.verbose && @printf("%d\t|\t%0.6e\t|\t%0.6e\t|\t%0.6e\t\n",itr, fgfmin/fgfmax, fwavmin/fwavmax,rf)
 
 			converged = (rf < tol)
 		end

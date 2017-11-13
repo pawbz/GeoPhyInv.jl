@@ -514,11 +514,17 @@ function Seismic_addon!(mod::Seismic;
 	for field in fields
 		setfield!(mod, field, (getfield(mod, field)+temp))
 	end
-	# random noise (in future change to fields)
-	mod.χvp += randn(size(mod.χvp)) .* randn_perc .* 1e-2 .* mean(mod.vp0); 
-	mod.χvs += randn(size(mod.χvs)) .* randn_perc .* 1e-2 .* mean(mod.vs0); 
-	mod.χρ += randn(size(mod.χρ)) .* randn_perc .* 1e-2 .* mean(mod.ρ0); 
 
+	# random noise
+	for field in fields
+		f0 = Symbol((replace("$(field)", "χ", "")),0)
+		m=getfield(mod, field)
+		m0=getfield(mod, f0)
+		for i in eachindex(m)
+			m[i] += randn() * randn_perc * 1e-2
+		end
+
+	end
 	return mod
 end
 

@@ -83,6 +83,7 @@ type Paramc
 	a_z_half::Vector{Float64}
 	b_z_half::Vector{Float64}
 	k_z_halfI::Vector{Float64}
+	modtt::Matrix{Float64}
 	modttI::Matrix{Float64}
 	modrr::Matrix{Float64}
 	modrrvx::Matrix{Float64}
@@ -430,7 +431,7 @@ function Param(;
 	    acqgeom,acqsrc,abs_trbl,isfields,sflags,
 	    irfields,rflags,δt,δxI,δzI,
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
-	    modttI,modrr,modrrvx,modrrvz,
+	    modtt, modttI,modrr,modrrvx,modrrvz,
 	    δmodtt,modrr_pert,δmodrrvx,δmodrrvz,
 	    grad_modtt_stack,grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,
 	    illum_flag,illum_stack,
@@ -508,13 +509,13 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 		Models.Seismic_get!(pac.modrr_pert, pac.exmodel_pert, :ρI)
 		get_rhovxI!(pac.δmodrrvx, pac.modrr_pert)
 		get_rhovzI!(pac.δmodrrvz, pac.modrr_pert)
-		for i in eachindex(δmodrrvx)
+		for i in eachindex(pac.δmodrrvx)
 			pac.δmodrrvx[i] -= pac.modrrvx[i]
 			pac.δmodrrvz[i] -= pac.modrrvz[i]
 		end
 
 		Models.Seismic_get!(pac.δmodtt, pac.exmodel_pert, :KI)
-		for i in eachindex(δmodtt)
+		for i in eachindex(pac.δmodtt)
 			pac.δmodtt[i] -= pac.modtt[i]
 		end
 	end
