@@ -28,7 +28,7 @@ J, α = JuMIT.Misfits.error_after_autocorr_scaling(x,y)
 
 x=randn(100,10);
 dfdx1=similar(x);
-JuMIT.Misfits.error_pairwise_corr_dist(dfdx1,x)
+@time JuMIT.Misfits.error_pairwise_corr_dist(dfdx1,x)
 xvec=vec(x)
 dfdx2=similar(xvec);
 JuMIT.Inversion.finite_difference!(x -> JuMIT.Misfits.error_pairwise_corr_dist(nothing, reshape(x,100,10)), xvec, dfdx2, :central)
@@ -44,3 +44,32 @@ dfdx2=similar(xvec);
 JuMIT.Inversion.finite_difference!(x -> JuMIT.Misfits.error_autocorr_pairwise_corr_dist(nothing, reshape(x,10,10)), xvec, dfdx2, :central)
 
 @test dfdx1 ≈ reshape(dfdx2,10,10)
+
+x=randn(100,10);
+w=randn(100,10);
+dfdx1=similar(x);
+@time JuMIT.Misfits.error_weighted_norm!(dfdx1,x,w)
+xvec=vec(x)
+dfdx2=similar(xvec);
+JuMIT.Inversion.finite_difference!(x -> JuMIT.Misfits.error_weighted_norm!(nothing, reshape(x,100,10), w), xvec, dfdx2, :central)
+
+@test dfdx1 ≈ reshape(dfdx2,100,10)
+
+x=randn(100,10);
+y=randn(100,10);
+w=randn(100,10);
+dfdx1=similar(x);
+dfdx2=similar(x);
+
+@time JuMIT.Misfits.error_cls!(dfdx1,x,y,w)
+@time f(x)=JuMIT.Misfits.error_cls!(nothing,x,y,w)
+@time ForwardDiff.gradient!(dfdx2,f, x);
+
+@test dfdx1 ≈ reshape(dfdx2,100,10)
+
+
+@time J=JuMIT.Misfits.error_corr_dist!(dfdx1,x,y)
+@time f(x)=JuMIT.Misfits.error_corr_dist!(nothing,x,y)
+@time ForwardDiff.gradient!(dfdx2, f, x);
+
+@test dfdx1 ≈ reshape(dfdx2,100,10)

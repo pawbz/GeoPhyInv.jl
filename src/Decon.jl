@@ -3,6 +3,7 @@ __precompile__()
 
 module Decon
 import JuMIT.DSP
+import JuMIT.Inversion
 import JuMIT.Misfits
 using Optim, LineSearches
 
@@ -216,7 +217,6 @@ function func_grad!(storage, x::Vector{Float64},
 			last_x::Vector{Float64}, 
 			pa)
 
-	α=1e-3
 
 	#pa.verbose && println("computing gradient...")
 
@@ -227,43 +227,67 @@ function func_grad!(storage, x::Vector{Float64},
 
 	if(storage === nothing)
 		# compute misfit and δdcal
-		f1 = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing)
+		f = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing)
 	else
-		f1 = Misfits.error_squared_euclidean!(pa.ddcal, pa.dcal, pa.dobs, nothing)
+		f = Misfits.error_squared_euclidean!(pa.ddcal, pa.dcal, pa.dobs, nothing)
 		Fadj!(pa, x, storage, pa.ddcal)
 	end
-
-	if(pa.func_max_save[1] == 0.0) 
-		pa.func_max_save[1]=f1 # store first value of f
-	end
-#
-	fac1=pa.α[1]/pa.func_max_save[1]
-#
-#
-	if((pa.attrib_inv == :gf) && !(storage === nothing))
-		f2 = Misfits.error_weighted_norm!(pa.dgf,pa.gf, pa.gfprecon)
-	else
-		f2 = Misfits.error_weighted_norm!(nothing,pa.gf, pa.gfprecon)
-	end
-	if(pa.func_max_save[2] == 0.0) 
-		pa.func_max_save[2]=f2 # store first value of f
-	end
-
-	fac2=pa.α[2]/pa.func_max_save[2]
-
-	if(!(storage === nothing) && (pa.attrib_inv == :gf))
-		for i in eachindex(storage)
-			storage[i] = fac1*storage[i]+fac2*pa.dgf[i]
-		end
-	end
-#
-	J = f1*fac1 + f2*fac2
-
-
-	return J
+	return f
 
 end
 
+
+#function func_grad!(storage, x::Vector{Float64},
+#			last_x::Vector{Float64}, 
+#			pa)
+#
+#
+#	#pa.verbose && println("computing gradient...")
+#
+#	# x to w 
+#	x_to_model!(x, pa)
+#
+#	F!(pa, x, last_x)
+#
+#	if(storage === nothing)
+#		# compute misfit and δdcal
+#		f1 = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing)
+#	else
+#		f1 = Misfits.error_squared_euclidean!(pa.ddcal, pa.dcal, pa.dobs, nothing)
+#		Fadj!(pa, x, storage, pa.ddcal)
+#	end
+#
+#	if(pa.func_max_save[1] == 0.0) 
+#		pa.func_max_save[1]=f1 # store first value of f
+#	end
+##
+#	fac1=pa.α[1]/pa.func_max_save[1]
+##
+##
+#	if((pa.attrib_inv == :gf) && !(storage === nothing))
+#		f2 = Misfits.error_weighted_norm!(pa.dgf,pa.gf, pa.gfprecon)
+#	else
+#		f2 = Misfits.error_weighted_norm!(nothing,pa.gf, pa.gfprecon)
+#	end
+#	if(pa.func_max_save[2] == 0.0) 
+#		pa.func_max_save[2]=f2 # store first value of f
+#	end
+#
+#	fac2=pa.α[2]/pa.func_max_save[2]
+#
+#	if(!(storage === nothing) && (pa.attrib_inv == :gf))
+#		for i in eachindex(storage)
+#			storage[i] = fac1*storage[i]+fac2*pa.dgf[i]
+#		end
+#	end
+##
+#	J = f1*fac1 + f2*fac2
+#
+#
+#	return J
+#
+#end
+#
 
 # add model based constraints here
 
@@ -374,52 +398,17 @@ end
 """
 * re_init_flag :: re-initialize inversions with random input or not?
 """
-function update_all!(pa; rtol=1e-3, tol=1e-3, maxitr_all=10, re_init_flag=true, maxitr=1000)
-
-
-	converged_all=false
-	itr_all=0
-
-	pa.verbose && println("Blind Decon")  
-
-	while ((!converged_all && itr_all < maxitr_all))
-		itr_all += 1
-		pa.verbose && println("===============================================================================")  
-		pa.verbose && (itr_all > 1) && println("\t", "failed to converge.. reintializing (",itr_all,"/",maxitr_all,")")
+function update_all!(pa; ParamAM_func::Function=x->Inversion.ParamAM(x,optim_tols=[1e-10, 1e-10],roundtrip_tol=1e-10,max_roundtrips=100))
 
 	
-		re_init_flag && initialize!(pa)
+	# create alternating minimization parameters
+	f1=x->update_wav!(pa, pa.xwav, pa.last_xwav, pa.dfwav)
+	f2=x->update_gf!(pa, pa.xgf, pa.last_xgf, pa.dfgf)
+	paam=ParamAM_func([f1, f2])
 
-		fgfmin=Inf
-		fgfmax=0.0
-		fwavmin=Inf
-		fwavmax=0.0
+	# do inversion
+	Inversion.go(paam)
 
-		itr=0
-		converged=false
-
-		pa.verbose && println("trip\t|\tfgf(<",rtol,"?)\t|\tfwav(<",rtol,"?)\t|\tconvergence(<",tol,"?)",) 
-		while !converged && itr < maxitr
-
-			pa.func_max_save[:]=0.0 # reset functional scales
-
-			itr += 1
-			fgf = update_gf!(pa, pa.xgf, pa.last_xgf, pa.dfgf)
-
-			fgfmin = min(fgfmin, fgf) 
-			fgfmax = max(fgfmax, fgf) 
-
-			fwav = update_wav!(pa, pa.xwav, pa.last_xwav, pa.dfwav)
-			fwavmin = min(fwavmin, fwav) 
-			fwavmax = max(fwavmax, fwav) 
-
-			rf = abs(fwav-fgf)/fwav
-			pa.verbose && @printf("%d\t|\t%0.6e\t|\t%0.6e\t|\t%0.6e\t\n",itr, fgfmin/fgfmax, fwavmin/fwavmax,rf)
-
-			converged = (rf < tol)
-		end
-		converged_all = (fgfmin/fgfmax < rtol) & (fwavmin/fwavmax < rtol)
-	end
 end
 
 
