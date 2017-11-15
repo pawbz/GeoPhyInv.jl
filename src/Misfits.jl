@@ -78,6 +78,34 @@ end
 
 
 """
+Compute the error with a normalized vector ̂̂x 
+̂x=x/|x|
+
+function 
+* `ghat` : gradient with respect to ̂x
+* `g`	 : output gradient with respect to x
+* `X`	 : preallocated matrix of dimension (nx,nx) if necessary
+"""
+function derivative_vector_magnitude!(g,ghat,x,X=nothing) 
+	xn=vecnorm(x)
+	nx=length(x)
+	scale!(x, inv(xn))  
+
+	# compute the outer product of 
+	if(!(X===nothing))      
+		A_mul_Bt!(X,x,x)        
+	else    
+		X=A_mul_Bt(x,x)
+	end         
+	for i in 1:nx
+		X[i,i]=X[i,i]-1. 
+	end
+	scale!(X,-inv(xn))
+	A_mul_B!(g,X,ghat)    
+	scale!(x, xn) 
+end
+
+"""
 Normalized least-squares error between two arrays after 
 estimating a scalar that best fits on to another.
 Return misfit and α such that αx-y is minimum.

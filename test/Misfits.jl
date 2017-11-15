@@ -73,3 +73,35 @@ dfdx2=similar(x);
 @time ForwardDiff.gradient!(dfdx2, f, x);
 
 @test dfdx1 ≈ reshape(dfdx2,100,10)
+
+
+# some func
+function f(x, z)
+    y=x./vecnorm(x)
+    J=sum((y-z).^2)
+    return J
+end
+
+# test derivative_vector_magnitude
+function g!(g, x, z)
+    xn=vecnorm(x)
+    scale!(x, inv(xn))
+    g1=similar(g)
+    for i in eachindex(g1)
+        g1[i]=2.*(x[i]-z[i])
+    end
+         scale!(x, xn)
+         nx=length(x)
+         X=zeros(nx,nx)
+         @time JuMIT.Misfits.derivative_vector_magnitude!(g,g1,x,X)
+    return g
+end
+
+x=randn(10)
+z=randn(10)
+g1=zeros(x)
+f1(x)=f(x,z)
+ForwardDiff.gradient!(g1,f1, x)
+g2=zeros(x)
+g!(g2,x,z)
+@test g1 ≈ g2

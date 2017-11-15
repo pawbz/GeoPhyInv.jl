@@ -23,6 +23,7 @@ import JuMIT.Data
 import JuMIT.Coupling
 import JuMIT.Misfits
 import JuMIT.Fdtd
+import JuMIT.Inversion
 using Optim, LineSearches
 using DistributedArrays
 
@@ -477,7 +478,7 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	elseif(pa.attrib_inv == :migr_finite_difference)
 
 		gx = similar(x);
-		gx = finite_difference!(x -> func_grad_xfwi!(nothing, x, last_x,  pa), x, gx, :central)
+		gx = Inversion.finite_difference!(x -> func_grad_xfwi!(nothing, x, last_x,  pa), x, gx, :central)
 
 		# convert gradient vector to model
 		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,gx,pa,-1)
@@ -965,78 +966,6 @@ function Coupling_x!(w::Coupling.TD,
 	end
 end
 
-
-macro forwardrule(x, e)
-	x, e = esc(x), esc(e)
-	quote
-	$e = sqrt(eps(eltype($x))) * max(one(eltype($x)), abs($x))
-	end
-end
-
-macro centralrule(x, e)
-	x, e = esc(x), esc(e)
-	quote
-	$e = cbrt(eps(eltype($x))) * max(one(eltype($x)), abs($x))
-	end
-end
-
-function finite_difference{T<:Number}(f::Function,x::T, dtype::Symbol = :central)
-	if dtype == :forward
-		@forwardrule x epsilon
-		xplusdx = x + epsilon
-		return (f(xplusdx) - f(x)) / epsilon
-	elseif dtype == :central
-		@centralrule x epsilon
-		xplusdx, xminusdx = x + epsilon, x - epsilon
-		return (f(xplusdx) - f(xminusdx)) / (epsilon + epsilon)
-	else
-		error("dtype must be :forward, :central")
-	end
-end
-
-
-
-function finite_difference!{S <: Number, T <: Number}(f::Function,
-	x::Vector{S},
-	g::Vector{T},
-	dtype::Symbol)
-	# What is the dimension of x?
-	n = length(x)
-
-	gpar = SharedArray{eltype(g)}(size(g))
-	xpar = SharedArray{eltype(x)}(size(x)); xpar = x;
-	# Iterate over each dimension of the gradient separately.
-	# Use xplusdx to store x + dx instead of creating a new vector on each pass.
-	# Use xminusdx to store x - dx instead of creating a new vector on each pass.
-	if dtype == :forward
-		# Establish a baseline value of f(x).
-		f_x = f(x)
-		for i = 1:n
-			@forwardrule x[i] epsilon
-			oldx = x[i]
-			x[i] = oldx + epsilon
-			f_xplusdx = f(x)
-			x[i] = oldx
-			g[i] = (f_xplusdx - f_x) / epsilon
-		end
-	elseif dtype == :central
-		@sync @parallel for i = 1:n
-			@centralrule xpar[i] epsilon
-			oldx = xpar[i]
-			xpar[i] = oldx + epsilon
-			f_xplusdx = f(xpar)
-			xpar[i] = oldx - epsilon
-			f_xminusdx = f(xpar)
-			xpar[i] = oldx
-			gpar[i] = (f_xplusdx - f_xminusdx) / (epsilon + epsilon)
-		end
-	else
-		error("dtype must be :forward or :central")
-	end
-
-	g[:] = copy(gpar);
-	return g
-end
 
 
 end # module

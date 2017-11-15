@@ -1,29 +1,52 @@
-# add processors
-addprocs(2)
-using SIT
+using Revise
+using JuMIT
 using Base.Test
-
-# test function
-f4(x::Vector) = (100.0 - x[1])^2 + (50.0 - x[2])^2
-
-x=[100.0, 50.0]
-gx1 = similar(x)
-gx2 = similar(x)
-
-# computing gradient in parallel
-SIT.Inversion.finite_difference!(x->(100.0 - x[1])^2 + (50.0 - x[2])^2, x, gx1, :central)
+using Optim
 
 
-# computing gradient 
-SIT.Inversion.finite_difference!(x->(100.0 - x[1])^2 + (50.0 - x[2])^2, x, gx2, :forward)
+x=randn(10);
+y1=randn(10);
+y2=randn(10).*100.;
 
-@test norm(gx1-[0., 0.]) < 10e-4
-@test norm(gx2-[0., 0.]) < 10e-4
-@test norm(gx2-gx1) < 10e-4
+f1(x)=JuMIT.Misfits.error_squared_euclidean!(nothing, x, y1, nothing)
+f2(x)=JuMIT.Misfits.error_squared_euclidean!(nothing, x, y2, nothing)
+
+g1(st,x)=JuMIT.Misfits.error_squared_euclidean!(st, x, y1, nothing)
+g2(st,x)=JuMIT.Misfits.error_squared_euclidean!(st, x, y2, nothing)
+
+optim_func=[f1,f2]
+optim_grad=[g1,g2]
+
+pa=JuMIT.Inversion.ParamMO(noptim=2,x_init=randn(10),
+    optim_func=optim_func,optim_grad=optim_grad)
+
+pa.func(x, pa)
+
+st=similar(x)
+pa.grad!(st, x, pa)
+
+using Optim
+df = OnceDifferentiable(x -> pa.func(x, pa),
+            (storage, x) -> pa.grad!(storage, x, pa))
+
+# only first objective
+pa.αvec=[1., 0.]
+res=optimize(df, x, )
+y11=Optim.minimizer(res)
+@test y11 ≈  y1
+
+# only second objective
+pa.αvec=[0., 1.]
+res=optimize(df, x, )
+y22=Optim.minimizer(res)
+@test y22 ≈ y2
 
 
-
-
-
-
-
+# test finite difference gradient
+for i in 1:3
+    randn!(pa.αvec) # test for different weighting paramters
+    g=similar(x)
+    JuMIT.Inversion.finite_difference!(x -> pa.func(x,pa), x, g, :central)
+    pa.grad!(st, x, pa)
+    @test st ≈ g
+end

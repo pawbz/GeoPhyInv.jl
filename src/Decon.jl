@@ -5,6 +5,7 @@ module Decon
 import JuMIT.DSP
 import JuMIT.Inversion
 import JuMIT.Misfits
+import JuMIT.Inversion
 using Optim, LineSearches
 
 type Param
@@ -21,6 +22,9 @@ type Param
 	wavprecon::Vector{Float64}
 	wavmat::Array{Float64,2}
 	dwavmat::Array{Float64,2}
+	wavnorm_flag::Bool 			# restrict wav along a unit circle during optimization
+	wavnormmat::Matrix{Float64}             # stored outer product of wav
+	dwavnorm::Vector{Float64}		# gradient w.r.t. normalized wavelet
 	spow2::Array{Complex{Float64},2}
 	rpow2::Array{Complex{Float64},2}
 	wpow2::Array{Complex{Float64},2}
@@ -46,6 +50,8 @@ end
 function Param(ntgf, nt, nr; 
 	       gfprecon=nothing,
 	       wavprecon=nothing,
+	       wavnorm_flag=false,
+	       fft_threads=false,
 	       dobs=nothing, gfobs=nothing, wavobs=nothing, verbose=false, attrib_inv=:gf,) 
 	(dobs===nothing) && (dobs=zeros(nt, nr))
 	dcal=zeros(nt, nr)
@@ -59,12 +65,12 @@ function Param(ntgf, nt, nr;
 	dgf=similar(gf)
 
 	# use maximum threads for fft
-	# FFTW.set_num_threads(Sys.CPU_CORES)
+	fft_threads &&  (FFTW.set_num_threads(Sys.CPU_CORES))
 	# fft dimension for plan
 	np2=nextpow2(maximum([2*nt, 2*ntgf]))
 	# create plan
-	fftplan = plan_fft!(complex.(zeros(np2,nr)),[1],flags=FFTW.PATIENT)
-	ifftplan = plan_ifft!(complex.(zeros(np2,nr)),[1],flags=FFTW.PATIENT)
+	fftplan = plan_fft!(complex.(zeros(np2,nr)),[1],flags=FFTW.MEASURE)
+	ifftplan = plan_ifft!(complex.(zeros(np2,nr)),[1],flags=FFTW.MEASURE)
 
 	# preallocate pow2 vectors
 	spow2=complex.(zeros(np2,nr))
@@ -76,16 +82,21 @@ function Param(ntgf, nt, nr;
 	xgf = zeros(ntgf*nr);
 	last_xgf = randn(size(xgf)) # reset last_x
 
-	# create df for optimization
+	# create dfgf for optimization
 	dfgf = OnceDifferentiable(x -> func_grad!(nothing, x, last_xgf, pa),
 	  (storage, x) -> func_grad!(storage, x, last_xgf, pa))
 
 	xwav = zeros(nt);
 	last_xwav = randn(size(xwav)) # reset last_x
 
-	# create df for optimization
-	dfwav = OnceDifferentiable(x -> func_grad!(nothing, x, last_xwav, pa),
-	  (storage, x) -> func_grad!(storage, x, last_xwav, pa))
+	# create dfwav for optimization
+	optim_func=[x -> func_grad!(nothing, x, last_xwav, pa), ]
+	optim_grad=[(storage, x) -> func_grad!(storage, x, last_xwav, pa), ]
+	# multi-objective framework
+	paMO=Inversion.ParamMO(noptim=1,x_init=randn(nt),
+			    		optim_func=optim_func,optim_grad=optim_grad)
+	dfwav = OnceDifferentiable(x -> pa.func(x, paMO),         
+			    (storage, x) -> pa.grad!(storage, x, paMO))
 
 	# create dummy gfobs if necessary
 	(gfobs===nothing) && (gfobs=zeros(gf))
@@ -98,7 +109,11 @@ function Param(ntgf, nt, nr;
 	# create gf precon
 	(wavprecon===nothing) && (wavprecon=ones(wav))
 
+	wavnorm_flag ?	(wavnormmat=zeros(nt, nt)) : (wavnormmat=zeros(1,1))
+	wavnorm_flag ?	(dwavnorm=zeros(nt)) : (dwavnorm=zeros(1))
+
 	pa = Param(gfobs, gf, gfprecon, dgf, ntgf, dobs, dcal, ddcal, wavobs, wav, wavprecon, wavmat, dwavmat,
+	    wavnorm_flag, wavnormmat, dwavnorm,
 	     spow2, rpow2, wpow2,
 	     nt, nr, attrib_inv, verbose, fftplan, ifftplan,
 	     xgf,last_xgf,dfgf,
@@ -156,7 +171,7 @@ function x_to_model!(x, pa)
 				pa.wav[i]=x[i]/pa.wavprecon[i]
 			end
 		end
-		scale!(pa.wav, inv(xn))
+		pa.wavnorm_flag && (scale!(pa.wav, inv(xn)))
 	else(pa.attrib_inv == :gf)
 		for i in eachindex(pa.gf)
 			if(iszero(pa.gfprecon[i]))
@@ -237,58 +252,6 @@ function func_grad!(storage, x::Vector{Float64},
 end
 
 
-#function func_grad!(storage, x::Vector{Float64},
-#			last_x::Vector{Float64}, 
-#			pa)
-#
-#
-#	#pa.verbose && println("computing gradient...")
-#
-#	# x to w 
-#	x_to_model!(x, pa)
-#
-#	F!(pa, x, last_x)
-#
-#	if(storage === nothing)
-#		# compute misfit and δdcal
-#		f1 = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing)
-#	else
-#		f1 = Misfits.error_squared_euclidean!(pa.ddcal, pa.dcal, pa.dobs, nothing)
-#		Fadj!(pa, x, storage, pa.ddcal)
-#	end
-#
-#	if(pa.func_max_save[1] == 0.0) 
-#		pa.func_max_save[1]=f1 # store first value of f
-#	end
-##
-#	fac1=pa.α[1]/pa.func_max_save[1]
-##
-##
-#	if((pa.attrib_inv == :gf) && !(storage === nothing))
-#		f2 = Misfits.error_weighted_norm!(pa.dgf,pa.gf, pa.gfprecon)
-#	else
-#		f2 = Misfits.error_weighted_norm!(nothing,pa.gf, pa.gfprecon)
-#	end
-#	if(pa.func_max_save[2] == 0.0) 
-#		pa.func_max_save[2]=f2 # store first value of f
-#	end
-#
-#	fac2=pa.α[2]/pa.func_max_save[2]
-#
-#	if(!(storage === nothing) && (pa.attrib_inv == :gf))
-#		for i in eachindex(storage)
-#			storage[i] = fac1*storage[i]+fac2*pa.dgf[i]
-#		end
-#	end
-##
-#	J = f1*fac1 + f2*fac2
-#
-#
-#	return J
-#
-#end
-#
-
 # add model based constraints here
 
 # all the greens' functions have to be correlated
@@ -316,13 +279,16 @@ function Fadj!(pa, x, storage, dcal)
 			end
 		end
 		# factor, because wav was divided by norm of x
-		xn=vecnorm(x)
 		for i in eachindex(storage)
 			if(iszero(pa.wavprecon[i]))
 				storage[i]=0.0
 			else
-				storage[i] = storage[i]*(xn-x[i]*x[i]/xn)/xn/xn/pa.wavprecon[i]
+				storage[i] = storage[i]/pa.wavprecon[i]
 			end
+		end
+		if(pa.wavnorm_flag)
+			copy!(pa.dwavnorm, storage)
+			Misfits.derivative_vector_magnitude!(storage,pa.dwavnorm,x,pa.wavnormmat)
 		end
 
 	else(pa.attrib_inv == :gf)
@@ -398,7 +364,7 @@ end
 """
 * re_init_flag :: re-initialize inversions with random input or not?
 """
-function update_all!(pa; ParamAM_func::Function=x->Inversion.ParamAM(x,optim_tols=[1e-10, 1e-10],roundtrip_tol=1e-10,max_roundtrips=100))
+function update_all!(pa; ParamAM_func::Function=x->Inversion.ParamAM(x,optim_tols=[1e-4, 1e-4],roundtrip_tol=1e-10,max_roundtrips=100,max_reroundtrips=10))
 
 	
 	# create alternating minimization parameters
