@@ -103,5 +103,5 @@ g1=zeros(x)
 f1(x)=f(x,z)
 ForwardDiff.gradient!(g1,f1, x)
 g2=zeros(x)
-g!(g2,x,z)
+@time g!(g2,x,z)
 @test g1 ≈ g2

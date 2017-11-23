@@ -28,15 +28,20 @@ function get_tapered_random_tmax_signal(tgrid::Grid.M1D;
 		filtsource = Bandpass(fmin, fmax; fs=fs);
 	end
 
-	itmax = indmin(abs.(tgrid.x-tmaxfrac*tgrid.x[end]))
+	itind = indmin(abs.(tgrid.x-abs(tmaxfrac)*tgrid.x[end]))
+	if(tmaxfrac>0.0)
+		its=1:itind
+	elseif(tmaxfrac<0.0)
+		its=itind:tgrid.nx
+	end
 	# 20% taper window
-	twin = taper(ones(itmax),taperperc) 
-	X = zeros(itmax)
+	twin = taper(ones(length(its)),taperperc) 
+	X = zeros(length(its))
 	wavsrc = zeros(tgrid.nx) 
 	if(filt_flag) 
-		X[:] = rand(dist, itmax) .* twin
+		X[:] = rand(dist, length(its)) .* twin
 	else
-		X[:] = rand(dist, itmax)
+		X[:] = rand(dist, length(its))
 	end
 	if(sparsep ≠ 1.0)
 		Xs=sprandn(length(X), sparsep)
@@ -46,11 +51,41 @@ function get_tapered_random_tmax_signal(tgrid::Grid.M1D;
 	(filt_flag) && (filt!(X, digitalfilter(filtsource, designmethod), X))
 	
 	(length(X) ≠ 1) && normalize!(X)
-	#wavsrc[1:itmax] = X.*twin
-	wavsrc[1:itmax] = X
+	wavsrc[its] = X
 	return wavsrc
 end
 
+
+"""
+* `x` : first dimension is time
+* `p` : sparsity
+* `rng` : Random Number Generator
+* `btperc` : Taper Perc
+* `etperc` : Taper Perc
+* `bfrac` : zeros at the beginning of each coloumn
+* `efrac` : zeros fraction at the end of each coloumn
+"""
+function tapered_rand!(x;p=1.0,rng=Normal(),btperc=0., etperc=0.,bfrac=0.0, efrac=0.0)
+	x[:]=0.0
+	nt=size(x,1)
+
+	a=1+round(Int,bfrac*nt)
+	b=nt-round(Int,efrac*nt)
+
+	dd=size(x)[2:end]
+	for i in CartesianRange(dd)
+		xx=view(x,a:b,i)
+		rand!(rng, xx)
+		taper!(xx, bperc=btperc, eperc=etperc)
+		nxx=size(xx,1)
+		if(p ≠ 1.0)
+			xs=sprandn(nxx, p)
+			xx[findn(xs.==0.0)]=0.0
+		end
+	end
+	scale!(x, inv(vecnorm(x)))
+	return x
+end
 
 
 """
@@ -157,18 +192,30 @@ Cosine taper a N-dimensional array along its first dimension.
 * `x::Array{Float64,N}` : 
 * `perc::Float64` : taper percentage
 """
-function taper{N}(x::Array{Float64,N},perc::Float64)
-
-	n = size(x,1)
-	nt = Int64(floor(n*perc/100.0))
-	# cosine window
-	tap = cosine(2*nt); 
-	win = vcat(tap[1:nt], ones(n-2*nt), tap[nt+1:2*nt]);
-	
-	# apply
-	(N==1) ? (return x.*win) : (return x.*repeat(win, 
-					      outer=vcat([1],[size(x,s) for s in 2:N])))
+function taper(x::AbstractArray,perc::Float64)
+	xout=copy(x);
+	taper!(xout,perc)
+	return xout
 end
+
+function taper!{N}(x::AbstractArray{Float64,N}, perc::Float64=0.0; bperc=perc,eperc=perc)
+
+	nt=size(x,1)
+	nttb=min(round(Int,nt*bperc/100.), nt)
+	ntte=min(round(Int,nt*eperc/100.), nt)
+	dd=size(x)[2:N]
+	for i in CartesianRange(dd)
+		kb=inv(2.*round(Int,nt*bperc/100.)-1)*pi
+		for it in 1:nttb
+			x[it,i] *= sin((it-1)*kb)
+		end
+		ke=inv(2.*round(Int,nt*eperc/100.)-1)*pi
+		for it in nt-ntte+1:nt 
+			x[it,i] *= sin((-it+nt)*ke)
+		end
+	end
+end
+
 
 """
 
@@ -245,12 +292,11 @@ function fast_filt!{T<:Real,N}(
 		  ) 
 
 	# check if nlags are consistent with the first dimension of inputs
-	(nsplags+nsnlags+1 ≠ size(s,1)) && error("length s")
-	(nrplags+nrnlags+1 ≠ size(r,1)) && error("length r")
-	(nwplags+nwnlags+1 ≠ size(w,1)) && error("length w")
+	#(nsplags+nsnlags+1 ≠ size(s,1)) && error("length s")
+	#(nrplags+nrnlags+1 ≠ size(r,1)) && error("length r")
+	#(nwplags+nwnlags+1 ≠ size(w,1)) && error("length w")
 
-	(size(s)[2:end] ≠ size(r)[2:end] ≠ size(w)[2:end]) && error("second dimension of s,r,w")
-	dim=size(s)[2:end];
+	#(size(s)[2:end] ≠ size(r)[2:end] ≠ size(w)[2:end]) && error("second dimension of s,r,w")
 
 	if(fftplan===nothing)
 		#FFTW.set_num_threads(Sys.CPU_CORES)
@@ -259,9 +305,9 @@ function fast_filt!{T<:Real,N}(
 	end
 
 	# allocate if not preallocated
-	(spow2===nothing) && (spow2=complex.(zeros(T,np2,dim...)))
-	(rpow2===nothing) && (rpow2=complex.(zeros(T,np2,dim...))) 
-	(wpow2===nothing) && (wpow2=complex.(zeros(T,np2,dim...)))
+	(spow2===nothing) && (dim=size(s)[2:end]; spow2=complex.(zeros(T,np2,dim...)))
+	(rpow2===nothing) && (dim=size(s)[2:end]; rpow2=complex.(zeros(T,np2,dim...))) 
+	(wpow2===nothing) && (dim=size(s)[2:end]; wpow2=complex.(zeros(T,np2,dim...)))
 
 	fast_filt_vec!(s,r,w,spow2,rpow2,wpow2,attrib,
 		   nsplags,nsnlags,nrplags,nrnlags,

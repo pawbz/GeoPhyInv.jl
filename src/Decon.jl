@@ -7,11 +7,15 @@ import JuMIT.Inversion
 import JuMIT.Misfits
 import JuMIT.Inversion
 using Optim, LineSearches
+using DSP
+using RecipesBase
+using Plots.PlotMeasures
 
 type Param
 	gfobs::Array{Float64,2}
 	gf::Array{Float64,2}
 	gfprecon::Array{Float64,2}
+	gfweights::Array{Float64,2}
 	dgf::Array{Float64,2}
 	ntgf::Int64
 	dobs::Array{Float64,2}
@@ -40,8 +44,45 @@ type Param
 	xwav::Vector{Float64}
 	last_xwav::Vector{Float64}
 	dfwav::Optim.UninitializedOnceDifferentiable{Void}
-	func_max_save::Vector{Float64}
-	α::Vector{Float64}
+end
+
+@userplot Plot
+
+
+@recipe function f(p::Plot)
+	pa=p.args[1]
+#	 layout := @layout [tophist           _hist2d{0.9w      ,0.9h} righthist]
+	# upper histogram    
+#	    layout --> @layout [        
+#			 tophist           _
+#			 hist2d{0.9w,0.9h} righthist    
+#		 ]
+g = grid(9, 2, widths = [1,1], heights = [1,1])
+	layout := (9,2)
+
+	@series begin        
+		subplot := 1
+		legend := false
+		pa.wavobs
+	end
+	@series begin        
+		subplot := 2
+		legend := false
+		pa.wav
+	end
+
+	@series begin        
+		subplot := 3
+		legend := false
+		pa.gfobs
+	end
+	@series begin        
+		subplot := 4
+		legend := false
+		pa.gf
+	end
+
+
 end
 
 """
@@ -49,6 +90,11 @@ end
 """
 function Param(ntgf, nt, nr; 
 	       gfprecon=nothing,
+	       gfweights=nothing,
+	       gfoptim=nothing,
+	       gfαvec=nothing,
+	       wavoptim=nothing,
+	       wavαvec=nothing,
 	       wavprecon=nothing,
 	       wavnorm_flag=false,
 	       fft_threads=false,
@@ -67,7 +113,7 @@ function Param(ntgf, nt, nr;
 	# use maximum threads for fft
 	fft_threads &&  (FFTW.set_num_threads(Sys.CPU_CORES))
 	# fft dimension for plan
-	np2=nextpow2(maximum([2*nt, 2*ntgf]))
+	np2=nextfastfft(maximum([2*nt, 2*ntgf]))
 	# create plan
 	fftplan = plan_fft!(complex.(zeros(np2,nr)),[1],flags=FFTW.MEASURE)
 	ifftplan = plan_ifft!(complex.(zeros(np2,nr)),[1],flags=FFTW.MEASURE)
@@ -82,21 +128,14 @@ function Param(ntgf, nt, nr;
 	xgf = zeros(ntgf*nr);
 	last_xgf = randn(size(xgf)) # reset last_x
 
-	# create dfgf for optimization
-	dfgf = OnceDifferentiable(x -> func_grad!(nothing, x, last_xgf, pa),
-	  (storage, x) -> func_grad!(storage, x, last_xgf, pa))
+	# dummy dfgf for optimization, to be updated later
+	dfgf = OnceDifferentiable(x -> randn(),   (storage, x) -> randn())
 
 	xwav = zeros(nt);
 	last_xwav = randn(size(xwav)) # reset last_x
 
-	# create dfwav for optimization
-	optim_func=[x -> func_grad!(nothing, x, last_xwav, pa), ]
-	optim_grad=[(storage, x) -> func_grad!(storage, x, last_xwav, pa), ]
-	# multi-objective framework
-	paMO=Inversion.ParamMO(noptim=1,x_init=randn(nt),
-			    		optim_func=optim_func,optim_grad=optim_grad)
-	dfwav = OnceDifferentiable(x -> pa.func(x, paMO),         
-			    (storage, x) -> pa.grad!(storage, x, paMO))
+	# dummy, to be updated later
+	dfwav = OnceDifferentiable(x -> randn(),   (storage, x) -> randn())
 
 	# create dummy gfobs if necessary
 	(gfobs===nothing) && (gfobs=zeros(gf))
@@ -105,6 +144,7 @@ function Param(ntgf, nt, nr;
 
 	# create gf precon
 	(gfprecon===nothing) && (gfprecon=ones(gf))
+	(gfweights===nothing) && (gfweights=ones(gf))
 
 	# create gf precon
 	(wavprecon===nothing) && (wavprecon=ones(wav))
@@ -112,22 +152,92 @@ function Param(ntgf, nt, nr;
 	wavnorm_flag ?	(wavnormmat=zeros(nt, nt)) : (wavnormmat=zeros(1,1))
 	wavnorm_flag ?	(dwavnorm=zeros(nt)) : (dwavnorm=zeros(1))
 
-	pa = Param(gfobs, gf, gfprecon, dgf, ntgf, dobs, dcal, ddcal, wavobs, wav, wavprecon, wavmat, dwavmat,
+	pa = Param(gfobs, gf, gfprecon, gfweights, dgf, ntgf, dobs, dcal, ddcal, wavobs, wav, wavprecon, wavmat, dwavmat,
 	    wavnorm_flag, wavnormmat, dwavnorm,
 	     spow2, rpow2, wpow2,
 	     nt, nr, attrib_inv, verbose, fftplan, ifftplan,
-	     xgf,last_xgf,dfgf,
-	     xwav,last_xwav,dfwav, zeros(3), [1., 0.0, 0.0])
-
+	     xgf, last_xgf, dfgf,
+	     xwav, last_xwav, dfwav)
+ 
 	if iszero(pa.dobs) 
 		((gfobs===nothing) | (wavobs===nothing)) && error("need gfobs and wavobs")
+		pa.attrib_inv=:wav
 		F!(pa, 
-     		pa.xwav, pa.last_xwav, # dummy
+     		pa.xwav,  # dummy
      		mattrib=:gfwav, dattrib=:dobs, gf=gfobs, wav=wavobs)
 	end
 
+	update_func_grad!(pa,gfoptim=gfoptim,wavoptim=wavoptim,gfαvec=gfαvec,wavαvec=wavαvec)
+
 	return pa
+	
 end
+
+function update_func_grad!(pa; gfoptim=nothing, wavoptim=nothing, gfαvec=nothing, wavαvec=nothing)
+	# they will be changed in this program, so make a copy 
+	wavsave=copy(pa.wav);
+	gfsave=copy(pa.gf);
+	dcalsave=copy(pa.dcal);
+
+	(gfoptim===nothing) && (gfoptim=[:ls])
+	(gfαvec===nothing) && (gfαvec=ones(length(gfoptim)))
+
+	(wavoptim===nothing) && (wavoptim=[:ls])
+	(wavαvec===nothing) && (wavαvec=ones(length(wavoptim)))
+
+	# dfgf for optimization functions
+	optim_funcgf=Vector{Function}(length(gfoptim))
+	optim_gradgf=Vector{Function}(length(gfoptim))
+	for iop in 1:length(gfoptim)
+		if (gfoptim[iop]==:ls)
+			optim_funcgf[iop]= x->func_grad!(nothing, x,  pa) 
+			optim_gradgf[iop]=(storage, x)->func_grad!(storage, x,  pa)
+		elseif(gfoptim[iop]==:weights)
+			optim_funcgf[iop]= x -> func_grad_gf_weights!(nothing, x, pa) 
+			optim_gradgf[iop]= (storage, x) -> func_grad_gf_weights!(storage, x, pa)
+		else
+			error("invalid optim_funcgf")
+		end
+	end
+	pa.attrib_inv=:gf
+	# multi-objective framework
+	paMOgf=Inversion.ParamMO(noptim=length(gfoptim), ninv=length(pa.xgf), αvec=gfαvec,
+			    		optim_func=optim_funcgf,optim_grad=optim_gradgf,
+					x_init=randn(length(pa.xgf),10))
+	# create dfgf for optimization
+	pa.dfgf = OnceDifferentiable(x -> paMOgf.func(x, paMOgf),       
+			    (storage, x) -> paMOgf.grad!(storage, x, paMOgf))
+
+
+	# dfwav for optimization functions
+	optim_funcwav=Vector{Function}(length(wavoptim))
+	optim_gradwav=Vector{Function}(length(wavoptim))
+	for iop in 1:length(wavoptim)
+		if (wavoptim[iop]==:ls)
+			optim_funcwav[iop]=x->func_grad!(nothing, x,  pa) 
+			optim_gradwav[iop]=(storage, x)->func_grad!(storage, x,  pa) 
+		else
+			error("invalid optim_funcwav")
+		end
+	end
+
+	pa.attrib_inv=:wav
+	# multi-objective framework
+	paMOwav=Inversion.ParamMO(noptim=length(wavoptim), ninv=pa.nt, αvec=wavαvec,
+			    		optim_func=optim_funcwav,optim_grad=optim_gradwav,
+					x_init=randn(length(pa.xwav),10))
+	pa.dfwav = OnceDifferentiable(x -> paMOwav.func(x, paMOwav),         
+			    (storage, x) -> paMOwav.grad!(storage, x, paMOwav))
+
+
+	copy!(pa.wav, wavsave)
+	copy!(pa.gf, gfsave)
+	copy!(pa.dcal,dcalsave)
+
+	return pa
+	
+end
+
 
 function ninv(pa)
 	if(pa.attrib_inv == :wav)
@@ -142,6 +252,12 @@ function error(pa)
 	fwav, α = Misfits.error_after_autocorr_scaling(pa.wav, pa.wavobs)
 	fgf, α = Misfits.error_after_autocorr_scaling(pa.gf, pa.gfobs)
 	f = Misfits.fg_cls!(nothing, pa.dcal, pa.dobs)
+
+	println("Blind Decon\t")
+	println("===========")
+	println("error in estimated wavelet:\t", fwav)
+	println("error in estimated Green Functions:\t", fgf)
+	println("final error in the data:\t", f)
 
 	return fwav, fgf, f
 end 
@@ -186,15 +302,21 @@ end
 
 function F!(
 			pa::Param,
-			x::Vector{Float64},
-			last_x::Vector{Float64};
+			x::AbstractVector{Float64};
 			gf=nothing,
 			wav=nothing,
 			mattrib::Symbol=:x,
 			dattrib::Symbol=:dcal,
 			   )
+	if(pa.attrib_inv==:wav)
+		compute=(x!=pa.last_xwav)
+	elseif(pa.attrib_inv==:gf)
+		compute=(x!=pa.last_xgf)
+	else
+		compute=false
+	end
 
-	if(x!=last_x)
+#	if(compute)
 
 		if(mattrib == :x)
 			x_to_model!(x, pa)
@@ -214,9 +336,17 @@ function F!(
 		end
 
 		#pa.verbose && println("updating buffer")
-		copy!(last_x, x)
+		if(pa.attrib_inv==:wav)
+			copy!(pa.last_xwav, x)
+		elseif(pa.attrib_inv==:gf)
+			copy!(pa.last_xgf, x)
+		end
+
+
 		for ir in 1:pa.nr
-			pa.wavmat[:,ir]=wav
+			for it in 1:pa.nt
+				pa.wavmat[it,ir]=wav[it]
+			end
 		end
 		DSP.fast_filt!(pa.ddcal, gf, pa.wavmat, :s, nwplags=pa.nt-1,
 		 nwnlags=0,nsplags=pa.nt-1,nsnlags=0,nrplags=pa.ntgf-1,nrnlags=0,
@@ -225,11 +355,10 @@ function F!(
 		  			)
 		copy!(getfield(pa, dattrib), pa.ddcal)
 		return pa
-	end
+#	end
 end
 
-function func_grad!(storage, x::Vector{Float64},
-			last_x::Vector{Float64}, 
+function func_grad!(storage, x::AbstractVector{Float64},
 			pa)
 
 
@@ -238,7 +367,7 @@ function func_grad!(storage, x::Vector{Float64},
 	# x to w 
 	x_to_model!(x, pa)
 
-	F!(pa, x, last_x)
+	F!(pa, x)
 
 	if(storage === nothing)
 		# compute misfit and δdcal
@@ -257,6 +386,19 @@ end
 # all the greens' functions have to be correlated
 
 # exponential-weighted norm for the green functions
+function func_grad_gf_weights!(storage, x, pa)
+	x_to_model!(x, pa)
+	!(pa.attrib_inv == :gf) && error("only for gf inversion")
+	if(!(storage === nothing)) #
+		f = Misfits.error_weighted_norm!(pa.dgf,pa.gf, pa.gfweights) #
+		for i in eachindex(storage)
+			storage[i]=pa.dgf[i]
+		end
+	else	
+		f = Misfits.error_weighted_norm!(nothing,pa.gf, pa.gfweights)
+	end
+	return f
+end
 
 #  
 
@@ -316,10 +458,9 @@ function Fadj!(pa, x, storage, dcal)
 end
 
 # core algorithm
-function update!(pa::Param, x, last_x, df; store_trace::Bool=false, 
+function update!(pa::Param, x, df; store_trace::Bool=false, 
 		 extended_trace::Bool=false, 
-	     time_limit=Float64=2.0*60., 
-	     f_tol::Float64=1e-8, g_tol::Float64=1e-8, x_tol::Float64=1e-8)
+	     f_tol::Float64=1e-8, g_tol::Float64=1e-30, x_tol::Float64=1e-30)
 
 	# initial w to x
 	model_to_x!(x, pa)
@@ -332,23 +473,23 @@ function update!(pa::Param, x, last_x, df; store_trace::Bool=false,
 		       Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
 		       iterations = 200, store_trace = store_trace,
 		       extended_trace=extended_trace, show_trace = false))
-	# pa.verbose && println(res)
+	pa.verbose && println(res)
 
 	x_to_model!(Optim.minimizer(res), pa)
 
 	return res
 end
 
-function update_gf!(pa, xgf, last_xgf, dfgf)
+function update_gf!(pa, xgf,  dfgf)
 	pa.attrib_inv=:gf    
-	resgf = update!(pa, xgf, last_xgf, dfgf)
+	resgf = update!(pa, xgf,  dfgf)
 	fgf = Optim.minimum(resgf)
 	return fgf
 end
 
-function update_wav!(pa, xwav, last_xwav, dfwav)
+function update_wav!(pa, xwav, dfwav)
 	pa.attrib_inv=:wav    
-	reswav = update!(pa, xwav, last_xwav, dfwav)
+	reswav = update!(pa, xwav, dfwav)
 	fwav = Optim.minimum(reswav)
 	return fwav
 end
@@ -364,17 +505,26 @@ end
 """
 * re_init_flag :: re-initialize inversions with random input or not?
 """
-function update_all!(pa; ParamAM_func::Function=x->Inversion.ParamAM(x,optim_tols=[1e-4, 1e-4],roundtrip_tol=1e-10,max_roundtrips=100,max_reroundtrips=10))
+function update_all!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothing)
+
+	if(ParamAM_func===nothing)
+		ParamAM_func=x->Inversion.ParamAM(x,optim_tols=[1e-5, 1e-5],name="Blind Decon",
+				    roundtrip_tol=1e-10,max_roundtrips=max_roundtrips,
+				    max_reroundtrips=max_reroundtrips,
+				    reinit_func=x->initialize!(pa))
+	end
 
 	
 	# create alternating minimization parameters
-	f1=x->update_wav!(pa, pa.xwav, pa.last_xwav, pa.dfwav)
-	f2=x->update_gf!(pa, pa.xgf, pa.last_xgf, pa.dfgf)
+	f1=x->update_wav!(pa, pa.xwav,  pa.dfwav)
+	f2=x->update_gf!(pa, pa.xgf, pa.dfgf)
 	paam=ParamAM_func([f1, f2])
 
 	# do inversion
 	Inversion.go(paam)
 
+	# print errors
+	Decon.error(pa)
 end
 
 
@@ -384,5 +534,45 @@ function initialize!(pa)
 	randn!(pa.gf)
 end
 
+
+
+
+
+"""
+Create preconditioners using the observed Green Functions.
+* `cflag` : causaulity flag
+"""
+function create_weights(ntgf, nt, gfobs; αexp=0.0, cflag=true)
+
+	nr=size(gfobs,2)
+	wavprecon=ones(nt)
+	gfprecon=ones(ntgf, nr); 
+	gfweights=ones(ntgf, nr); 
+	minindz=ntgf
+	gfweights=ones(ntgf, nr)
+	for ir in 1:nr
+		gf=normalize(view(gfobs,:,ir))
+		indz=findfirst(x->abs(x)>1e-6, gf)
+		if(cflag)
+			if(indz==0)
+				gfprecon[:,ir]=0.0    
+				gfweights[:,ir]=0.0
+			else
+				gfprecon[1:indz-1,ir]=0.0    
+				gfweights[1:indz-1,ir]=0.0
+#				wavprecon[end-indz+1:end]=0.0
+			end
+		end
+		if(indz≠0)
+			for i in indz+1:ntgf        
+				gfweights[i,ir]=exp(αexp*(i-indz-1)/ntgf)  # exponential weights
+				gfprecon[i,ir]=exp(αexp*(i-indz-1)/ntgf)  # exponential weights
+			end
+		end
+	end
+
+	return gfprecon, gfweights, wavprecon
+
+end
 
 end # module

@@ -8,7 +8,7 @@ This module has different inversion schemes.
 
 module Inversion
 using Optim, LineSearches
-
+using RecipesBase
 """
 Parameters for alternating minimization of a single objective function, while updating different model parameters
 """
@@ -25,6 +25,45 @@ type ParamAM
 	roundtrip_tol::Float64		# tolerance for stopping roundtrips
 	verbose::Bool
 end
+
+
+@userplot PlotAM
+
+@recipe function f(p::PlotAM)
+	itr=p.args[1]
+	fvec=p.args[2]
+	frate=p.args[3]
+	nop=length(fvec)
+
+	layout := (2,nop)
+
+	for iop in 1:nop
+		@series begin
+			subplot := iop
+			legend := false
+			xscale := :log10
+			yscale := :log10
+			xlabel := "Iteration"
+			seriestype := :scatter
+			title := string("op ",iop)
+			[itr], [fvec[iop]]
+		end
+		@series begin
+			subplot := (1+round(Int,nop/2))+iop
+			xscale := :log10
+			yscale := :log10
+			xlabel := "Iteration"
+			legend := false
+			title := string("op rate",iop)
+			seriestype := :scatter
+			[itr], [frate[iop]]
+		end
+
+	end
+
+
+end
+
 
 
 function ParamAM(optim_func;
@@ -62,18 +101,19 @@ function go(pa::ParamAM)
 	itrr=0
 
 	pa.verbose && println(pa.name, "\t alternate optimization")  
+	rf=zeros(pa.noptim)
 
 	while ((!reroundtrip_converge && itrr < pa.max_reroundtrips))
 		itrr += 1
 		pa.verbose && (itrr > 1) && println("failed to converge.. reintializing (",itrr,"/",pa.max_reroundtrips,")")
-		pa.verbose && println("=================================================================================")  
+		pa.verbose && println("=========================================================================================")  
 
 	
 		pa.fvec[:]=0.0
 		pa.fvec_init[:]=0.0
 
 		# execute re-initialization function
-		pa.reinit_func(nothing)
+		(itrr > 1) && pa.reinit_func(nothing)
 
 		itr=0
 		roundtrip_converge=false
@@ -82,9 +122,9 @@ function go(pa::ParamAM)
 		if(pa.verbose)
 			@printf("trip\t|")
 			for iop in 1:pa.noptim
-				@printf("\top %d (%0.1e)\t|",iop, pa.optim_tols[iop])
+				@printf("\t\top %d\t(%0.1e)\t|",iop, pa.optim_tols[iop])
 			end
-			@printf("\tvar(op) (%0.1e)\t",pa.roundtrip_tol)
+#			@printf("\tvar(op) (%0.1e)\t",pa.roundtrip_tol)
 			@printf("\n")
 		end
 		while !roundtrip_converge && itr < pa.max_roundtrips
@@ -110,23 +150,41 @@ function go(pa::ParamAM)
 				pa.fvec[iop,1] /= pa.fvec_init[iop]
 			end
 
+			# compute the change in the functions
+			for iop in 1:pa.noptim
+				rf[iop]=abs(pa.fvec[iop,2]-pa.fvec[iop,1])/pa.fvec[iop,2]
+			end
+
+			if(itr>2)
+				plotam!(itr,pa.fvec[:,1],rf)
+			elseif(itr==2)
+				plotam(itr,pa.fvec[:,1],rf)
+			end
 			if(pa.verbose)
 				@printf("%d\t|",itr)
 				for iop in 1:pa.noptim
-					@printf("\t%0.6e\t|",pa.fvec[iop,1])
+					@printf("\t%0.6e\t",pa.fvec[iop,1])
+					(itr==1) ? @printf("\t\t|") : @printf("(%0.6e)\t|",rf[iop])
 				end
-			end
-			# variance b/w objectives
-			rf=vecnorm(pa.fvec[:,1])/vecnorm(fill(pa.fvec[1,1],pa.noptim))
-			if(pa.verbose)
-				@printf("\t%0.6e\t|",rf)
 				@printf("\n")
 			end
-			(itr > 3) && (roundtrip_converge = (rf < pa.roundtrip_tol)) # do atleast 3 round trips before quitting
+
+			(itr > 3) && (roundtrip_converge = all(rf .< pa.optim_tols)) # do atleast 3 round trips before quitting
+
+
+
+
+			# variance b/w objectives
+#			rf=vecnorm(pa.fvec[:,1])/vecnorm(fill(pa.fvec[1,1],pa.noptim))
+#			if(pa.verbose)
+#				@printf("\t%0.6e\t|",rf)
+#				@printf("\n")
+#			end
 		end
 		reroundtrip_converge = all(pa.fvec[:,1] .< pa.optim_tols[:])
-		pa.verbose && println("=================================================================================")  
+		pa.verbose && println("=========================================================================================")  
 	end
+	return nothing
 end
 
 #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -167,6 +225,7 @@ Only allocation is creating an additional vector for temporary gradient storage
 function ParamMO(;
 		 noptim=1,
 		 αvec=ones(noptim),
+		 ninv=nothing, #number of inversion variables
 		 x_init=nothing,
 		 optim_func=nothing,
 		 optim_grad=nothing,
@@ -177,13 +236,6 @@ function ParamMO(;
 
 	fvec=zeros(noptim)
 	fvec_init=zeros(noptim)
-
-	# compute functional using x_init and store them 
-	for iop in 1:noptim
-		fvec_init[iop]=optim_func[iop](x_init)
-	end
-	any(iszero.(fvec_init)) && error("fvec_init cannot be zero")
-
 
 	# func scalarizes fvec
 	func=function func(x, pa)
@@ -210,8 +262,37 @@ function ParamMO(;
 	end
 
 	# allocate storage_temp
-	storage_temp=similar(x_init)
+	if(!(ninv===nothing))
+		storage_temp=zeros(ninv)
+	elseif(!(x_init===nothing))
+		storage_temp=zeros(x_init)
+	else
+		error("need ninv or x_init")
+	end
 	pa=ParamMO(noptim,optim_func,optim_grad,αvec,fvec_init,fvec,storage_temp,func,grad!)
+
+	# compute functional using x_init and store them 
+	if(!(x_init===nothing))
+		update_fvec_init!(x_init, pa)
+	end
+
+	return pa
+end
+
+"""
+Average the reference values of function over second dimension of x
+"""
+function update_fvec_init!(x_init, pa::ParamMO)
+	pa.fvec_init[:]=0.0
+	avgsize=size(x_init,2)
+	for iv in 1:avgsize
+		xi=view(x_init,:,iv)
+		for iop in 1:pa.noptim
+			pa.fvec_init[iop]+=pa.optim_func[iop](xi)
+		end
+	end
+	scale!(pa.fvec_init, inv(avgsize))
+	any(iszero.(pa.fvec_init)) && error("fvec_init cannot be zero")
 end
 
 

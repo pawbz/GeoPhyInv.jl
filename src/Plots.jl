@@ -1,6 +1,7 @@
 module Plots
 
 using PyPlot
+using StatsBase
 import JuMIT.Interpolation
 import JuMIT.Acquisition
 import JuMIT.Grid
@@ -229,37 +230,73 @@ end
 
 
 function Decon(pa; rvec=collect(1:pa.nr))
-	fig=figure(figsize=(10,8))
-	subplot(621)
+	nrow=9
+	ncol=2
+	iff=0
+	fig=figure(figsize=(12,15))
+	iff += 1;subplot(nrow,ncol,iff)
 	plot(pa.wavobs)
 	title("Actual S")
-	subplot(622)
+	iff += 1;subplot(nrow,ncol,iff)
 	plot(pa.gfobs[:,rvec])
 	title("Actual G")
-	subplot(623)
+	iff += 1;subplot(nrow,ncol,iff)
 	plot(pa.wav)
 	title("Estimated S")
-	subplot(624)
+	#
+	iff += 1;subplot(nrow,ncol,iff)
 	plot(pa.gf[:,rvec])
 	title("Estimated G")
-	subplot(625)
+	#-----------------------
+	awavobs=autocor(pa.wavobs, 1:pa.nt-1, demean=true)
+	awav=autocor(pa.wav, 1:pa.nt-1, demean=true)
+	wavli=max(maximum(abs,awavobs), maximum(abs,awav))
+	agfobs=autocor(pa.gfobs,1:pa.ntgf-1, demean=true)
+	agf=autocor(pa.gf,1:pa.ntgf-1, demean=true)
+	gfli=max(maximum(abs,agfobs), maximum(abs,agf))
+	#-----------------------
+	iff += 1;subplot(nrow,ncol,iff)
+	plot(awavobs)
+	ylim(-wavli, wavli)
+	title("Actual SS\$^*\$")
+	#
+	iff += 1;subplot(nrow,ncol,iff)
+	plot(awav)
+	ylim(-wavli, wavli)
+	title("Estimated SS\$^*\$")
+	#
+	iff += 1;subplot(nrow,ncol,iff)
+	plot(agfobs[:,rvec])
+	ylim(-gfli, gfli)
+	title("Actual GG\$^*\$")
+	#
+	iff += 1;subplot(nrow,ncol,iff)
+	plot(agf[:,rvec])
+	ylim(-gfli, gfli)
+	title("Estimated GG\$^*\$")
+	#
+	iff += 1;subplot(nrow,ncol,iff)
 	plot(pa.dobs[:,rvec])
 	title("Actual D")
-	subplot(626)
+	iff += 1;subplot(nrow,ncol,iff)
 	plot(pa.dcal[:,rvec])
 	title("Estimated D")
-	subplot(627)
-	mscatter(pa.wavobs, pa.wav, "S")
-	subplot(628)
-	mscatter(pa.gfobs, pa.gf, "G")
-	subplot(629)
-	mscatter(pa.dobs, pa.dcal, "D")
-	subplot(6,2,10)
+	#
+	iff += 1;subplot(nrow,ncol,iff)
+	mscatter(awavobs, awav, "Crossplot - SS\$^*\$")
+	iff += 1;subplot(nrow,ncol,iff)
+	mscatter(agfobs, agf, "Crossplot - GG\$^*\$")
+	iff += 1;subplot(nrow,ncol,iff)
+	mscatter(pa.dobs, pa.dcal, "Crossplot - D")
+	iff += 1;subplot(nrow,ncol,iff)
 	plot(pa.gfprecon)
-	title("GFPRECON")
-	subplot(6,2,11)
+	title("G PRECON")
+	iff += 1;subplot(nrow,ncol,iff)
 	plot(pa.wavprecon)
 	title("WAVPRECON")
+	iff += 1;subplot(nrow,ncol,iff)
+	plot(pa.gfweights)
+	title("G WEIGHTS")
 	tight_layout()
 
 end
