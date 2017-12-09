@@ -12,54 +12,60 @@ Return n indices in order
 Cannot find a julia method which does, this.
 If a faster method is found, replace it later.
 """
-function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64=1)
+function indminn!(ivec, x::AbstractVector{Float64}, val::Float64)
 	# using enumerate to avoid indexing
-	ivec = fill(0,n);
-	xc = zeros(n);
+	n=length(ivec)
+	ivec[:]=zero(eltype(ivec))
 	for inn in 1:n
-		min_i = 0
-		min_x = Inf
-		for (i, xi) in enumerate(x)
-			dist = abs(xi - val)
-			if ((dist < min_x))
-				min_x = dist
-				min_i = i
-				xc[]
-			end
-		end
-		xc[inn] = x[min_i]
-		x[min_i] = typemax(Float64)
-		ivec[inn] = min_i
+		ivec[inn] = indminimum(x, val, ivec)
 	end
-	x[ivec] = xc
-	return sort(ivec)
+	sort!(ivec)
+	return ivec
+end
+
+"""
+minimum index using imask
+"""
+function indminimum(x, val, imask=[])
+	min_i=0
+	min_x=typemax(Float64)
+	for (i, xi) in enumerate(x)
+		dist = abs(xi - val)
+		if ((dist < min_x) && (i ∉ imask))
+			min_x = dist
+			min_i = i
+		end
+	end
+	return min_i
+end
+
+function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64=1)
+	ivec=fill(0,n)
+	indminn!(ivec,x,val)
+	return ivec
 end
 
 "return index such that "
 function indminn_inside(x, valbeg, valend)
-	iibeg = indminn(x, valbeg, 2)
-	iiend = indminn(x, valend, 2)
-	ibeg = findfirst((valbeg-x[iibeg]).*(valend-x[iibeg]) .<= 0.0)
-	iend = findlast((valbeg-x[iiend]).*(valend-x[iiend]) .<= 0.0)
+	iibeg1 = indminimum(x, valbeg)
+	iibeg2 = indminimum(x, valbeg,iibeg1)
+	iiend1 = indminimum(x, valend)
+	iiend2 = indminimum(x, valend,iiend1)
 
-	return iibeg[ibeg], iiend[iend]
+	if((valbeg-x[iibeg1])*(valend-x[iibeg1]) <= 0.0)
+		iibeg=iibeg1
+	else
+		iibeg=iibeg2
+	end
+	if((valbeg-x[iiend1])*(valend-x[iiend1])<=0.0)
+		iiend=iiend1
+	else
+		iiend=iiend2
+	end
+
+	return iibeg, iiend
 end
 
-## slower version for large vectors
-#function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64)
-#	xa =abs(x-val)
-#	((n >= 1) & (n <= length(x))) ? nothing : error("invalid n")
-#	ivec = [];
-#	xc = [];
-#	for i in 1:n
-#		ii = indmin(xa);
-#		push!(ivec, ii)
-#		push!(xc, x[ii])
-#		xa[ii] = typemax(Float64);
-#	end
-#	xa[ivec] = xc
-#	return sort(ivec)
-#end
 
 function interp_spray!(xin::Vector{Float64}, yin::AbstractVector{Float64},
 					   xout::Vector{Float64}, yout::AbstractVector{Float64},
@@ -78,6 +84,7 @@ function interp_spray!(xin::Vector{Float64}, yin::AbstractVector{Float64},
 	else
 		error("invalid attrib")
 	end
+	ivec=zeros(Int64,np)
 
 	if(attrib == :interp)
 		# yout is only updated "within" bounds of yin 
@@ -86,8 +93,8 @@ function interp_spray!(xin::Vector{Float64}, yin::AbstractVector{Float64},
 
 		yout[ioutmin:ioutmax] = zero(Float64);
 		@simd for i in ioutmin:ioutmax
-			ivec=indminn(xin,xout[i], np);
-			interp_func(i, yout, xin[ivec]...,yin[ivec]..., xout[i])
+			indminn!(ivec,xin,xout[i]);
+			interp_func(i, ivec, yout, xin,yin, xout[i])
 		end
 	elseif(attrib == :spray)
 		# spary values of yin "within" bounds of yout
@@ -96,8 +103,8 @@ function interp_spray!(xin::Vector{Float64}, yin::AbstractVector{Float64},
 
 		yout[:] = zero(Float64);
 		@simd for i in iinmin:iinmax
-			ivec=indminn(xout,xin[i], np);
-			spray_func(ivec..., yout, xout[ivec]..., xin[i], yin[i])
+			indminn!(ivec,xout,xin[i]);
+			spray_func(ivec, yout, xout, xin[i], yin[i])
 		end
 	end
 end # interp_spray!
@@ -118,6 +125,7 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 	else
 		error("invalid attrib")
 	end
+	ivec=zeros(Int64,np)
 
 	if(attrib == :interp)
 		# yout is only updated within bounds of yin 
@@ -130,17 +138,19 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 		# first along x
 		@simd for ix in i2outmin:i2outmax
 			@simd for iz in eachindex(zin)
-				ivec=indminn(xin, xout[ix], np);
+				indminn!(ivec,xin, xout[ix]);
 				iy=(ix-i2outmin)*length(zin)+iz
-				interp_func(iy, y_x, xin[ivec]..., yin[iz, ivec]..., xout[ix])
+				yyin=view(yin, iz, :)
+				interp_func(iy, ivec, y_x, xin, yyin, xout[ix])
 			end
 		end
 		# then along z
 		@simd for ix in i2outmin:i2outmax
 			@simd for iz in i1outmin:i1outmax
-				ivec=indminn(zin,zout[iz], np);
+				indminn!(ivec,zin,zout[iz]);
 				iy=iz+(ix-1)*length(zout)
-				interp_func(iy, yout, zin[ivec]..., y_x[ivec, ix-i2outmin+1]..., zout[iz]...)
+				yy_x=view(y_x, :, ix-i2outmin+1)
+				interp_func(iy, ivec, yout, zin, yy_x, zout[iz])
 			end
 		end
 	elseif(attrib == :spray)
@@ -153,17 +163,17 @@ function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{
 		# first along z
 		@simd for ix in i2inmin:i2inmax
 			@simd for iz in i1inmin:i1inmax
-				ivec=indminn(zout,zin[iz], np);
-				iy=ivec+(ix-i2inmin)*length(zout)
-				spray_func(iy..., y_z, zout[ivec]..., zin[iz], yin[iz, ix])
+				indminn!(ivec,zout,zin[iz]);
+				yy_z=view(y_z,:,ix-i2inmin+1)
+				spray_func(ivec, yy_z, zout, zin[iz], yin[iz, ix])
 			end
 		end
 		# then along x
 		@simd for ix in i2inmin:i2inmax
 			@simd for iz in eachindex(zout)
-				ivec=indminn(xout,xin[ix], np);
-				iy=(ivec-1).*length(zout) + iz
-				spray_func(iy..., yout, xout[ivec]...,  xin[ix], y_z[iz,ix-i2inmin+1])
+				indminn!(ivec,xout,xin[ix]);
+				yyout=view(yout,iz,:)
+				spray_func(ivec, yyout, xout,  xin[ix], y_z[iz,ix-i2inmin+1])
 			end
 		end
 	end
@@ -172,12 +182,12 @@ end # interp_spray!
 
 """
 this subroutine interpolates or sprays bilinearly [one is adjoint of another]
-interpolation returns y using y1, y2
-spraying returns y1, y2 using y
+interpolation returns y using Y[ivec[1]], Y[ivec[2]]
+spraying returns Y[ivec[1]], Y[ivec[2]] using y
  
                         +                      
                         |                      
-    y1= f(x1)           |      y2= f(x2)   
+    Y[ivec[1]]= f(X[ivec[1]])           |      Y[ivec[2]]= f(X[ivec[2]])   
       +-----------------x--------+             
                  y=f(x) |                      
                         +                      
@@ -185,112 +195,111 @@ spraying returns y1, y2 using y
 bilinear interpolation
 Reference: http://www.ajdesigner.com/phpinterpolation/bilinear_interpolation_equation.php
 """
-function interp_B1_1D(iy, yV, x1, x2, y1, y2, x)
-	denom = (x2 - x1)
-	@inbounds yV[iy] = ((y1*(x2-x) + y2*(x-x1)) / denom)
+function interp_B1_1D(iy, ivec, yV, X, Y, x)
+	@inbounds yV[iy] = ((Y[ivec[1]]*(X[ivec[2]]-x) + Y[ivec[2]]*(x-X[ivec[1]])) * inv(X[ivec[2]]-X[ivec[1]]))
 end # interpolate_spray_B1_1D
 
-function spray_B1_1D( iy1, iy2, yV, x1, x2, x, y)
-	denom = (x2 - x1)
-	@inbounds yV[iy1] += (y * (x2-x)/denom)
-	@inbounds yV[iy2] += (y * (x-x1)/denom)
+function spray_B1_1D(ivec, yV, X, x, y)
+	denom = (X[ivec[2]] - X[ivec[1]])
+	@inbounds yV[ivec[1]] += (y * (X[ivec[2]]-x)/denom)
+	@inbounds yV[ivec[2]] += (y * (x-X[ivec[1]])/denom)
 end # interpolate_spray_B1_1D
 
 
 """
 this subroutine interpolates or sprays 
 using cubic bspline
-interpolation returns y using y1, y2, y3, y4
-spraying returns y1, y2, y3, y4 using y
+interpolation returns y using Y[ivec[1]], y2, Y[ivec[3]], Y[ivec[4]]
+spraying returns Y[ivec[1]], y2, Y[ivec[3]], Y[ivec[4]] using y
 
                        +                      
                        |                      
-   y1      y2          |    y3       y4
+   Y[ivec[1]]      y2          |    Y[ivec[3]]       Y[ivec[4]]
      +-------+---------x----+--------+             
                 y=f(x) |                      
                        +                      
 """
-function interp_B2_1D!(iy, yV, x1, x2, x3, x4, y1, y2, y3, y4, x)
+function interp_B2_1D!(iy, ivec, yV, X,Y,x)
 	
 	"some constants"
-	h = (x2 - x1);
+	h = (X[ivec[2]] - X[ivec[1]]);
 	hcube = h*h*h;
 	hcubeI = hcube^(-1.0)
 
 	if(h == zero(Float64)) then
-		y[iy] =  (Float64(0.25) * (y1 + y2 + y3 + y4))
+		y[iy] =  (Float64(0.25) * (Y[ivec[1]] + Y[ivec[2]] + Y[ivec[3]] + Y[ivec[4]]))
 	else
 		
-		if((((x-x1)*(x-x2)) < zero(Float64)) | (x==x1)) 
+		if((((x-X[ivec[1]])*(x-X[ivec[2]])) < zero(Float64)) | (x==X[ivec[1]])) 
 			"left edge interpolate"
-			c1 = (1.0 / 6.0 * (2.0 * h - (x - (x1-h)))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - ((x4-h) - x))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((x2-h) - x)^2.0 * (2.0 * h - (x - (x2-h))) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((x3-h) - x)^2.0 * (2.0 * h + (x - (x3-h))) ) )) * hcubeI
-			@inbounds yV[iy] = (y1 * (c2 + 2.0*c1) + y2 * (c3 - c1) + y3 * c4)
-		elseif((((x-x3)*(x-x4)) < zero(Float64)) | (x==x4)) 
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (X[ivec[1]]-h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((X[ivec[4]]-h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((X[ivec[2]]-h) - x)^2.0 * (2.0 * h - (x - (X[ivec[2]]-h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((X[ivec[3]]-h) - x)^2.0 * (2.0 * h + (x - (X[ivec[3]]-h))) ) )) * hcubeI
+			@inbounds yV[iy] = (Y[ivec[1]] * (c2 + 2.0*c1) + Y[ivec[2]] * (c3 - c1) + Y[ivec[3]] * c4)
+		elseif((((x-X[ivec[3]])*(x-X[ivec[4]])) < zero(Float64)) | (x==X[ivec[4]])) 
 			"right edge interpolate"
-			c1 = (1.0 / 6.0 * (2.0 * h - (x - (x1+h)))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - ((x4+h) - x))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((x2+h) - x)^2.0 * (2.0 * h - (x - (x2+h))) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((x3+h) - x)^2.0 * (2.0 * h + (x - (x3+h))) ) )) * hcubeI
-			@inbounds yV[iy] = (y2 * c1 + y3 * (c2 - c4) + y4 * (c3 + 2.0*c4))
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (X[ivec[1]]+h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((X[ivec[4]]+h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((X[ivec[2]]+h) - x)^2.0 * (2.0 * h - (x - (X[ivec[2]]+h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((X[ivec[3]]+h) - x)^2.0 * (2.0 * h + (x - (X[ivec[3]]+h))) ) )) * hcubeI
+			@inbounds yV[iy] = (Y[ivec[2]] * c1 + Y[ivec[3]] * (c2 - c4) + Y[ivec[4]] * (c3 + 2.0*c4))
 		else
-			c1 = (1.0 / 6.0 * (2.0 * h - (x - x1))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - (x4 - x))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * (x2 - x)^2.0 * (2.0 * h - (x - x2)) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * (x3 - x)^2.0 * (2.0 * h + (x - x3)) ) )) * hcubeI
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - X[ivec[1]]))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - (X[ivec[4]] - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * (X[ivec[2]] - x)^2.0 * (2.0 * h - (x - X[ivec[2]])) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * (X[ivec[3]] - x)^2.0 * (2.0 * h + (x - X[ivec[3]])) ) )) * hcubeI
 			"center interpolate"
-			@inbounds yV[iy] = ((y1 * c1 + y2 * c2 + y3 * c3 + y4 * c4))
+			@inbounds yV[iy] = ((Y[ivec[1]] * c1 + Y[ivec[2]] * c2 + Y[ivec[3]] * c3 + Y[ivec[4]] * c4))
 		end
 	end
 	return yV[iy]
 
 end # interp_B2_1D
 
-function spray_B2_1D!(iy1, iy2, iy3, iy4, yV, x1, x2, x3, x4, x, y)
+function spray_B2_1D!(ivec, yV, X, x, y)
 
 	"some constants"
-	h = (x2 - x1);
+	h = (X[ivec[2]] - X[ivec[1]]);
 	hcube = h*h*h;
 	hcubeI = hcube^(-1.0)
 
 	if(h == zero(Float64)) then
-		@inbounds yV[iy1] += (y)
-		@inbounds yV[iy2] += (y) 
-		@inbounds yV[iy3] += (y) 
-		@inbounds yV[iy4] += (y) 
+		@inbounds yV[ivec[1]] += (y)
+		@inbounds yV[ivec[2]] += (y) 
+		@inbounds yV[ivec[3]] += (y) 
+		@inbounds yV[ivec[4]] += (y) 
 	else
-		if((((x-x1)*(x-x2)) < zero(Float64)) | (x==x1)) 
+		if((((x-X[ivec[1]])*(x-X[ivec[2]])) < zero(Float64)) | (x==X[ivec[1]])) 
 			"left edge spray"
-			c1 = (1.0 / 6.0 * (2.0 * h - (x - (x1-h)))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - ((x4-h) - x))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((x2-h) - x)^2.0 * (2.0 * h - (x - (x2-h))) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((x3-h) - x)^2.0 * (2.0 * h + (x - (x3-h))) ) )) * hcubeI
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (X[ivec[1]]-h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((X[ivec[4]]-h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((X[ivec[2]]-h) - x)^2.0 * (2.0 * h - (x - (X[ivec[2]]-h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((X[ivec[3]]-h) - x)^2.0 * (2.0 * h + (x - (X[ivec[3]]-h))) ) )) * hcubeI
 
-			@inbounds yV[iy1] += (y * (c2 + 2.0*c1))
-			@inbounds yV[iy2] += (y * (c3 - c1))
-			@inbounds yV[iy3] += (y * c4)
-		elseif((((x-x3)*(x-x4)) < zero(Float64)) | (x==x4)) 
+			@inbounds yV[ivec[1]] += (y * (c2 + 2.0*c1))
+			@inbounds yV[ivec[2]] += (y * (c3 - c1))
+			@inbounds yV[ivec[3]] += (y * c4)
+		elseif((((x-X[ivec[3]])*(x-X[ivec[4]])) < zero(Float64)) | (x==X[ivec[4]])) 
 			"right edge spray"        
-			c1 = (1.0 / 6.0 * (2.0 * h - (x - (x1+h)))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - ((x4+h) - x))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((x2+h) - x)^2.0 * (2.0 * h - (x - (x2+h))) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((x3+h) - x)^2.0 * (2.0 * h + (x - (x3+h))) ) )) * hcubeI
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - (X[ivec[1]]+h)))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - ((X[ivec[4]]+h) - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * ((X[ivec[2]]+h) - x)^2.0 * (2.0 * h - (x - (X[ivec[2]]+h))) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * ((X[ivec[3]]+h) - x)^2.0 * (2.0 * h + (x - (X[ivec[3]]+h))) ) )) * hcubeI
 
-			@inbounds yV[iy2] += y * c1 
-			@inbounds yV[iy3] += y * (c2 - c4) 
-			@inbounds yV[iy4] += y * (c3+ 2.0 * c4) 
+			@inbounds yV[ivec[2]] += y * c1 
+			@inbounds yV[ivec[3]] += y * (c2 - c4) 
+			@inbounds yV[ivec[4]] += y * (c3+ 2.0 * c4) 
 		else
 			"center spray"
-			c1 = (1.0 / 6.0 * (2.0 * h - (x - x1))^3) * hcubeI
-			c4 = (1.0 / 6.0 * (2.0 * h - (x4 - x))^3) * hcubeI
-			c2 = ((2.0 / 3.0 * hcube - (0.5 * (x2 - x)^2.0 * (2.0 * h - (x - x2)) ) )) * hcubeI
-			c3 = ((2.0 / 3.0 * hcube - (0.5 * (x3 - x)^2.0 * (2.0 * h + (x - x3)) ) )) * hcubeI
-			@inbounds yV[iy1] += (y * c1)
-			@inbounds yV[iy2] += (y * c2)
-			@inbounds yV[iy3] += (y * c3) 
-			@inbounds yV[iy4] += (y * c4) 
+			c1 = (1.0 / 6.0 * (2.0 * h - (x - X[ivec[1]]))^3) * hcubeI
+			c4 = (1.0 / 6.0 * (2.0 * h - (X[ivec[4]] - x))^3) * hcubeI
+			c2 = ((2.0 / 3.0 * hcube - (0.5 * (X[ivec[2]] - x)^2.0 * (2.0 * h - (x - X[ivec[2]])) ) )) * hcubeI
+			c3 = ((2.0 / 3.0 * hcube - (0.5 * (X[ivec[3]] - x)^2.0 * (2.0 * h + (x - X[ivec[3]])) ) )) * hcubeI
+			@inbounds yV[ivec[1]] += (y * c1)
+			@inbounds yV[ivec[2]] += (y * c2)
+			@inbounds yV[ivec[3]] += (y * c3) 
+			@inbounds yV[ivec[4]] += (y * c4) 
 		end
 	end
 end # interpolate_spray_B3_1D

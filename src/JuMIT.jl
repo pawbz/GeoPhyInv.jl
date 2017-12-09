@@ -13,6 +13,7 @@ module JuMIT
 include("Grid.jl")
 include("Poisson.jl")
 include("Interpolation.jl")
+include("Operators.jl")
 include("DSP.jl")
 include("Wavelets.jl")
 include("Smooth.jl")
@@ -30,6 +31,7 @@ include("Inversion.jl")
 include("FWI.jl")
 include("CICA.jl")
 include("Decon.jl")
+include("DeconOP.jl")
 include("Plots.jl")
 
 end # module

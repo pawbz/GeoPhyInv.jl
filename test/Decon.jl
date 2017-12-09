@@ -85,7 +85,8 @@ begin
 	gfobs=randn(ntgf, nr)
 	wavobs=randn(nt)
 	gfobs[1,:]=0.0; # mute
-	gfprecon, gfweights, wavprecon=JuMIT.Decon.create_weights(ntgf, nt, gfobs, αexp=10., cflag=false)
+	gfprecon, gfweights, wavprecon=JuMIT.Decon.create_weights(ntgf, nt, gfobs,
+		αexp=10., cflag=true)
 	padecon=JuMIT.Decon.Param(ntgf, nt, nr, gfobs=gfobs, gfweights=gfweights,
 	    fft_threads=false, wavnorm_flag=false, wavobs=wavobs, verbose=false, gfprecon=gfprecon,
 	    wavprecon=wavprecon);
@@ -112,12 +113,16 @@ end
 
 
 
-
-copy!(padecon.gf, gfobs)
-padecon.attrib_inv=:gf
-JuMIT.Decon.model_to_x!(padecon.xgf, padecon);
-@time JuMIT.Decon.func_grad!(storagegf, padecon.xgf,  padecon)
-@test (storagegf ≈ zeros(storagegf))
+begin
+	padecon.attrib_inv=:gf
+	JuMIT.Decon.model_to_x!(padecon.xgf, padecon);
+	@time JuMIT.Decon.F!(padecon, padecon.xgf,  );
+	@test padecon.dcal ≈ padecon.dobs
+end
+begin
+	@time JuMIT.Decon.func_grad!(storagegf, padecon.xgf, padecon)
+	@test (storagegf ≈ zeros(storagegf))
+end
 
 
 # final test

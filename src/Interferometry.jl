@@ -5,6 +5,7 @@ module Interferometry
 import JuMIT.Grid
 import JuMIT.Acquisition
 import JuMIT.Data
+import JuMIT.DSP
 
 
 """
@@ -108,6 +109,45 @@ function TD_virtual_diff(
 end
 
 
+
+"""
+Correlating noise records with reference records
+* `irref` : reference receiver
+"""
+function TD_noise_corr(data::Data.TD; tlagfrac=0.5, irref=1,)
+
+	# tgrid after correlation
+	tt = data.tgrid.x[end]-data.tgrid.x[1]
+	tgridc = Grid.M1D_lag(tlagfrac*tt, data.tgrid.δx)
+
+	# allocate TD
+	dataout=Data.TD_zeros(data.fields, tgridc, data.acqgeom)
+
+	TD_noise_corr!(dataout, data, irref)
+end
+
+function TD_noise_corr!(dataout, data, irref)
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	
+	fields=data.fields
+
+	nto = dataout.tgrid.nx;
+	isodd(nto) || error("odd samples in output data required")
+	for ifield = 1:length(fields), iss = 1:nss
+		dd=data.d[iss, ifield]
+		ddo=dataout.d[iss, ifield]
+
+		for  ir = 1:nr[iss]
+			ddv=view(dd,:, ir)
+			ddvr=view(dd,:, irref)
+			ddov=view(ddo,:,ir)
+
+			DSP.fast_filt!(ddv, ddvr, ddov, :w)
+		end
+	end
+
+	return dataout
+
+end
 
 end # module
 

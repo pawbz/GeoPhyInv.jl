@@ -273,26 +273,34 @@ Current implementation has only one source for every supersource.
 * a fixed spread acquisition geometry `Geom`
 """
 function Geom_fixed(
-	      smin::Float64,
-	      smax::Float64,
-	      s0::Float64,
-	      rmin::Float64,
-	      rmax::Float64,
-	      r0::Float64,
+	      smin::Real,
+	      smax::Real,
+	      s0::Real,
+	      rmin::Real,
+	      rmax::Real,
+	      r0::Real,
 	      nss::Int64,
 	      nr::Int64,
 	      sattrib::Symbol=:horizontal,
 	      rattrib::Symbol=:horizontal,
- 	      rand_flags::Vector{Bool}=[false, false]
+ 	      rand_flags::Vector{Bool}=[false, false];
+	      sα::Real=0.0,
+	      rα::Real=0.0,
 	     )
+
+	smin=Float64(smin); rmin=Float64(rmin)
+	smax=Float64(smax); rmax=Float64(rmax)
+	s0=Float64(s0); r0=Float64(r0)
+	sα=Float64(sα)*pi/180.
+	rα=Float64(rα)*pi/180.
 
 
 	sarray = isequal(nss,1) ? fill(smin,1) : (rand_flags[1] ? 
 					   rand(Uniform(minimum([smin,smax]),maximum([smin,smax])),nss) : linspace(smin,smax,nss))
 	if(sattrib==:horizontal)
-		sz = fill(s0,nss); sx=sarray
+		sz = s0+(sarray-minimum(sarray))*sin(sα)/cos(sα); sx=sarray
 	elseif(sattrib==:vertical)
-		sx = fill(s0,nss); sz=sarray
+		sx = s0+(sarray-minimum(sarray))*sin(sα)/cos(sα); sz=sarray
 	else
 		error("invalid sattrib")
 	end
@@ -300,9 +308,9 @@ function Geom_fixed(
 	rarray = isequal(nr,1) ? fill(rmin,1) : (rand_flags[2] ? 
 				        rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : linspace(rmin,rmax,nr))
 	if(rattrib==:horizontal)
-		rz = fill(r0,nr); rx = rarray
+		rz = r0+(rarray-minimum(rarray))*sin(rα)/cos(rα); rx = rarray
 	elseif(rattrib==:vertical)
-		rx = fill(r0,nr); rz = rarray
+		rx = r0+(rarray-minimum(rarray))*sin(rα)/cos(rα); rz = rarray
 	else
 		error("invalid rattrib")
 	end
@@ -610,15 +618,15 @@ end
 Generate band-limited random source signals 
 """
 function Src_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol}; 
-			  distvec=[Uniform(-2.0, 2.0) for iss in 1:nss],
+			  distvec=[Normal() for iss in 1:nss],
 			  sparsepvec=[1. for iss in 1:nss],
 			  fmin::Float64=0.0, 
 			  fmax::Float64=0.0, 
 			  tgrid::Grid.M1D=nothing, 
-			  tmax::Float64=tgrid.x[end])
+			  tmaxfrac::Float64=1.0)
 	wavsrc = [repeat(zeros(tgrid.nx),inner=(1,ns)) for iss=1:nss, ifield=1:length(fields)] 
 	for ifield in 1:length(fields), iss in 1:nss, is in 1:ns
-		wavsrc[iss, ifield][:,is] = DSP.get_tapered_random_tmax_signal(tgrid, fmin=fmin, fmax=fmax, tmax=tmax, dist=distvec[iss], 
+		wavsrc[iss, ifield][:,is] = DSP.get_tapered_random_tmax_signal(tgrid, fmin=fmin, fmax=fmax, tmaxfrac=tmaxfrac, dist=distvec[iss], 
 								 sparsep=sparsepvec[iss])
 	end
 	src=Src(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))

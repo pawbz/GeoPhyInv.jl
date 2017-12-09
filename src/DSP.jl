@@ -87,6 +87,59 @@ function tapered_rand!(x;p=1.0,rng=Normal(),btperc=0., etperc=0.,bfrac=0.0, efra
 	return x
 end
 
+"""
+randomly shift and add x to itself
+using circshift; not memory efficient
+"""
+function cshift_add_rand!(x::AbstractVector; ntimes=1, tminfrac=0.0, tmaxfrac=1.0)
+	nt=size(x,1)
+	a=1+round(Int,tminfrac*nt)
+	b=round(Int,tmaxfrac*nt)
+
+	for it in 1:ntimes
+		# a random shift
+		its=rand(DiscreteUniform(a,b))
+		xx = circshift(x,(its,)) # pre-allocate for performance?
+		for i in eachindex(x)
+			x[i] += xx[i]
+		end
+	end
+end
+
+
+"""
+Construct Toy Green's functions
+Decaying peaks, control number of events, and their positions, depending on bfrac and efrac.
+"""
+function toy_green!(x;nevents=1,afrac=[1./2.^(ie-1) for ie in 1:nevents],bfrac=0.0,efrac=0.0)
+	nt=size(x,1)
+	nr=size(x,2)
+	x[:]=0.0
+	a=1+round(Int,bfrac*nt)
+	b=nt-round(Int,efrac*nt)
+	(b-a<nevents+2) && error("not enough samples")
+
+	itvec=zeros(Int64,nevents+1)
+	for ir in 1:nr
+		itvec[:]=0
+		for ie in 1:nevents
+			if(ie==1)
+				# first event, direct arrival
+				itvec[ie]=rand(DiscreteUniform(a,b-nevents-1))
+			else
+				# all other events after first event
+				itvec[ie]=rand(DiscreteUniform(itvec[1]+1,b-1))
+			end
+			sgn=1.
+			# randomly choose sign for all other events
+			if(ie≠1)
+				sgn=(rand(Bernoulli())==1) ? 1. : -1.
+			end
+			x[itvec[ie],ir]=sgn*afrac[ie]
+		end
+	end
+	return x
+end
 
 """
 Generate a band-limited 
@@ -299,9 +352,10 @@ function fast_filt!{T<:Real,N}(
 	#(size(s)[2:end] ≠ size(r)[2:end] ≠ size(w)[2:end]) && error("second dimension of s,r,w")
 
 	if(fftplan===nothing)
+		dim=size(s)[2:end];
 		#FFTW.set_num_threads(Sys.CPU_CORES)
-		fftplan=plan_fft!(complex.(zeros(np2,dim...)),)
-		ifftplan=plan_ifft!(complex.(zeros(np2,dim...)),)
+		fftplan=plan_fft!(complex.(zeros(np2,dim...)),[1])
+		ifftplan=plan_ifft!(complex.(zeros(np2,dim...)),[1])
 	end
 
 	# allocate if not preallocated

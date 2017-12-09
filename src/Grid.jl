@@ -237,7 +237,7 @@ end
 
 """
 Grid with both positive and negative samples for a given lag.
-Make sure that the number so samples is odd
+Construction makes sure that the number of output grid samples is odd.
 """
 function M1D_lag(xlag::Float64, δx::Float64)
 	x1=[tt for tt in 0.0:-δx:-xlag]

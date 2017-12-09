@@ -4,6 +4,7 @@ module Misfits
 
 using ForwardDiff
 using Distances
+using StatsBase
 import JuMIT.Data 
 import JuMIT.Grid
 
@@ -126,24 +127,14 @@ end
 
 """
 Measure the least-squares distance between auto correlations of x and y, 
-after estimating a scalar that best fits x to y
-Estimate linear phase in the frequency domain, correpsoding to a translation in
-the time domain before computing the least-squares misfit between two vectors x and y
-|e^{𝚤ωt}X-Y|	
-* fft is performed only along the first dimension
 """
-function error_after_autocorr_scaling(x::AbstractArray{Float64}, y::AbstractArray{Float64})
-	X=fft(x, [1]);
-	Y=fft(y, [1]);
+function error_after_normalized_autocor(x::AbstractArray{Float64}, y::AbstractArray{Float64})
+	nt=size(x,1)
 
-	# remove phase
-	X=real(X .* conj(X))
-	Y=real(Y .* conj(Y))
+	ax=autocor(x, 0:nt-1, demean=true) # normalizd autocorr from StatsBase
+	ay=autocor(y, 0:nt-1, demean=true)
 
-	# return except for a real scaler
-	J, α = error_after_scaling(X, Y)
-
-	return J, α
+	return error_squared_euclidean!(nothing,  ax,   ay, nothing, norm_flag=true)
 end
 
 """
@@ -196,7 +187,7 @@ function fg_cls!{N}(dfdx,
 end
 
 
-function error_squared_euclidean!(dfdx,  x,   y,   w)
+function error_squared_euclidean!(dfdx,  x,   y,   w; norm_flag=false)
 	J=zero(Float64)
 	if(w===nothing)
 		for i in eachindex(x)
@@ -216,6 +207,17 @@ function error_squared_euclidean!(dfdx,  x,   y,   w)
 			for i in eachindex(x)
 				dfdx[i] = 2.0 * w[i] * (x[i]-y[i])
 			end
+		end
+	end
+	if(norm_flag) # second norm of y
+		ynorm=zero(Float64)
+		for i in eachindex(y)
+			ynorm += y[i]*y[i]
+		end
+		# divide the functional with ynorm
+		J /= ynorm
+		if(!(dfdx === nothing)) 
+			scale!(dfdx, inv(ynorm)) # divide dfdx with ynorm too
 		end
 	end
 	return J

@@ -474,33 +474,45 @@ Add features to a model.
 
 * `point_loc::Vector{Float64}=[0., 0.,]` : approx location of point pert.
 * `point_pert::Float64=0.0` : perturbation at the point scatterer
-* `circ_loc::Vector{Float64}=nothing` : location of center of perturbation, [z, x]
-* `circ_rad::Float64=0.0` : radius of circular perturbation
-* `circ_pert::Float64=0.1` : perturbation inside a circle
+* `ellip_loc::Vector{Float64}=nothing` : location of center of perturbation, [z, x]
+* `ellip_rad::Float64=0.0` : radius of circular perturbation
+* `ellip_pert::Float64=0.1` : perturbation inside a circle
 * `rect_loc::Array{Float64}=nothing` : rectangle location, [zmin, xmin, zmax, xmax]
 * `rect_pert::Float64=0.1` : perturbation in a rectangle
 * `randn_pert::Float64=0.0` : percentage of reference values for additive random noise
+* `fields::Vector{Symbol}=[:χvp,:χρ,:χvs]` : which fields are to be modified?
+* `onlyin` : `mod` is modified only when field values are in these ranges 
 """
 function Seismic_addon!(mod::Seismic; 
 		       point_loc::Vector{Float64}=[0., 0.,],
 		       point_pert::Float64=0.0,
-		       circ_loc::Vector{Float64}=[0., 0.,],
-		       circ_rad::Float64=0.0,
-		       circ_pert::Float64=0.0,
-		       rect_loc::Vector{Float64}=[0., 0., 0., 0.,],
+		       ellip_loc=[0., 0.,],
+		       ellip_rad=0.0,
+		       ellip_pert::Float64=0.0,
+		       ellip_α=0.0,
+		       rect_loc=[0., 0., 0., 0.,],
 		       rect_pert::Float64=0.0,
+		       constant_pert::Float64=0.0,
 		       randn_perc::Real=0.0,
-		       fields::Vector{Symbol}=[:χvp,:χρ,:χvs]
+		       fields::Vector{Symbol}=[:χvp,:χρ,:χvs],
+		       onlyin::Vector{Vector{Float64}}=[[typemin(Float64), typemax(Float64)] for i in fields]
 		       )
+	rect_loc=convert.(Float64,rect_loc);
+	ellip_loc=convert.(Float64,ellip_loc);
+
 	temp = zeros(mod.mgrid.nz, mod.mgrid.nx)
 
 	ipointlocx = Interpolation.indminn(mod.mgrid.x, point_loc[2], 1)[1] 
 	ipointlocz = Interpolation.indminn(mod.mgrid.z, point_loc[1], 1)[1] 
 	temp[ipointlocz, ipointlocx] += point_pert
 
-	if(!(circ_pert == 0.0))
-		temp += [((sqrt((mod.mgrid.x[ix]-circ_loc[2])^2 + 
-			(mod.mgrid.z[iz]-circ_loc[1])^2 ) <= circ_rad) ? circ_pert : 0.0)  for 
+	if(!(ellip_pert == 0.0))
+		α=ellip_α*pi/180.
+		# circle or ellipse
+		rads= (length(ellip_rad)==1) ? [ellip_rad[1],ellip_rad[1]] : [ellip_rad[1],ellip_rad[2]]
+
+		temp += [(((((mod.mgrid.x[ix]-ellip_loc[2])*cos(α)+(mod.mgrid.z[iz]-ellip_loc[1])*sin(α))^2*inv(rads[1]^2) + 
+	      ((-mod.mgrid.z[iz]+ellip_loc[1])*cos(α)+(mod.mgrid.x[ix]-ellip_loc[2])*sin(α))^2*inv(rads[2]^2)) <= 1.) ? ellip_pert : 0.0)  for 
 	   		iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx ]
 	end
 	if(!(rect_pert == 0.0))
@@ -510,9 +522,18 @@ function Seismic_addon!(mod::Seismic;
 			rect_pert : 0.0  for
 			iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx ]
 	end
+	if(!(constant_pert == 0.0))
+		temp += constant_pert
+	end
 
-	for field in fields
-		setfield!(mod, field, (getfield(mod, field)+temp))
+
+	for (iff,field) in enumerate(fields)
+		m=getfield(mod, field)
+		for i in eachindex(m)
+			if(((m[i]-onlyin[iff][1])*(m[i]-onlyin[iff][2]))<0.0)
+				m[i] += temp[i]
+			end
+		end
 	end
 
 	# random noise
@@ -527,6 +548,7 @@ function Seismic_addon!(mod::Seismic;
 	end
 	return mod
 end
+
 
 """
 Apply smoothing to `Seismic` using a Gaussian filter of zwidth and xwidth

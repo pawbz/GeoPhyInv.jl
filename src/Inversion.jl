@@ -9,6 +9,7 @@ This module has different inversion schemes.
 module Inversion
 using Optim, LineSearches
 using RecipesBase
+using TimerOutputs
 """
 Parameters for alternating minimization of a single objective function, while updating different model parameters
 """
@@ -71,6 +72,7 @@ function ParamAM(optim_func;
 	       noptim=length(optim_func),
 	       optim_tols=[1e-3 for iop in 1:noptim],
 	       roundtrip_tol=1e-3,
+	       min_roundtrips=10, # minimum roundtrips before checking rate of convergence
 	       verbose=true,
 	       reinit_func=x->randn(),
 	       max_reroundtrips=1, re_init_flag=true, max_roundtrips=1)
@@ -96,6 +98,7 @@ same objective functional
 """
 function go(pa::ParamAM)
 
+	to = TimerOutput(); # create a timer object
 
 	reroundtrip_converge=false
 	itrr=0
@@ -103,6 +106,7 @@ function go(pa::ParamAM)
 	pa.verbose && println(pa.name, "\t alternate optimization")  
 	rf=zeros(pa.noptim)
 
+	timeprint=pa.verbose
 	while ((!reroundtrip_converge && itrr < pa.max_reroundtrips))
 		itrr += 1
 		pa.verbose && (itrr > 1) && println("failed to converge.. reintializing (",itrr,"/",pa.max_reroundtrips,")")
@@ -122,7 +126,7 @@ function go(pa::ParamAM)
 		if(pa.verbose)
 			@printf("trip\t|")
 			for iop in 1:pa.noptim
-				@printf("\t\top %d\t(%0.1e)\t|",iop, pa.optim_tols[iop])
+				@printf("\t\top %d\t(%0.1e)\t|",iop, pa.roundtrip_tol)
 			end
 #			@printf("\tvar(op) (%0.1e)\t",pa.roundtrip_tol)
 			@printf("\n")
@@ -134,10 +138,16 @@ function go(pa::ParamAM)
 
 			# optimizations in each roundtrip
 			for iop in 1:pa.noptim
+				name=string("op ",iop," in each roundtrip")
 				pa.fvec[iop,2]=pa.fvec[iop,1]
-				pa.fvec[iop,1]=pa.optim_func[iop](nothing)
+				@timeit to name pa.fvec[iop,1]=pa.optim_func[iop](nothing)
 			end
 
+
+			if(timeprint)
+				println(to)
+				timeprint=false
+			end
 			# store functionals at the first roundtrip
 			if(iszero(pa.fvec_init))
 				for iop in 1:pa.noptim
@@ -156,20 +166,28 @@ function go(pa::ParamAM)
 			end
 
 			if(itr>2)
-				plotam!(itr,pa.fvec[:,1],rf)
+				#plotam!(itr,pa.fvec[:,1],rf)
 			elseif(itr==2)
-				plotam(itr,pa.fvec[:,1],rf)
-			end
-			if(pa.verbose)
-				@printf("%d\t|",itr)
-				for iop in 1:pa.noptim
-					@printf("\t%0.6e\t",pa.fvec[iop,1])
-					(itr==1) ? @printf("\t\t|") : @printf("(%0.6e)\t|",rf[iop])
-				end
-				@printf("\n")
+				#plotam(itr,pa.fvec[:,1],rf)
 			end
 
-			(itr > 3) && (roundtrip_converge = all(rf .< pa.optim_tols)) # do atleast 3 round trips before quitting
+			if(itr > 10)# do atleast 10 round trips before quitting
+				roundtrip_converge=all(rf .< pa.roundtrip_tol) || all(pa.fvec[:,1] .< pa.optim_tols[:])
+			else
+				roundtrip_converge=false
+			end
+
+			# print info
+			if(pa.verbose)
+				if((itr<5) ||(itr<40 && (mod(itr,5)==0)) || (mod(itr,20)==0) || roundtrip_converge)
+					@printf("%d\t|",itr)
+					for iop in 1:pa.noptim
+						@printf("\t%0.6e\t",pa.fvec[iop,1])
+						(itr==1) ? @printf("\t\t|") : @printf("(%0.6e)\t|",rf[iop])
+					end
+					@printf("\n")
+				end
+			end
 
 
 
@@ -184,6 +202,12 @@ function go(pa::ParamAM)
 		reroundtrip_converge = all(pa.fvec[:,1] .< pa.optim_tols[:])
 		pa.verbose && println("=========================================================================================")  
 	end
+	if(all(pa.fvec[:,1] .< pa.optim_tols[:]))
+		message=string("CONVERGED in ",itrr," reroundtrips")
+	elseif(itrr == pa.max_reroundtrips)
+		message="NOT CONVERGED: reached maximum reroundtrips"
+	end
+	pa.verbose && println(pa.name, "\t", message)  
 	return nothing
 end
 

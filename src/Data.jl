@@ -225,24 +225,36 @@ Normalize time-domain seismic data.
 
 * normalized data as `TD`
 """
-function TD_normalize(data::TD, attrib::Symbol)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+function TD_normalize(data::TD, attrib::Symbol=:recrms)
 	datan = deepcopy(data);
-	for ifield = 1:length(data.fields), iss = 1:nss, ir = 1:nr[iss]
-		if(attrib == :recrms)
-			nval = sqrt(mean(datan.d[iss, ifield][:,ir].^2.))
-		elseif(attrib == :recmax)
-			nval = maximum(datan.d[iss, ifield][:,ir])
-		else
-			error("invalid attrib")
-		end
-
-		# normalize
-		datan.d[iss, ifield][:, ir] = 
-		isequal(nval, 0.0) ? zeros(nt) : datan.d[iss, ifield][:, ir]./nval  
-	end
+	TD_normalize!(datan, attrib)
 	return datan
 end
+function TD_normalize!(data::TD, attrib::Symbol=:recrms)
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	for ifield = 1:length(data.fields), iss = 1:nss
+		dd=data.d[iss, ifield]
+		scs=vecnorm(dd,2)
+
+		for ir = 1:nr[iss]
+			ddv=view(dd, :, ir)
+
+			if(attrib == :recrms)
+				sc=vecnorm(ddv,2)
+				scale!(ddv,inv(sc))
+			elseif(attrib == :recmax)
+				sc=vecnorm(ddv,Inf)
+				scale!(ddv,inv(sc))
+			elseif(attrib == :srcrms)
+				scale!(ddv,inv(scs))
+			else
+				error("invalid attrib")
+			end
+		end
+	end
+	return data
+end
+
 
 """
 Construct TD using data at all the unique receiver positions

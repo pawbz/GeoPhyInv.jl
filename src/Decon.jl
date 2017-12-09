@@ -2,14 +2,14 @@
 __precompile__()
 
 module Decon
+using DSP
 import JuMIT.DSP
 import JuMIT.Inversion
 import JuMIT.Misfits
 import JuMIT.Inversion
 using Optim, LineSearches
-using DSP
 using RecipesBase
-using Plots.PlotMeasures
+using StatsBase
 
 type Param
 	gfobs::Array{Float64,2}
@@ -49,38 +49,129 @@ end
 @userplot Plot
 
 
-@recipe function f(p::Plot)
+@recipe function f(p::Plot, rvec=nothing)
 	pa=p.args[1]
-#	 layout := @layout [tophist           _hist2d{0.9w      ,0.9h} righthist]
-	# upper histogram    
-#	    layout --> @layout [        
-#			 tophist           _
-#			 hist2d{0.9w,0.9h} righthist    
-#		 ]
-g = grid(9, 2, widths = [1,1], heights = [1,1])
-	layout := (9,2)
+	(rvec===nothing) && (rvec=1:pa.nr)
+
+	# time vectors
+	# autocorr wav
+	awavobs=autocor(pa.wavobs, 1:pa.nt-1, demean=true)
+	awav=autocor(pa.wav, 1:pa.nt-1, demean=true)
+	wavli=max(maximum(abs,awavobs), maximum(abs,awav))
+	# autocorr gf 
+	agfobs=autocor(pa.gfobs,1:pa.ntgf-1, demean=true)
+	agf=autocor(pa.gf,1:pa.ntgf-1, demean=true)
+	gfli=max(maximum(abs,agfobs), maximum(abs,agf))
+
+	# cut receivers
+	dcal=pa.dcal[:,rvec]
+	dobs=pa.dobs[:,rvec]
+
+	layout := (5,3)
 
 	@series begin        
 		subplot := 1
+#		aspect_ratio := :auto
 		legend := false
 		pa.wavobs
 	end
 	@series begin        
 		subplot := 2
 		legend := false
-		pa.wav
-	end
-
-	@series begin        
-		subplot := 3
-		legend := false
 		pa.gfobs
 	end
-	@series begin        
-		subplot := 4
-		legend := false
-		pa.gf
-	end
+#
+#	@series begin        
+#		subplot := 3
+#		legend := false
+#		pa.dobs
+#	end
+#
+#	@series begin        
+#		subplot := 4
+#		legend := false
+#		pa.wav
+#	end
+#	@series begin        
+#		subplot := 5
+#		legend := false
+#		pa.gf[:,rvec]
+#	end
+#
+#	@series begin        
+#		subplot := 6
+#		legend := false
+#		pa.dcal[:,rvec]
+#	end
+#
+#	@series begin        
+#		subplot := 7
+#		legend := false
+#		awavobs
+#
+#		
+#	end
+#	@series begin        
+#		subplot := 8
+#		legend := false
+#		agfobs[:, rvec]
+#	end
+#
+#	@series begin        
+#		subplot := 9
+#		legend := false
+#		
+#	end
+#
+#	@series begin        
+#		subplot := 10
+#		legend := false
+#		awav
+#
+#		
+#	end
+#	@series begin        
+#		subplot := 11
+#		legend := false
+#		agf[:,rvec]
+#	end
+#
+#	@series begin        
+#		subplot := 12
+#		legend := false
+#		pa.dcal[:,rvec]-pa.dobs[:,rvec]
+#	end
+#
+#
+#
+#
+#	@series begin        
+#		subplot := 13
+#		aspect_ratio := :equal
+#		seriestype := :histogram2d
+#		title := "Scatter Wav"
+#		legend := false
+#		awavobs, awav
+#	end
+#
+#	@series begin        
+#		subplot := 14
+#		aspect_ratio := :equal
+#		seriestype := :histogram2d
+#		title := "Scatter Wav"
+#		legend := false
+#		agfobs, agf
+#	end
+#
+#	@series begin        
+#		subplot := 15
+#		aspect_ratio := 1
+#		seriestype := :histogram2d
+#		title := "Scatter Wav"
+#		legend := false
+#		pa.dobs, pa.dcal
+#	end
+#
 
 
 end
@@ -107,7 +198,7 @@ function Param(ntgf, nt, nr;
 	wav=randn(nt)
 	wavmat=repeat(wav,outer=(1,nr))
 	dwavmat=similar(wavmat)
-	gf=randn(ntgf,nr)
+	gf=zeros(ntgf,nr)
 	dgf=similar(gf)
 
 	# use maximum threads for fft
@@ -167,6 +258,7 @@ function Param(ntgf, nt, nr;
      		mattrib=:gfwav, dattrib=:dobs, gf=gfobs, wav=wavobs)
 	end
 
+	initialize!(pa)
 	update_func_grad!(pa,gfoptim=gfoptim,wavoptim=wavoptim,gfαvec=gfαvec,wavαvec=wavαvec)
 
 	return pa
@@ -249,15 +341,15 @@ end
 
 
 function error(pa) 
-	fwav, α = Misfits.error_after_autocorr_scaling(pa.wav, pa.wavobs)
-	fgf, α = Misfits.error_after_autocorr_scaling(pa.gf, pa.gfobs)
-	f = Misfits.fg_cls!(nothing, pa.dcal, pa.dobs)
+	fwav = Misfits.error_after_normalized_autocor(pa.wav, pa.wavobs)
+	fgf = Misfits.error_after_normalized_autocor(pa.gf, pa.gfobs)
+	f = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing, norm_flag=true)
 
 	println("Blind Decon\t")
 	println("===========")
 	println("error in estimated wavelet:\t", fwav)
-	println("error in estimated Green Functions:\t", fgf)
-	println("final error in the data:\t", f)
+	println("error after autocor in estimated Green Functions:\t", fgf)
+	println("normalized error in the data:\t", f)
 
 	return fwav, fgf, f
 end 
@@ -316,7 +408,7 @@ function F!(
 		compute=false
 	end
 
-#	if(compute)
+	if(compute)
 
 		if(mattrib == :x)
 			x_to_model!(x, pa)
@@ -355,7 +447,7 @@ function F!(
 		  			)
 		copy!(getfield(pa, dattrib), pa.ddcal)
 		return pa
-#	end
+	end
 end
 
 function func_grad!(storage, x::AbstractVector{Float64},
@@ -371,9 +463,9 @@ function func_grad!(storage, x::AbstractVector{Float64},
 
 	if(storage === nothing)
 		# compute misfit and δdcal
-		f = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing)
+		f = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing, norm_flag=true)
 	else
-		f = Misfits.error_squared_euclidean!(pa.ddcal, pa.dcal, pa.dobs, nothing)
+		f = Misfits.error_squared_euclidean!(pa.ddcal, pa.dcal, pa.dobs, nothing, norm_flag=true)
 		Fadj!(pa, x, storage, pa.ddcal)
 	end
 	return f
@@ -471,7 +563,7 @@ function update!(pa::Param, x, df; store_trace::Bool=false,
 	res = optimize(df, x, 
 		       LBFGS(),
 		       Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
-		       iterations = 200, store_trace = store_trace,
+		       iterations = 2000, store_trace = store_trace,
 		       extended_trace=extended_trace, show_trace = false))
 	pa.verbose && println(res)
 
@@ -494,23 +586,24 @@ function update_wav!(pa, xwav, dfwav)
 	return fwav
 end
 
-#function remove_gfprecon(pa)
-#	for i in eachindex(pa.gfprecon)
-#		if(pa.gfprecon[i]≠0.0)
-#			pa.gfprecon[i]=1.0
-#		end
-#	end
-#end
+function remove_gfprecon!(pa)
+	for i in eachindex(pa.gfprecon)
+		if(pa.gfprecon[i]≠0.0)
+			pa.gfprecon[i]=1.0
+		end
+	end
+end
 
 """
 * re_init_flag :: re-initialize inversions with random input or not?
 """
-function update_all!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothing)
+function update_all!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothing, roundtrip_tol=1e-3)
 
 	if(ParamAM_func===nothing)
-		ParamAM_func=x->Inversion.ParamAM(x,optim_tols=[1e-5, 1e-5],name="Blind Decon",
-				    roundtrip_tol=1e-10,max_roundtrips=max_roundtrips,
+		ParamAM_func=x->Inversion.ParamAM(x, optim_tols=[1e-5, 1e-5],name="Blind Decon",
+				    roundtrip_tol=roundtrip_tol, max_roundtrips=max_roundtrips,
 				    max_reroundtrips=max_reroundtrips,
+				    min_roundtrips=10,
 				    reinit_func=x->initialize!(pa))
 	end
 
@@ -524,12 +617,12 @@ function update_all!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=n
 	Inversion.go(paam)
 
 	# print errors
-	Decon.error(pa)
+	error(pa)
 end
 
 
 function initialize!(pa)
-	# starting models
+	# starting random models
 	randn!(pa.wav)
 	randn!(pa.gf)
 end
