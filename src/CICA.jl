@@ -131,8 +131,12 @@ function ICA(x,
 		bins[ib]=bindices[ib]+1:bindices[ib+1]
 	end
 
+	println("FastICA\t")
+	println("===================")
 	println("total samples\t",nt)
+	println("total number of bins\t",nbins)
 	println("average samples in each bin\t",round(Int,mean(length.(bins))))
+	println("")
 
 	# allocating vectors, that store G, g, and dg
 	GWx = Matrix{T}(ns, nt)
@@ -552,172 +556,6 @@ end
 
 
 
-type ConvMix
-	tgrids::Grid.M1D
-	tgridg::Grid.M1D
-	nr::Int64
-	"actual mixing Green functions"
-	g::Array{Float64,3}
-	"estimated Green functions assuming s is known"
-	ge::Array{Float64,3}
-	"estimated Green functions assuming s is known and data are not blended"
-	gb::Array{Float64,3}
-	"source signals on tgrid"
-	s::Matrix{Float64}
-	"data after convolution and blending"
-	d::Matrix{Float64}
-	"data matrix before blending"
-	dd::Array{Float64,3}
-	"estimated data matrix after ica"
-	dde::Array{Float64,3}
-	"error in ge compared to gb"
-	err_std::Array{Float64,2}
-	"error after ica compared to dd"
-	err_ica::Array{Float64,2}
-	"ica model"
-	ica::ICA
-end
-
-
-"""
-* `nt0` : samples in Green function
-* `nt` : samples in the long time series
-
-* `ssparsepvec` : spartisty
-
-"""
-function ConvMix(nt0, nt, nr;α=0.5, sdistvec=[Normal(), Uniform(-2.0, 2.0)], ssparsepvec=[1., 1.],
-		gdist=Normal(), gsparsep=1.,
-		ica_func::Function=(x,ns)->ICA(x,ns),)
-
-	δt=0.0001; # results of independent of this
-	tendg=(nt0-1)*δt
-	tends=(nt-1)*δt
-
-	tgridg = Grid.M1D(0.0,tendg, δt);
-	tgrids = Grid.M1D(0.0,tends, δt);
-
-	s=zeros(tgrids.nx, 2)
-	s[:,1]=DSP.get_tapered_random_tmax_signal(tgrids, dist=sdistvec[1], sparsep=ssparsepvec[1], taperperc=0.0)
-	s[:,2]=DSP.get_tapered_random_tmax_signal(tgrids, dist=sdistvec[2], sparsep=ssparsepvec[2], taperperc=0.0)
-	g=zeros(tgridg.nx, nr, 2)
-	for is in 1:2
-		for ir in 1:nr
-			g[:,ir,is]=DSP.get_tapered_random_tmax_signal(tgridg, dist=gdist, sparsep=gsparsep, taperperc=0.0)
-		end
-	end
-
-
-	dd=zeros(tgrids.nx, nr, 2)
-	for is in 1:2
-		for ir in 1:nr
-			ddv=view(dd, :, ir, is)
-			gv=view(g, :, ir, is)
-			sv=view(s, :, is)
-			DSP.fast_filt!(ddv,sv,gv,:s)
-		end
-	end
-
-	uni=Uniform(-2, 2)
-	s1=rand(uni, nt)
-	s2=randn(nt)
-
-	unip = Uniform(-pi, pi)
-
-
-	#s1 = s1 .* exp.(im*rand(unip,nt))
-	#s2 = s2 .* exp.(im*rand(unip,nt))
-
-	s1=rfft(s1)
-	s2=rfft(s2)
-
-	S = hcat(s1, s2)';
-
-
-	#A = complex.(randn(nr, 2), randn(nr, 2));
-	A = complex.(randn(nr, 2) );
-	x=A*S
-	d=real.(x)
-	#d=zeros(nr,tgrids.nx)
-	#for ir in 1:nr
-	#	d[ir,:]=α*dd[:,ir,1]+dd[:,ir,2]*(1-α)
-	#end
-	#x=rfft(d, [2])
-	ica=ica_func(x, 2)
-
-
-	Sout=fastica!(ica, A=A);
-	err = Sout[2]    
-	println("RRRRRR",err)
-
-	return ConvMix(tgrids, tgridg,nr,g,similar(g), similar(g), s, d, dd, similar(dd),
-		zeros(nr, 2), zeros(nr,2), ica)
-end
-
-function update_ica(cmix)
-	x=rfft(cmix.d, [2])
-	cmix.ica=ica_func(x, 2)
-end
-
-
-"""
-Do deblending for every receiver individually.
-And then update 'cmix'.
-"""
-function fastica!(cmix::ConvMix)
-
-	for ir in 1:cmix.nr
-		cmix.ica.magic_recv=ir
-		fastica!(cmix.ica)
-
-		dd=transpose((cmix.dd[:,ir,:]))
-		DD=rfft(dd,2)
-
-		dd=rfft(cmix.s,[1])
-		DD=transpose(dd)
-		
-#		x=irfft(cmix.ica.s, cmix.tgrids.nx, [2])
-#		cmix.err_ica[ir,:]=
-		err=error_after_ica(cmix.ica,DD)
-		println("TTTTT\t",err)
-	end
-		
-end
-
-"""
-Perform cross-correlation with known source 
-signatures to extract Green functions.
-"""
-function update_gd_ge(cmix::ConvMix)
-	for is in 1:2
-		for ir in 1:cmix.nr
-			gbv=view(cmix.gb,:,ir,is)
-			gev=view(cmix.ge,:,ir,is)
-			dv=view(cmix.d,ir,:)
-			ddv=view(cmix.dd,:,ir,is)
-			sv=view(cmix.s,:,is)
-
-			DSP.fast_filt!(dv,sv,gev,:w);
-			DSP.fast_filt!(ddv,sv,gbv,:w);
-		end
-	end
-end
-
-"""
-Calculate the errors after std cross-correlation and update cmix 
-"""
-function update_errors(cmix::ConvMix)
-	for is in 1:2
-		for ir in 1:cmix.nr
-			gbv=view(cmix.gb,:,ir,is)
-			gev=view(cmix.ge,:,ir,is)
-			cmix.err_std[ir,is] = Misfits.error_after_scaling(gev,gbv)[1]
-		end
-	end
-end
-
-
-
 """
 Whiten the data that are input to ICA. Whietning matrix is stored in `Q`.
 """
@@ -739,10 +577,10 @@ function do_whiten!(ica::ICA)
 	    ord = sortperm(Efac.values; rev=true)
 	    v, P = Efac.values[ord], Efac.vectors[:, ord]
 	    # whitening matrix
-	    copy!(Q, scale!(P, sqrt.(inv.(v))))
+	    copy!(Q, scale!(P, sqrt.(inv.((v)))))
 
 	    # for testing --  this should be a diagonal matrix
-	    #println(W0' * C * W0)
+	    #println(Q' * C * Q)
 	    Ac_mul_B!(xhat, Q, x)
     end
     return ica.Q

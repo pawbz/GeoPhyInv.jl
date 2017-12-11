@@ -6,12 +6,15 @@ using DSP
 import JuMIT.DSP
 import JuMIT.Inversion
 import JuMIT.Misfits
+import JuMIT.Conv
 import JuMIT.Inversion
 using Optim, LineSearches
 using RecipesBase
 using StatsBase
 
 type Param
+	obs::Conv.Param # observed model
+	cal::Conv.Param # calculated model
 	gfobs::Array{Float64,2}
 	gf::Array{Float64,2}
 	gfprecon::Array{Float64,2}

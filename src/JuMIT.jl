@@ -30,8 +30,10 @@ include("Misfits.jl")
 include("Inversion.jl")
 include("FWI.jl")
 include("CICA.jl")
-include("Decon.jl")
-include("DeconOP.jl")
+include("Conv.jl")
+include("ConvMix.jl")
+include("DeConv.jl")
+include("DeConvOP.jl")
 include("Plots.jl")
 
 end # module

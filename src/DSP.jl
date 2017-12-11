@@ -7,6 +7,67 @@ using Distributions
 using DistributedArrays
 using DSP # from julia
 
+"""
+Random source signal models for Param.
+Generate a band-limited 
+random signal of a particular maximum time, `tmax`.
+Sinc function in the frequency domain corresponds to 
+a box car function is applied in the time domain.
+
+This method has some extra allocations.
+"""
+function freq_rand!(x;
+	tgrid=nothing,
+	fmin=nothing, # minimum fraction of Nyquist sampling
+	fmax=nothing, # maximum fraction of Nyquist
+	rng=Normal(),
+	verbose=false,
+	)
+
+	nt=size(x,1)
+	(tgrid===nothing) && (tgrid=Grid.M1D(0.0, (nt-1)*1.0, 1.0))  # create dummy tgrid
+	fgrid=Grid.M1D_rfft(tgrid) # corresponding fgrid
+	(nt≠tgrid.nx) && error("dimension")
+
+	tmax=abs(tgrid.x[end]-tgrid.x[1])
+
+	xfreq=complex.(zeros(fgrid.nx)) # allocation in freq domain
+	xx=zeros(tgrid.nx) # allocation in time domain
+
+	fs=inv(tgrid.δx)
+	freqmin=(fmin===nothing) ? 0.0 : fmin*fs*0.5
+	freqmax=(fmax===nothing) ? fs*0.5 : fmax*fs*0.5
+	(freqmax ≤ freqmin) && error("fmin and fmax")
+
+	Δf = inv(tmax) # resolution in the frequency domain
+	(Δf ≤ fgrid.δx) ? error("desired resolution smaller than grid sampling") :
+	(Δf ≥ (freqmax-freqmin)) ? error("need to increase tmax") :
+	fvec = [f for f in freqmin:Δf:freqmax]
+	ifvec = fill(0, size(fvec))
+
+	verbose && println("number of frequencies added to signal:\t", size(fvec,1))
+	verbose && println("interval between random variable:\t", Δf)
+	verbose && println("minimum frequency added to signal\t",minimum(fvec))
+	verbose && println("maximum frequency added to signal\t",maximum(fvec))
+	for iff in eachindex(fvec)
+		ifvec[iff] =  indmin((fgrid.x - fvec[iff]).^2.0)
+	end
+
+	for iff in eachindex(fvec)
+		# translated sinc function
+		fshift=fgrid.x[ifvec[iff]]
+		X=rand(rng) * exp(im*rand(Uniform(-pi, pi)))
+		for ifff in 1:fgrid.nx
+			xfreq[ifff] += (X * sinc(tmax*(abs(fgrid.x[ifff] - fshift))))
+		end
+	end
+	xx=irfft(xfreq, nt)
+
+	copy!(x, xx)
+	return x
+
+end
+
 
 """
 Tapering is necessary to be able to input random signal into finite-difference code
@@ -110,6 +171,7 @@ end
 """
 Construct Toy Green's functions
 Decaying peaks, control number of events, and their positions, depending on bfrac and efrac.
+* `afrac` : control amplitude of peaks
 """
 function toy_green!(x;nevents=1,afrac=[1./2.^(ie-1) for ie in 1:nevents],bfrac=0.0,efrac=0.0)
 	nt=size(x,1)
@@ -140,64 +202,6 @@ function toy_green!(x;nevents=1,afrac=[1./2.^(ie-1) for ie in 1:nevents],bfrac=0
 	end
 	return x
 end
-
-"""
-Generate a band-limited 
-random signal of a particular maximum time, `tmax`.
-
-
-
-such that a box car function is applied in the time domain
-"""
-function get_random_tmax_signal(;
-	fgrid::Grid.M1D=nothing, # frequency domain grid
-	fmin::Float64=0.0, # minimum frequency
-	fmax::Float64=nothing, # maximum frequency
-	tmax::Float64=nothing, # frequency sampling is decided based on the length in time
-	dist::Symbol=:gaussian # distribution type
-	)
-
-	# initialize outputs
-	S = fill(complex(0.0,0.0),fgrid.nx);
-	Sreal = fill(0.0,fgrid.nx);
-	s = fill(complex(0.0,0.0),fgrid.nx);
-
-	Δf = 1.0 / tmax
-	Δf <= fgrid.δx ? error("sampling smaller than grid sampling") :
-	Δf >= (fmax-fmin) ? error("need to increase tmax") :
-	fvec = [f for f in fmin:Δf:fmax]
-	ifvec = fill(0, size(fvec))
-
-	println("number of frequencies added to signal:\t", size(fvec,1))
-	println("interval between random variable:\t", Δf)
-	println("minimum frequency added to signal\t",minimum(fvec))
-	println("maximum frequency added to signal\t",maximum(fvec))
-	for iff in eachindex(fvec)
-		ifvec[iff] =  indmin((fgrid.x - fvec[iff]).^2.0)
-	end
-
-	if(dist == :gaussian)
-		X = randn(size(fvec));
-	elseif(dist == :uniform)
-		X = rand(Uniform(-2.0, 2.0), size(fvec))
-	else
-		error("invalid dist")
-	end
-
-	for iff in eachindex(fvec)
-		Sreal += X[iff] .* sinc(tmax.*(abs(fgrid.x - fgrid.x[ifvec[iff]])))
-	end
-
-	S = complex.(Sreal, 0.0);
-
-	# remove mean 
-	#S[1] = 0.0; 
-	s = ifft(S); 
-
-	return S, s
-
-end
-
 
 
 function findfreq{ND}(
@@ -267,213 +271,6 @@ function taper!{N}(x::AbstractArray{Float64,N}, perc::Float64=0.0; bperc=perc,ep
 			x[it,i] *= sin((-it+nt)*ke)
 		end
 	end
-end
-
-
-"""
-
-# Arguments
-* `RW` :  the first time series which is causal
-"""
-function fast_filt_vec!{T,N}(
-		   s::AbstractArray{T,N}, 
-		   r::AbstractArray{T,N},
-		   w::AbstractArray{T,N},
-		   spow2,
-		   rpow2, 
-		   wpow2,
-		   attrib,nsplags,nsnlags,nrplags,nrnlags,nwplags,nwnlags,
-		   np2,
-		   fftplan, ifftplan)
-	sizecheck = ((size(s,1)==np2)&(size(w,1)==np2)&(size(r,1)==np2))
-	typecheck = ((eltype(s)<:Complex)&(eltype(w)<:Complex)&(eltype(r)<:Complex))
-	
-	# initialize pow2 vectors
-	spow2[:] = complex(T(0))
-	rpow2[:] = complex(T(0))
-	wpow2[:] = complex(T(0))
-
-	# just arrange order
-	nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, 1)
-	nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, 1)
-	nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, 1)
-
-	if(attrib == :s)
-		A_mul_B!(wpow2, fftplan, wpow2)
-		A_mul_B!(rpow2, fftplan, rpow2)
-		@. spow2 = rpow2 * wpow2
-		A_mul_B!(spow2, ifftplan, spow2)
-		nlag_npow2_pad_truncate!(s, spow2, nsplags, nsnlags, np2, -1)
-		return s
-	elseif(attrib == :r)
-		A_mul_B!(wpow2, fftplan, wpow2)
-		A_mul_B!(spow2, fftplan, spow2)
-		conj!(wpow2)
-		@. rpow2 = spow2 * wpow2
-		A_mul_B!(rpow2, ifftplan, rpow2)
-		nlag_npow2_pad_truncate!(r, rpow2, nrplags, nrnlags, np2, -1)
-		return r
-	elseif(attrib == :w)
-		A_mul_B!(rpow2, fftplan, rpow2)
-		A_mul_B!(spow2, fftplan, spow2)
-		conj!(rpow2)
-		@. wpow2 = spow2 * rpow2
-		A_mul_B!(wpow2, ifftplan, wpow2)
-		nlag_npow2_pad_truncate!(w, wpow2, nwplags, nwnlags, np2, -1)
-		return w
-	end
-end
-
-function fast_filt!{T<:Real,N}(
-		   s::AbstractArray{T,N}, 
-		   r::AbstractArray{T,N},
-		   w::AbstractArray{T,N},
-		   attrib::Symbol;
-		   spow2=nothing, 
-		   rpow2=nothing,
-		   wpow2=nothing,
-		   # default +ve and -ve lags 
-		   nsplags::Int64=size(s,1)-1,
-		   nsnlags::Int64=size(s,1)-1-nsplags,
-		   nrplags::Int64=size(r,1)-1,
-		   nrnlags::Int64=size(r,1)-1-nrplags,
-		   nwplags::Int64=div(size(w,1)-1,2),
-		   nwnlags::Int64=size(w,1)-1-nwplags,
-		   np2=nextpow2(maximum([2*size(s,1), 2*size(r,1), 2*size(w,1)])),
-		   fftplan=nothing,
-		   ifftplan=nothing,
-		  ) 
-
-	# check if nlags are consistent with the first dimension of inputs
-	#(nsplags+nsnlags+1 ≠ size(s,1)) && error("length s")
-	#(nrplags+nrnlags+1 ≠ size(r,1)) && error("length r")
-	#(nwplags+nwnlags+1 ≠ size(w,1)) && error("length w")
-
-	#(size(s)[2:end] ≠ size(r)[2:end] ≠ size(w)[2:end]) && error("second dimension of s,r,w")
-
-	if(fftplan===nothing)
-		dim=size(s)[2:end];
-		#FFTW.set_num_threads(Sys.CPU_CORES)
-		fftplan=plan_fft!(complex.(zeros(np2,dim...)),[1])
-		ifftplan=plan_ifft!(complex.(zeros(np2,dim...)),[1])
-	end
-
-	# allocate if not preallocated
-	(spow2===nothing) && (dim=size(s)[2:end]; spow2=complex.(zeros(T,np2,dim...)))
-	(rpow2===nothing) && (dim=size(s)[2:end]; rpow2=complex.(zeros(T,np2,dim...))) 
-	(wpow2===nothing) && (dim=size(s)[2:end]; wpow2=complex.(zeros(T,np2,dim...)))
-
-	fast_filt_vec!(s,r,w,spow2,rpow2,wpow2,attrib,
-		   nsplags,nsnlags,nrplags,nrnlags,
-		   nwplags,nwnlags,np2, fftplan, ifftplan)
-
-#	end
-end
-
-"not being used at the moment"
-function fast_filt_parallel!{T<:Real,N}(
-		   s::AbstractArray{T,N}, 
-		   r::AbstractArray{T,N},
-		   w::AbstractArray{T,N},
-		   attrib::Symbol;
-		   # default +ve and -ve lags 
-		   nsplags::Int64=size(s,1)-1,
-		   nsnlags::Int64=size(s,1)-1-nsplags,
-		   nrplags::Int64=size(r,1)-1,
-		   nrnlags::Int64=size(r,1)-1-nrplags,
-		   nwplags::Int64=div(size(w,1)-1,2),
-		   nwnlags::Int64=size(w,1)-1-nwplags,
-		   parallel_dim=2,
-		   work=workers()[1:min(size(s,parallel_dim), nworkers())],
-		   np2=nextpow2(maximum([2*size(s,1), 2*size(r,1), 2*size(w,1)])),
-		   fftplan=plan_fft!(complex.(zeros(np2)),flags=FFTW.PATIENT,timelimit=20),
-		   ) 
-	((parallel_dim < 2) | (parallel_dim > N)) && error("invalid parallel_dim")
-	nwork = length(work)
-	dist=[((id==parallel_dim) ? nwork : 1) for id in 1:N]
-
-	#FFTW.set_num_threads(Sys.CPU_CORES)
-
-	sd=distribute(s, procs=work, dist=dist)
-	rd=distribute(r, procs=work, dist=dist)
-	wd=distribute(w, procs=work, dist=dist)
-
-	@sync begin
-		for (ip, p) in enumerate(procs(sd))
-			@async remotecall_wait(p) do 
-				fast_filt!(localpart(sd), localpart(rd), localpart(wd), 
-					   attrib,
-					   nsplags=nsplags,nsnlags=nsnlags,
-					   nrplags=nrplags,nrnlags=nrnlags,
-					   nwplags=nwplags,nwnlags=nwnlags,)
-			end
-		end
-	end
-	s[:] = Array(sd)
-	r[:] = Array(rd)
-	w[:] = Array(wd)
-end
-
-
-"""
-
-# Arguments
-
-* `x` : real signal with dimension nplag + nnlag + 1
-	first has decreasing negative lags, 
-	then has zero lag at nnlags + 1,
-	then has increasing positive nplags lags,
-	signal contains only positive lags and zero lag if nnlag=0 and vice versa
-* `xpow2` : npow2 real vector with dimension npow2
-* `nplags` : number of positive lags
-* `nnlags` : number of negative lags
-* `npow2` : number of samples in xpow2
-* `flag` : = 1 means xpow2 is returned using x
-	   = -1 means x is returned using xpow2
-"""
-function nlag_npow2_pad_truncate!{T}(
-				  x::AbstractArray{T}, 
-				  xpow2::AbstractArray{Complex{T}}, 
-				  nplags::Integer, 
-				  nnlags::Integer, 
-				  npow2::Integer, 
-				  flag::Integer
-				  )
-	(size(x,1) ≠ nplags + nnlags + 1) && error("size x")
-	(size(xpow2,1) ≠ npow2) && error("size xpow2")
-
-	for id in 1:size(x,2)
-		if(flag == 1)
-			xpow2[1,id] = complex(x[nnlags+1,id]) # zero lag
-			# +ve lags
-			if (nplags > 0) 
-				for i=1:nplags
-					xpow2[i+1,id]= complex(x[nnlags+1+i,id])
-				end
-			end
-			# -ve lags
-			if(nnlags != 0) 
-				for i=1:nnlags
-					xpow2[npow2-i+1,id] = complex(x[nnlags+1-i,id])
-				end
-			end
-		elseif(flag == -1)
-			x[nnlags+1,id] = real.(xpow2[1,id]); # zero lag
-			if(nplags != 0) 
-				for i=1:nplags
-					x[nnlags+1+i,id] = real.(xpow2[1+i,id]);
-				end
-			end
-			if(nnlags != 0)
-				for i=1:nnlags
-					x[nnlags+1-i,id] = real.(xpow2[npow2-i+1,id])
-				end
-			end
-		else
-			error("invalid flag")
-		end
-	end
-	return nothing
 end
 
 
