@@ -6,22 +6,22 @@ np=1000
 n=777
 n2=100
 x = randn(n,n2); xa = similar(x)
-z = complex.(zeros(np,n2),zeros(np,n2));
+z = zeros(np,n2);
 
 # cover all lags for serial mode
 @time for i in [0, 2, 4, n-1]
-	JuMIT.DSP.nlag_npow2_pad_truncate!(x, z, n-i-1,i,np,1)
-	JuMIT.DSP.nlag_npow2_pad_truncate!(xa, z, n-i-1,i,np,-1)
+	JuMIT.Conv.pad_truncate!(x, z, n-i-1,i,np,1)
+	JuMIT.Conv.pad_truncate!(xa, z, n-i-1,i,np,-1)
 	@test x ≈ xa
 end
 
 np=1000
 n=777
 x = randn(n); xa = similar(x)
-z = complex.(zeros(np),zeros(np));
+z = zeros(np));
 @time for i in [0, 2, 4, n-1]
-	JuMIT.DSP.nlag_npow2_pad_truncate!(x, z, n-i-1,i,np,1)
-	JuMIT.DSP.nlag_npow2_pad_truncate!(xa, z, n-i-1,i,np,-1)
+	JuMIT.Conv.pad_truncate!(x, z, n-i-1,i,np,1)
+	JuMIT.Conv.pad_truncate!(xa, z, n-i-1,i,np,-1)
 	@test x ≈ xa
 end
 
@@ -35,14 +35,14 @@ for nw in [7, 8], nr in [20, 10], ns in [11, 10]
 
 	r[5]=1.; w[3]=1.;
 
-	JuMIT.DSP.fast_filt!(s,r,w,:s)
-	JuMIT.DSP.fast_filt!(s,r,wa,:w)
+	JuMIT.Conv.mod!(s,r,w,:d)
+	JuMIT.Conv.mod!(s,r,wa,:wav)
 	@test w ≈ wa
 
-	JuMIT.DSP.fast_filt!(s,ra,w,:r)
+	JuMIT.Conv.mod!(s,ra,w,:gf)
 	@test ra ≈ r
 
-	JuMIT.DSP.fast_filt!(sa,ra,wa,:s)
+	JuMIT.Conv.mod!(sa,ra,wa,:d)
 	@test sa ≈ s
 end
 

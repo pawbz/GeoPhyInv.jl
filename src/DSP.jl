@@ -3,6 +3,7 @@ __precompile__()
 module DSP
 
 import JuMIT.Grid
+import JuMIT.Interpolation
 using Distributions
 using DistributedArrays
 using DSP # from julia
@@ -20,6 +21,7 @@ function freq_rand!(x;
 	tgrid=nothing,
 	fmin=nothing, # minimum fraction of Nyquist sampling
 	fmax=nothing, # maximum fraction of Nyquist
+	nevent_fracs::Array{Float64}=[0.0],
 	rng=Normal(),
 	verbose=false,
 	)
@@ -29,7 +31,7 @@ function freq_rand!(x;
 	fgrid=Grid.M1D_rfft(tgrid) # corresponding fgrid
 	(nt≠tgrid.nx) && error("dimension")
 
-	tmax=abs(tgrid.x[end]-tgrid.x[1])
+	tmax=abs(tgrid.x[nt]-tgrid.x[1])
 
 	xfreq=complex.(zeros(fgrid.nx)) # allocation in freq domain
 	xx=zeros(tgrid.nx) # allocation in time domain
@@ -50,19 +52,25 @@ function freq_rand!(x;
 	verbose && println("minimum frequency added to signal\t",minimum(fvec))
 	verbose && println("maximum frequency added to signal\t",maximum(fvec))
 	for iff in eachindex(fvec)
-		ifvec[iff] =  indmin((fgrid.x - fvec[iff]).^2.0)
+		ifvec[iff] =  Interpolation.indminn(fgrid.x, fvec[iff])[1]
 	end
 
 	for iff in eachindex(fvec)
 		# translated sinc function
-		fshift=fgrid.x[ifvec[iff]]
-		X=rand(rng) * exp(im*rand(Uniform(-pi, pi)))
+		fshift=fgrid.x[ifvec[iff]]  # shift for translated sinc function
+		X=rand(rng) * exp(im*rand(Uniform(-pi, pi))) # uniformly distributed phase and random amplitude
+		Xe=complex(1.0) # intialization for events
+		for tfrac in nevent_fracs
+			Xe += exp(im*fshift*2*π*tfrac*tgrid.x[nt]) # phase translations for each event
+		end
+		X *= Xe # add events to X
 		for ifff in 1:fgrid.nx
-			xfreq[ifff] += (X * sinc(tmax*(abs(fgrid.x[ifff] - fshift))))
+			α=tmax*(abs(fgrid.x[ifff] - fshift)) # argument of sinc function
+			xfreq[ifff] += (X * sinc(α)) # go
 		end
 	end
 	xx=irfft(xfreq, nt)
-
+	normalize!(xx)
 	copy!(x, xx)
 	return x
 

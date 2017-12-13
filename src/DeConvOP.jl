@@ -1,7 +1,7 @@
 # blind deconvolution
 __precompile__()
 
-module DeconOP
+module DeConvOP
 import JuMIT.DSP
 import JuMIT.Operators
 import JuMIT.Inversion

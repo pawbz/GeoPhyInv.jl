@@ -229,17 +229,17 @@ function Seismic(model::Models.Seismic;
 end
 
 
-function Decon(pa; rvec=collect(1:pa.nr))
-	gfobs=reshape(pa.gfobs, (pa.ntgf, pa.nr))
-	gf=reshape(pa.gf, (pa.ntgf, pa.nr))
-	dobs=real.(reshape(pa.dobs, (pa.nt, pa.nr)))
-	dcal=real.(reshape(pa.dcal, (pa.nt, pa.nr)))
+function DeConv(pa; rvec=collect(1:pa.nr))
+	gfobs=reshape(pa.obs.gf, (pa.ntgf, pa.nr))
+	gf=reshape(pa.cal.gf, (pa.ntgf, pa.nr))
+	dobs=real.(reshape(pa.obs.d, (pa.nt, pa.nr)))
+	dcal=real.(reshape(pa.cal.d, (pa.nt, pa.nr)))
 	nrow=9
 	ncol=2
 	iff=0
 	fig=figure(figsize=(12,15))
 	iff += 1;subplot(nrow,ncol,iff)
-	plot(pa.wavobs)
+	plot(pa.obs.wav)
 	title("Actual S")
 	grid()
 	iff += 1;subplot(nrow,ncol,iff)
@@ -247,7 +247,7 @@ function Decon(pa; rvec=collect(1:pa.nr))
 	title("Actual G")
 	grid()
 	iff += 1;subplot(nrow,ncol,iff)
-	plot(pa.wav)
+	plot(pa.cal.wav)
 	title("Estimated S")
 	grid()
 	#
@@ -256,8 +256,8 @@ function Decon(pa; rvec=collect(1:pa.nr))
 	title("Estimated G")
 	grid()
 	#-----------------------
-	awavobs=autocor(pa.wavobs, 1:pa.nt-1, demean=true)
-	awav=autocor(pa.wav, 1:pa.nt-1, demean=true)
+	awavobs=autocor(pa.obs.wav, 1:pa.nt-1, demean=true)
+	awav=autocor(pa.cal.wav, 1:pa.nt-1, demean=true)
 	wavli= any(isnan.(awavobs)) ? maximum(abs,awav) : max(maximum(abs,awavobs), maximum(abs,awav))
 	agfobs=autocor(gfobs,1:pa.ntgf-1, demean=true)
 	agf=autocor(gf,1:pa.ntgf-1, demean=true)

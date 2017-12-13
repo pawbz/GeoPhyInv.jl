@@ -1,7 +1,7 @@
 # blind deconvolution
 __precompile__()
 
-module Decon
+module DeConv
 using DSP
 import JuMIT.DSP
 import JuMIT.Inversion
@@ -12,35 +12,23 @@ using Optim, LineSearches
 using RecipesBase
 using StatsBase
 
-type Param
-	obs::Conv.Param # observed model
-	cal::Conv.Param # calculated model
-	gfobs::Array{Float64,2}
-	gf::Array{Float64,2}
+mutable struct Param
+	ntgf::Int64
+	nt::Int64
+	nr::Int64
+	obs::Conv.Param{Float64,2} # observed convolutional model
+	cal::Conv.Param{Float64,2} # calculated convolutional model
+	dgf::Array{Float64,2}
+	dwav::Array{Float64,2}
+	ddcal::Array{Float64,2}
 	gfprecon::Array{Float64,2}
 	gfweights::Array{Float64,2}
-	dgf::Array{Float64,2}
-	ntgf::Int64
-	dobs::Array{Float64,2}
-	dcal::Array{Float64,2}
-	ddcal::Array{Float64,2}
-	wavobs::Vector{Float64}
-	wav::Vector{Float64}
 	wavprecon::Vector{Float64}
-	wavmat::Array{Float64,2}
-	dwavmat::Array{Float64,2}
 	wavnorm_flag::Bool 			# restrict wav along a unit circle during optimization
 	wavnormmat::Matrix{Float64}             # stored outer product of wav
 	dwavnorm::Vector{Float64}		# gradient w.r.t. normalized wavelet
-	spow2::Array{Complex{Float64},2}
-	rpow2::Array{Complex{Float64},2}
-	wpow2::Array{Complex{Float64},2}
-	nt::Int64
-	nr::Int64
 	attrib_inv::Symbol
 	verbose::Bool
-	fftplan::Base.DFT.FFTW.cFFTWPlan
-	ifftplan::Base.DFT.ScaledPlan
 	xgf::Vector{Float64}
 	last_xgf::Vector{Float64}
 	dfgf::Optim.UninitializedOnceDifferentiable{Void}
@@ -49,135 +37,7 @@ type Param
 	dfwav::Optim.UninitializedOnceDifferentiable{Void}
 end
 
-@userplot Plot
 
-
-@recipe function f(p::Plot, rvec=nothing)
-	pa=p.args[1]
-	(rvec===nothing) && (rvec=1:pa.nr)
-
-	# time vectors
-	# autocorr wav
-	awavobs=autocor(pa.wavobs, 1:pa.nt-1, demean=true)
-	awav=autocor(pa.wav, 1:pa.nt-1, demean=true)
-	wavli=max(maximum(abs,awavobs), maximum(abs,awav))
-	# autocorr gf 
-	agfobs=autocor(pa.gfobs,1:pa.ntgf-1, demean=true)
-	agf=autocor(pa.gf,1:pa.ntgf-1, demean=true)
-	gfli=max(maximum(abs,agfobs), maximum(abs,agf))
-
-	# cut receivers
-	dcal=pa.dcal[:,rvec]
-	dobs=pa.dobs[:,rvec]
-
-	layout := (5,3)
-
-	@series begin        
-		subplot := 1
-#		aspect_ratio := :auto
-		legend := false
-		pa.wavobs
-	end
-	@series begin        
-		subplot := 2
-		legend := false
-		pa.gfobs
-	end
-#
-#	@series begin        
-#		subplot := 3
-#		legend := false
-#		pa.dobs
-#	end
-#
-#	@series begin        
-#		subplot := 4
-#		legend := false
-#		pa.wav
-#	end
-#	@series begin        
-#		subplot := 5
-#		legend := false
-#		pa.gf[:,rvec]
-#	end
-#
-#	@series begin        
-#		subplot := 6
-#		legend := false
-#		pa.dcal[:,rvec]
-#	end
-#
-#	@series begin        
-#		subplot := 7
-#		legend := false
-#		awavobs
-#
-#		
-#	end
-#	@series begin        
-#		subplot := 8
-#		legend := false
-#		agfobs[:, rvec]
-#	end
-#
-#	@series begin        
-#		subplot := 9
-#		legend := false
-#		
-#	end
-#
-#	@series begin        
-#		subplot := 10
-#		legend := false
-#		awav
-#
-#		
-#	end
-#	@series begin        
-#		subplot := 11
-#		legend := false
-#		agf[:,rvec]
-#	end
-#
-#	@series begin        
-#		subplot := 12
-#		legend := false
-#		pa.dcal[:,rvec]-pa.dobs[:,rvec]
-#	end
-#
-#
-#
-#
-#	@series begin        
-#		subplot := 13
-#		aspect_ratio := :equal
-#		seriestype := :histogram2d
-#		title := "Scatter Wav"
-#		legend := false
-#		awavobs, awav
-#	end
-#
-#	@series begin        
-#		subplot := 14
-#		aspect_ratio := :equal
-#		seriestype := :histogram2d
-#		title := "Scatter Wav"
-#		legend := false
-#		agfobs, agf
-#	end
-#
-#	@series begin        
-#		subplot := 15
-#		aspect_ratio := 1
-#		seriestype := :histogram2d
-#		title := "Scatter Wav"
-#		legend := false
-#		pa.dobs, pa.dcal
-#	end
-#
-
-
-end
 
 """
 `gfprecon` : a preconditioner applied to each Greens functions [ntgf]
@@ -199,25 +59,13 @@ function Param(ntgf, nt, nr;
 	
 	# initial values are random
 	wav=randn(nt)
-	wavmat=repeat(wav,outer=(1,nr))
-	dwavmat=similar(wavmat)
+	dwav=zeros(nt,nr)
 	gf=zeros(ntgf,nr)
-	dgf=similar(gf)
+	dgf=zeros(gf)
 
 	# use maximum threads for fft
 	fft_threads &&  (FFTW.set_num_threads(Sys.CPU_CORES))
-	# fft dimension for plan
-	np2=nextfastfft(maximum([2*nt, 2*ntgf]))
-	# create plan
-	fftplan = plan_fft!(complex.(zeros(np2,nr)),[1],flags=FFTW.MEASURE)
-	ifftplan = plan_ifft!(complex.(zeros(np2,nr)),[1],flags=FFTW.MEASURE)
 
-	# preallocate pow2 vectors
-	spow2=complex.(zeros(np2,nr))
-	rpow2=complex.(zeros(np2,nr))
-	wpow2=complex.(zeros(np2,nr))
-
-	
 	# convert initial model to the inversion variable
 	xgf = zeros(ntgf*nr);
 	last_xgf = randn(size(xgf)) # reset last_x
@@ -246,19 +94,18 @@ function Param(ntgf, nt, nr;
 	wavnorm_flag ?	(wavnormmat=zeros(nt, nt)) : (wavnormmat=zeros(1,1))
 	wavnorm_flag ?	(dwavnorm=zeros(nt)) : (dwavnorm=zeros(1))
 
-	pa = Param(gfobs, gf, gfprecon, gfweights, dgf, ntgf, dobs, dcal, ddcal, wavobs, wav, wavprecon, wavmat, dwavmat,
-	    wavnorm_flag, wavnormmat, dwavnorm,
-	     spow2, rpow2, wpow2,
-	     nt, nr, attrib_inv, verbose, fftplan, ifftplan,
-	     xgf, last_xgf, dfgf,
-	     xwav, last_xwav, dfwav)
+	obs=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nr,), 
+		wavlags=[nt-1, 0], d=dobs, gf=gfobs,wav=repeat(wavobs,outer=(1,nr)))
+	cal=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nr,), 
+		wavlags=[nt-1, 0], d=similar(dobs), gf=gf,wav=repeat(wav,outer=(1,nr)))
+
+
+	pa=Param(ntgf,nt,nr,obs,cal,dgf,dwav,ddcal,gfprecon,gfweights,wavprecon,wavnorm_flag,wavnormmat,
+	  dwavnorm,attrib_inv,verbose,xgf,last_xgf,dfgf,xwav,last_xwav,dfwav)
  
-	if iszero(pa.dobs) 
-		((gfobs===nothing) | (wavobs===nothing)) && error("need gfobs and wavobs")
-		pa.attrib_inv=:wav
-		F!(pa, 
-     		pa.xwav,  # dummy
-     		mattrib=:gfwav, dattrib=:dobs, gf=gfobs, wav=wavobs)
+	if iszero(pa.obs.d) 
+		(iszero(pa.obs.gf) | iszero(pa.obs.wav)) && error("need gfobs and wavobs")
+		Conv.mod!(pa.obs, :d)
 	end
 
 	initialize!(pa)
@@ -270,9 +117,9 @@ end
 
 function update_func_grad!(pa; gfoptim=nothing, wavoptim=nothing, gfαvec=nothing, wavαvec=nothing)
 	# they will be changed in this program, so make a copy 
-	wavsave=copy(pa.wav);
-	gfsave=copy(pa.gf);
-	dcalsave=copy(pa.dcal);
+	wavsave=copy(pa.cal.wav);
+	gfsave=copy(pa.cal.gf);
+	dcalsave=copy(pa.cal.d);
 
 	(gfoptim===nothing) && (gfoptim=[:ls])
 	(gfαvec===nothing) && (gfαvec=ones(length(gfoptim)))
@@ -325,9 +172,9 @@ function update_func_grad!(pa; gfoptim=nothing, wavoptim=nothing, gfαvec=nothin
 			    (storage, x) -> paMOwav.grad!(storage, x, paMOwav))
 
 
-	copy!(pa.wav, wavsave)
-	copy!(pa.gf, gfsave)
-	copy!(pa.dcal,dcalsave)
+	copy!(pa.cal.wav, wavsave)
+	copy!(pa.cal.gf, gfsave)
+	copy!(pa.cal.d,dcalsave)
 
 	return pa
 	
@@ -344,9 +191,9 @@ end
 
 
 function error(pa) 
-	fwav = Misfits.error_after_normalized_autocor(pa.wav, pa.wavobs)
-	fgf = Misfits.error_after_normalized_autocor(pa.gf, pa.gfobs)
-	f = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing, norm_flag=true)
+	fwav = Misfits.error_after_normalized_autocor(pa.cal.wav, pa.obs.wav)
+	fgf = Misfits.error_after_normalized_autocor(pa.cal.gf, pa.obs.gf)
+	f = Misfits.error_squared_euclidean!(nothing, pa.cal.d, pa.obs.d, nothing, norm_flag=true)
 
 	println("Blind Decon\t")
 	println("===========")
@@ -361,11 +208,11 @@ end
 function model_to_x!(x, pa)
 	if(pa.attrib_inv == :wav)
 		for i in eachindex(x)
-			x[i]=pa.wav[i]*pa.wavprecon[i]
+			x[i]=pa.cal.wav[i,1]*pa.wavprecon[i] # just take any one receiver
 		end
 	else(pa.attrib_inv == :gf)
 		for i in eachindex(x)
-			x[i]=pa.gf[i]*pa.gfprecon[i] 		# multiply by gfprecon
+			x[i]=pa.cal.gf[i]*pa.gfprecon[i] 		# multiply by gfprecon
 		end
 	end
 	return x
@@ -375,34 +222,30 @@ end
 function x_to_model!(x, pa)
 	if(pa.attrib_inv == :wav)
 		xn=vecnorm(x)
-		for i in eachindex(pa.wav)
-			if(iszero(pa.wavprecon[i]))
-				pa.wav[i]=0.0
-			else
-				pa.wav[i]=x[i]/pa.wavprecon[i]
+		for j in 1:pa.nr
+			for i in 1:pa.nt
+				if(iszero(pa.wavprecon[i]))
+					pa.cal.wav[i,j]=0.0
+				else
+					# put same in all receivers
+					pa.cal.wav[i,j]=x[i]/pa.wavprecon[i]
+				end
 			end
 		end
-		pa.wavnorm_flag && (scale!(pa.wav, inv(xn)))
+		pa.wavnorm_flag && (scale!(pa.cal.wav, inv(xn)))
 	else(pa.attrib_inv == :gf)
-		for i in eachindex(pa.gf)
+		for i in eachindex(pa.cal.gf)
 			if(iszero(pa.gfprecon[i]))
-				pa.gf[i]=0.0
+				pa.cal.gf[i]=0.0
 			else
-				pa.gf[i]=x[i]/pa.gfprecon[i]
+				pa.cal.gf[i]=x[i]/pa.gfprecon[i]
 			end
 		end
 	end
 	return pa
 end
 
-function F!(
-			pa::Param,
-			x::AbstractVector{Float64};
-			gf=nothing,
-			wav=nothing,
-			mattrib::Symbol=:x,
-			dattrib::Symbol=:dcal,
-			   )
+function F!(pa::Param,	x::AbstractVector{Float64}  )
 	if(pa.attrib_inv==:wav)
 		compute=(x!=pa.last_xwav)
 	elseif(pa.attrib_inv==:gf)
@@ -413,22 +256,7 @@ function F!(
 
 	if(compute)
 
-		if(mattrib == :x)
-			x_to_model!(x, pa)
-			gf=pa.gf
-			wav=pa.wav
-		elseif(mattrib == :gf)
-			wav=pa.wav
-			(gf===nothing) && error("need gf")
-		elseif(mattrib == :wav)
-			gf=pa.gf
-			(wav===nothing) && error("need wav")
-		elseif(mattrib == :gfwav)
-			(gf===nothing) && error("need gf")
-			(wav===nothing) && error("need wav")
-		else
-			error("invalid mattrib")
-		end
+		x_to_model!(x, pa) # modify pa.cal.wav or pa.cal.gf
 
 		#pa.verbose && println("updating buffer")
 		if(pa.attrib_inv==:wav)
@@ -438,37 +266,23 @@ function F!(
 		end
 
 
-		for ir in 1:pa.nr
-			for it in 1:pa.nt
-				pa.wavmat[it,ir]=wav[it]
-			end
-		end
-		DSP.fast_filt!(pa.ddcal, gf, pa.wavmat, :s, nwplags=pa.nt-1,
-		 nwnlags=0,nsplags=pa.nt-1,nsnlags=0,nrplags=pa.ntgf-1,nrnlags=0,
-		  np2=size(pa.fftplan,1), fftplan=pa.fftplan, ifftplan=pa.ifftplan,
-		  spow2=pa.spow2, rpow2=pa.rpow2, wpow2=pa.wpow2,
-		  			)
-		copy!(getfield(pa, dattrib), pa.ddcal)
+		Conv.mod!(pa.cal, :d) # modify pa.cal.d
 		return pa
 	end
 end
 
-function func_grad!(storage, x::AbstractVector{Float64},
-			pa)
+function func_grad!(storage, x::AbstractVector{Float64},pa)
 
-
-	#pa.verbose && println("computing gradient...")
-
-	# x to w 
+	# x to pa.cal.wav or pa.cal.gf 
 	x_to_model!(x, pa)
 
-	F!(pa, x)
+	F!(pa, x) # forward
 
 	if(storage === nothing)
 		# compute misfit and δdcal
-		f = Misfits.error_squared_euclidean!(nothing, pa.dcal, pa.dobs, nothing, norm_flag=true)
+		f = Misfits.error_squared_euclidean!(nothing, pa.cal.d, pa.obs.d, nothing, norm_flag=true)
 	else
-		f = Misfits.error_squared_euclidean!(pa.ddcal, pa.dcal, pa.dobs, nothing, norm_flag=true)
+		f = Misfits.error_squared_euclidean!(pa.ddcal, pa.cal.d, pa.obs.d, nothing, norm_flag=true)
 		Fadj!(pa, x, storage, pa.ddcal)
 	end
 	return f
@@ -485,12 +299,12 @@ function func_grad_gf_weights!(storage, x, pa)
 	x_to_model!(x, pa)
 	!(pa.attrib_inv == :gf) && error("only for gf inversion")
 	if(!(storage === nothing)) #
-		f = Misfits.error_weighted_norm!(pa.dgf,pa.gf, pa.gfweights) #
+		f = Misfits.error_weighted_norm!(pa.dgf,pa.cal.gf, pa.gfweights) #
 		for i in eachindex(storage)
 			storage[i]=pa.dgf[i]
 		end
 	else	
-		f = Misfits.error_weighted_norm!(nothing,pa.gf, pa.gfweights)
+		f = Misfits.error_weighted_norm!(nothing,pa.cal.gf, pa.gfweights)
 	end
 	return f
 end
@@ -501,21 +315,21 @@ end
 
 """
 Apply Fadj to 
+x is not used?
 """
 function Fadj!(pa, x, storage, dcal)
+	storage[:] = 0.
 	if(pa.attrib_inv == :wav)
-		DSP.fast_filt!(dcal, pa.gf, pa.wavmat, :w, nwplags=pa.nt-1, 
-		 nwnlags=0,nsplags=pa.nt-1,nsnlags=0,nrplags=pa.ntgf-1,nrnlags=0,
-		  np2=size(pa.fftplan,1), fftplan=pa.fftplan, ifftplan=pa.ifftplan,
-		  spow2=pa.spow2, rpow2=pa.rpow2, wpow2=pa.wpow2,
-			)
-		storage[:] = 0.
-		for i in 1:size(pa.wavmat,2)
-			for j in 1:size(pa.wavmat,1)
-				storage[j] += pa.wavmat[j,i]
+		Conv.mod!(pa.cal, :wav, d=dcal, wav=pa.dwav)
+
+		# stack ∇wav along receivers
+		for i in 1:size(pa.dwav,2)             
+			for j in 1:size(pa.dwav,1)
+				storage[j] += pa.dwav[j,i]
 			end
 		end
-		# factor, because wav was divided by norm of x
+
+		# apply precon
 		for i in eachindex(storage)
 			if(iszero(pa.wavprecon[i]))
 				storage[i]=0.0
@@ -523,23 +337,16 @@ function Fadj!(pa, x, storage, dcal)
 				storage[i] = storage[i]/pa.wavprecon[i]
 			end
 		end
+		# factor, because wav was divided by norm of x
 		if(pa.wavnorm_flag)
 			copy!(pa.dwavnorm, storage)
 			Misfits.derivative_vector_magnitude!(storage,pa.dwavnorm,x,pa.wavnormmat)
 		end
 
 	else(pa.attrib_inv == :gf)
-		for ir in 1:pa.nr
-			for it in 1:size(pa.wavmat,1)
-				pa.wavmat[it,ir]=pa.wav[it]
-			end
-		end
-		DSP.fast_filt!(dcal, pa.dgf, pa.wavmat, :r, nwplags=pa.nt-1,
-		 nwnlags=0,nsplags=pa.nt-1,nsnlags=0,nrplags=pa.ntgf-1,nrnlags=0,
-		  np2=size(pa.fftplan,1), fftplan=pa.fftplan, ifftplan=pa.ifftplan,
-		  spow2=pa.spow2, rpow2=pa.rpow2, wpow2=pa.wpow2,
-			)
-		copy!(storage, pa.dgf)
+		Conv.mod!(pa.cal, :gf, gf=pa.dgf, d=dcal)
+		copy!(storage, pa.dgf) # remove?
+
 		for i in eachindex(storage)
 			if(iszero(pa.gfprecon[i]))
 				storage[i]=0.0
@@ -626,8 +433,13 @@ end
 
 function initialize!(pa)
 	# starting random models
-	randn!(pa.wav)
-	randn!(pa.gf)
+	for i in 1:pa.nt
+		x=randn()
+		for j in 1:pa.nr
+			pa.cal.wav[i,j]=x
+		end
+	end
+	randn!(pa.cal.gf)
 end
 
 
@@ -636,9 +448,13 @@ end
 
 """
 Create preconditioners using the observed Green Functions.
-* `cflag` : causaulity flag
+* `cflag` : impose causaulity by creating gfprecon using gfobs
+* `max_tfrac_gfprecon` : maximum length of precon windows on gf
 """
-function create_weights(ntgf, nt, gfobs; αexp=0.0, cflag=true)
+function create_weights(ntgf, nt, gfobs; αexp=0.0, cflag=true,
+		       max_tfrac_gfprecon=1.0)
+	
+	ntgfprecon=max_tfrac_gfprecon*ntgf;
 
 	nr=size(gfobs,2)
 	wavprecon=ones(nt)
@@ -649,25 +465,152 @@ function create_weights(ntgf, nt, gfobs; αexp=0.0, cflag=true)
 	for ir in 1:nr
 		gf=normalize(view(gfobs,:,ir))
 		indz=findfirst(x->abs(x)>1e-6, gf)
-		if(cflag)
-			if(indz==0)
-				gfprecon[:,ir]=0.0    
-				gfweights[:,ir]=0.0
+		for i in 1:ntgf
+			if(i<indz)
+				cflag && (gfprecon[i,ir]=0.0)
+				cflag && (gfweights[i,ir]=0.0)
+			elseif(i>indz & i<indz+ntgfprecon)
+				(indz≠0) && (gfweights[i,ir]=exp(αexp*(i-indz-1)/ntgf))  # exponential weights
+				(indz≠0) && (gfprecon[i,ir]=exp(αexp*(i-indz-1)/ntgf))  # exponential weights
 			else
-				gfprecon[1:indz-1,ir]=0.0    
-				gfweights[1:indz-1,ir]=0.0
-#				wavprecon[end-indz+1:end]=0.0
+				gfprecon[i,ir]=0.0
+				gfweights[i,ir]=0.0
 			end
-		end
-		if(indz≠0)
-			for i in indz+1:ntgf        
-				gfweights[i,ir]=exp(αexp*(i-indz-1)/ntgf)  # exponential weights
-				gfprecon[i,ir]=exp(αexp*(i-indz-1)/ntgf)  # exponential weights
-			end
+
 		end
 	end
 
 	return gfprecon, gfweights, wavprecon
+
+end
+
+@userplot Plot
+
+
+@recipe function f(p::Plot, rvec=nothing)
+	pa=p.args[1]
+	(rvec===nothing) && (rvec=1:pa.nr)
+
+	# time vectors
+	# autocorr wav
+	awavobs=autocor(pa.obs.wav, 1:pa.nt-1, demean=true)
+	awav=autocor(pa.wav, 1:pa.nt-1, demean=true)
+	wavli=max(maximum(abs,awavobs), maximum(abs,awav))
+	# autocorr gf 
+	agfobs=autocor(pa.obs.gf,1:pa.ntgf-1, demean=true)
+	agf=autocor(pa.cal.gf,1:pa.ntgf-1, demean=true)
+	gfli=max(maximum(abs,agfobs), maximum(abs,agf))
+
+	# cut receivers
+	dcal=pa.cal.d[:,rvec]
+	dobs=pa.obs.d[:,rvec]
+
+	layout := (5,3)
+
+	@series begin        
+		subplot := 1
+#		aspect_ratio := :auto
+		legend := false
+		pa.obs.wav
+	end
+	@series begin        
+		subplot := 2
+		legend := false
+		pa.obs.gf
+	end
+#
+#	@series begin        
+#		subplot := 3
+#		legend := false
+#		pa.obs.d
+#	end
+#
+#	@series begin        
+#		subplot := 4
+#		legend := false
+#		pa.wav
+#	end
+#	@series begin        
+#		subplot := 5
+#		legend := false
+#		pa.cal.gf[:,rvec]
+#	end
+#
+#	@series begin        
+#		subplot := 6
+#		legend := false
+#		pa.cal.d[:,rvec]
+#	end
+#
+#	@series begin        
+#		subplot := 7
+#		legend := false
+#		awavobs
+#
+#		
+#	end
+#	@series begin        
+#		subplot := 8
+#		legend := false
+#		agfobs[:, rvec]
+#	end
+#
+#	@series begin        
+#		subplot := 9
+#		legend := false
+#		
+#	end
+#
+#	@series begin        
+#		subplot := 10
+#		legend := false
+#		awav
+#
+#		
+#	end
+#	@series begin        
+#		subplot := 11
+#		legend := false
+#		agf[:,rvec]
+#	end
+#
+#	@series begin        
+#		subplot := 12
+#		legend := false
+#		pa.cal.d[:,rvec]-pa.obs.d[:,rvec]
+#	end
+#
+#
+#
+#
+#	@series begin        
+#		subplot := 13
+#		aspect_ratio := :equal
+#		seriestype := :histogram2d
+#		title := "Scatter Wav"
+#		legend := false
+#		awavobs, awav
+#	end
+#
+#	@series begin        
+#		subplot := 14
+#		aspect_ratio := :equal
+#		seriestype := :histogram2d
+#		title := "Scatter Wav"
+#		legend := false
+#		agfobs, agf
+#	end
+#
+#	@series begin        
+#		subplot := 15
+#		aspect_ratio := 1
+#		seriestype := :histogram2d
+#		title := "Scatter Wav"
+#		legend := false
+#		pa.obs.d, pa.cal.d
+#	end
+#
+
 
 end
 

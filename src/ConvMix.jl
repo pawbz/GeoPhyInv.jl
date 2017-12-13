@@ -15,10 +15,10 @@ using DataFrames
 using RecipesBase
 
 
-type Param
+mutable struct Param
 	ns::Int # number of independent components
-	obs::Vector{Conv.Param} # observed independent components
-	nomix::Vector{Conv.Param} # unmixed data for simple xcorr
+	obs::Vector{Conv.Param{Float64,2}} # observed independent components
+	nomix::Vector{Conv.Param{Float64,2}} # unmixed data for simple xcorr
 	mix::Vector{Conv.Param} # mixture, results of simple xcorr stored here
 	"ica model"
 	ica::CICA.ICA # results after performing ICA
@@ -112,7 +112,7 @@ function Param(;ntgf=1, # instantaneos
 	x=transpose(rfft(mix[1].d, [1]))
 	ica=ica_func(x, ns)
 
-	err=DataFrame(rec_src=vec([(ir,is) for ir in 1:nr, is in 1:ns]), gf_no_mix_xcorr=zeros(nr*ns), gf_mix_xcorr=zeros(nr*ns), dat_mix_ica=zeros(nr*ns), 
+	err=DataFrame(rec_src=vec([(ir,is) for ir in 1:nr, is in 1:ns]), gf_no_mix_xcorr=zeros(nr*ns), gf_mix_xcorr=zeros(nr*ns), d_mix_ica=zeros(nr*ns), 
 	       gf_mix_ica=zeros(nr*ns))
 
 	pa=Param(ns, obs, nomix,  mix, ica, icaunmix, err)
@@ -131,8 +131,8 @@ function update_err(pa)
 			d1=view(pa.nomix[is].gf, :, ir)
 			d2=view(pa.mix[is].gf, :, ir)
 			d0=view(pa.obs[is].gf, :, ir)
-			pa.err[:no_mix_xcorr][ir+(is-1)*nr]=Misfits.error_after_scaling(d1, d0)[1]
-			pa.err[:mix_xcorr][ir+(is-1)*nr]=Misfits.error_after_scaling(d2, d0)[1]
+			pa.err[:gf_no_mix_xcorr][ir+(is-1)*nr]=Misfits.error_after_scaling(d1, d0)[1]
+			pa.err[:gf_mix_xcorr][ir+(is-1)*nr]=Misfits.error_after_scaling(d2, d0)[1]
 		end
 	end
 end
@@ -164,25 +164,36 @@ function fastica!(pa::Param)
 		s=transpose((pa.ica.s))
 		s=irfft(s,pa.obs[1].ntd,[1])
 		 
-	end
-	for is in 1:ns
-		Conv.mod!(icaunmix[is], :gf)
-	end
-	for ir in 1:nr
 		for is in 1:ns
-			d=view(pa.icaunmix[is].d,:,ir)
 			ss=view(s,:,is)
-			copy!(d,ss)
 
 			err=zeros(ns)
 			for iss=1:ns
 				d0=view(pa.obs[iss].d,:,ir)
-				err[iss]=Misfits.error_after_scaling(d, d0)[1]
+				err[iss]=Misfits.error_after_scaling(ss, d0)[1]
 			end
-			pa.err[:mix_ica][ir+(is-1)*nr]=minimum(err)
+			pa.err[:d_mix_ica][ir+(is-1)*nr]=minimum(err)
+
+			# fill to the closest source, only for synthetic!
+			d=view(pa.icaunmix[indmin(err)].d,:,ir)
+			copy!(d,ss)
 		end
 	end
 		
+
+	# use xcorr to estimate green functions
+	for is in 1:ns
+		Conv.mod!(pa.icaunmix[is], :gf)
+	end
+
+	# compute error in estimated gf assuming source signatures are known
+	for is in 1:pa.ns
+		for ir in 1:nr 
+			d=view(pa.icaunmix[is].gf, :, ir)
+			d0=view(pa.obs[is].gf, :, ir)
+			pa.err[:gf_mix_ica][ir+(is-1)*nr]=Misfits.error_after_scaling(d, d0)[1]
+		end
+	end
 
 end
 

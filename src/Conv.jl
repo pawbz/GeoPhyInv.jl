@@ -95,7 +95,7 @@ end
 
 
 """
-Convolution that allocates pa.
+Convolution that allocates `Param` internally.
 """
 function mod!{T,N}(
 	   d::AbstractArray{T,N}, 
@@ -108,14 +108,18 @@ function mod!{T,N}(
 	# allocation of freq matrices
 	pa=Param(ntgf=ntgf, ntd=ntd, ntwav=ntwav, gf=gf, wav=wav, d=d)
 
-	# using pa
+	# using pa, return d, gf, wav according to attrib
 	mod!(pa, attrib)
 end
 
 """
 Convolution modelling with no allocations at all.
+By default, the fields `gf`, `d` and `wav` in pa are modified accordingly.
+Otherwise use keyword arguments to input them.
 """
-function mod!(pa::Param, attrib::Symbol)
+function mod!(pa::Param, attrib::Symbol; 
+	      gf=pa.gf, d=pa.d, wav=pa.wav # external arrays to be modified
+	     )
 	T=eltype(pa.d)
 	
 	# initialize freq vectors
@@ -123,35 +127,39 @@ function mod!(pa::Param, attrib::Symbol)
 	pa.gffreq[:] = complex(T(0))
 	pa.wavfreq[:] = complex(T(0))
 
+	pa.gfpad[:]=T(0)
+	pa.dpad[:]=T(0)
+	pa.wavpad[:]=T(0)
+
 	# necessary zero padding
-	pad_truncate!(pa.gf, pa.gfpad, pa.gflags[1], pa.gflags[2], pa.np2, 1)
-	pad_truncate!(pa.d, pa.dpad, pa.dlags[1], pa.dlags[2], pa.np2, 1)
-	pad_truncate!(pa.wav, pa.wavpad, pa.wavlags[1], pa.wavlags[2], pa.np2, 1)
+	pad_truncate!(gf, pa.gfpad, pa.gflags[1], pa.gflags[2], pa.np2, 1)
+	pad_truncate!(d, pa.dpad, pa.dlags[1], pa.dlags[2], pa.np2, 1)
+	pad_truncate!(wav, pa.wavpad, pa.wavlags[1], pa.wavlags[2], pa.np2, 1)
 
 	if(attrib == :d)
 		A_mul_B!(pa.wavfreq, pa.fftplan, pa.wavpad)
 		A_mul_B!(pa.gffreq, pa.fftplan, pa.gfpad)
 		@. pa.dfreq = pa.gffreq * pa.wavfreq
 		A_mul_B!(pa.dpad, pa.ifftplan, pa.dfreq)
-		pad_truncate!(pa.d, pa.dpad, pa.dlags[1], pa.dlags[2], pa.np2, -1)
-		return pa.d
+		pad_truncate!(d, pa.dpad, pa.dlags[1], pa.dlags[2], pa.np2, -1)
+		return d
 	elseif(attrib == :gf)
 		A_mul_B!(pa.wavfreq, pa.fftplan, pa.wavpad)
 		A_mul_B!(pa.dfreq, pa.fftplan, pa.dpad)
 		conj!(pa.wavfreq)
 		@. pa.gffreq = pa.dfreq * pa.wavfreq
 		A_mul_B!(pa.gfpad, pa.ifftplan, pa.gffreq)
-		pad_truncate!(pa.gf, pa.gfpad, pa.gflags[1], pa.gflags[2], pa.np2, -1)
+		pad_truncate!(gf, pa.gfpad, pa.gflags[1], pa.gflags[2], pa.np2, -1)
 		
-		return pa.gf
+		return gf
 	elseif(attrib == :wav)
 		A_mul_B!(pa.gffreq, pa.fftplan, pa.gfpad)
 		A_mul_B!(pa.dfreq, pa.fftplan, pa.dpad)
 		conj!(pa.gffreq)
 		@. pa.wavfreq = pa.dfreq * pa.gffreq
 		A_mul_B!(pa.wavpad, pa.ifftplan, pa.wavfreq)
-		pad_truncate!(pa.wav, pa.wavpad, pa.wavlags[1], pa.wavlags[2], pa.np2, -1)
-		return pa.wav
+		pad_truncate!(wav, pa.wavpad, pa.wavlags[1], pa.wavlags[2], pa.np2, -1)
+		return wav
 	end
 end
 
