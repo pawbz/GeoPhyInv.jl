@@ -534,9 +534,9 @@ end
 """
 Remove preconditioners from pa
 """
-function remove_gfprecon!(pa)
+function remove_gfprecon!(pa; all=false)
 	for i in eachindex(pa.gfprecon)
-		if(pa.gfprecon[i]≠0.0)
+		if((pa.gfprecon[i]≠0.0) || all)
 			pa.gfprecon[i]=1.0
 			pa.gfpreconI[i]=1.0
 		end
@@ -546,9 +546,9 @@ end
 """
 Remove weights from pa
 """
-function remove_gfweights!(pa)
+function remove_gfweights!(pa; all=false)
 	for i in eachindex(pa.gfweights)
-		if(pa.gfweights[i]≠0.0)
+		if((pa.gfweights[i]≠0.0) || all)
 			pa.gfweights[i]=1.0
 		end
 	end
@@ -661,9 +661,23 @@ function create_weights(ntgf, nt, gfobs; αexp=0.0, cflag=true,
 			gfweights[:,ir]=0.0
 		end
 	end
-
 	return gfprecon, gfweights, wavprecon
+end
 
+function create_white_weights(ntgf, nt, nr)
+	wavprecon=ones(nt)
+	gfprecon=ones(2*ntgf-1, nr);
+	for i in 1:ntgf-1    
+		gfprecon[ntgf+i,1]=0.0    
+		gfprecon[ntgf-i,1]=0.0
+	end
+	gfweights=zeros(2*ntgf-1, nr);
+	gfweights[ntgf,1]=0.0
+	for i in 1:ntgf-1
+		gfweights[ntgf+i,1]=i*2
+		gfweights[ntgf-i,1]=i*2
+	end
+	return gfprecon, gfweights, wavprecon
 end
 
 @userplot Plot
