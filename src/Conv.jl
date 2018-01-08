@@ -35,6 +35,15 @@ type Param{T<:Real,N}
 	dlags::Vector{Int}
 end
 
+function Base.fill!(pa::Param, k)
+	for iff in [:d, :gf, :wav]
+		m=getfield(pa,iff)
+		m[:]=eltype(pa.d)(k)
+	end
+end
+
+
+
 function Param(;ntwav=1, ntgf=1, ntd=1, dims=(), 
 	       d=zeros(ntd, dims...), wav=zeros(ntwav, dims...), gf=zeros(ntgf, dims...),
 	      wavlags=nothing, dlags=nothing, gflags=nothing)
@@ -227,6 +236,48 @@ function pad_truncate!{T}(
 end
 
 
+function xcorr(A::AbstractArray{Float64}; lags=[size(A,1)-1, size(A,1)-1], iref=1)
+	Ax=zeros(sum(lags)+1, size(A,2))
+	return xcorr!(Ax, A; lags=lags, iref=iref)
+end
 
+
+"""
+Use first colomn of A and cross-correlate with rest of columns of it.
+And store results in Ax.
+After xcorr, the coeffcients are normalized with norm(A[:,1])
+It has some allocations, use carefully
+By default, Ax has almost same positive and negative lags.
+"""
+function xcorr!(Ax::AbstractArray{Float64}, 
+		  A::AbstractArray{Float64}; lags=nothing, iref=1)
+
+	(!(lags===nothing)) &&	(size(Ax,1) ≠ sum(lags) + 1) && error("size Ax")
+	(size(Ax,2) ≠ size(A,2)) && error("same second dimension for Ax A")
+	nr=size(A,2)
+	nt=size(A,1)
+	ntwav=size(Ax,1)
+
+	wav=zeros(ntwav);
+	gf=zeros(nt);
+	d=zeros(nt);
+	# allocate pa
+	pa=Param(ntgf=nt, ntd=nt, ntwav=ntwav, gf=gf, wav=wav, d=d, wavlags=lags)
+
+	a=view(A,:,iref)
+	α=(vecnorm(a)^2)
+	α = (iszero(α)) ? 1.0 : inv(α) # take inverse if not zero
+	
+	copy!(pa.d, a)
+	for ir in 1:nr
+		b=view(A,:,ir)
+		c=view(Ax,:,ir)
+		copy!(pa.gf, b)
+		mod!(pa, :wav)
+		copy!(c, pa.wav)
+		scale!(c, α)
+	end
+	return Ax
+end
 
 end

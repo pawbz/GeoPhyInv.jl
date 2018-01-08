@@ -5,7 +5,7 @@ module Interferometry
 import JuMIT.Grid
 import JuMIT.Acquisition
 import JuMIT.Data
-import JuMIT.DSP
+import JuMIT.Conv
 
 
 """
@@ -141,7 +141,7 @@ function TD_noise_corr!(dataout, data, irref)
 			ddvr=view(dd,:, irref)
 			ddov=view(ddo,:,ir)
 
-			DSP.fast_filt!(ddv, ddvr, ddov, :w)
+			Conv.mod!(ddv, ddvr, ddov, :wav)
 		end
 	end
 

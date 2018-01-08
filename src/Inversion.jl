@@ -20,6 +20,7 @@ type ParamAM
 	noptim::Int64 			# number of optimizations in every roundtrip
 	optim_func::Vector{Function}	# optimization functions, call them to perform optimizations
 	reinit_func::Function		# re-initialize function that is executed if roundtrips fail to converge
+	after_reroundtrip_func::Function # function executed after each reroundtrip (use it to store erros)
 	fvec::Matrix{Float64}		# functionals
 	fvec_init::Vector{Float64}	# 
 	optim_tols::Vector{Float64}	# tolerance for each optimization
@@ -75,6 +76,7 @@ function ParamAM(optim_func;
 	       min_roundtrips=10, # minimum roundtrips before checking rate of convergence
 	       verbose=true,
 	       reinit_func=x->randn(),
+	       after_reroundtrip_func=x->randn(),
 	       max_reroundtrips=1, re_init_flag=true, max_roundtrips=1)
 
 	fvec=zeros(noptim, 2)
@@ -82,7 +84,7 @@ function ParamAM(optim_func;
 
 
 	pa=ParamAM(name, max_roundtrips, max_reroundtrips, noptim, optim_func, 
-	  reinit_func,
+	  reinit_func, after_reroundtrip_func,
 	  fvec, fvec_init, optim_tols, roundtrip_tol, verbose)
 
 	return pa
@@ -199,6 +201,7 @@ function go(pa::ParamAM)
 #				@printf("\n")
 #			end
 		end
+		pa.after_reroundtrip_func(nothing) # after each roundtrip, execute this
 		reroundtrip_converge = all(pa.fvec[:,1] .< pa.optim_tols[:])
 		pa.verbose && println("=========================================================================================")  
 	end

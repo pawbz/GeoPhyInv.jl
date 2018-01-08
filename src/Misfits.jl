@@ -188,7 +188,7 @@ end
 
 
 function error_squared_euclidean!(dfdx,  x,   y,   w; norm_flag=false)
-	J=zero(Float64)
+	J=zero(eltype(x))
 	if(w===nothing)
 		for i in eachindex(x)
 			J += (x[i]-y[i]) * (x[i]-y[i])

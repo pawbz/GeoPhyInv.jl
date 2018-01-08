@@ -315,4 +315,19 @@ function M1D_fft(nx::Int64, δ::Float64)
 	return M1D(vec, nx, δ)
 end
 
+
+"""
+Return grid after cross-correlation.
+The positive and negative lags are approximately given by lags.
+"""
+function M1D_xcorr(tgrid; lags=[1.,1.].*abs(tgrid.x[end]-tgrid.x[1]))
+
+	plags=round(Int,  lags[1]*inv(tgrid.δx))
+	nlags=round(Int,  lags[2]*inv(tgrid.δx))
+
+	vec=vcat(-1.*collect(nlags:-1:0),collect(1:plags)).*tgrid.δx
+	return M1D(vec, length(vec), tgrid.δx)
+end
+
+
 end # module

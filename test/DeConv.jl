@@ -59,23 +59,22 @@ pa=JuMIT.DeConv.Param(ntgf, nt, nr, gfobs=gfobs, wavobs=wavobs, wavnorm_flag=fal
 storagewav=randn(size(pa.xwav))
 storagegf=randn(size(pa.xgf))
 # memory tests
-for i in 1:4
-	println("===========")
-	pa.attrib_inv=:wav
-	@time JuMIT.DeConv.F!(pa, pa.xwav,  );
-	@time JuMIT.DeConv.Fadj!(pa, pa.xwav, storagewav, pa.ddcal)
-	@time JuMIT.DeConv.x_to_model!(pa.xwav, pa);
-	@time JuMIT.DeConv.model_to_x!(pa.xwav, pa);
-	@time JuMIT.DeConv.update_wav!(pa, pa.xwav,  pa.dfwav)
-	@time JuMIT.DeConv.func_grad!(storagewav, pa.xwav,pa)
-	pa.attrib_inv=:gf
-	@time JuMIT.DeConv.F!(pa, pa.xgf,);
-	@time JuMIT.DeConv.Fadj!(pa, pa.xgf,storagegf, pa.ddcal)
-	@time JuMIT.DeConv.x_to_model!(pa.xgf, pa);
-	@time JuMIT.DeConv.model_to_x!(pa.xgf, pa);
-	@time JuMIT.DeConv.update_gf!(pa, pa.xgf,  pa.dfgf)
-	@time JuMIT.DeConv.func_grad!(storagegf, pa.xgf,  pa)
-end
+using BenchmarkTools
+println("===========")
+pa.attrib_inv=:wav
+@btime (randn!(pa.last_xwav); JuMIT.DeConv.F!(pa, pa.xwav,  ));
+@btime JuMIT.DeConv.Fadj!(pa, pa.xwav, storagewav, pa.ddcal)
+@btime JuMIT.DeConv.x_to_model!(pa.xwav, pa);
+@btime JuMIT.DeConv.model_to_x!(pa.xwav, pa);
+@btime JuMIT.DeConv.update_wav!(pa, pa.xwav,  pa.dfwav)
+@btime JuMIT.DeConv.func_grad!(storagewav, pa.xwav,pa)
+pba.attrib_inv=:gf
+@btime JuMIT.DeConv.F!(pa, pa.xgf,);
+@btime JuMIT.DeConv.Fadj!(pa, pa.xgf,storagegf, pa.ddcal)
+@btime JuMIT.DeConv.x_to_model!(pa.xgf, pa);
+@btime JuMIT.DeConv.model_to_x!(pa.xgf, pa);
+@btime JuMIT.DeConv.update_gf!(pa, pa.xgf,  pa.dfgf)
+@btime JuMIT.DeConv.func_grad!(storagegf, pa.xgf,  pa)
 
 
 # check if there are any model discrepancies

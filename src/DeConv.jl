@@ -7,23 +7,33 @@ import JuMIT.DSP
 import JuMIT.Inversion
 import JuMIT.Misfits
 import JuMIT.Conv
+import JuMIT.Grid
 import JuMIT.Inversion
 using Optim, LineSearches
 using RecipesBase
+using DataFrames
 using StatsBase
+using JLD
+using CSV
 
 mutable struct Param
 	ntgf::Int64
 	nt::Int64
 	nr::Int64
+	gfobs::Array{Float64, 2} # save, before modyfying it in obs
+	wavobs::Vector{Float64} # save, before modifying it in obs
+	dobs::Array{Float64,2} # save before modifying it
 	obs::Conv.Param{Float64,2} # observed convolutional model
 	cal::Conv.Param{Float64,2} # calculated convolutional model
+	calsave::Conv.Param{Float64,2} # save the best result
 	dgf::Array{Float64,2}
 	dwav::Array{Float64,2}
 	ddcal::Array{Float64,2}
 	gfprecon::Array{Float64,2}
+	gfpreconI::Array{Float64,2}
 	gfweights::Array{Float64,2}
 	wavprecon::Vector{Float64}
+	wavpreconI::Vector{Float64}
 	wavnorm_flag::Bool 			# restrict wav along a unit circle during optimization
 	wavnormmat::Matrix{Float64}             # stored outer product of wav
 	dwavnorm::Vector{Float64}		# gradient w.r.t. normalized wavelet
@@ -35,6 +45,8 @@ mutable struct Param
 	xwav::Vector{Float64}
 	last_xwav::Vector{Float64}
 	dfwav::Optim.UninitializedOnceDifferentiable{Void}
+	err::DataFrames.DataFrame
+	mode::Int32
 end
 
 
@@ -43,6 +55,7 @@ end
 `gfprecon` : a preconditioner applied to each Greens functions [ntgf]
 """
 function Param(ntgf, nt, nr; 
+	       mode=1,
 	       gfprecon=nothing,
 	       gfweights=nothing,
 	       gfoptim=nothing,
@@ -53,59 +66,92 @@ function Param(ntgf, nt, nr;
 	       wavnorm_flag=false,
 	       fft_threads=false,
 	       dobs=nothing, gfobs=nothing, wavobs=nothing, verbose=false, attrib_inv=:gf,) 
-	(dobs===nothing) && (dobs=zeros(nt, nr))
-	dcal=zeros(nt, nr)
-	ddcal=zeros(nt, nr)
-	
-	# initial values are random
-	wav=randn(nt)
-	dwav=zeros(nt,nr)
-	gf=zeros(ntgf,nr)
-	dgf=zeros(gf)
 
 	# use maximum threads for fft
 	fft_threads &&  (FFTW.set_num_threads(Sys.CPU_CORES))
 
-	# convert initial model to the inversion variable
-	xgf = zeros(ntgf*nr);
-	last_xgf = randn(size(xgf)) # reset last_x
-
 	# dummy dfgf for optimization, to be updated later
 	dfgf = OnceDifferentiable(x -> randn(),   (storage, x) -> randn())
-
-	xwav = zeros(nt);
-	last_xwav = randn(size(xwav)) # reset last_x
 
 	# dummy, to be updated later
 	dfwav = OnceDifferentiable(x -> randn(),   (storage, x) -> randn())
 
-	# create dummy gfobs if necessary
-	(gfobs===nothing) && (gfobs=zeros(gf))
-	# create dummy wavobs if necessary
-	(wavobs===nothing) && (wavobs=zeros(wav))
+	# create models depending on mode
+	if(mode==1)
+		obs=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nr,), wavlags=[nt-1, 0])
+		cal=deepcopy(obs)
+	elseif(mode==2)
+		obs=Conv.Param(ntwav=2*nt-1, ntd=2*nt-1, ntgf=2*ntgf-1, dims=(nr,), wavlags=[nt-1, nt-1], dlags=[nt-1, nt-1], gflags=[ntgf-1, ntgf-1])
+		cal=deepcopy(obs)
+	end
+	calsave=deepcopy(cal);
 
-	# create gf precon
-	(gfprecon===nothing) && (gfprecon=ones(gf))
-	(gfweights===nothing) && (gfweights=ones(gf))
-
-	# create gf precon
-	(wavprecon===nothing) && (wavprecon=ones(wav))
+	# initial values are random
+	dwav=zeros(cal.wav)
+	dgf=zeros(cal.gf)
+	ddcal=zeros(cal.d)
+	
+	# inversion variables allocation
+	xgf = zeros(length(cal.gf));
+	xwav = zeros(nt-1);
+	last_xgf = randn(size(xgf)) # reset last_x
+	last_xwav = randn(size(xwav)) # reset last_x
 
 	wavnorm_flag ?	(wavnormmat=zeros(nt, nt)) : (wavnormmat=zeros(1,1))
 	wavnorm_flag ?	(dwavnorm=zeros(nt)) : (dwavnorm=zeros(1))
 
-	obs=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nr,), 
-		wavlags=[nt-1, 0], d=dobs, gf=gfobs,wav=repeat(wavobs,outer=(1,nr)))
-	cal=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nr,), 
-		wavlags=[nt-1, 0], d=similar(dobs), gf=gf,wav=repeat(wav,outer=(1,nr)))
+	err=DataFrame(gf=[], gf_nodecon=[], wav=[],d=[])
 
+	pa=Param(ntgf,nt,nr,
+	  zeros(ntgf,nr), zeros(nt),
+	  zeros(nt, nr),
+	  obs,cal,calsave, dgf,dwav,ddcal,
+	  zeros(cal.gf), zeros(cal.gf),
+	  zeros(cal.gf),
+	  zeros(xwav), zeros(xwav),
+	  wavnorm_flag,wavnormmat,
+	  dwavnorm,attrib_inv,verbose,xgf,last_xgf,dfgf,xwav,last_xwav,dfwav, err,
+	  mode)
 
-	pa=Param(ntgf,nt,nr,obs,cal,dgf,dwav,ddcal,gfprecon,gfweights,wavprecon,wavnorm_flag,wavnormmat,
-	  dwavnorm,attrib_inv,verbose,xgf,last_xgf,dfgf,xwav,last_xwav,dfwav)
+	add_gfprecon!(pa, gfprecon)
+	add_gfweights!(pa, gfweights)
+	add_wavprecon!(pa, wavprecon)
  
-	if iszero(pa.obs.d) 
-		(iszero(pa.obs.gf) | iszero(pa.obs.wav)) && error("need gfobs and wavobs")
-		Conv.mod!(pa.obs, :d)
+	# fix obs as necessary
+	if(!(dobs===nothing))
+		for i in eachindex(pa.dobs)
+			pa.dobs[i]=dobs[i]
+		end
+		if(mode==1)
+			copy!(pa.obs.d, dobs) 
+		elseif(mode==2)
+			dobs=Conv.xcorr(dobs) # do a cross-correlation 
+			copy!(pa.obs.d, dobs) 
+		end
+
+	elseif(!(gfobs===nothing || wavobs===nothing))
+		for i in eachindex(pa.gfobs)
+			pa.gfobs[i]=gfobs[i]
+		end# save gfobs, before modifying
+		for i in eachindex(pa.wavobs)
+			pa.wavobs[i]=wavobs[i]
+		end# save gfobs, before modifying
+			
+		obstemp=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nr,), wavlags=[nt-1, 0])
+		copy!(obstemp.gf, pa.gfobs)
+		copy!(obstemp.wav, repmat(pa.wavobs,1,nr))
+		Conv.mod!(obstemp, :d) # model observed data
+		copy!(pa.dobs, obstemp.d)
+
+		if(mode==2)
+			gfobs=Conv.xcorr(gfobs)
+			wavobs=Conv.xcorr(wavobs)
+		end
+		copy!(pa.obs.gf, gfobs)
+		replace_obswav!(pa, wavobs)
+		Conv.mod!(pa.obs, :d) # model observed data
+	else
+		error("need gfobs and wavobs")
 	end
 
 	initialize!(pa)
@@ -114,6 +160,36 @@ function Param(ntgf, nt, nr;
 	return pa
 	
 end
+
+function add_gfprecon!(pa::Param, gfprecon=nothing)
+	# create gf precon
+	(gfprecon===nothing) && (gfprecon=ones(pa.cal.gf))
+
+	copy!(pa.gfprecon, gfprecon)		
+	copy!(pa.gfpreconI, pa.gfprecon)
+	for i in eachindex(gfprecon)
+		if(!(iszero(gfprecon[i])))
+			pa.gfpreconI[i]=inv(pa.gfprecon[i])
+		end
+	end
+end
+function add_wavprecon!(pa::Param, wavprecon=nothing)
+	# create gf precon
+	(wavprecon===nothing) && (wavprecon=ones(pa.xwav))
+	copy!(pa.wavprecon, wavprecon)
+	copy!(pa.wavpreconI, pa.wavprecon)
+	for i in eachindex(wavprecon)
+		if(!(iszero(wavprecon[i])))
+			pa.wavpreconI[i]=inv(pa.wavprecon[i])
+		end
+	end
+end
+function add_gfweights!(pa::Param, gfweights=nothing)
+	(gfweights===nothing) && (gfweights=ones(gf))
+	copy!(pa.gfweights, gfweights)
+end
+
+
 
 function update_func_grad!(pa; gfoptim=nothing, wavoptim=nothing, gfαvec=nothing, wavαvec=nothing)
 	# they will be changed in this program, so make a copy 
@@ -165,7 +241,7 @@ function update_func_grad!(pa; gfoptim=nothing, wavoptim=nothing, gfαvec=nothin
 
 	pa.attrib_inv=:wav
 	# multi-objective framework
-	paMOwav=Inversion.ParamMO(noptim=length(wavoptim), ninv=pa.nt, αvec=wavαvec,
+	paMOwav=Inversion.ParamMO(noptim=length(wavoptim), ninv=length(pa.xwav), αvec=wavαvec,
 			    		optim_func=optim_funcwav,optim_grad=optim_gradwav,
 					x_init=randn(length(pa.xwav),10))
 	pa.dfwav = OnceDifferentiable(x -> paMOwav.func(x, paMOwav),         
@@ -189,26 +265,46 @@ function ninv(pa)
 	end
 end
 
+"""
+compute errors
+update pa.err
+print?
+give either cal or calsave?
+"""
+function err!(pa::Param; cal=pa.cal) 
+	xgf_nodecon=Conv.xcorr(pa.dobs, lags=[pa.ntgf-1, pa.ntgf-1])
+	xgfobs=Conv.xcorr(pa.gfobs, iref=1) # compute xcorr with reference gf
+	if(pa.mode==1) 
+		fwav = Misfits.error_after_normalized_autocor(cal.wav, pa.obs.wav)
+		xgfcal=Conv.xcorr(cal.gf, iref=1) # compute xcorr with reference gf
+		fgf = Misfits.error_squared_euclidean!(nothing, xgfcal, xgfobs, nothing, norm_flag=true)
+	elseif(pa.mode==2)
+		fgf = Misfits.error_squared_euclidean!(nothing, cal.gf, pa.obs.gf, nothing, norm_flag=true)
+		fwav = Misfits.error_squared_euclidean!(nothing, cal.wav, pa.obs.wav, nothing, norm_flag=true)
+	end
+	fgf_nodecon = Misfits.error_squared_euclidean!(nothing, xgf_nodecon, xgfobs, nothing, norm_flag=true)
+	f = Misfits.error_squared_euclidean!(nothing, cal.d, pa.obs.d, nothing, norm_flag=true)
 
-function error(pa) 
-	fwav = Misfits.error_after_normalized_autocor(pa.cal.wav, pa.obs.wav)
-	fgf = Misfits.error_after_normalized_autocor(pa.cal.gf, pa.obs.gf)
-	f = Misfits.error_squared_euclidean!(nothing, pa.cal.d, pa.obs.d, nothing, norm_flag=true)
-
-	println("Blind Decon\t")
-	println("===========")
-	println("error in estimated wavelet:\t", fwav)
-	println("error after autocor in estimated Green Functions:\t", fgf)
-	println("normalized error in the data:\t", f)
-
-	return fwav, fgf, f
+	push!(pa.err[:wav],fwav)
+	push!(pa.err[:d],f)
+	push!(pa.err[:gf],fgf)
+	push!(pa.err[:gf_nodecon],fgf_nodecon)
+	println("Blind Decon Errors\t")
+	println("==================")
+	show(pa.err)
 end 
 
 
 function model_to_x!(x, pa)
 	if(pa.attrib_inv == :wav)
-		for i in eachindex(x)
-			x[i]=pa.cal.wav[i,1]*pa.wavprecon[i] # just take any one receiver
+		if(pa.mode==1)
+			for i in eachindex(x)
+				x[i]=pa.cal.wav[i,1]*pa.wavprecon[i] # just take any one receiver
+			end
+		elseif(pa.mode==2)
+			for i in eachindex(x)
+				x[i]=pa.cal.wav[i+pa.nt,1]*pa.wavprecon[i] # just take any one receiver and only positive lags
+			end
 		end
 	else(pa.attrib_inv == :gf)
 		for i in eachindex(x)
@@ -221,25 +317,31 @@ end
 
 function x_to_model!(x, pa)
 	if(pa.attrib_inv == :wav)
-		xn=vecnorm(x)
-		for j in 1:pa.nr
-			for i in 1:pa.nt
-				if(iszero(pa.wavprecon[i]))
-					pa.cal.wav[i,j]=0.0
-				else
+		if(pa.mode==1)
+			for j in 1:pa.nr
+				for i in 1:pa.nt
 					# put same in all receivers
-					pa.cal.wav[i,j]=x[i]/pa.wavprecon[i]
+					pa.cal.wav[i,j]=x[i]*pa.wavpreconI[i]
+				end
+			end
+			if(pa.wavnorm_flag)
+				xn=vecnorm(x)
+				scale!(pa.cal.wav, inv(xn))
+			end
+		elseif(pa.mode==2)
+			for j in 1:pa.nr
+				pa.cal.wav[pa.nt,j]=1.0
+				for i in 1:pa.nt-1
+					# put same in all receivers
+					pa.cal.wav[pa.nt+i,j]=x[i]*pa.wavpreconI[i]
+					# put same in negative lags
+					pa.cal.wav[pa.nt-i,j]=x[i]*pa.wavpreconI[i]
 				end
 			end
 		end
-		pa.wavnorm_flag && (scale!(pa.cal.wav, inv(xn)))
 	else(pa.attrib_inv == :gf)
 		for i in eachindex(pa.cal.gf)
-			if(iszero(pa.gfprecon[i]))
-				pa.cal.gf[i]=0.0
-			else
-				pa.cal.gf[i]=x[i]/pa.gfprecon[i]
-			end
+			pa.cal.gf[i]=x[i]*pa.gfpreconI[i]
 		end
 	end
 	return pa
@@ -289,6 +391,16 @@ function func_grad!(storage, x::AbstractVector{Float64},pa)
 
 end
 
+"""
+update calsave only when error in d is low
+"""
+function update_calsave!(pa)
+	f1=Misfits.error_squared_euclidean!(nothing, pa.calsave.d, pa.obs.d, nothing, norm_flag=true)
+	f2=Misfits.error_squared_euclidean!(nothing, pa.cal.d, pa.obs.d, nothing, norm_flag=true)
+	if(f2<f1)
+		pa.calsave=deepcopy(pa.cal)
+	end
+end
 
 # add model based constraints here
 
@@ -321,11 +433,19 @@ function Fadj!(pa, x, storage, dcal)
 	storage[:] = 0.
 	if(pa.attrib_inv == :wav)
 		Conv.mod!(pa.cal, :wav, d=dcal, wav=pa.dwav)
-
-		# stack ∇wav along receivers
-		for i in 1:size(pa.dwav,2)             
-			for j in 1:size(pa.dwav,1)
-				storage[j] += pa.dwav[j,i]
+		if(pa.mode==1)
+			# stack ∇wav along receivers
+			for i in 1:size(pa.dwav,2)             
+				for j in 1:size(pa.dwav,1)
+					storage[j] += pa.dwav[j,i]
+				end
+			end
+		elseif(pa.mode==2)
+			for i in 1:size(pa.dwav,2)             
+				for j in 1:pa.nt-1
+					storage[j] += pa.dwav[pa.nt-j,i] # -ve lags
+					storage[j] += pa.dwav[pa.nt+j,i] # -ve lags
+				end
 			end
 		end
 
@@ -382,6 +502,20 @@ function update!(pa::Param, x, df; store_trace::Bool=false,
 	return res
 end
 
+function replace_obswav!(pa::Param, wav)
+	if(length(wav)==length(pa.obs.wav))
+		copy!(pa.obs.wav, wav)
+	elseif(length(wav)==size(pa.obs.wav,1))
+		for j in 1:pa.nr, i in 1:size(pa.obs.wav,1)
+				pa.obs.wav[i,j]=wav[i]
+		end
+	else
+		error("invalid input wav")
+	end
+	# observed data changes as well :)
+	Conv.mod!(pa.obs,:d)
+end
+
 function update_gf!(pa, xgf,  dfgf)
 	pa.attrib_inv=:gf    
 	resgf = update!(pa, xgf,  dfgf)
@@ -396,25 +530,45 @@ function update_wav!(pa, xwav, dfwav)
 	return fwav
 end
 
+
+"""
+Remove preconditioners from pa
+"""
 function remove_gfprecon!(pa)
 	for i in eachindex(pa.gfprecon)
 		if(pa.gfprecon[i]≠0.0)
 			pa.gfprecon[i]=1.0
+			pa.gfpreconI[i]=1.0
 		end
 	end
 end
 
 """
+Remove weights from pa
+"""
+function remove_gfweights!(pa)
+	for i in eachindex(pa.gfweights)
+		if(pa.gfweights[i]≠0.0)
+			pa.gfweights[i]=1.0
+		end
+	end
+end
+
+
+"""
 * re_init_flag :: re-initialize inversions with random input or not?
 """
-function update_all!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothing, roundtrip_tol=1e-3)
+function update_all!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothing, roundtrip_tol=1e-6,
+		     optim_tols=[1e-6, 1e-6])
 
 	if(ParamAM_func===nothing)
-		ParamAM_func=x->Inversion.ParamAM(x, optim_tols=[1e-5, 1e-5],name="Blind Decon",
+		ParamAM_func=x->Inversion.ParamAM(x, optim_tols=optim_tols,name="Blind Decon",
 				    roundtrip_tol=roundtrip_tol, max_roundtrips=max_roundtrips,
 				    max_reroundtrips=max_reroundtrips,
 				    min_roundtrips=10,
-				    reinit_func=x->initialize!(pa))
+				    reinit_func=x->initialize!(pa),
+				    after_reroundtrip_func=x->(err!(pa); update_calsave!(pa);),
+				    )
 	end
 
 	
@@ -427,19 +581,35 @@ function update_all!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=n
 	Inversion.go(paam)
 
 	# print errors
-	error(pa)
+	err!(pa)
+	println(" ")
 end
 
 
 function initialize!(pa)
-	# starting random models
-	for i in 1:pa.nt
-		x=randn()
-		for j in 1:pa.nr
-			pa.cal.wav[i,j]=x
+	if(pa.mode==1)
+		# starting random models
+		for i in 1:pa.nt
+			x=(pa.wavprecon[i]≠0.0) ? randn() : 0.0
+			for j in 1:pa.nr
+				pa.cal.wav[i,j]=x
+			end
 		end
+	elseif(pa.mode==2)
+		for i in 1:pa.nt-1
+			x=(pa.wavprecon[i]≠0.0) ? randn() : 0.0
+			for j in 1:pa.nr
+				pa.cal.wav[pa.nt+i,j]=x*0.0
+				pa.cal.wav[pa.nt-i,j]=x*0.0
+			end
+		end
+		pa.cal.wav[pa.nt,:]=1.0
+
 	end
-	randn!(pa.cal.gf)
+	for i in eachindex(pa.cal.gf)
+		x=(pa.gfprecon[i]≠0.0) ? randn() : 0.0
+		pa.cal.gf[i]=x
+	end
 end
 
 
@@ -454,7 +624,7 @@ Create preconditioners using the observed Green Functions.
 function create_weights(ntgf, nt, gfobs; αexp=0.0, cflag=true,
 		       max_tfrac_gfprecon=1.0)
 	
-	ntgfprecon=max_tfrac_gfprecon*ntgf;
+	ntgfprecon=round(Int,max_tfrac_gfprecon*ntgf);
 
 	nr=size(gfobs,2)
 	wavprecon=ones(nt)
@@ -465,18 +635,30 @@ function create_weights(ntgf, nt, gfobs; αexp=0.0, cflag=true,
 	for ir in 1:nr
 		gf=normalize(view(gfobs,:,ir))
 		indz=findfirst(x->abs(x)>1e-6, gf)
-		for i in 1:ntgf
-			if(i<indz)
-				cflag && (gfprecon[i,ir]=0.0)
-				cflag && (gfweights[i,ir]=0.0)
-			elseif(i>indz & i<indz+ntgfprecon)
-				(indz≠0) && (gfweights[i,ir]=exp(αexp*(i-indz-1)/ntgf))  # exponential weights
-				(indz≠0) && (gfprecon[i,ir]=exp(αexp*(i-indz-1)/ntgf))  # exponential weights
-			else
+	#	if(indz > 1) 
+	#		indz -= 1 # window one sample less than actual
+	#	end
+		if(!cflag && indz≠0)
+			indz=1
+		end
+		if(indz≠0)
+			for i in 1:indz-1
 				gfprecon[i,ir]=0.0
 				gfweights[i,ir]=0.0
 			end
-
+			for i in indz:indz+ntgfprecon
+				if(i≤ntgf)
+					gfweights[i,ir]=exp(αexp*(i-indz-1)/ntgf)  # exponential weights
+					gfprecon[i,ir]=exp(αexp*(i-indz-1)/ntgf)  # exponential weights
+				end
+			end
+			for i in indz+ntgfprecon+1:ntgf
+				gfprecon[i,ir]=0.0
+				gfweights[i,ir]=0.0
+			end
+		else
+			gfprecon[:,ir]=0.0
+			gfweights[:,ir]=0.0
 		end
 	end
 
@@ -487,37 +669,102 @@ end
 @userplot Plot
 
 
-@recipe function f(p::Plot, rvec=nothing)
+@recipe function f(p::Plot; rvec=nothing, δt=1.0)
 	pa=p.args[1]
 	(rvec===nothing) && (rvec=1:pa.nr)
 
+	gfxobs=zeros(2*size(pa.obs.gf,1)-1, size(pa.obs.gf,2))
+	gfxcal=similar(gfxobs)
+	scobs=vecnorm(pa.obs.gf[:,1])^2
+	sccal=vecnorm(pa.cal.gf[:,1])^2
+	for ir in 1:pa.nr
+		gfxobs[:,ir] = xcorr(pa.obs.gf[:,1], pa.obs.gf[:, ir])/scobs
+		gfxcal[:,ir] = xcorr(pa.cal.gf[:,1], pa.cal.gf[:, ir])/sccal
+	end
+	#
+	gf=collect(1:pa.ntgf)*δt
+	gfx=collect(-pa.ntgf+1:1:pa.ntgf-1)*δt
+
 	# time vectors
 	# autocorr wav
-	awavobs=autocor(pa.obs.wav, 1:pa.nt-1, demean=true)
-	awav=autocor(pa.wav, 1:pa.nt-1, demean=true)
+	awavobs=autocor(pa.obs.wav[:,1], 1:pa.nt-1, demean=true)
+	awav=autocor(pa.cal.wav[:,1], 1:pa.nt-1, demean=true)
 	wavli=max(maximum(abs,awavobs), maximum(abs,awav))
 	# autocorr gf 
 	agfobs=autocor(pa.obs.gf,1:pa.ntgf-1, demean=true)
 	agf=autocor(pa.cal.gf,1:pa.ntgf-1, demean=true)
 	gfli=max(maximum(abs,agfobs), maximum(abs,agf))
 
-	# cut receivers
-	dcal=pa.cal.d[:,rvec]
-	dobs=pa.obs.d[:,rvec]
+	nwav=length(awavobs)
+	fact=(nwav>1000) ? round(Int,nwav/1000) : 1
 
-	layout := (5,3)
+	awavobs=awavobs[1:fact:nwav] # resample
+	awav=awav[1:fact:nwav] # resample
+
+	fact=(pa.nt*pa.nr>1000) ? round(Int,pa.nt*pa.nr/1000) : 1
+	# cut receivers
+#	dcal=pa.cal.d[1:fact:pa.nt*pa.nr]
+#	dobs=pa.obs.d[1:fact:pa.nt*pa.nr]
+
+	layout := (3,2)
 
 	@series begin        
 		subplot := 1
 #		aspect_ratio := :auto
 		legend := false
-		pa.obs.wav
+		l := :stem
+		title := "Observed GF"
+		w := 3
+		gf, pa.obs.gf
 	end
 	@series begin        
 		subplot := 2
+#		aspect_ratio := :auto
 		legend := false
-		pa.obs.gf
+		l := :stem
+		title := "Modelled GF"
+		w := 3
+		gf, pa.cal.gf
 	end
+	@series begin        
+		subplot := 3
+#		aspect_ratio := :auto
+		legend := false
+		l := :stem
+		title := "Observed GFX"
+		w := 3
+		gfx, gfxobs
+	end
+	@series begin        
+		subplot := 4
+#		aspect_ratio := :auto
+		legend := false
+		title := "Calculated GFX"
+		l := :stem
+		w := 3
+		gfx, gfxcal
+	end
+
+
+	@series begin        
+		subplot := 5
+		aspect_ratio := :equal
+		seriestype := :scatter
+		title := "Scatter GF"
+		legend := false
+		gfxobs, gfxcal
+	end
+
+	@series begin        
+		subplot := 6
+		aspect_ratio := :equal
+		seriestype := :scatter
+		title := "Scatter Wav"
+		legend := false
+		awavobs, awav
+	end
+
+
 #
 #	@series begin        
 #		subplot := 3
@@ -583,15 +830,7 @@ end
 #
 #
 #
-#	@series begin        
-#		subplot := 13
-#		aspect_ratio := :equal
-#		seriestype := :histogram2d
-#		title := "Scatter Wav"
-#		legend := false
-#		awavobs, awav
-#	end
-#
+
 #	@series begin        
 #		subplot := 14
 #		aspect_ratio := :equal
@@ -610,8 +849,88 @@ end
 #		pa.obs.d, pa.cal.d
 #	end
 #
+end
 
 
+
+"""
+Save Param
+"""
+function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
+	!(isdir(folder)) && error("invalid directory")
+
+
+	(tgridgf===nothing) && (tgridgf = Grid.M1D(0.0, (pa.ntgf-1)*1.0, pa.ntgf))
+
+	# save original gf
+	file=joinpath(folder, "gfobs.csv")
+	CSV.write(file,DataFrame(hcat(tgridgf.x, pa.gfobs)))
+	file=joinpath(folder, "gfcal.csv")
+	CSV.write(file,DataFrame(hcat(tgridgf.x, pa.calsave.gf)))
+
+	# compute cross-correlations of gf
+	xtgridgf=Grid.M1D_xcorr(tgridgf); # grid
+	if(pa.mode==1)
+		xgfobs=Conv.xcorr(pa.gfobs)
+	elseif(pa.mode==2)
+		xgfobs=pa.obs.gf
+	end
+	file=joinpath(folder, "xgfobs.csv")
+	CSV.write(file,DataFrame(hcat(xtgridgf.x, xgfobs)))
+	if(pa.mode==1)
+		xgfcal=Conv.xcorr(pa.cal.gf)
+	elseif(pa.mode==2)
+		xgfcal=pa.calsave.gf
+	end
+	file=joinpath(folder, "xgfcal.csv")
+	CSV.write(file,DataFrame(hcat(xtgridgf.x,xgfcal)))
+
+	# compute cross-correlations without blind Decon
+	xgf_nodecon=Conv.xcorr(pa.dobs, lags=[pa.ntgf-1, pa.ntgf-1])
+	file=joinpath(folder, "xgf_nodecon.csv")
+	CSV.write(file,DataFrame(hcat(xtgridgf.x,xgf_nodecon)))
+
+	# cross-plot of gf
+	file=joinpath(folder, "gfcross.csv")
+	CSV.write(file,DataFrame( hcat(vec(xgfobs), vec(xgfcal))))
+	file=joinpath(folder, "gfcross_nodecon.csv")
+	CSV.write(file,DataFrame( hcat(vec(xgfobs), vec(xgf_nodecon))))
+
+
+	# compute autocorrelations of source
+	xwavobs=autocor(pa.obs.wav[:,1], 1:pa.nt-1, demean=true)
+	xwavcal=autocor(pa.calsave.wav[:,1], 1:pa.nt-1, demean=true)
+	wavmat=hcat(vec(xwavobs), vec(xwavcal))
+	scale!(wavmat, inv(maximum(abs, wavmat)))
+	
+
+	# resample wav, final sample should not exceed 1000
+	nwav=length(xwavobs)
+	fact=(nwav>1000) ? round(Int,nwav/1000) : 1
+	xwavobs=xwavobs[1:fact:nwav] # resample
+	xwavcal=xwavcal[1:fact:nwav] # resample
+
+	# x plots of wav
+	file=joinpath(folder, "wavcross.csv")
+	CSV.write(file,DataFrame(wavmat))
+
+	# x plots of data
+	dcal=pa.calsave.d
+	dobs=pa.obs.d
+	nd=length(dcal);
+	fact=(nd>1000) ? round(Int,nd/1000) : 1
+	dcal=dcal[1:fact:nd]
+	dobs=dobs[1:fact:nd]
+	datmat=hcat(vec(dcal), vec(dobs))
+	scale!(datmat, inv(maximum(abs, datmat)))
+
+	file=joinpath(folder, "datcross.csv")
+	CSV.write(file,DataFrame( datmat))
+
+	# finally save err
+	err!(pa, cal=pa.calsave) # compute err in calsave 
+	file=joinpath(folder, "err.csv")
+	CSV.write(file, pa.err)
 end
 
 end # module

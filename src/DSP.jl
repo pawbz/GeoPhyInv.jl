@@ -219,33 +219,25 @@ function findfreq{ND}(
 		  threshold::Float64=-50.
 		  )
 
-nfft = nextpow2(tgrid.nx);
-# npow2 grid for time
-tnpow2grid = Grid.M1D_fft(nfft, tgrid.δx);
-# corresponding npow2 frequency grid 
-fnpow2grid = Grid.M1D_fft(tnpow2grid);
+	cx=rfft(x,[1]);
+	fgrid=Grid.M1D_rfft(tgrid);
 
-cx = fill(complex(0.0,0.0),nfft);
-cx[1:tgrid.nx] = complex.(x,0.0);
+	ax = (abs.(cx).^2); # power spectrum in dB
 
-cx = fft(cx);
-ax = (abs.(cx).^2); # power spectrum in dB
-ax[fnpow2grid.x .< 0.] = 0. # remove negative frequencies
+	if(maximum(ax) == 0.0)
+		warn("x is zero"); return 0.0
+	else 
+		ax /= maximum(ax);
+		ax = 10. .* log10.(ax)
+	end
 
-if(maximum(ax) == 0.0)
-	warn("x is zero"); return 0.0
-else 
-	ax /= maximum(ax);
-	ax = 10. .* log10.(ax)
-end
-
-if(attrib == :max)
-	return maximum(fnpow2grid.x[ax .>= threshold])
-elseif(attrib == :min)
-	return minimum(fnpow2grid.x[ax .>= threshold])
-elseif(attrib == :peak)
-	return fnpow2grid.x[indmax(ax)]
-end
+	if(attrib == :max)
+		return maximum(fgrid.x[findlast(ax .>= threshold)])
+	elseif(attrib == :min)
+		return minimum(fgrid.x[findfirst(ax .>= threshold)])
+	elseif(attrib == :peak)
+		return fgrid.x[indmax(ax)]
+	end
 
 end
 

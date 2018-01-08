@@ -7,6 +7,8 @@ import JuMIT.Acquisition
 import JuMIT.Grid
 import JuMIT.Data
 import JuMIT.Models
+import JuMIT.Conv
+
 
 
 #"""
@@ -229,38 +231,48 @@ function Seismic(model::Models.Seismic;
 end
 
 
-function DeConv(pa; rvec=collect(1:pa.nr))
-	gfobs=reshape(pa.obs.gf, (pa.ntgf, pa.nr))
-	gf=reshape(pa.cal.gf, (pa.ntgf, pa.nr))
-	dobs=real.(reshape(pa.obs.d, (pa.nt, pa.nr)))
-	dcal=real.(reshape(pa.cal.d, (pa.nt, pa.nr)))
+function DeConv(pa; rvec=collect(1:pa.nr), cal=pa.calsave)
+	## extract data to be plotted
+	#gfobs=reshape(pa.obs.gf, (pa.ntgf, pa.nr))
+	#gf=reshape(cal.gf, (pa.ntgf, pa.nr))
+	#dobs=real.(reshape(pa.obs.d, (pa.nt, pa.nr)))
+	#dcal=real.(reshape(cal.d, (pa.nt, pa.nr)))
+	gfobs=pa.obs.gf
+	gf=cal.gf
+	dobs=pa.obs.d
+	dcal=cal.d
+	wavobs=pa.obs.wav[:,1];
+	wavcal=cal.wav[:,1];
+	
+
 	nrow=9
 	ncol=2
 	iff=0
 	fig=figure(figsize=(12,15))
 	iff += 1;subplot(nrow,ncol,iff)
-	plot(pa.obs.wav)
+	plot(wavobs)
 	title("Actual S")
 	grid()
 	iff += 1;subplot(nrow,ncol,iff)
 	plot(gfobs[:,rvec])
-	title("Actual G")
+	title("Actual GG*")
 	grid()
 	iff += 1;subplot(nrow,ncol,iff)
-	plot(pa.cal.wav)
+	plot(wavcal)
 	title("Estimated S")
 	grid()
 	#
 	iff += 1;subplot(nrow,ncol,iff)
 	plot(gf[:,rvec])
-	title("Estimated G")
+	title("Estimated GG*")
 	grid()
 	#-----------------------
-	awavobs=autocor(pa.obs.wav, 1:pa.nt-1, demean=true)
-	awav=autocor(pa.cal.wav, 1:pa.nt-1, demean=true)
+	awavobs=autocor(wavobs, 1:pa.nt-1, demean=true)
+	awav=autocor(wavcal, 1:pa.nt-1, demean=true)
 	wavli= any(isnan.(awavobs)) ? maximum(abs,awav) : max(maximum(abs,awavobs), maximum(abs,awav))
-	agfobs=autocor(gfobs,1:pa.ntgf-1, demean=true)
-	agf=autocor(gf,1:pa.ntgf-1, demean=true)
+	agfobs=Conv.xcorr(pa.obs.gf, iref=3) # compute xcorr with reference gf
+	agf=Conv.xcorr(cal.gf, iref=3) # compute xcorr with reference gf
+	agfvec=-size(pa.obs.gf,1)+1:1:size(pa.obs.gf,1)-1
 	gfli=max(maximum(abs,agfobs), maximum(abs,agf))
 	#-----------------------
 	iff += 1;subplot(nrow,ncol,iff)
@@ -276,13 +288,13 @@ function DeConv(pa; rvec=collect(1:pa.nr))
 	grid()
 	#
 	iff += 1;subplot(nrow,ncol,iff)
-	plot(agfobs[:,rvec])
+	plot(agfvec, agfobs[:,rvec])
 	ylim(-gfli, gfli)
 	grid()
 	title("Actual GG\$^*\$")
 	#
 	iff += 1;subplot(nrow,ncol,iff)
-	plot(agf[:,rvec])
+	plot(agfvec, agf[:,rvec])
 	ylim(-gfli, gfli)
 	title("Estimated GG\$^*\$")
 	grid()
@@ -294,6 +306,7 @@ function DeConv(pa; rvec=collect(1:pa.nr))
 	iff += 1;subplot(nrow,ncol,iff)
 	plot(dcal[:,rvec])
 	title("Estimated D")
+	grid()
 	#
 	iff += 1;subplot(nrow,ncol,iff)
 	mscatter(awavobs, awav, "Crossplot - SS\$^*\$")
@@ -302,7 +315,7 @@ function DeConv(pa; rvec=collect(1:pa.nr))
 	iff += 1;subplot(nrow,ncol,iff)
 	mscatter(dobs, dcal, "Crossplot - D")
 	iff += 1;subplot(nrow,ncol,iff)
-	plot(pa.gfprecon)
+	plot(pa.gfprecon[:,rvec])
 	title("G PRECON")
 	grid()
 	iff += 1;subplot(nrow,ncol,iff)
@@ -310,7 +323,7 @@ function DeConv(pa; rvec=collect(1:pa.nr))
 	title("WAVPRECON")
 	grid()
 	iff += 1;subplot(nrow,ncol,iff)
-	plot(pa.gfweights)
+	plot(pa.gfweights[:,rvec])
 	title("G WEIGHTS")
 	grid()
 	tight_layout()

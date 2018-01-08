@@ -91,15 +91,13 @@ n2=128
 
 using BenchmarkTools
 # check if mod! will not have any allocations
-for n in [10, 1000, 10000]
-	println("====================")
-	s=zeros(n,n)
-	r=zeros(n,n)
-	w=zeros(n,n)
-	pa=JuMIT.Conv.Param(d=s,gf=r,wav=w,dims=(n,), ntgf=n, ntd=n, ntwav=n);
+n=1000
+println("====================")
+s=zeros(n,n)
+r=zeros(n,n)
+w=zeros(n,n)
+pa=JuMIT.Conv.Param(d=s,gf=r,wav=w,dims=(n,), ntgf=n, ntd=n, ntwav=n);
 
-	@time JuMIT.Conv.mod!(pa, :d)
-	@time JuMIT.Conv.mod!(pa, :gf)
-	@time JuMIT.Conv.mod!(pa, :wav)
-end
-
+@btime JuMIT.Conv.mod!(pa, :d)
+@btime JuMIT.Conv.mod!(pa, :gf)
+@btime JuMIT.Conv.mod!(pa, :wav)
