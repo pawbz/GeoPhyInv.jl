@@ -277,13 +277,13 @@ function DeConv(pa; rvec=collect(1:pa.nr), cal=pa.calsave)
 	#-----------------------
 	iff += 1;subplot(nrow,ncol,iff)
 	(any(isnan.(awavobs))) || plot(awavobs)
-	ylim(-wavli, wavli)
+	#ylim(-wavli, wavli)
 	title("Actual SS\$^*\$")
 	grid()
 	#
 	iff += 1;subplot(nrow,ncol,iff)
 	plot(awav)
-	ylim(-wavli, wavli)
+	#ylim(-wavli, wavli)
 	title("Estimated SS\$^*\$")
 	grid()
 	#

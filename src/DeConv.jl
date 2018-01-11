@@ -20,7 +20,8 @@ mutable struct Param
 	ntgf::Int64
 	nt::Int64
 	nr::Int64
-	gfobs::Array{Float64, 2} # save, before modyfying it in obs
+	nra::Int64 # save actual nr here, as for mode==2: nr=nr*nr
+	gfobs::Array{Float64, 2} # save, before modifying it in obs
 	wavobs::Vector{Float64} # save, before modifying it in obs
 	dobs::Array{Float64,2} # save before modifying it
 	obs::Conv.Param{Float64,2} # observed convolutional model
@@ -77,10 +78,12 @@ function Param(ntgf, nt, nr;
 	dfwav = OnceDifferentiable(x -> randn(),   (storage, x) -> randn())
 
 	# create models depending on mode
+	nra=nr
 	if(mode==1)
 		obs=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nr,), wavlags=[nt-1, 0])
 		cal=deepcopy(obs)
 	elseif(mode==2)
+		nr=nr*nr
 		obs=Conv.Param(ntwav=2*nt-1, ntd=2*nt-1, ntgf=2*ntgf-1, dims=(nr,), wavlags=[nt-1, nt-1], dlags=[nt-1, nt-1], gflags=[ntgf-1, ntgf-1])
 		cal=deepcopy(obs)
 	end
@@ -103,8 +106,9 @@ function Param(ntgf, nt, nr;
 	err=DataFrame(gf=[], gf_nodecon=[], wav=[],d=[])
 
 	pa=Param(ntgf,nt,nr,
-	  zeros(ntgf,nr), zeros(nt),
-	  zeros(nt, nr),
+		 nra,
+	  zeros(ntgf,nra), zeros(nt),
+	  zeros(nt, nra),
 	  obs,cal,calsave, dgf,dwav,ddcal,
 	  zeros(cal.gf), zeros(cal.gf),
 	  zeros(cal.gf),
@@ -137,9 +141,9 @@ function Param(ntgf, nt, nr;
 			pa.wavobs[i]=wavobs[i]
 		end# save gfobs, before modifying
 			
-		obstemp=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nr,), wavlags=[nt-1, 0])
+		obstemp=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nra,), wavlags=[nt-1, 0])
 		copy!(obstemp.gf, pa.gfobs)
-		copy!(obstemp.wav, repmat(pa.wavobs,1,nr))
+		copy!(obstemp.wav, repmat(pa.wavobs,1,nra))
 		Conv.mod!(obstemp, :d) # model observed data
 		copy!(pa.dobs, obstemp.d)
 
@@ -273,10 +277,10 @@ give either cal or calsave?
 """
 function err!(pa::Param; cal=pa.cal) 
 	xgf_nodecon=Conv.xcorr(pa.dobs, lags=[pa.ntgf-1, pa.ntgf-1])
-	xgfobs=Conv.xcorr(pa.gfobs, iref=1) # compute xcorr with reference gf
+	xgfobs=Conv.xcorr(pa.gfobs) # compute xcorr with reference gf
 	if(pa.mode==1) 
 		fwav = Misfits.error_after_normalized_autocor(cal.wav, pa.obs.wav)
-		xgfcal=Conv.xcorr(cal.gf, iref=1) # compute xcorr with reference gf
+		xgfcal=Conv.xcorr(cal.gf) # compute xcorr with reference gf
 		fgf = Misfits.error_squared_euclidean!(nothing, xgfcal, xgfobs, nothing, norm_flag=true)
 	elseif(pa.mode==2)
 		fgf = Misfits.error_squared_euclidean!(nothing, cal.gf, pa.obs.gf, nothing, norm_flag=true)
@@ -666,16 +670,18 @@ end
 
 function create_white_weights(ntgf, nt, nr)
 	wavprecon=ones(nt)
-	gfprecon=ones(2*ntgf-1, nr);
-	for i in 1:ntgf-1    
-		gfprecon[ntgf+i,1]=0.0    
-		gfprecon[ntgf-i,1]=0.0
-	end
-	gfweights=zeros(2*ntgf-1, nr);
-	gfweights[ntgf,1]=0.0
-	for i in 1:ntgf-1
-		gfweights[ntgf+i,1]=i*2
-		gfweights[ntgf-i,1]=i*2
+	gfprecon=ones(2*ntgf-1, nr*nr);
+	gfweights=zeros(2*ntgf-1, nr*nr);
+	for ir in 1:nr
+		for i in 1:ntgf-1    
+			gfprecon[ntgf+i,ir+(ir-1)*nr]=0.0    
+			gfprecon[ntgf-i,ir+(ir-1)*nr]=0.0
+		end
+		gfweights[ntgf,ir+(ir-1)*nr]=0.0
+		for i in 1:ntgf-1
+			gfweights[ntgf+i,ir+(ir-1)*nr]=i*2
+			gfweights[ntgf-i,ir+(ir-1)*nr]=i*2
+		end
 	end
 	return gfprecon, gfweights, wavprecon
 end
@@ -879,8 +885,12 @@ function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
 	# save original gf
 	file=joinpath(folder, "gfobs.csv")
 	CSV.write(file,DataFrame(hcat(tgridgf.x, pa.gfobs)))
-	file=joinpath(folder, "gfcal.csv")
-	CSV.write(file,DataFrame(hcat(tgridgf.x, pa.calsave.gf)))
+	# save for imagesc
+	file=joinpath(folder, "imgfobs.csv")
+	CSV.write(file,DataFrame(hcat(repeat(tgridgf.x,outer=pa.nra),
+				      repeat(1:pa.nra,inner=pa.ntgf),vec(pa.gfobs))),)
+	# file=joinpath(folder, "gfcal.csv")
+	# CSV.write(file,DataFrame(hcat(tgridgf.x, pa.calsave.gf)))
 
 	# compute cross-correlations of gf
 	xtgridgf=Grid.M1D_xcorr(tgridgf); # grid
@@ -904,6 +914,11 @@ function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
 	file=joinpath(folder, "xgf_nodecon.csv")
 	CSV.write(file,DataFrame(hcat(xtgridgf.x,xgf_nodecon)))
 
+	# compute cross-correlation of source wavelet
+	xwavobs=Conv.xcorr(pa.wavobs, lags=[pa.ntgf-1, pa.ntgf-1])
+	file=joinpath(folder, "xwavobs.csv")
+	CSV.write(file,DataFrame(hcat(xtgridgf.x,xwavobs)))
+
 	# cross-plot of gf
 	file=joinpath(folder, "gfcross.csv")
 	CSV.write(file,DataFrame( hcat(vec(xgfobs), vec(xgfcal))))
@@ -912,8 +927,13 @@ function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
 
 
 	# compute autocorrelations of source
-	xwavobs=autocor(pa.obs.wav[:,1], 1:pa.nt-1, demean=true)
-	xwavcal=autocor(pa.calsave.wav[:,1], 1:pa.nt-1, demean=true)
+	if(pa.mode==1)
+		xwavobs=autocor(pa.obs.wav[:,1], 1:pa.nt-1, demean=true)
+		xwavcal=autocor(pa.calsave.wav[:,1], 1:pa.nt-1, demean=true)
+	elseif(pa.mode==2)
+		xwavobs=pa.obs.wav[:,1]
+		xwavcal=pa.calsave.wav[:,1]
+	end
 	wavmat=hcat(vec(xwavobs), vec(xwavcal))
 	scale!(wavmat, inv(maximum(abs, wavmat)))
 	

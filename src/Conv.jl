@@ -236,8 +236,12 @@ function pad_truncate!{T}(
 end
 
 
-function xcorr(A::AbstractArray{Float64}; lags=[size(A,1)-1, size(A,1)-1], iref=1)
-	Ax=zeros(sum(lags)+1, size(A,2))
+function xcorr(A::AbstractArray{Float64}; lags=[size(A,1)-1, size(A,1)-1], iref=0)
+	nr=size(A,2)
+	if(iref==0)
+		iref=1:nr
+	end
+	Ax=zeros(sum(lags)+1, size(A,2)*length(iref))
 	return xcorr!(Ax, A; lags=lags, iref=iref)
 end
 
@@ -250,11 +254,15 @@ It has some allocations, use carefully
 By default, Ax has almost same positive and negative lags.
 """
 function xcorr!(Ax::AbstractArray{Float64}, 
-		  A::AbstractArray{Float64}; lags=nothing, iref=1)
+		  A::AbstractArray{Float64}; lags=nothing, iref=0)
+
+	nr=size(A,2)
+	if(iref==0)
+		iref=1:nr
+	end
 
 	(!(lags===nothing)) &&	(size(Ax,1) ≠ sum(lags) + 1) && error("size Ax")
-	(size(Ax,2) ≠ size(A,2)) && error("same second dimension for Ax A")
-	nr=size(A,2)
+	(size(Ax,2) ≠ size(A,2)*length(iref)) && error("same second dimension for Ax A")
 	nt=size(A,1)
 	ntwav=size(Ax,1)
 
@@ -264,18 +272,23 @@ function xcorr!(Ax::AbstractArray{Float64},
 	# allocate pa
 	pa=Param(ntgf=nt, ntd=nt, ntwav=ntwav, gf=gf, wav=wav, d=d, wavlags=lags)
 
-	a=view(A,:,iref)
-	α=(vecnorm(a)^2)
-	α = (iszero(α)) ? 1.0 : inv(α) # take inverse if not zero
-	
-	copy!(pa.d, a)
-	for ir in 1:nr
-		b=view(A,:,ir)
-		c=view(Ax,:,ir)
-		copy!(pa.gf, b)
-		mod!(pa, :wav)
-		copy!(c, pa.wav)
-		scale!(c, α)
+
+	irrr=0
+	for irr in iref
+		irrr += 1
+		a=view(A,:,irr)
+		α=(vecnorm(a)^2)
+		α = (iszero(α)) ? 1.0 : inv(α) # take inverse if not zero
+		
+		copy!(pa.d, a)
+		for ir in 1:nr
+			b=view(A,:,ir)
+			c=view(Ax,:,ir+(irrr-1)*nr)
+			copy!(pa.gf, b)
+			mod!(pa, :wav)
+			copy!(c, pa.wav)
+			scale!(c, α)
+		end
 	end
 	return Ax
 end
