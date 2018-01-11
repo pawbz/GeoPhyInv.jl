@@ -121,42 +121,47 @@ function Param(ntgf, nt, nr;
 	add_gfweights!(pa, gfweights)
 	add_wavprecon!(pa, wavprecon)
  
-	# fix obs as necessary
+	if(!(gfobs===nothing))
+		for i in eachindex(pa.gfobs)
+			pa.gfobs[i]=gfobs[i]
+		end# save gfobs, before modifying
+	end
+
+	if(!(wavobs===nothing))
+		for i in eachindex(pa.wavobs)
+			pa.wavobs[i]=wavobs[i]
+		end# save gfobs, before modifying
+	end
+
 	if(!(dobs===nothing))
 		for i in eachindex(pa.dobs)
 			pa.dobs[i]=dobs[i]
 		end
-		if(mode==1)
-			copy!(pa.obs.d, dobs) 
-		elseif(mode==2)
-			dobs=Conv.xcorr(dobs) # do a cross-correlation 
-			copy!(pa.obs.d, dobs) 
-		end
-
-	elseif(!(gfobs===nothing || wavobs===nothing))
-		for i in eachindex(pa.gfobs)
-			pa.gfobs[i]=gfobs[i]
-		end# save gfobs, before modifying
-		for i in eachindex(pa.wavobs)
-			pa.wavobs[i]=wavobs[i]
-		end# save gfobs, before modifying
-			
+	else # otherwise perform modelling
+		(iszero(pa.gfobs) || iszero(pa.wavobs)) && error("need gfobs and wavobs")
 		obstemp=Conv.Param(ntwav=nt, ntd=nt, ntgf=ntgf, dims=(nra,), wavlags=[nt-1, 0])
 		copy!(obstemp.gf, pa.gfobs)
 		copy!(obstemp.wav, repmat(pa.wavobs,1,nra))
 		Conv.mod!(obstemp, :d) # model observed data
 		copy!(pa.dobs, obstemp.d)
-
-		if(mode==2)
-			gfobs=Conv.xcorr(gfobs)
-			wavobs=Conv.xcorr(wavobs)
-		end
-		copy!(pa.obs.gf, gfobs)
-		replace_obswav!(pa, wavobs)
-		Conv.mod!(pa.obs, :d) # model observed data
-	else
-		error("need gfobs and wavobs")
 	end
+
+	if(mode==1)
+		gfobs=pa.gfobs
+		wavobs=pa.wavobs
+		dobs=pa.dobs
+	elseif(mode==2)
+		gfobs=Conv.xcorr(pa.gfobs)
+		wavobs=Conv.xcorr(pa.wavobs)
+		dobs=Conv.xcorr(pa.dobs) # do a cross-correlation 
+	end
+
+	# obs.gf <-- gfobs
+	copy!(pa.obs.gf, gfobs)
+	# obs.wav <-- wavobs
+	replace_obswav!(pa, wavobs)
+	# obs.d <-- dobs
+	copy!(pa.obs.d, dobs) 
 
 	initialize!(pa)
 	update_func_grad!(pa,gfoptim=gfoptim,wavoptim=wavoptim,gfαvec=gfαvec,wavαvec=wavαvec)
