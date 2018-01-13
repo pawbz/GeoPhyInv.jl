@@ -906,6 +906,10 @@ function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
 	end
 	file=joinpath(folder, "xgfobs.csv")
 	CSV.write(file,DataFrame(hcat(xtgridgf.x, xgfobs)))
+
+	file=joinpath(folder, "imxgfobs.csv")
+	CSV.write(file,DataFrame(hcat(repeat(xtgridgf.x,outer=pa.nra),
+				      repeat(1:pa.nra,inner=xtgridgf.nx),vec(xgfobs[:,1:pa.nra]))),)
 	if(pa.mode==1)
 		xgfcal=Conv.xcorr(pa.cal.gf)
 	elseif(pa.mode==2)
@@ -913,11 +917,18 @@ function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
 	end
 	file=joinpath(folder, "xgfcal.csv")
 	CSV.write(file,DataFrame(hcat(xtgridgf.x,xgfcal)))
+	file=joinpath(folder, "imxgfcal.csv")
+	CSV.write(file,DataFrame(hcat(repeat(xtgridgf.x,outer=pa.nra),
+				      repeat(1:pa.nra,inner=xtgridgf.nx),vec(xgfcal[:,1:pa.nra]))),)
 
 	# compute cross-correlations without blind Decon
 	xgf_nodecon=Conv.xcorr(pa.dobs, lags=[pa.ntgf-1, pa.ntgf-1])
 	file=joinpath(folder, "xgf_nodecon.csv")
 	CSV.write(file,DataFrame(hcat(xtgridgf.x,xgf_nodecon)))
+
+	file=joinpath(folder, "imxgf_nodecon.csv")
+	CSV.write(file,DataFrame(hcat(repeat(xtgridgf.x,outer=pa.nra),
+				      repeat(1:pa.nra,inner=xtgridgf.nx),vec(xgf_nodecon[:,1:pa.nra]))),)
 
 	# compute cross-correlation of source wavelet
 	xwavobs=Conv.xcorr(pa.wavobs, lags=[pa.ntgf-1, pa.ntgf-1])

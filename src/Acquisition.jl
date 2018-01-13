@@ -14,6 +14,8 @@ import JuMIT.Models
 import JuMIT.Wavelets
 import JuMIT.DSP
 using Distributions
+using DataFrames
+using CSV
 
 """
 Acquisiton has supersources, sources and receivers.
@@ -681,4 +683,14 @@ function Src_getvec(src::Vector{Src}, field::Symbol)
 	return vec(hcat(hcat(vect...)...))
 end
 
+function save(geom, folder)
+	!(isdir(folder)) && error("invalid directory")
+	for iss in 1:geom.nss
+		file=joinpath(folder, string("s", iss, ".csv"))
+		CSV.write(file,DataFrame(hcat(geom.sx[iss], geom.sz[iss])))
+		file=joinpath(folder, string("r", iss, ".csv"))
+		CSV.write(file,DataFrame(hcat(geom.rx[iss], geom.rz[iss])))
+	end
+end
+	
 end # module

@@ -136,13 +136,8 @@ function TD_noise_corr!(dataout, data, irref)
 		dd=data.d[iss, ifield]
 		ddo=dataout.d[iss, ifield]
 
-		for  ir = 1:nr[iss]
-			ddv=view(dd,:, ir)
-			ddvr=view(dd,:, irref)
-			ddov=view(ddo,:,ir)
+		Conv.xcorr!(ddo, dd, iref=irref)
 
-			Conv.mod!(ddv, ddvr, ddov, :wav)
-		end
 	end
 
 	return dataout

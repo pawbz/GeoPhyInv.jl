@@ -6,6 +6,8 @@ module Models
 import JuMIT.Grid
 import JuMIT.Interpolation
 import JuMIT.Smooth
+using DataFrames
+using CSV
 
 """
 Data type fo represent a seismic model.
@@ -734,5 +736,28 @@ end
 #
 #macro inter
 
+function save(mod::Seismic, folder)
+	!(isdir(folder)) && error("invalid directory")
+
+	nx=mod.mgrid.nx
+	nz=mod.mgrid.nz
+	n=max(nx,nz);
+	fact=(n>20) ? round(Int,n/20) : 1
+	mgrid=Grid.M2D_resamp(mod.mgrid, mod.mgrid.δx*fact, mod.mgrid.δz*fact)
+	x=mgrid.x
+	z=mgrid.z
+	nx=length(x)
+	nz=length(z)
+	modo=Seismic_zeros(mgrid)
+	Seismic_interp_spray!(mod, modo, :interp)
+
+	for m in [:vp, :ρ, :Zp]
+		# save original gf
+		file=joinpath(folder, string("im", m, ".csv"))
+		CSV.write(file,DataFrame(hcat(repeat(z,outer=nx),
+					      repeat(x,inner=nz),vec(Seismic_get(modo, m)))))
+	end
+end
+	
 
 end # module
