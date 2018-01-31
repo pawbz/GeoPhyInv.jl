@@ -238,13 +238,36 @@ end
 """
 Grid with both positive and negative samples for a given lag.
 Construction makes sure that the number of output grid samples is odd.
+
+* xlag if scalar use same for both +ve and -ve lags, otherwise give vector
+
+# Output
+* Grid with both +ve and-ve lags
+* number of +ve and -ve lags
 """
-function M1D_lag(xlag::Float64, δx::Float64)
-	x1=[tt for tt in 0.0:-δx:-xlag]
-	x = vcat(flipdim(x1,1), -1.0.*x1[2:end])
-	δx = length(x)==1 ? 0. : x[2]-x[1]
-	isodd(length(x)) ? nothing : error("error in creating lag grid")
-	return M1D(x, size(x,1), δx)
+function M1D_lag(xlag, δx::Float64)
+	if(length(xlag)==1)
+		xlag=[xlag[1],xlag[1]]
+	end
+	nplag=round(Int,xlag[1]/δx)
+	nnlag=round(Int,xlag[2]/δx)
+	x=[0.0]
+	x1=[(it-1)*δx for it in 2:nplag]
+	if(x1≠[])
+		x=vcat(x,x1)
+	end
+	x2=[(it-1)*δx for it in 2:nnlag]
+	if(x2≠[])
+		x=vcat(-1.*flipdim(x2,1),x)
+	end
+	if(x==[])
+		δx=0.
+		x=zeros(1)
+	end
+	if(xlag[1]==xlag[2]≠0)
+		isodd(length(x)) ? nothing : error("error in creating lag grid")
+	end
+	return M1D(x, size(x,1), δx), [nplag, nnlag]
 end
 
 """

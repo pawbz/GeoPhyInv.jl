@@ -33,20 +33,22 @@ Time-domain source and receiver filters.
 * `tgridrf::Grid.M1D` : a  time grid for receiver filters with both positive and negative lags
 * `acqgeom::Acquisition.Geom` : acquisition geometry
 """
-type TD
+mutable struct TD
 	ssf::Array{Array{Float64,1},2}
 	rf::Array{Array{Float64,2},2}
 	fields::Vector{Symbol}
 	tgridssf::Grid.M1D
 	tgridrf::Grid.M1D
+	ssflags::Vector{Int}
+	rflags::Vector{Int}
 	acqgeom::Acquisition.Geom
-	TD(ssf, rf, fields, tgridssf, tgridrf, acqgeom) = 
+	TD(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, acqgeom) = 
 		any([
 		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
 		  length(fields) == 0,
 		  broadcast(size,ssf) != [(tgridssf.nx,) for iss=1:acqgeom.nss, ifield=1:length(fields)]
 		  ]) ? 
-		error("error in TD construction") : new(ssf, rf, fields, tgridssf, tgridrf, acqgeom)
+		error("error in TD construction") : new(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, acqgeom)
 
 end 
 
@@ -54,9 +56,10 @@ end
 Initialize coupling filters `TD` with  delta functions.
 
 # Arguments
- 
-* `tlagssf<:Real` : maximum lag in seconds for source filter
-* `tlagrf<:Real` : maximum lag in seconds  for receiver filter
+
+* `tgriddata` : time grid of the data
+* `tlagssf_fracs::Vector{Real}` : +ve and -ve fractions of source filter
+* `tlagrf_fracs::Vector{Real}` : +ve and -ve fractions for receiver filter
 * `δt:Float64` : sampling interval in time
 * `fields::Vector{Symbol}` : number of components
 * `acqgeom::Acquisition.Geom` : acquisition geometry
@@ -65,19 +68,18 @@ Initialize coupling filters `TD` with  delta functions.
 
 * time-domain coupling filters as `TD`
 """
-function TD_delta{T<:Real}(tlagssf::T,
-		  tlagrf::T,
-		  δt::Float64,
+function TD_delta(
+			   tgriddata, 
+			   tlagssf_fracs,
+			   tlagrf_fracs,
 		  fields::Vector{Symbol},
 		  acqgeom::Acquisition.Geom
 		 )
-	tgridssf = Grid.M1D_lag(tlagssf, δt)
-	tgridrf = Grid.M1D_lag(tlagrf, δt)
-	return TD_delta(tgridssf, tgridrf, fields, deepcopy(acqgeom))
-end
+	δt=tgriddata.δx
+	tot_t=abs(tgriddata.x[end]-tgriddata.x[1])
 
-function TD_delta(tgridssf::Grid.M1D, tgridrf::Grid.M1D,
-		  fields::Vector{Symbol}, acqgeom::Acquisition.Geom )
+	tgridssf, ssflags = Grid.M1D_lag(tot_t.*tlagssf_fracs, δt)
+	tgridrf, rflags = Grid.M1D_lag(tot_t.*tlagrf_fracs, δt)
 
 	spiss = zeros(tgridssf.nx); spir = zeros(tgridrf.nx);
 	# check where to put spikes
@@ -87,10 +89,12 @@ function TD_delta(tgridssf::Grid.M1D, tgridrf::Grid.M1D,
 	spiss[nspikessf] = 1.0; spir[nspikerf] = 1.0; 
 	# number of unique receivers (implement in future)
 	# one receiver filter for each unique receiver
+
 	return TD([spiss for iss=1:acqgeom.nss, ifield=1:length(fields)],
 	   [repeat(spir, outer=[1,acqgeom.nr[iss]]) for iss=1:acqgeom.nss, ifield=1:length(fields)],
-	   fields,tgridssf,tgridrf,deepcopy(acqgeom))
+	   fields,tgridssf,tgridrf,ssflags,rflags,deepcopy(acqgeom))
 
 end
+
 
 end # module

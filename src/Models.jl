@@ -742,7 +742,7 @@ function save(mod::Seismic, folder)
 	nx=mod.mgrid.nx
 	nz=mod.mgrid.nz
 	n=max(nx,nz);
-	fact=(n>20) ? round(Int,n/20) : 1
+	fact=(n>40) ? round(Int,n/40) : 1
 	mgrid=Grid.M2D_resamp(mod.mgrid, mod.mgrid.δx*fact, mod.mgrid.δz*fact)
 	x=mgrid.x
 	z=mgrid.z

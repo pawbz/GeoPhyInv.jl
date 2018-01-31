@@ -114,7 +114,7 @@ end
 Correlating noise records with reference records
 * `irref` : reference receiver
 """
-function TD_noise_corr(data::Data.TD; tlagfrac=0.5, irref=1,)
+function TD_noise_corr(data::Data.TD; tlagfrac=0.5, irref=[1],)
 
 	# tgrid after correlation
 	tt = data.tgrid.x[end]-data.tgrid.x[1]
@@ -129,6 +129,8 @@ end
 function TD_noise_corr!(dataout, data, irref)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	
 	fields=data.fields
+	ntlag=Int((dataout.tgrid.nx-1)/2)
+	paxcorr=Conv.Param_xcorr(data.tgrid.nx,2*ntlag+1,irref,[ntlag, ntlag],false)
 
 	nto = dataout.tgrid.nx;
 	isodd(nto) || error("odd samples in output data required")
@@ -136,7 +138,7 @@ function TD_noise_corr!(dataout, data, irref)
 		dd=data.d[iss, ifield]
 		ddo=dataout.d[iss, ifield]
 
-		Conv.xcorr!(ddo, dd, iref=irref)
+		Conv.xcorr!(ddo, dd, paxcorr)
 
 	end
 

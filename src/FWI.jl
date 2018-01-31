@@ -17,6 +17,7 @@ module FWI
 
 import JuMIT.Interpolation
 import JuMIT.Models
+import JuMIT.Conv
 import JuMIT.Grid
 import JuMIT.Acquisition
 import JuMIT.Data
@@ -76,6 +77,7 @@ type Param
 	parameterization::Vector{Symbol}
 	"model preconditioning"
 	mprecon::AbstractArray{Float64,2}
+	convmod::Matrix{Conv.Param{Float64,2}} # convolutional model for each supershot and field
 	"calculated data after applying w"
 	wdcal::Data.TD
 	"calculated data after applying w"
@@ -581,6 +583,50 @@ end
 
 
 """
+Return functional and gradient of the CLS objective 
+"""
+function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
+
+	pa.verbose && println("computing gradient...")
+
+	F!(pa, x, last_x)
+
+	# apply coupling to the modeled data
+	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
+
+	if(storage === nothing)
+		# compute misfit and δdcal
+		f = Misfits.TD!(nothing, pa.wdcal, pa.dobs, pa.dprecon)
+		return f
+	else
+
+		# compute gradient w.r.t. coupled calculated data
+		f = Misfits.TD!(pa.dfdwdcal, pa.wdcal, pa.dobs, pa.dprecon)
+
+		# compute gradient w.r.t. calculated data
+		Data.TDcoup!(pa.dfdwdcal, pa.dfdcal, pa.w, :r)
+
+		# adjoint sources
+		update_adjsrc!(pa.adjsrc, pa.dfdcal, pa.adjacqgeom)
+		Fdtd.update_acqsrc!(pa.paf, [pa.acqsrc, pa.adjsrc])
+
+		# x to model
+		Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
+
+		# do adjoint modelling here
+		Fdtd.update_model!(pa.paf.c, pa.modm)
+
+		Fadj!(pa)	
+	
+		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
+
+		return storage
+	end
+end # func_grad_xfwi!
+
+
+"""
+Cross-correlation CLS
 Return functional and gradient of the CLS objective 
 """
 function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)

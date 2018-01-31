@@ -13,7 +13,9 @@ import JuMIT.Acquisition
 import JuMIT.Grid
 import JuMIT.Interpolation
 import JuMIT.Coupling
+import JuMIT.Misfits
 import JuMIT.DSP
+using DSP
 
 """
 Time domain representation of Seismic Data.
@@ -96,7 +98,7 @@ Method to resample data in time.
 
 * data after resampling as `TD`
 """
-function TD_resamp(data::TD,
+function interp(data::TD,
 		tgrid::Grid.M1D
 		)
 	nss = data.acqgeom.nss
@@ -104,20 +106,21 @@ function TD_resamp(data::TD,
 	dataout = TD(
 	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:length(data.fields)],
 	      data.fields,tgrid,data.acqgeom)
-	TD_resamp!(dataout, data)
+	interp_spray!(dataout, data)
 	return dataout
 end
 
 
 """
 Method to resample data in time.
+Can reduce allocations =========
 
 # Arguments
 
 * `data::TD` : input data of type `TD`
 * `dataout::TD` : preallocated data of type `TD` that is modified
 """
-function TD_resamp!(dataout::TD, data::TD)
+function interp_spray!(dataout::TD, data::TD, attrib=:interp, Battrib=:B1)
 	# check if datasets are similar
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
@@ -129,7 +132,7 @@ function TD_resamp!(dataout::TD, data::TD)
 		for ir = 1:nr[iss]
 			din=view(dat,:,ir)
 			dout=view(dato,:,ir)
-			Interpolation.interp_spray!(xin, din, xout, dout,:interp,:B1)
+	 		Interpolation.interp_spray!(xin, din, xout, dout,attrib,Battrib)
 		end
 	end
 	return dataout
@@ -158,6 +161,11 @@ function Base.fill!(data::TD, k::Float64)
 		data.d[iss,ifield][:]=k 
 	end
 end
+function TD_zeros(d::TD)
+	return TD([zeros(d.tgrid.nx,d.acqgeom.nr[iss]) for iss=1:d.acqgeom.nss, ifield=1:length(d.fields)],d.fields,
+	   deepcopy(d.tgrid),deepcopy(d.acqgeom)) 
+end
+
 
 "Same as `TD_zeros`, except for returning ones"
 function TD_ones(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.Geom) 
@@ -255,6 +263,29 @@ function TD_normalize!(data::TD, attrib::Symbol=:recrms)
 	return data
 end
 
+
+function TD_filter!(data::TD; fmin=nothing, fmax=nothing)
+
+	if((fmin===nothing) && (fmax===nothing))
+		return nothing
+	end
+	fs = 1/ data.tgrid.δx;
+	designmethod = Butterworth(4);
+	filtsource = Bandpass(fmin, fmax; fs=fs);
+
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	for ifield = 1:length(data.fields), iss = 1:nss
+		dd=data.d[iss, ifield]
+		scs=vecnorm(dd,2)
+
+		for ir = 1:nr[iss]
+			ddv=view(dd, :, ir)
+
+			filt!(ddv, digitalfilter(filtsource, designmethod), ddv)
+		end
+	end
+	return data
+end
 
 """
 Construct TD using data at all the unique receiver positions
@@ -394,5 +425,105 @@ function TD_weight!(
 	end
 
 end
+
+
+
+"""
+Calculate the distance between the observed data `y` and the calculated data `x`.
+The time grid of the observed data can be different from that of the modelled data.
+The acqistion geometry of both the data sets should be the same.
+
+If `J` is the distance, the gradient of the misfit w.r.t to the calculated data is returned as `dJx`
+* `w` used for data preconditioning
+* `coupling` source and receiver coupling functions
+"""
+mutable struct Param_error
+	x::TD # modelled data
+	y::TD # observed data
+	w::TD # weights
+	xr::TD # modelled data after resampling
+	dJxr::TD # gradient w.r.t. xr
+	dJx::TD # gradient w.r.t. x
+	ynorm::Float64 # normalize functional with energy of y
+	func::Function # function to compute misfit
+end
+
+function Param_error(x,y,w=nothing, coupling=nothing)
+
+	if(coupling===nothing)
+		 coupling=Coupling.TD_delta(y.tgrid,[0.0,0.0],[0.0, 0.0], [:P], y.acqgeom)
+	end
+
+	paconvssf=Conv.Param(ntwav=couplling.tgridssf.nx, 
+		      ntd=y.tgrid.nx, 
+		      ntgf=y.tgrid.nx, 
+		      wavlags=coupling.ssflags, 
+		      dlags=[y.tgrid.nx-1, 0], 
+		      gflags=[y.tgrid.nx-1, 0])
+
+	if(w===nothing) 
+		w=Data.TD_ones(y.fields,y.tgrid,y.acqgeom)
+	end
+	!(isapprox(w,y)) && error("weights have to be similar to y")
+
+	!(isequal(x.acqgeom, y.acqgeom)) && error("observed and modelled data should have same acqgeom")
+	!(isequal(x.fields, y.fields)) && error("observed and modelled data should have same fields")
+
+	xr=TD_zeros(y)
+	dJxr=TD_zeros(y)
+	dJx=TD_zeros(x)
+
+	ynorm = dot(y, y)
+	(ynorm == 0.0) && error("y cannot be zero")
+
+	func=Misfits.error_squared_euclidean!
+
+	return Param_error(x,y,w,xr,dJxr,dJx,ynorm,func)
+end
+
+function error!(pa::Param_error, grad_flag=false)
+
+	tgrid = pa.x.tgrid;
+	acq = pa.x.acqgeom;
+	fields = pa.x.fields;
+	nss = acq.nss;
+
+	# resample xr <-- x
+	interp_spray!(pa.xr, pa.x, :interp)
+
+	J = 0.0;
+	for ifield=1:length(fields), iss=1:acq.nss
+		yy=pa.y.d[iss, ifield]
+		xx=pa.xr.d[iss,ifield]
+		ww=pa.w.d[iss,ifield]
+
+		dJxrr=pa.dJxr.d[iss, ifield]
+		
+		for ir=1:acq.nr[iss]
+			yyy=view(yy,:,ir)
+			xxx=view(xx,:,ir)
+			www=view(ww,:,ir)
+
+			if(grad_flag)
+				dJxrrr=view(dJxrr,:,ir)
+				JJ = pa.func(dJxrrr, xxx, yyy, www);
+				scale!(dJxrrr, inv(pa.ynorm))
+			else
+				JJ = pa.func(nothing, xxx, yyy, www);
+			end
+			J += JJ 
+		end
+	end
+	J /= pa.ynorm
+
+	# spray dJx <-- dJxr
+	interp_spray!(pa.dJx, pa.dJxr, :spray)
+
+	(J == 0.0) && warn("misfit computed is zero")
+
+	return J
+end
+
+
 
 end # module

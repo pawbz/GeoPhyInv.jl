@@ -92,7 +92,7 @@ function interp_spray!(xin::Vector{Float64}, yin::AbstractVector{Float64},
 		ioutmin, ioutmax = indminn_inside(xout, xin[1], xin[end])
 
 		yout[ioutmin:ioutmax] = zero(Float64);
-		@simd for i in ioutmin:ioutmax
+	 	@simd for i in ioutmin:ioutmax
 			indminn!(ivec,xin,xout[i]);
 			interp_func(i, ivec, yout, xin,yin, xout[i])
 		end
@@ -101,7 +101,9 @@ function interp_spray!(xin::Vector{Float64}, yin::AbstractVector{Float64},
 		# get 2 indices and choose the inner most one
 		iinmin, iinmax = indminn_inside(xin,xout[1],xout[end])
 
-		yout[:] = zero(Float64);
+		for i in eachindex(yout)
+			yout[i] = zero(Float64)
+		end
 		@simd for i in iinmin:iinmax
 			indminn!(ivec,xout,xin[i]);
 			spray_func(ivec, yout, xout, xin[i], yin[i])

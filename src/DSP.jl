@@ -8,6 +8,25 @@ using Distributions
 using DistributedArrays
 using DSP # from julia
 
+
+
+function chirp!(x; tgrid=nothing,
+	fmin=nothing, # minimum fraction of Nyquist sampling
+	fmax=nothing, # maximum fraction of Nyquist
+	)
+
+	fs=inv(tgrid.δx)
+	freqmin=(fmin===nothing) ? 0.0 : fmin*fs*0.5
+	freqmax=(fmax===nothing) ? fs*0.5 : fmax*fs*0.5
+
+	k=(freqmax-freqmin)*inv(tgrid.x[end]-tgrid.x[1])
+
+	for it in 1:tgrid.nx
+		t=(it-1)*tgrid.δx
+		x[it] = sin(2.*π*(freqmin*t+k/2.0*t*t))
+	end
+
+end
 """
 Random source signal models for Param.
 Generate a band-limited 
@@ -160,17 +179,22 @@ end
 randomly shift and add x to itself
 using circshift; not memory efficient
 """
-function cshift_add_rand!(x::AbstractVector; ntimes=1, tminfrac=0.0, tmaxfrac=1.0)
+function cshift_add_rand!(x::AbstractVector; ntimes=1, tminfrac=0.0, tmaxfrac=1.0, rand_amp_flag=true)
 	nt=size(x,1)
 	a=1+round(Int,tminfrac*nt)
 	b=round(Int,tmaxfrac*nt)
 
 	for it in 1:ntimes
+		if(rand_amp_flag)
+			amp=randn()
+		else
+			amp=1.0
+		end
 		# a random shift
 		its=rand(DiscreteUniform(a,b))
 		xx = circshift(x,(its,)) # pre-allocate for performance?
 		for i in eachindex(x)
-			x[i] += xx[i]
+			x[i] += xx[i] * amp
 		end
 	end
 end

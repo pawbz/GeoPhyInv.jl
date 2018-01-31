@@ -46,12 +46,12 @@ end
 
 function Param(;ntwav=1, ntgf=1, ntd=1, dims=(), 
 	       d=zeros(ntd, dims...), wav=zeros(ntwav, dims...), gf=zeros(ntgf, dims...),
-	      wavlags=nothing, dlags=nothing, gflags=nothing)
+	      wavlags=nothing, dlags=nothing, gflags=nothing,
+		np2=nextfastfft(maximum([2*ntwav, 2*ntgf, 2*ntd])) # fft dimension for plan
+	      )
 	(eltype(d) ≠ eltype(wav) ≠ eltype(gf)) && error("type error")
 	T=eltype(d)
 
-	# fft dimension for plan
-	np2=nextfastfft(maximum([2*ntwav, 2*ntgf, 2*ntd]))
 	dims=size(d)[2:end]
 
 	# default lags
@@ -236,13 +236,33 @@ function pad_truncate!{T}(
 end
 
 
-function xcorr(A::AbstractArray{Float64}; lags=[size(A,1)-1, size(A,1)-1], iref=0)
+mutable struct Param_xcorr
+	paconv::Conv.Param{Float64,1}
+	iref::Vector{Int64}
+	norm_flag::Bool
+end
+
+function Param_xcorr(nt::Int64, ntwav::Int64, iref, lags, norm_flag=true)
+	wav=zeros(ntwav);
+	gf=zeros(nt);
+	d=zeros(nt);
+	paconv=Param(ntgf=nt, ntd=nt, ntwav=ntwav, gf=gf, wav=wav, d=d, wavlags=lags)
+	pa=Param_xcorr(paconv, collect(iref), norm_flag)
+	return pa
+end
+
+function xcorr(A::AbstractArray{Float64}; lags=[size(A,1)-1, size(A,1)-1], iref=0, norm_flag=true)
 	nr=size(A,2)
 	if(iref==0)
 		iref=1:nr
 	end
 	Ax=zeros(sum(lags)+1, size(A,2)*length(iref))
-	return xcorr!(Ax, A; lags=lags, iref=iref)
+
+	nt=size(A,1)
+	ntwav=size(Ax,1)
+	pa=Param_xcorr(nt, ntwav, iref, lags, norm_flag)
+
+	return xcorr!(Ax, A, pa)
 end
 
 
@@ -250,47 +270,85 @@ end
 Use first colomn of A and cross-correlate with rest of columns of it.
 And store results in Ax.
 After xcorr, the coeffcients are normalized with norm(A[:,1])
-It has some allocations, use carefully
 By default, Ax has almost same positive and negative lags.
 """
-function xcorr!(Ax::AbstractArray{Float64}, 
-		  A::AbstractArray{Float64}; lags=nothing, iref=0)
+function xcorr!(Ax::AbstractArray{Float64}, A::AbstractArray{Float64}, pa)
 
 	nr=size(A,2)
-	if(iref==0)
-		iref=1:nr
-	end
+	iref=pa.iref
+	lags=pa.paconv.wavlags
+	norm_flag=pa.norm_flag
 
-	(!(lags===nothing)) &&	(size(Ax,1) ≠ sum(lags) + 1) && error("size Ax")
+	(size(Ax,1) ≠ sum(lags) + 1) && error("size Ax")
 	(size(Ax,2) ≠ size(A,2)*length(iref)) && error("same second dimension for Ax A")
-	nt=size(A,1)
-	ntwav=size(Ax,1)
 
-	wav=zeros(ntwav);
-	gf=zeros(nt);
-	d=zeros(nt);
-	# allocate pa
-	pa=Param(ntgf=nt, ntd=nt, ntwav=ntwav, gf=gf, wav=wav, d=d, wavlags=lags)
-
+	pa=pa.paconv
 
 	irrr=0
+	α=0.0
 	for irr in iref
 		irrr += 1
 		a=view(A,:,irr)
-		α=(vecnorm(a)^2)
-		α = (iszero(α)) ? 1.0 : inv(α) # take inverse if not zero
+		if(irrr==1 && norm_flag) # save scale reference for first column only 
+			α=(vecnorm(a)^2)
+			α = (iszero(α)) ? 1.0 : inv(α) # take inverse if not zero
+		end
 		
-		copy!(pa.d, a)
+		for i in eachindex(pa.d)
+			pa.d[i]=a[i]
+		end
 		for ir in 1:nr
 			b=view(A,:,ir)
 			c=view(Ax,:,ir+(irrr-1)*nr)
-			copy!(pa.gf, b)
+			for i in eachindex(pa.gf)
+				pa.gf[i]=b[i]
+			end
 			mod!(pa, :wav)
 			copy!(c, pa.wav)
-			scale!(c, α)
+			norm_flag && scale!(c, α)
 		end
 	end
 	return Ax
+end
+
+"""
+given dJdAx and A, computes dJdA
+"""
+function xcorr_grad!(dA::AbstractArray{Float64}, dAx::AbstractArray{Float64}, A::AbstractArray{Float64}, pa)
+	nr=size(A,2)
+	iref=pa.iref
+	lags=pa.paconv.wavlags
+	pa=pa.paconv
+	irrr=0
+	α=0.0
+	scale!(dA, 0.0)
+	for irr in iref
+		irrr += 1
+		a=view(A,:,irr)
+		da=view(dA,:,irr)
+		
+		copy!(pa.d, a)
+		
+		for ir in 1:nr
+			b=view(A,:,ir)
+			db=view(dA,:,ir)
+
+			c=view(dAx,:,ir+(irrr-1)*nr)
+
+			mod!(pa, :d, wav=c, gf=b) # check
+			for i in eachindex(pa.d)
+				da[i] +=pa.d[i]
+			end
+
+			mod!(pa, :gf, wav=c, d=a) # check
+
+			for i in eachindex(pa.d)
+				db[i] +=pa.gf[i]
+			end
+		end
+	end
+	return dA
+
 end
 
 end

@@ -5,7 +5,7 @@ module Misfits
 using ForwardDiff
 using Distances
 using StatsBase
-import JuMIT.Data 
+import JuMIT.Conv 
 import JuMIT.Grid
 
 
@@ -137,42 +137,6 @@ function error_after_normalized_autocor(x::AbstractArray{Float64}, y::AbstractAr
 	return error_squared_euclidean!(nothing,  ax,   ay, nothing, norm_flag=true)
 end
 
-"""
-Input the obeserved and modelled data to output the misfit
-and the adjoint sources
-TODO: 
-
-"""
-function TD!(dfdx,
-	     x::Data.TD, 
-	     y::Data.TD, 
-	     w::Data.TD=Data.TD_ones(x.fields,x.tgrid,x.acqgeom))
-
-	# check if x and y are similar
-	tgrid = x.tgrid;
-	acq = x.acqgeom;
-	fields = x.fields;
-	nss = acq.nss;
-
-	normfact = dot(y, y)
-	(normfact == 0.0) && error("y cannot be zero")
-
-	f = 0.0;
-	for ifield=1:length(fields), iss=1:acq.nss, ir=1:acq.nr[iss]
-		if(!(dfdx === nothing))
-			ft = fg_cls!(view(dfdx.d[iss,ifield],:,ir), view(x.d[iss, ifield],:,ir), y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir]);
-			dfdx.d[iss,ifield][:,ir] /= normfact
-		else
-			ft = fg_cls!(nothing, view(x.d[iss, ifield],:,ir), y.d[iss, ifield][:,ir], w.d[iss, ifield][:, ir]);
-		end
-		"multiplication with time sampling due to integration ?"
-		f += ft / normfact #* tgrid.δx;
-	end
-	(f == 0.0) && warn("misfit computed is zero")
-
-	return f
-end
-
 
 function fg_cls!{N}(dfdx, 
 		    x::AbstractArray{Float64,N}, 
@@ -223,26 +187,28 @@ function error_squared_euclidean!(dfdx,  x,   y,   w; norm_flag=false)
 	return J
 end
 
-
-function error_weighted_norm!(dfdx,  err,   w)
+"""
+Computed the weighted norm of 
+"""
+function error_weighted_norm!(dfdx,  x,   w)
 	J=zero(Float64)
 	if(w===nothing)
-		for i in eachindex(err)
-			J += (err[i]) * (err[i])
+		for i in eachindex(x)
+			J += (x[i]) * (x[i])
 		end
 	else
-		for i in eachindex(err)
-			J += w[i] * (err[i]) * (err[i])
+		for i in eachindex(x)
+			J += w[i] * (x[i]) * (x[i])
 		end
 	end
 	if(!(dfdx === nothing))
 		if(w===nothing)
-			for i in eachindex(err)
-				dfdx[i] = 2.0 * (err[i])
+			for i in eachindex(x)
+				dfdx[i] = 2.0 * (x[i])
 			end
 		else
-			for i in eachindex(err)
-				dfdx[i] = 2.0 * w[i] * (err[i])
+			for i in eachindex(x)
+				dfdx[i] = 2.0 * w[i] * (x[i])
 			end
 		end
 	end
@@ -250,11 +216,88 @@ function error_weighted_norm!(dfdx,  err,   w)
 end
 
 
+"""
+Each column of the matrix x is correlated with itself,
+the energy at non-zero las will be penalized and returned as J.
+"""
+function error_acorr_weighted_norm!(dfdx, x; paconv=nothing, dfdwav=nothing)
+	nt=size(x,1)
+	nr=size(x,2)
+	# create Conv mod if not preallocated
+	if(paconv===nothing)
+		paconv=Conv.Param(ntgf=nt, ntd=nt, ntwav=2*nt-1, dims=(nr,), wavlags=[nt-1, nt-1])
+	end
 
-function fg_cls_conv(r, s, w)
+	copy!(paconv.gf,x)
+	copy!(paconv.d,x)
 
+	Conv.mod!(paconv, :wav)
+	wav=paconv.wav
+	J=0.0
+	for ir in 1:nr
+		for it in 1:size(wav,1)
+			J += (wav[it,ir]) * (wav[it,ir]) * abs((nt-it)/(nt-1))
+		end
+	end
+
+	if(!(dfdx===nothing))
+
+		if(dfdwav===nothing)
+			dfdwav=zeros(paconv.wav)
+		end
+		for ir in 1:nr
+			for it in 1:size(wav,1)
+				dfdwav[it,ir] = 2.0 * (wav[it,ir]) * abs((nt-it)/(nt-1))
+			end
+		end
+
+		Conv.mod!(paconv, :gf, gf=dfdx, wav=dfdwav)
+
+		scale!(dfdx, 2.)
+	end
+
+	return J
 
 end
 
+"""
+type for corr_squared_euclidean
+"""
+mutable struct Param_CSE
+	paxcorr::Conv.Param_xcorr
+	Ax::Matrix{Float64}
+	dAx::Matrix{Float64}
+end
+
+
+function Param_CSE(nt,nr)
+	paxcorr=Conv.Param_xcorr(nt,2*nt-1,1:nr,[nt-1, nt-1], false)
+	Ax=zeros(2*nt-1,nr*nr)
+	Ay=zeros(2*nt-1,nr*nr)
+	dAx=zeros(2*nt-1,nr*nr)
+	return Param_CSE(paxcorr, Ax, dAx)
+end
+
+function error_corr_squared_euclidean!(dfdx,  x,   Ay;  pa=nothing)
+	nt=size(x,1)
+	nr=size(x,2)
+	if(pa===nothing)
+		pa=Param_CSE(nt,nr)
+	end
+	Ax=pa.Ax
+	dfdAx=pa.dAx
+	pa=pa.paxcorr
+
+	Conv.xcorr!(Ax, x, pa)
+
+	if(dfdx===nothing)
+		J=error_squared_euclidean!(nothing,  Ax,   Ay,   nothing, norm_flag=false)
+	else
+		J=error_squared_euclidean!(dfdAx,  Ax,   Ay,   nothing, norm_flag=false)
+		Conv.xcorr_grad!(dfdx, dfdAx, x, pa)
+	end
+
+	return J
+end
 
 end # module

@@ -121,6 +121,7 @@ function spectra(tgrid, wav)
 	ylabel("power (dB)");
 	xlabel("frequency (Hz)");
 	plot(fgrid.x, powwavdb)
+	return fgrid.x, powwavdb
 end
 
 
@@ -270,8 +271,8 @@ function DeConv(pa; rvec=collect(1:pa.nr), cal=pa.calsave)
 	awavobs=autocor(wavobs, 1:pa.nt-1, demean=true)
 	awav=autocor(wavcal, 1:pa.nt-1, demean=true)
 	wavli= any(isnan.(awavobs)) ? maximum(abs,awav) : max(maximum(abs,awavobs), maximum(abs,awav))
-	agfobs=Conv.xcorr(pa.obs.gf, iref=3) # compute xcorr with reference gf
-	agf=Conv.xcorr(cal.gf, iref=3) # compute xcorr with reference gf
+	agfobs=Conv.xcorr(pa.obs.gf, iref=[1]) # compute xcorr with reference gf
+	agf=Conv.xcorr(cal.gf, iref=[1]) # compute xcorr with reference gf
 	agfvec=-size(pa.obs.gf,1)+1:1:size(pa.obs.gf,1)-1
 	gfli=max(maximum(abs,agfobs), maximum(abs,agf))
 	#-----------------------

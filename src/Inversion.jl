@@ -360,11 +360,11 @@ function finite_difference!{S <: Number, T <: Number}(f::Function,
 	x::Vector{S},
 	g::Vector{T},
 	dtype::Symbol)
+
+	g[:]=zero(T)
 	# What is the dimension of x?
 	n = length(x)
 
-	gpar = SharedArray{eltype(g)}(size(g))
-	xpar = SharedArray{eltype(x)}(size(x)); xpar = x;
 	# Iterate over each dimension of the gradient separately.
 	# Use xplusdx to store x + dx instead of creating a new vector on each pass.
 	# Use xminusdx to store x - dx instead of creating a new vector on each pass.
@@ -380,21 +380,20 @@ function finite_difference!{S <: Number, T <: Number}(f::Function,
 			g[i] = (f_xplusdx - f_x) / epsilon
 		end
 	elseif dtype == :central
-		@sync @parallel for i = 1:n
-			@centralrule xpar[i] epsilon
-			oldx = xpar[i]
-			xpar[i] = oldx + epsilon
-			f_xplusdx = f(xpar)
-			xpar[i] = oldx - epsilon
-			f_xminusdx = f(xpar)
-			xpar[i] = oldx
-			gpar[i] = (f_xplusdx - f_xminusdx) / (epsilon + epsilon)
+		for i = 1:n
+			@centralrule x[i] epsilon
+			oldx = x[i]
+			x[i] = oldx + epsilon
+			f_xplusdx = f(x)
+			x[i] = oldx - epsilon
+			f_xminusdx = f(x)
+			x[i] = oldx
+			g[i] = (f_xplusdx - f_xminusdx) / (epsilon + epsilon)
 		end
 	else
 		error("dtype must be :forward or :central")
 	end
 
-	g[:] = copy(gpar);
 	return g
 end
 
