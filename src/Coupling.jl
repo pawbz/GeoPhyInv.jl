@@ -90,9 +90,11 @@ function TD_delta(
 	# number of unique receivers (implement in future)
 	# one receiver filter for each unique receiver
 
-	return TD([spiss for iss=1:acqgeom.nss, ifield=1:length(fields)],
+	ssf=[spiss for iss=1:acqgeom.nss, ifield=1:length(fields)]
+
+	return TD(ssf,
 	   [repeat(spir, outer=[1,acqgeom.nr[iss]]) for iss=1:acqgeom.nss, ifield=1:length(fields)],
-	   fields,tgridssf,tgridrf,ssflags,rflags,deepcopy(acqgeom))
+	   fields,tgridssf,tgridrf,ssflags,rflags,deepcopy(acqgeom), dJssf)
 
 end
 

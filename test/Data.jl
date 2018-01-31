@@ -18,6 +18,8 @@ randn!(x.d[1,1])
 
 pa=JuMIT.Data.Param_error(x,y);
 
+pa.coupling
+
 function err(xvec)
 
 	for i in eachindex(x.d[1,1])

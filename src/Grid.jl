@@ -256,10 +256,12 @@ function M1D_lag(xlag, δx::Float64)
 	if(x1≠[])
 		x=vcat(x,x1)
 	end
+	nplag=length(x1)
 	x2=[(it-1)*δx for it in 2:nnlag]
 	if(x2≠[])
 		x=vcat(-1.*flipdim(x2,1),x)
 	end
+	nnlag=length(x2)
 	if(x==[])
 		δx=0.
 		x=zeros(1)
@@ -267,7 +269,7 @@ function M1D_lag(xlag, δx::Float64)
 	if(xlag[1]==xlag[2]≠0)
 		isodd(length(x)) ? nothing : error("error in creating lag grid")
 	end
-	return M1D(x, size(x,1), δx), [nplag, nnlag]
+	return M1D(x, size(x,1), δx), [nplag, nnlag] # lags are one less because of zero lag
 end
 
 """

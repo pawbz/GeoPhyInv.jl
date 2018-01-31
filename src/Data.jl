@@ -11,6 +11,7 @@ module Data
 
 import JuMIT.Acquisition
 import JuMIT.Grid
+import JuMIT.Conv
 import JuMIT.Interpolation
 import JuMIT.Coupling
 import JuMIT.Misfits
@@ -444,22 +445,36 @@ mutable struct Param_error
 	xr::TD # modelled data after resampling
 	dJxr::TD # gradient w.r.t. xr
 	dJx::TD # gradient w.r.t. x
+	dJssf::Matrix{Vector{Float64}} # gradient w.r.t source filters
 	ynorm::Float64 # normalize functional with energy of y
+	coup::Coupling.TD
+	paconvssf::Conv.Param{Float64,1} # convolutional model for source filters
+	paconvrf::Conv.Param{Float64,1} # convolutional model for receiver filters
 	func::Function # function to compute misfit
+	dJxc::Vector{Float64} # temp array of length nt
 end
 
-function Param_error(x,y,w=nothing, coupling=nothing)
+function Param_error(x,y,w=nothing, coup=nothing)
 
-	if(coupling===nothing)
-		 coupling=Coupling.TD_delta(y.tgrid,[0.0,0.0],[0.0, 0.0], [:P], y.acqgeom)
+	if(coup===nothing)
+		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.acqgeom)
 	end
 
-	paconvssf=Conv.Param(ntwav=couplling.tgridssf.nx, 
+	paconvssf=Conv.Param(ntwav=coup.tgridssf.nx, 
 		      ntd=y.tgrid.nx, 
 		      ntgf=y.tgrid.nx, 
-		      wavlags=coupling.ssflags, 
+		      wavlags=coup.ssflags, 
 		      dlags=[y.tgrid.nx-1, 0], 
 		      gflags=[y.tgrid.nx-1, 0])
+
+	paconvrf=Conv.Param(ntwav=coup.tgridrf.nx, 
+		      ntd=y.tgrid.nx, 
+		      ntgf=y.tgrid.nx, 
+		      wavlags=coup.rflags, 
+		      dlags=[y.tgrid.nx-1, 0], 
+		      gflags=[y.tgrid.nx-1, 0])
+
+	dJssf=deepcopy(ssf)
 
 	if(w===nothing) 
 		w=Data.TD_ones(y.fields,y.tgrid,y.acqgeom)
@@ -477,11 +492,12 @@ function Param_error(x,y,w=nothing, coupling=nothing)
 	(ynorm == 0.0) && error("y cannot be zero")
 
 	func=Misfits.error_squared_euclidean!
+	dJxc=zeros(y.tgrid.nx)
 
-	return Param_error(x,y,w,xr,dJxr,dJx,ynorm,func)
+	return Param_error(x,y,w,xr,dJxr,dJx,dJssf,ynorm,coup,paconvssf, paconvrf, func, dJxc)
 end
 
-function error!(pa::Param_error, grad_flag=false)
+function error!(pa::Param_error, grad=nothing)
 
 	tgrid = pa.x.tgrid;
 	acq = pa.x.acqgeom;
@@ -498,18 +514,42 @@ function error!(pa::Param_error, grad_flag=false)
 		ww=pa.w.d[iss,ifield]
 
 		dJxrr=pa.dJxr.d[iss, ifield]
+
+		wav=pa.coup.ssf[iss,ifield]
+		if(grad==:dJssf)
+			dJwav=pa.dJssf[iss,ifield]
+			dJwav[:]=0.0 # gradient is set to zero for all
+		end
 		
 		for ir=1:acq.nr[iss]
 			yyy=view(yy,:,ir)
 			xxx=view(xx,:,ir)
 			www=view(ww,:,ir)
 
-			if(grad_flag)
+			# apply source filter to xxx
+			Conv.mod!(pa.paconvssf, :d, gf=xxx, wav=wav)
+			xxxwav=pa.paconvssf.d
+
+			if(grad==:dJx)
+				# compute dJxc
+				JJ = pa.func(pa.dJxc, xxxwav, yyy, www);
+
 				dJxrrr=view(dJxrr,:,ir)
-				JJ = pa.func(dJxrrr, xxx, yyy, www);
+				# apply adjoint of source filter to dJxc
+				Conv.mod!(pa.paconvssf, :gf, gf=dJxrrr, wav=wav, d=pa.dJxc)
 				scale!(dJxrrr, inv(pa.ynorm))
+			elseif(grad==:dJssf)
+				# compute dJxc
+				JJ = pa.func(pa.dJxc, xxxwav, yyy, www);
+
+				# apply adjoint of source filter to dJxc
+				Conv.mod!(pa.paconvssf, :wav, gf=xxx, d=pa.dJxc)
+				for i in eachindex(dJwav)
+					dJwav[i]+=pa.paconvssf.wav[i] # stack gradient of ssf over all receivers
+				end
+				scale!(dJwav, inv(pa.ynorm))
 			else
-				JJ = pa.func(nothing, xxx, yyy, www);
+				JJ = pa.func(nothing, xxxwav, yyy, www);
 			end
 			J += JJ 
 		end
