@@ -77,26 +77,11 @@ type Param
 	parameterization::Vector{Symbol}
 	"model preconditioning"
 	mprecon::AbstractArray{Float64,2}
-	convmod::Matrix{Conv.Param{Float64,2}} # convolutional model for each supershot and field
-	"calculated data after applying w"
-	wdcal::Data.TD
-	"calculated data after applying w"
-	dfdwdcal::Data.TD
-	"calculated data"
-	dcal::Data.TD
-	"calculated data"
-	dfdcal::Data.TD
-	"observed data"
-	dobs::Data.TD
-	"data preconditioning"
-	dprecon::Data.TD
-	"store temporary data"
-	dtemp::Vector{Data.TD}
-	"coupling functions"
-	w::Coupling.TD
+	"compute data misfit"
+	paTD::Data.Param_error
 	verbose::Bool
+	"synthetic or field inversion"
 	attrib::Symbol
-	buffer::Any
 	"update buffer in every iteration?"
 	buffer_update_flag::Bool
 end
@@ -131,6 +116,7 @@ Constructor for `Param`
 * `modm::Models.Seismic` : seismic model on modelling mesh 
 
 # Optional Arguments
+* `tgrid_obs::Grid.M1D` : time grid for observed data
 
 * `igrid::Grid.M2D=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
 * `mprecon_factor::Float64=1` : factor to control model preconditioner, always greater than 1
@@ -138,8 +124,8 @@ Constructor for `Param`
   * `>1` means the preconditioning is switched on, larger the mprecon_factor, stronger the applied preconditioner becomes
 * `dobs::Data.TD` : observed data
 * `dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.acqgeom)` : data preconditioning, defaults to one 
-* `tlagssf::Float64=0.0` : maximum lagtime of unknown source filter
-* `tlagrf::Float64=0.0` : maximum lagtime of unknown receiver filter
+* `tlagssf_fracs=0.0` : maximum lagtime of unknown source filter
+* `tlagrf_fracs=0.0` : maximum lagtime of unknown receiver filter
 * `acqsrc_obs::Acquisition.Src=acqsrc` : source wavelets to generate *observed data*; can be different from `acqsrc`
 * `modm_obs::Models.Seismic=modm` : actual seismic model to generate *observed data*
 * `modm0::Models.Seismic=modm` : background seismic model for Born modelling and inversion (still being tested)
@@ -157,13 +143,14 @@ function Param(
 	       attrib_inv::Symbol,
 	       modm::Models.Seismic;
 	       # other optional 
+	       tgrid_obs::Grid.M1D=tgrid,
 	       recv_fields=[:P],
 	       igrid::Grid.M2D=modm.mgrid,
 	       mprecon_factor::Float64=1.0,
-	       dobs::Data.TD=Data.TD_zeros(recv_fields,tgrid,acqgeom),
-	       dprecon::Data.TD=Data.TD_ones(recv_fields,dobs.tgrid,dobs.acqgeom),
-	       tlagssf::Float64=0.0,
-	       tlagrf::Float64=0.0,
+	       dobs::Data.TD=Data.TD_zeros(recv_fields,tgrid_obs,acqgeom),
+	       dprecon=nothing,
+	       tlagssf_fracs=0.0,
+	       tlagrf_fracs=0.0,
 	       acqsrc_obs::Acquisition.Src=acqsrc,
 	       modm_obs::Models.Seismic=modm,
 	       modm0::Models.Seismic=modm,
@@ -174,22 +161,23 @@ function Param(
 	       )
 
 
-	# create modi according to igrid and  interpolation of modm
+	# create modi according to igrid and interpolation of modm
 	modi = Models.Seismic_zeros(igrid);
 	Models.Seismic_interp_spray!(modm, modi, :interp)
 
-
 	#
-	((attrib_mod == :fdtd_hborn) | (attrib_mod == :fdtd_born)) && 
-	(attrib == :synthetic) &&
-	(isequal(modm0, modm_obs)) && error("change background model used for Born modelling")
+	# need a separate model for synthetic
+	if(attrib == :synthetic) 
+		((attrib_mod == :fdtd_hborn) | (attrib_mod == :fdtd_born)) && 
+		isequal(modm0, modm_obs) && error("change background model used for Born modelling")
+		isequal(modm, modm_obs) && error("initial model same as actual model")
+	end
 
 	# acqgeom geometry for adjoint propagation
 	adjacqgeom = AdjGeom(acqgeom)
 
 	# generate adjoint sources
 	adjsrc=generate_adjsrc(recv_fields, tgrid, adjacqgeom)
-
 
 	# generating forward and adjoint modelling engines
 	# generate modelled data, border values, etc.
@@ -267,6 +255,42 @@ function Param(
 	gmodm=similar(modm)
 	gmodi=similar(modi)
 
+	# check dprecon
+	if(!(dprecon===nothing))
+		(!(isapprox(dprecon,dobs))) && error("invalid dprecon used")
+	end
+	# generate observed data if attrib is synthetic
+	if((attrib == :synthetic) & iszero(dobs))
+		# update model in the same forward engine
+		# save modm
+		modm_copy=deepcopy(modm)
+		Fdtd.update_model!(paf.c, modm_obs)
+
+		paf.c.activepw=[1,]
+		paf.c.sflags=[2, 0]
+		paf.c.illum_flag=false
+		# update sources in the forward engine
+		Fdtd.update_acqsrc!(paf, [acqsrc_obs, adjsrc])
+		paf.c.backprop_flag=0
+		paf.c.gmodel_flag=false
+
+		# F
+		Fdtd.mod!(paf);
+		dobs1=paf.c.data[1]
+		Data.interp_spray!(dobs, dobs1, :interp, :B1)
+
+	        Fdtd.initialize!(paf.c)  # clear everything
+
+		# put back model and sources
+		Fdtd.update_model!(paf.c, modm_copy)
+		Fdtd.update_acqsrc!(paf, [acqsrc, adjsrc])
+	end
+	iszero(dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
+
+	# create Parameters for data misfit
+	coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, recv_fields, acqgeom)
+	paTD=Data.Param_error(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup);
+
 	pa = Param(paf,
 	     deepcopy(acqsrc), 
 	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
@@ -277,14 +301,8 @@ function Param(
 	     gmodm,gmodi,
 	     deepcopy(mod_inv_parameterization),
 	     zeros(2,2), # dummy, update mprecon later
-	     Data.TD_zeros(recv_fields,tgrid,acqgeom), 
-	     Data.TD_zeros(recv_fields,tgrid,acqgeom), 
-	     Data.TD_zeros(recv_fields,tgrid,acqgeom), 
-	     Data.TD_zeros(recv_fields,tgrid,acqgeom), 
-	     deepcopy(dobs), deepcopy(dprecon), 
-	     [Data.TD_zeros(recv_fields,tgrid,acqgeom)], 
-	     Coupling.TD_delta(tlagssf, tlagrf, tgrid.δx, recv_fields, acqgeom), verbose, attrib,
-	     nothing, true)
+	     paTD,
+	     verbose, attrib, true)
 
 
 	# update pdcal
@@ -300,27 +318,8 @@ function Param(
 	pa.paf.c.illum_flag=false # switch off illum flag for speed
 
 	dcal=pa.paf.c.data[1]
-	copy!(pa.dcal, dcal)
+	copy!(pa.paTD.x, dcal)
 
-	# generate observed data if attrib is synthetic
-	if((attrib == :synthetic) & iszero(pa.dobs))
-		# update model in the same forward engine
-		Fdtd.update_model!(paf.c, modm_obs)
-		# update sources in the forward engine
-		Fdtd.update_acqsrc!(paf, [acqsrc_obs, adjsrc])
-		# F
-		Fdtd.mod!(pa.paf);
-		dobs=pa.paf.c.data[1]
-		copy!(pa.dobs, dobs);
-
-
-	        Fdtd.initialize!(paf.c)  # clear everything
-
-		# put back model and sources
-		Fdtd.update_model!(paf.c, modm)
-		Fdtd.update_acqsrc!(paf, [acqsrc, adjsrc])
-	end
-	iszero(pa.dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
 
 	return pa
 end
@@ -396,8 +395,9 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	Seismic_xbound!(lower_x, upper_x, pa)
 
 	if(pa.attrib_inv == :cls)
-		df = OnceDifferentiable(x -> func_grad_xfwi!(nothing, x, last_x,  pa),
-			  (storage, x) -> func_grad_xfwi!(storage, x, last_x, pa))
+		f = x -> func_grad_xfwi!(nothing, x, last_x,  pa)
+		g! = (storage, x) -> func_grad_xfwi!(storage, x, last_x, pa)
+		od = OnceDifferentiable(f, g!, x)
 		"""
 		Unbounded LBFGS inversion, only for testing
 		"""
@@ -410,7 +410,7 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 		"""
 		Bounded LBFGS inversion
 		"""
-		res = optimize(df, x, 
+		res = optimize(od, x,
 			       lower_x,
 			       upper_x,
 			       Fminbox{LBFGS}(); iterations=iterations, # actual iterations
@@ -441,7 +441,7 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 		Fdtd.mod!(pa.paf)
 
 		dcal=pa.paf.c.data[1]
-		copy!(pa.dcal, dcal)
+		copy!(pa.paTD.x, dcal)
 
 
 		# leave buffer update flag to true before leaving xfwi
@@ -529,7 +529,7 @@ function F!(pa::Param, x, last_x=[0.0])
 
 		Fdtd.mod!(pa.paf);
 		dcal=pa.paf.c.data[1]
-		copy!(pa.dcal,dcal)
+		copy!(pa.paTD.x,dcal)
 	end
 end
 
@@ -550,7 +550,7 @@ function Fborn!(pa::Param, model_pert)
 
 	Fdtd.mod!(pa.paf);
 	dcal=pa.paf.c.data[2]
-	copy!(pa.dcal,dcal)
+	copy!(pa.paTD.x,dcal)
 
 end
 "build a model precon"
@@ -591,23 +591,15 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 
 	F!(pa, x, last_x)
 
-	# apply coupling to the modeled data
-	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
-
 	if(storage === nothing)
-		# compute misfit and δdcal
-		f = Misfits.TD!(nothing, pa.wdcal, pa.dobs, pa.dprecon)
+		# compute misfit 
+		f = Data.error!(pa.paTD)
 		return f
 	else
-
-		# compute gradient w.r.t. coupled calculated data
-		f = Misfits.TD!(pa.dfdwdcal, pa.wdcal, pa.dobs, pa.dprecon)
-
-		# compute gradient w.r.t. calculated data
-		Data.TDcoup!(pa.dfdwdcal, pa.dfdcal, pa.w, :r)
+		f = Data.error!(pa.paTD, :dJx)
 
 		# adjoint sources
-		update_adjsrc!(pa.adjsrc, pa.dfdcal, pa.adjacqgeom)
+		update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
 		Fdtd.update_acqsrc!(pa.paf, [pa.acqsrc, pa.adjsrc])
 
 		# x to model
@@ -624,49 +616,6 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 	end
 end # func_grad_xfwi!
 
-
-"""
-Cross-correlation CLS
-Return functional and gradient of the CLS objective 
-"""
-function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
-
-	pa.verbose && println("computing gradient...")
-
-	F!(pa, x, last_x)
-
-	# apply coupling to the modeled data
-	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
-
-	if(storage === nothing)
-		# compute misfit and δdcal
-		f = Misfits.TD!(nothing, pa.wdcal, pa.dobs, pa.dprecon)
-		return f
-	else
-
-		# compute gradient w.r.t. coupled calculated data
-		f = Misfits.TD!(pa.dfdwdcal, pa.wdcal, pa.dobs, pa.dprecon)
-
-		# compute gradient w.r.t. calculated data
-		Data.TDcoup!(pa.dfdwdcal, pa.dfdcal, pa.w, :r)
-
-		# adjoint sources
-		update_adjsrc!(pa.adjsrc, pa.dfdcal, pa.adjacqgeom)
-		Fdtd.update_acqsrc!(pa.paf, [pa.acqsrc, pa.adjsrc])
-
-		# x to model
-		Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
-
-		# do adjoint modelling here
-		Fdtd.update_model!(pa.paf.c, pa.modm)
-
-		Fadj!(pa)	
-	
-		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
-
-		return storage
-	end
-end # func_grad_xfwi!
 
 """
 * use x and update model in pa
@@ -687,6 +636,11 @@ function Fadj!(pa::Param)
 
 end
 
+
+
+"""
+outdated
+"""
 function hessian_xfwi!(loc, pa)
 
 	model_pert = deepcopy(pa.modm)
@@ -957,38 +911,20 @@ end
 """
 Return functional and gradient of the CLS objective 
 """
-function func_grad_Coupling!(storage, x::Vector{Float64},
-			last_x::Vector{Float64}, 
-			pa::Param)
+function func_grad_Coupling!(storage, x::Vector{Float64},pa::Param)
 
 	pa.verbose ? println("computing gradient...") : nothing
 
 	# x to w 
-	Coupling_x!(pa.w, x, pa, -1)
-
-	if(x!=last_x)
-		pa.verbose ? println("updating buffer") : nothing
-		copy!(last_x, x)
-		Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
-	end
+	Coupling_x!(pa.paTD.coup, x, pa, -1)
 
 	if(storage === nothing)
-		# compute misfit and δdcal
-		f = Misfits.TD!(nothing, pa.wdcal, pa.dobs, pa.dprecon)
+		# compute misfit 
+		f = Data.error!(paTD)
 		return f
 	else
-
-		f = Misfits.TD!(pa.dfdwdcal, pa.wdcal, pa.dobs, pa.dprecon)
-
-		# allocate for w (do we need to preallocate)
-		gw = Coupling.TD_delta(pa.w.tgridssf, pa.w.tgridrf, pa.w.fields, pa.w.acqgeom)
-
-		# get gradient w.r.t. w
-		Data.TDcoup!(pa.dfdwdcal, pa.dcal, gw, :w)
-
-		# convert w to x
-		Coupling_x!(gw, storage, pa, 1)
-
+		f = Data.error!(paTD, :dJssf)
+		Coupling_gx!(storage, paTD.dJssf)
 		return storage
 	end
 end
@@ -1011,6 +947,22 @@ function Coupling_x!(w::Coupling.TD,
 		error("invalid flag")
 	end
 end
+
+"""
+Convert dJssf to gradient vector
+"""
+function Coupling_gx!(gx, dJssf)
+	ntssf=length(dJssf)[1,1]
+	g[:]=0.0
+
+	for ifield=1:length(fields), iss=1:acq.nss
+		dwav=dJssf[iss,ifield]
+		for i in eachindex(gx)
+			gx[i]=dwav[i]
+		end
+	end
+end
+
 
 
 

@@ -94,7 +94,7 @@ function TD_delta(
 
 	return TD(ssf,
 	   [repeat(spir, outer=[1,acqgeom.nr[iss]]) for iss=1:acqgeom.nss, ifield=1:length(fields)],
-	   fields,tgridssf,tgridrf,ssflags,rflags,deepcopy(acqgeom), dJssf)
+	   fields,tgridssf,tgridrf,ssflags,rflags,deepcopy(acqgeom))
 
 end
 

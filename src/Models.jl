@@ -154,12 +154,11 @@ Copy for `Seismic` models. The models should have same bounds and sizes.
 function Base.copy!(modo::Seismic, mod::Seismic)
 	if(isapprox(modo, mod))
 		for f in [:χvp, :χρ, :χvs]
-#			modof=getfield(modo,f)
-#			modf=getfield(mod,f)
-			copy!(getfield(modo,f), getfield(mod,f))
-#			for i in eachindex(modf)
-#				modof[i]=modf[i]
-#			end
+			modof=getfield(modo,f)
+			modf=getfield(mod,f)
+			for i in eachindex(modf)
+				modof[i]=modf[i]
+			end
 		end
 		return modo
 	else

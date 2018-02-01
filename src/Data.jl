@@ -454,7 +454,7 @@ mutable struct Param_error
 	dJxc::Vector{Float64} # temp array of length nt
 end
 
-function Param_error(x,y,w=nothing, coup=nothing)
+function Param_error(x,y;w=nothing, coup=nothing)
 
 	if(coup===nothing)
 		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.acqgeom)
@@ -474,7 +474,7 @@ function Param_error(x,y,w=nothing, coup=nothing)
 		      dlags=[y.tgrid.nx-1, 0], 
 		      gflags=[y.tgrid.nx-1, 0])
 
-	dJssf=deepcopy(ssf)
+	dJssf=deepcopy(coup.ssf)
 
 	if(w===nothing) 
 		w=Data.TD_ones(y.fields,y.tgrid,y.acqgeom)
@@ -563,6 +563,30 @@ function error!(pa::Param_error, grad=nothing)
 
 	return J
 end
+
+mutable struct Param_xcorr
+	# xcorr for each supersource
+	paxcorr::Matrix{Conv.Param_xcorr}
+end
+
+function xcorr!(Ad, d, pa::Param_xcorr)
+	for ifield=1:length(fields), iss=1:acq.nss
+		dd=d.d[iss, ifield]
+		Add=Ad.d[iss,ifield]
+		paa=pa[ifield,iss]
+		Conv.xcorr!(Add, dd, paa)
+	end
+end
+
+function xcorr_grad!(Ad, d, pa::Param_xcorr)
+	for ifield=1:length(fields), iss=1:acq.nss
+		dd=d.d[iss, ifield]
+		Add=Ad.d[iss,ifield]
+		paa=pa[ifield,iss]
+		Conv.xcorr!(Add, dd, paa)
+	end
+end
+
 
 
 

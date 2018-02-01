@@ -18,7 +18,6 @@ randn!(x.d[1,1])
 
 pa=JuMIT.Data.Param_error(x,y);
 
-pa.coupling
 
 function err(xvec)
 
@@ -34,7 +33,7 @@ xvec=vec(pa.x.d[1,1])
 g2=zeros(xvec)
 JuMIT.Inversion.finite_difference!(x -> err(x), xvec, g2, :central)
 
-JuMIT.Data.error!(pa,true);
+JuMIT.Data.error!(pa,:dJx);
 g1=vec(pa.dJx.d[1,1])
 @test g1 ≈ g2
 
