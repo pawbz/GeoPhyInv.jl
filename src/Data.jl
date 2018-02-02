@@ -443,18 +443,20 @@ mutable struct Param_error
 	y::TD # observed data
 	w::TD # weights
 	xr::TD # modelled data after resampling
+	xrc::TD # modelled data after resampling and convolution with source coupling
 	dJxr::TD # gradient w.r.t. xr
+	dJxrc::TD # gradient w.r.t. xr
 	dJx::TD # gradient w.r.t. x
 	dJssf::Matrix{Vector{Float64}} # gradient w.r.t source filters
 	ynorm::Float64 # normalize functional with energy of y
 	coup::Coupling.TD
 	paconvssf::Conv.Param{Float64,1} # convolutional model for source filters
 	paconvrf::Conv.Param{Float64,1} # convolutional model for receiver filters
-	func::Function # function to compute misfit
-	dJxc::Vector{Float64} # temp array of length nt
+	pacse::Matrix{Misfits.Param_CSE}
+	func::Matrix{Function} # function to compute misfit for every ss and fields
 end
 
-function Param_error(x,y;w=nothing, coup=nothing)
+function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 
 	if(coup===nothing)
 		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.acqgeom)
@@ -485,16 +487,30 @@ function Param_error(x,y;w=nothing, coup=nothing)
 	!(isequal(x.fields, y.fields)) && error("observed and modelled data should have same fields")
 
 	xr=TD_zeros(y)
+	xrc=TD_zeros(y)
 	dJxr=TD_zeros(y)
+	dJxrc=TD_zeros(y)
 	dJx=TD_zeros(x)
 
 	ynorm = dot(y, y)
 	(ynorm == 0.0) && error("y cannot be zero")
 
-	func=Misfits.error_squared_euclidean!
 	dJxc=zeros(y.tgrid.nx)
 
-	return Param_error(x,y,w,xr,dJxr,dJx,dJssf,ynorm,coup,paconvssf, paconvrf, func, dJxc)
+
+	if(func_attrib==:cls)
+		pacse=[Misfits.Param_CSE(1, 1, zeros(1,1)) for i in 1:2, j=1:2] # dummy
+		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+	elseif(func_attrib==:xcorrcls)
+		pacse=[Misfits.Param_CSE(y.tgrid.nx, y.acqgeom.nr[iss],y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->Misfits.error_corr_squared_euclidean!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+	end
+
+	pa=Param_error(x,y,w,xr,xrc,dJxr,dJxrc,
+		    dJx,dJssf,ynorm,coup,paconvssf, paconvrf, pacse, func)
+
+
+	return pa
 end
 
 function error!(pa::Param_error, grad=nothing)
@@ -507,52 +523,58 @@ function error!(pa::Param_error, grad=nothing)
 	# resample xr <-- x
 	interp_spray!(pa.xr, pa.x, :interp)
 
+	xr=pa.xr
+	xrc=pa.xrc
+	y=pa.y
+
 	J = 0.0;
 	for ifield=1:length(fields), iss=1:acq.nss
-		yy=pa.y.d[iss, ifield]
-		xx=pa.xr.d[iss,ifield]
-		ww=pa.w.d[iss,ifield]
-
-		dJxrr=pa.dJxr.d[iss, ifield]
-
+		xrr=xr.d[iss,ifield]
+		xrcc=xrc.d[iss,ifield]
 		wav=pa.coup.ssf[iss,ifield]
+
+		# xrc <- xr apply source filter to xr
+		for ir=1:acq.nr[iss]
+			xrrr=view(xrr,:,ir)
+			xrccc=view(xrcc,:,ir)
+			Conv.mod!(pa.paconvssf, :d, gf=xrrr, wav=wav, d=xrccc)
+		end
+
+		if(grad===nothing)
+			JJ=pa.func[iss,ifield](nothing,  xrcc)
+		else
+			dJxrcc=pa.dJxrc.d[iss,ifield]
+			JJ=pa.func[iss,ifield](dJxrcc,  xrcc)
+		end
+
+		# dJxr <- dJxrc  apply adjoint of source filter to dJxc
+		if(grad==:dJx)
+			dJxrr=pa.dJxr.d[iss,ifield]
+			dJxrcc=pa.dJxrc.d[iss,ifield]
+			for ir=1:acq.nr[iss]
+				dJxrccc=view(dJxrcc,:,ir)
+				dJxrrr=view(dJxrr,:,ir)
+
+				Conv.mod!(pa.paconvssf, :gf, gf=dJxrrr, wav=wav, d=dJxrccc)
+				scale!(dJxrrr, inv(pa.ynorm))  # take care of scale later in the functional
+			end
+		end
+
+		# dJssf <- dJxrc 
 		if(grad==:dJssf)
 			dJwav=pa.dJssf[iss,ifield]
 			dJwav[:]=0.0 # gradient is set to zero for all
-		end
-		
-		for ir=1:acq.nr[iss]
-			yyy=view(yy,:,ir)
-			xxx=view(xx,:,ir)
-			www=view(ww,:,ir)
-
-			# apply source filter to xxx
-			Conv.mod!(pa.paconvssf, :d, gf=xxx, wav=wav)
-			xxxwav=pa.paconvssf.d
-
-			if(grad==:dJx)
-				# compute dJxc
-				JJ = pa.func(pa.dJxc, xxxwav, yyy, www);
-
-				dJxrrr=view(dJxrr,:,ir)
-				# apply adjoint of source filter to dJxc
-				Conv.mod!(pa.paconvssf, :gf, gf=dJxrrr, wav=wav, d=pa.dJxc)
-				scale!(dJxrrr, inv(pa.ynorm))
-			elseif(grad==:dJssf)
-				# compute dJxc
-				JJ = pa.func(pa.dJxc, xxxwav, yyy, www);
-
-				# apply adjoint of source filter to dJxc
-				Conv.mod!(pa.paconvssf, :wav, gf=xxx, d=pa.dJxc)
+			for ir=1:acq.nr[iss]
+				xrrr=view(xrr,:,ir)
+				dJxrccc=view(dJxrc,:,ir)
+				Conv.mod!(pa.paconvssf, :wav, gf=xxx, d=dJxrcc)
 				for i in eachindex(dJwav)
 					dJwav[i]+=pa.paconvssf.wav[i] # stack gradient of ssf over all receivers
 				end
 				scale!(dJwav, inv(pa.ynorm))
-			else
-				JJ = pa.func(nothing, xxxwav, yyy, www);
 			end
-			J += JJ 
 		end
+		J += JJ 
 	end
 	J /= pa.ynorm
 
@@ -562,31 +584,14 @@ function error!(pa::Param_error, grad=nothing)
 	(J == 0.0) && warn("misfit computed is zero")
 
 	return J
-end
 
-mutable struct Param_xcorr
-	# xcorr for each supersource
-	paxcorr::Matrix{Conv.Param_xcorr}
-end
-
-function xcorr!(Ad, d, pa::Param_xcorr)
+	J = 0.0;
 	for ifield=1:length(fields), iss=1:acq.nss
-		dd=d.d[iss, ifield]
-		Add=Ad.d[iss,ifield]
-		paa=pa[ifield,iss]
-		Conv.xcorr!(Add, dd, paa)
+		pacsee=pa.pacse[iss,ifield]
+		error_corr_squared_euclidean!(dfdx,  x; pa=pacsee)
+
 	end
 end
-
-function xcorr_grad!(Ad, d, pa::Param_xcorr)
-	for ifield=1:length(fields), iss=1:acq.nss
-		dd=d.d[iss, ifield]
-		Add=Ad.d[iss,ifield]
-		paa=pa[ifield,iss]
-		Conv.xcorr!(Add, dd, paa)
-	end
-end
-
 
 
 

@@ -16,26 +16,28 @@ y=JuMIT.Data.TD_ones(fields,tgrid2,acqgeom)
 randn!(y.d[1,1])
 randn!(x.d[1,1])
 
-pa=JuMIT.Data.Param_error(x,y);
+for func_attrib in [:cls, :xcorrcls]
+	pa=JuMIT.Data.Param_error(x,y, func_attrib=func_attrib);
 
 
-function err(xvec)
+	function err(xvec)
 
-	for i in eachindex(x.d[1,1])
-		pa.x.d[1,1][i]=xvec[i]
+		for i in eachindex(x.d[1,1])
+			pa.x.d[1,1][i]=xvec[i]
+		end
+
+		return JuMIT.Data.error!(pa)
 	end
 
-	return JuMIT.Data.error!(pa)
+
+	xvec=vec(pa.x.d[1,1])
+	g2=zeros(xvec)
+	JuMIT.Inversion.finite_difference!(x -> err(x), xvec, g2, :central)
+
+	JuMIT.Data.error!(pa,:dJx);
+	g1=vec(pa.dJx.d[1,1])
+	@test g1 ≈ g2
 end
-
-
-xvec=vec(pa.x.d[1,1])
-g2=zeros(xvec)
-JuMIT.Inversion.finite_difference!(x -> err(x), xvec, g2, :central)
-
-JuMIT.Data.error!(pa,:dJx);
-g1=vec(pa.dJx.d[1,1])
-@test g1 ≈ g2
 
 
 

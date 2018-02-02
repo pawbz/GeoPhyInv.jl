@@ -242,7 +242,8 @@ mutable struct Param_xcorr
 	norm_flag::Bool
 end
 
-function Param_xcorr(nt::Int64, ntwav::Int64, iref, lags, norm_flag=true)
+function Param_xcorr(nt::Int64, iref, ntwav::Int64=2*nt-1, lags=nothing; norm_flag=true)
+	(lags===nothing) && (lags=[nt-1, nt-1])
 	wav=zeros(ntwav);
 	gf=zeros(nt);
 	d=zeros(nt);

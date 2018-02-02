@@ -266,25 +266,25 @@ type for corr_squared_euclidean
 mutable struct Param_CSE
 	paxcorr::Conv.Param_xcorr
 	Ax::Matrix{Float64}
+	Ay::Matrix{Float64}
 	dAx::Matrix{Float64}
 end
 
 
-function Param_CSE(nt,nr)
-	paxcorr=Conv.Param_xcorr(nt,2*nt-1,1:nr,[nt-1, nt-1], false)
+function Param_CSE(nt,nr,y)
+	paxcorr=Conv.Param_xcorr(nt,collect(1:nr),norm_flag=false)
 	Ax=zeros(2*nt-1,nr*nr)
 	Ay=zeros(2*nt-1,nr*nr)
+	Conv.xcorr!(Ay,y,paxcorr)
 	dAx=zeros(2*nt-1,nr*nr)
-	return Param_CSE(paxcorr, Ax, dAx)
+	return Param_CSE(paxcorr, Ax, Ay, dAx)
 end
 
-function error_corr_squared_euclidean!(dfdx,  x,   Ay;  pa=nothing)
+function error_corr_squared_euclidean!(dfdx,  x,  pa)
 	nt=size(x,1)
 	nr=size(x,2)
-	if(pa===nothing)
-		pa=Param_CSE(nt,nr)
-	end
 	Ax=pa.Ax
+	Ay=pa.Ay
 	dfdAx=pa.dAx
 	pa=pa.paxcorr
 
