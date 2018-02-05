@@ -157,9 +157,9 @@ function Param(ntgf, nt, nr;
 		wavobs=pa.wavobs
 		dobs=pa.dobs
 	elseif(mode==2)
-		gfobs=Conv.xcorr(pa.gfobs)
-		wavobs=Conv.xcorr(pa.wavobs)
-		dobs=Conv.xcorr(pa.dobs) # do a cross-correlation 
+		gfobs=hcat(Conv.xcorr(pa.gfobs)...)
+		wavobs=hcat(Conv.xcorr(pa.wavobs)...)
+		dobs=hcat(Conv.xcorr(pa.dobs)...) # do a cross-correlation 
 	end
 
 	# obs.gf <-- gfobs
@@ -294,11 +294,11 @@ print?
 give either cal or calsave?
 """
 function err!(pa::Param; cal=pa.cal) 
-	xgf_nodecon=Conv.xcorr(pa.dobs, lags=[pa.ntgf-1, pa.ntgf-1])
-	xgfobs=Conv.xcorr(pa.gfobs) # compute xcorr with reference gf
+	xgf_nodecon=hcat(Conv.xcorr(pa.dobs, lags=[pa.ntgf-1, pa.ntgf-1])...)
+	xgfobs=hcat(Conv.xcorr(pa.gfobs)...) # compute xcorr with reference gf
 	if(pa.mode==1) 
 		fwav = Misfits.error_after_normalized_autocor(cal.wav, pa.obs.wav)
-		xgfcal=Conv.xcorr(cal.gf) # compute xcorr with reference gf
+		xgfcal=hcat(Conv.xcorr(cal.gf)...) # compute xcorr with reference gf
 		fgf = Misfits.error_squared_euclidean!(nothing, xgfcal, xgfobs, nothing, norm_flag=true)
 	elseif(pa.mode==2)
 		fgf = Misfits.error_squared_euclidean!(nothing, cal.gf, pa.obs.gf, nothing, norm_flag=true)
@@ -933,7 +933,7 @@ function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
 	# compute cross-correlations of gf
 	xtgridgf=Grid.M1D_xcorr(tgridgf); # grid
 	if(pa.mode==1)
-		xgfobs=Conv.xcorr(pa.gfobs)
+		xgfobs=hcat(Conv.xcorr(pa.gfobs)...)
 	elseif(pa.mode==2)
 		xgfobs=pa.obs.gf
 	end
@@ -944,7 +944,7 @@ function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
 	CSV.write(file,DataFrame(hcat(repeat(xtgridgf.x,outer=pa.nra),
 				      repeat(1:pa.nra,inner=xtgridgf.nx),vec(xgfobs[:,1:pa.nra]))),)
 	if(pa.mode==1)
-		xgfcal=Conv.xcorr(pa.cal.gf)
+		xgfcal=hcat(Conv.xcorr(pa.cal.gf)...)
 	elseif(pa.mode==2)
 		xgfcal=pa.calsave.gf
 	end
@@ -955,7 +955,7 @@ function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
 				      repeat(1:pa.nra,inner=xtgridgf.nx),vec(xgfcal[:,1:pa.nra]))),)
 
 	# compute cross-correlations without blind Decon
-	xgf_nodecon=Conv.xcorr(pa.dobs, lags=[pa.ntgf-1, pa.ntgf-1])
+	xgf_nodecon=hcat(Conv.xcorr(pa.dobs, lags=[pa.ntgf-1, pa.ntgf-1])...)
 	file=joinpath(folder, "xgf_nodecon.csv")
 	CSV.write(file,DataFrame(hcat(xtgridgf.x,xgf_nodecon)))
 
@@ -964,7 +964,7 @@ function save(pa::Param, folder; tgridgf=nothing, tgrid=nothing)
 				      repeat(1:pa.nra,inner=xtgridgf.nx),vec(xgf_nodecon[:,1:pa.nra]))),)
 
 	# compute cross-correlation of source wavelet
-	xwavobs=Conv.xcorr(pa.wavobs, lags=[pa.ntgf-1, pa.ntgf-1])
+	xwavobs=hcat(Conv.xcorr(pa.wavobs, lags=[pa.ntgf-1, pa.ntgf-1])...)
 	file=joinpath(folder, "xwavobs.csv")
 	CSV.write(file,DataFrame(hcat(xtgridgf.x,xwavobs)))
 
@@ -1062,5 +1062,119 @@ function phase_retrievel(Ay,
 	return x
 
 end
+
+
+
+
+
+
+
+"""
+Deterministic Decon, where wavelet is known
+"""
+mutable struct ParamD{T<:Real,N}
+	np2::Int
+	ntd::Int
+	ntwav::Int
+	d::Array{T,N}
+	gf::Array{T,N}
+	wav::Vector{T}
+	dpad::Array{T,N}
+	gfpad::Array{T,N}
+	wavpad::Vector{T}
+	dfreq::Array{Complex{T},N}
+	gffreq::Array{Complex{T},N}
+	wavfreq::Array{Complex{T},1}
+	fftplan::Base.DFT.FFTW.rFFTWPlan
+	ifftplan::Base.DFT.ScaledPlan
+	fftplanwav::Base.DFT.FFTW.rFFTWPlan
+	ϵ::T
+end
+
+function ParamD(;ntd=1, ntwav=1, dims=(), np2=nextfastfft(maximum([2*ntwav, 2*ntd])), # fft dimension for plan
+			d=zeros(ntd, dims...), wav=zeros(ntwav), gf=zeros(d), ϵ=1e-2)
+	T=eltype(d)
+
+	dims=size(d)[2:end]
+	nrfft=div(np2,2)+1
+	fftplan=plan_rfft(zeros(T, np2,dims...),[1])
+	ifftplan=plan_irfft(complex.(zeros(T, nrfft,dims...)),np2,[1])
+	fftplanwav=plan_rfft(zeros(T, np2,),[1])
+	
+	dfreq=complex.(zeros(T,nrfft,dims...))
+	gffreq=complex.(zeros(T,nrfft,dims...))
+	wavfreq=complex.(zeros(T,nrfft))
+
+	# preallocate padded arrays
+	dpad=(zeros(T,np2,dims...))
+	gfpad=(zeros(T,np2,dims...))
+	wavpad=(zeros(T,np2,))
+
+	wavv=normalize(wav) # make a copy, don't edit wav
+
+	return ParamD(np2,ntd,ntwav,d,gf,wavv,dpad,gfpad,wavpad,dfreq,gffreq,wavfreq,
+		fftplan, ifftplan, fftplanwav, ϵ)
+
+end
+
+"""
+Convolution that allocates `Param` internally.
+"""
+function mod!{T,N}(
+	   d::AbstractArray{T,N}, 
+	   wav::AbstractVector{T}, attrib::Symbol)
+	ntd=size(d,1)
+	ntgf=size(gf,1)
+	ntwav=size(wav,1)
+
+	# allocation of freq matrices
+	pa=ParamD(ntd=ntd, ntwav=ntwav, wav=wav, d=d)
+
+	# using pa, return d, gf, wav according to attrib
+	mod!(pa)
+end
+
+"""
+Convolution modelling with no allocations at all.
+By default, the fields `gf`, `d` and `wav` in pa are modified accordingly.
+Otherwise use keyword arguments to input them.
+"""
+function mod!(pa::ParamD; 
+	      gf=pa.gf, d=pa.d, wav=pa.wav # external arrays to be modified
+	     )
+	T=eltype(pa.d)
+	ntd=size(pa.d,1)
+	ntwav=size(pa.wav,1)
+	
+	# initialize freq vectors
+	pa.dfreq[:] = complex(T(0))
+	pa.gffreq[:] = complex(T(0))
+	pa.wavfreq[:] = complex(T(0))
+
+	pa.gfpad[:]=T(0)
+	pa.dpad[:]=T(0)
+	pa.wavpad[:]=T(0)
+
+	# necessary zero padding
+	Conv.pad_truncate!(gf, pa.gfpad, ntd-1, 0, pa.np2, 1)
+	Conv.pad_truncate!(d, pa.dpad, ntd-1, 0, pa.np2, 1)
+	Conv.pad_truncate!(wav, pa.wavpad, ntwav-1, 0, pa.np2, 1)
+
+	A_mul_B!(pa.wavfreq, pa.fftplanwav, pa.wavpad)
+	A_mul_B!(pa.dfreq, pa.fftplan, pa.dpad)
+	for i in eachindex(pa.gffreq)
+		ii=ind2sub(pa.gffreq,i)[1]
+		pa.gffreq[i]=pa.dfreq[i]*inv(pa.wavfreq[ii]*conj(pa.wavfreq[ii])+pa.ϵ)
+	end
+	A_mul_B!(pa.gfpad, pa.ifftplan, pa.gffreq)
+
+	Conv.pad_truncate!(gf, pa.gfpad, ntd-1, 0, pa.np2, -1)
+	
+
+	return gf
+
+end
+
+
 
 end # module

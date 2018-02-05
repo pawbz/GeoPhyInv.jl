@@ -66,12 +66,33 @@ function indminn_inside(x, valbeg, valend)
 	return iibeg, iiend
 end
 
+"""
+N is either one or two
+* `x` coordinates before interpolation
+* `xi` coordinates after interpolation
+"""
+type Param{T<:Real}
+	x::Array{Array{T,1},1}
+	xi::Array{Array{T,1},1}
+	np::Int
+	nd::Int
+	nx::Vector{Int}
+	nxi::Vector{Int}
+	ivecinterp::Vector{Matrix{Int64}}
+	ivecspray::Vector{Matrix{Int64}}
+	iximin::Vector{Int64}
+	iximax::Vector{Int64}
+	ixmin::Vector{Int64}
+	ixmax::Vector{Int64}
+	interp_func::Function
+	spray_func::Function
+	Battrib::Symbol # select spline 
+	y_x::Matrix{T}
+	y_z::Matrix{T}
+end
 
-function interp_spray!(xin::Vector{Float64}, yin::AbstractVector{Float64},
-					   xout::Vector{Float64}, yout::AbstractVector{Float64},
-					   attrib::Symbol,
-					   Battrib::Symbol=:B1
-					  )
+
+function Param(x::Array{Vector{Float64}}, xi::Array{Vector{Float64}}, Battrib::Symbol=:B1)
 
 	if(Battrib == :B1)
 		np=2;
@@ -84,98 +105,141 @@ function interp_spray!(xin::Vector{Float64}, yin::AbstractVector{Float64},
 	else
 		error("invalid attrib")
 	end
-	ivec=zeros(Int64,np)
+	!(length(x)==length(xi)) && error("incorrect dimensions x")
+	nd=length(x)
+	nx=[length(x[id]) for id in 1:nd]
+	nxi=[length(xi[id]) for id in 1:nd]
+
+	ivecinterp=[zeros(Int64,np,nxi[id]) for id in 1:nd]
+	ivecspray=[zeros(Int64,np,nx[id]) for id in 1:nd]
+
+	iximin=zeros(Int64,nd)
+	iximax=zeros(Int64,nd)
+	ixmin=zeros(Int64,nd)
+	ixmax=zeros(Int64,nd)
+
+	for id in 1:nd
+		# yi is only updated "within" bounds of y 
+		# get two indices and choose the inner most one
+		iximin[id], iximax[id] = indminn_inside(xi[id], x[id][1], x[id][end])
+		# spary values of y "within" bounds of yi
+		# get 2 indices and choose the inner most one
+		ixmin[id], ixmax[id] = indminn_inside(x[id],xi[id][1],xi[id][end])
+
+		# index interp
+		for i in 1:nxi[id]
+			ivec=ivecinterp[id]
+			ivecc=view(ivec, :, i)
+			xn=x[id]
+			xit=xi[id]
+			indminn!(ivecc,xn,xit[i])
+		end
+		# index spray
+		for i in 1:nx[id]
+			ivec=ivecspray[id]
+			ivecc=view(ivec, :, i)
+			xn=x[id]
+			xit=xi[id]
+			indminn!(ivecc,xit,xn[i])
+		end
+
+	end
+
+	# some other allocations for 2D
+	if(nd==2)
+		y_x=zeros(Float64, length(x[2]), length(iximin[1]:iximax[1]))
+		y_z = zeros(Float64, length(x[2]), length(iximin[1]:iximax[1]))
+	else
+		y_x=zeros(1,1)
+		y_z=zeros(1,1)
+	end
+	return Param(
+	x,	xi,	np,	nd,	nx,	nxi,	ivecinterp,	ivecspray,	iximin,	iximax,	ixmin,
+	ixmax,	interp_func,	spray_func,	Battrib, y_x, y_z)
+
+
+end # Param
+
+
+function interp_spray!(y::AbstractVector{Float64}, yi::AbstractVector{Float64} , pa::Param{Float64}, attrib)
 
 	if(attrib == :interp)
-		# yout is only updated "within" bounds of yin 
-		# get two indices and choose the inner most one
-		ioutmin, ioutmax = indminn_inside(xout, xin[1], xin[end])
-
-		yout[ioutmin:ioutmax] = zero(Float64);
-	 	@simd for i in ioutmin:ioutmax
-			indminn!(ivec,xin,xout[i]);
-			interp_func(i, ivec, yout, xin,yin, xout[i])
+		# yi is only updated "within" bounds of y 
+		for i in pa.iximin[1] : pa.iximax[1]
+			yi[i] = zero(Float64)
+		end
+		ivec=pa.ivecinterp[1]
+		@simd for i in pa.iximin[1]:pa.iximax[1]
+			ivecc=view(ivec,:,i)
+			pa.interp_func(i, ivecc, yi, pa.x[1], y, pa.xi[1][i])
 		end
 	elseif(attrib == :spray)
-		# spary values of yin "within" bounds of yout
-		# get 2 indices and choose the inner most one
-		iinmin, iinmax = indminn_inside(xin,xout[1],xout[end])
-
-		for i in eachindex(yout)
-			yout[i] = zero(Float64)
+		for i in eachindex(y)
+			y[i] = zero(Float64)
 		end
-		@simd for i in iinmin:iinmax
-			indminn!(ivec,xout,xin[i]);
-			spray_func(ivec, yout, xout, xin[i], yin[i])
+		# spary values of yi "within" bounds of y
+		ivec=pa.ivecinterp[1]
+		@simd for i in pa.iximin[1]:pa.iximax[1]
+			ivecc=view(ivec,:,i)
+			pa.spray_func(ivecc, y, pa.x[1], pa.xi[1][i], yi[i])
 		end
 	end
 end # interp_spray!
 
-function interp_spray!(xin::Array{Float64,1}, zin::Array{Float64,1}, yin::Array{Float64,2},
-					   xout::Array{Float64,1}, zout::Array{Float64,1}, yout::Array{Float64,2},
-					   attrib::Symbol, 
-					   Battrib::Symbol=:B1
-					  )
-	if(Battrib == :B1)
-		np=2;
-		interp_func = interp_B1_1D 
-		spray_func = spray_B1_1D 
-	elseif(Battrib == :B2)
-		np=4;
-		interp_func = interp_B2_1D!
-		spray_func = spray_B2_1D!
-	else
-		error("invalid attrib")
-	end
-	ivec=zeros(Int64,np)
+"""
+This allocates memory, need to be fixed
+"""
+function interp_spray!(y::Matrix{Float64}, yi::Matrix{Float64} , pa::Param{Float64}, attrib)
 
 	if(attrib == :interp)
-		# yout is only updated within bounds of yin 
-		# get 2 indices and choose the inner most one
-		i1outmin, i1outmax = indminn_inside(zout,zin[1],zin[end])
-		i2outmin, i2outmax = indminn_inside(xout,xin[1],xin[end])
-		yout[i1outmin:i1outmax, i2outmin:i2outmax] = zero(Float64);
+		for i1 in pa.iximin[2]:pa.iximax[2], i2 in pa.iximin[1]:pa.iximax[1]
+			yi[i1, i2] = zero(Float64);
+		end
+		pa.y_x[:]=zero(Float64)
 
-		y_x=zeros(Float64, length(zin), length(i2outmin:i2outmax))
 		# first along x
-		@simd for ix in i2outmin:i2outmax
-			@simd for iz in eachindex(zin)
-				indminn!(ivec,xin, xout[ix]);
-				iy=(ix-i2outmin)*length(zin)+iz
-				yyin=view(yin, iz, :)
-				interp_func(iy, ivec, y_x, xin, yyin, xout[ix])
+		ivec=pa.ivecinterp[1]
+		@simd for ix in pa.iximin[1]:pa.iximax[1]
+			@simd for iz in eachindex(pa.x[2])
+				ivecc=view(ivec,:,ix)
+				iy=(ix-pa.iximin[1])*length(pa.x[2])+iz
+				yy=view(y, iz, :)
+				pa.interp_func(iy, ivecc, pa.y_x, pa.x[1], yy, pa.xi[1][ix])
 			end
 		end
 		# then along z
-		@simd for ix in i2outmin:i2outmax
-			@simd for iz in i1outmin:i1outmax
-				indminn!(ivec,zin,zout[iz]);
-				iy=iz+(ix-1)*length(zout)
-				yy_x=view(y_x, :, ix-i2outmin+1)
-				interp_func(iy, ivec, yout, zin, yy_x, zout[iz])
+		ivec=pa.ivecinterp[2]
+		@simd for ix in pa.iximin[1]:pa.iximax[1]
+			@simd for iz in pa.iximin[2]:pa.iximax[2]
+				ivecc=view(ivec,:,iz)
+				iy=iz+(ix-1)*length(pa.xi[2])
+				yy_x=view(pa.y_x, :, ix-pa.iximin[1]+1)
+				pa.interp_func(iy, ivecc, yi, pa.x[2], yy_x, pa.xi[2][iz])
 			end
 		end
 	elseif(attrib == :spray)
-		# spary values of yin only within bounds of yout
+		# spary values of y only within bounds of yi
 		# get 2 indices and choose the inner most one
-		i1inmin, i1inmax = indminn_inside(zin,zout[1],zout[end])
-		i2inmin, i2inmax = indminn_inside(xin,xout[1],xout[end])
-		yout[:, :] = zero(Float64);
-		y_z = zeros(Float64, length(zout), length(i2inmin:i2inmax))
+		for i in eachindex(y)
+			y[i]=zero(Float64)
+		end
+		pa.y_z[:]=zero(Float64)
 		# first along z
-		@simd for ix in i2inmin:i2inmax
-			@simd for iz in i1inmin:i1inmax
-				indminn!(ivec,zout,zin[iz]);
-				yy_z=view(y_z,:,ix-i2inmin+1)
-				spray_func(ivec, yy_z, zout, zin[iz], yin[iz, ix])
+		ivec=pa.ivecinterp[2]
+		@simd for ix in pa.iximin[1]:pa.iximax[1]
+			@simd for iz in pa.iximin[2]:pa.iximax[2]
+				ivecc=view(ivec,:,iz)
+				yy_z=view(pa.y_z,:,ix-pa.iximin[1]+1)
+				pa.spray_func(ivecc, yy_z, pa.x[2], pa.xi[2][iz], yi[iz, ix])
 			end
 		end
 		# then along x
-		@simd for ix in i2inmin:i2inmax
-			@simd for iz in eachindex(zout)
-				indminn!(ivec,xout,xin[ix]);
-				yyout=view(yout,iz,:)
-				spray_func(ivec, yyout, xout,  xin[ix], y_z[iz,ix-i2inmin+1])
+		ivec=pa.ivecinterp[1]
+		@simd for ix in  pa.iximin[1]:pa.iximax[1]
+			@simd for iz in eachindex(pa.x[2])
+				ivecc=view(ivec,:,ix)
+				yy=view(y,iz,:)
+				pa.spray_func(ivecc, yy, pa.x[1],  pa.xi[1][ix], pa.y_z[iz,ix-pa.iximin[1]+1])
 			end
 		end
 	end
@@ -185,7 +249,7 @@ end # interp_spray!
 """
 this subroutine interpolates or sprays bilinearly [one is adjoint of another]
 interpolation returns y using Y[ivec[1]], Y[ivec[2]]
-spraying returns Y[ivec[1]], Y[ivec[2]] using y
+sprayg returns Y[ivec[1]], Y[ivec[2]] using y
  
                         +                      
                         |                      
@@ -212,7 +276,7 @@ end # interpolate_spray_B1_1D
 this subroutine interpolates or sprays 
 using cubic bspline
 interpolation returns y using Y[ivec[1]], y2, Y[ivec[3]], Y[ivec[4]]
-spraying returns Y[ivec[1]], y2, Y[ivec[3]], Y[ivec[4]] using y
+sprayg returns Y[ivec[1]], y2, Y[ivec[3]], Y[ivec[4]] using y
 
                        +                      
                        |                      
@@ -229,7 +293,7 @@ function interp_B2_1D!(iy, ivec, yV, X,Y,x)
 	hcubeI = hcube^(-1.0)
 
 	if(h == zero(Float64)) then
-		y[iy] =  (Float64(0.25) * (Y[ivec[1]] + Y[ivec[2]] + Y[ivec[3]] + Y[ivec[4]]))
+		yV[iy] =  (Float64(0.25) * (Y[ivec[1]] + Y[ivec[2]] + Y[ivec[3]] + Y[ivec[4]]))
 	else
 		
 		if((((x-X[ivec[1]])*(x-X[ivec[2]])) < zero(Float64)) | (x==X[ivec[1]])) 

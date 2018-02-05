@@ -147,7 +147,7 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 	elseif(δ > 0.0)
 		mgrid_out=Grid.M2D_resamp(model.mgrid,δ,δ,)
 		model_out=Models.Seismic_zeros(mgrid_out)
-		Models.Seismic_interp_spray!(model, model_out, :interp, :B1)
+		Models.interp_spray!(model, model_out, :interp, :B1)
 		Models.print(model_out,string(attrib))
 		return model_out
 	else

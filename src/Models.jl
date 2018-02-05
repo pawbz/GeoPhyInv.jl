@@ -719,15 +719,15 @@ function to resample in the model domain
 * `mod::Seismic` : model
 * `modi::Seismic` : model after interpolation
 """
-function Seismic_interp_spray!(mod::Seismic, mod_out::Seismic, attrib::Symbol, Battrib::Symbol=:B2 )
+function interp_spray!(mod::Seismic, mod_out::Seismic, attrib::Symbol, Battrib::Symbol=:B2; pa=nothing)
+	if(pa===nothing)
+		pa=Interpolation.Param([mod.mgrid.x, mod.mgrid.z], [mod_out.mgrid.x, mod_out.mgrid.z], Battrib)
+	end
 
 	"loop over fields in `Seismic`"
-	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χvp,
-		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvp, attrib, Battrib)
-	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χvs,
-		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χvs, attrib, Battrib)
-	Interpolation.interp_spray!(mod.mgrid.x, mod.mgrid.z, mod.χρ,
-		      mod_out.mgrid.x, mod_out.mgrid.z, mod_out.χρ, attrib, Battrib)
+	Interpolation.interp_spray!(mod.χvp, mod_out.χvp, pa, attrib)
+	Interpolation.interp_spray!(mod.χvs, mod_out.χvs, pa, attrib)
+	Interpolation.interp_spray!(mod.χρ, mod_out.χρ,  pa, attrib)
 
 	mod_out.vp0 = copy(mod.vp0); mod_out.vs0 = copy(mod.vs0); 
 	mod_out.ρ0 = copy(mod.ρ0);
@@ -748,7 +748,7 @@ function save(mod::Seismic, folder)
 	nx=length(x)
 	nz=length(z)
 	modo=Seismic_zeros(mgrid)
-	Seismic_interp_spray!(mod, modo, :interp)
+	interp_spray!(mod, modo, :interp)
 
 	for m in [:vp, :ρ, :Zp]
 		# save original gf

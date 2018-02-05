@@ -1,6 +1,7 @@
 using Revise
 using JuMIT
 using Base.Test
+using BenchmarkTools
 
 
 fields=[:P]
@@ -17,7 +18,9 @@ randn!(y.d[1,1])
 randn!(x.d[1,1])
 
 for func_attrib in [:cls, :xcorrcls]
-	pa=JuMIT.Data.Param_error(x,y, func_attrib=func_attrib);
+	coup=JuMIT.Coupling.TD_delta(y.tgrid, [0.1,0.1], 0.0,  x.fields, x.acqgeom)
+	randn!(coup.ssf[1,1])
+	pa=JuMIT.Data.Param_error(x,y, func_attrib=func_attrib, coup=coup);
 
 
 	function err(xvec)
@@ -34,9 +37,29 @@ for func_attrib in [:cls, :xcorrcls]
 	g2=zeros(xvec)
 	JuMIT.Inversion.finite_difference!(x -> err(x), xvec, g2, :central)
 
-	JuMIT.Data.error!(pa,:dJx);
+	@time JuMIT.Data.error!(pa,:dJx);
 	g1=vec(pa.dJx.d[1,1])
 	@test g1 ≈ g2
+
+
+	function errw(xvec)
+
+		for i in eachindex(pa.coup.ssf[1,1])
+			pa.coup.ssf[1,1][i]=xvec[i]
+		end
+
+		return JuMIT.Data.error!(pa)
+	end
+
+	xvec=vec(pa.coup.ssf[1,1])
+	g2=zeros(xvec)
+	JuMIT.Inversion.finite_difference!(x -> errw(x), xvec, g2, :central)
+
+	@time JuMIT.Data.error!(pa,:dJssf);
+	g1=vec(pa.dJssf[1,1])
+	@test g1 ≈ g2
+
+
 end
 
 

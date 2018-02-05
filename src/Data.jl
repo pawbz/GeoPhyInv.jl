@@ -14,6 +14,7 @@ import JuMIT.Grid
 import JuMIT.Conv
 import JuMIT.Interpolation
 import JuMIT.Coupling
+import JuMIT.DeConv
 import JuMIT.Misfits
 import JuMIT.DSP
 using DSP
@@ -107,7 +108,7 @@ function interp(data::TD,
 	dataout = TD(
 	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:length(data.fields)],
 	      data.fields,tgrid,data.acqgeom)
-	interp_spray!(dataout, data)
+	interp_spray!(data, dataout)
 	return dataout
 end
 
@@ -121,19 +122,22 @@ Can reduce allocations =========
 * `data::TD` : input data of type `TD`
 * `dataout::TD` : preallocated data of type `TD` that is modified
 """
-function interp_spray!(dataout::TD, data::TD, attrib=:interp, Battrib=:B1)
+function interp_spray!(data::TD, dataout::TD, attrib=:interp, Battrib=:B1; pa=nothing)
 	# check if datasets are similar
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
 	xin=data.tgrid.x
 	xout=dataout.tgrid.x
+	if(pa===nothing)
+		pa=Interpolation.Param([xin], [xout], :B1)
+	end
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dat=data.d[iss,ifield]
 		dato=dataout.d[iss,ifield]
 		for ir = 1:nr[iss]
 			din=view(dat,:,ir)
 			dout=view(dato,:,ir)
-	 		Interpolation.interp_spray!(xin, din, xout, dout,attrib,Battrib)
+	 		Interpolation.interp_spray!(din, dout, pa, attrib)
 		end
 	end
 	return dataout
@@ -454,6 +458,7 @@ mutable struct Param_error
 	paconvrf::Conv.Param{Float64,1} # convolutional model for receiver filters
 	pacse::Matrix{Misfits.Param_CSE}
 	func::Matrix{Function} # function to compute misfit for every ss and fields
+	painterp::Interpolation.Param{Float64}
 end
 
 function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
@@ -478,6 +483,8 @@ function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 
 	dJssf=deepcopy(coup.ssf)
 
+	painterp=Interpolation.Param([x.tgrid.x], [y.tgrid.x], :B1)
+
 	if(w===nothing) 
 		w=Data.TD_ones(y.fields,y.tgrid,y.acqgeom)
 	end
@@ -497,7 +504,6 @@ function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 
 	dJxc=zeros(y.tgrid.nx)
 
-
 	if(func_attrib==:cls)
 		pacse=[Misfits.Param_CSE(1, 1, zeros(1,1)) for i in 1:2, j=1:2] # dummy
 		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
@@ -507,7 +513,7 @@ function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 	end
 
 	pa=Param_error(x,y,w,xr,xrc,dJxr,dJxrc,
-		    dJx,dJssf,ynorm,coup,paconvssf, paconvrf, pacse, func)
+		    dJx,dJssf,ynorm,coup,paconvssf, paconvrf, pacse, func, painterp)
 
 
 	return pa
@@ -521,11 +527,12 @@ function error!(pa::Param_error, grad=nothing)
 	nss = acq.nss;
 
 	# resample xr <-- x
-	interp_spray!(pa.xr, pa.x, :interp)
+	interp_spray!(pa.x, pa.xr, :interp, pa=pa.painterp)
 
 	xr=pa.xr
 	xrc=pa.xrc
 	y=pa.y
+
 
 	J = 0.0;
 	for ifield=1:length(fields), iss=1:acq.nss
@@ -533,31 +540,46 @@ function error!(pa::Param_error, grad=nothing)
 		xrcc=xrc.d[iss,ifield]
 		wav=pa.coup.ssf[iss,ifield]
 
+		nt=size(xrr,1)
+		nr=size(xrr,2)
+
+		copy!(pa.paconvssf.wav,wav)
 		# xrc <- xr apply source filter to xr
-		for ir=1:acq.nr[iss]
+		for ir=1:nr
 			xrrr=view(xrr,:,ir)
-			xrccc=view(xrcc,:,ir)
-			Conv.mod!(pa.paconvssf, :d, gf=xrrr, wav=wav, d=xrccc)
+			for i in 1:nt
+				pa.paconvssf.d[i]=xrr[i,ir]
+			end
+			Conv.mod!(pa.paconvssf, :d, gf=xrrr, wav=wav)
+			for i in 1:nt
+				xrcc[i,ir]=pa.paconvssf.d[i]
+			end
 		end
 
 		if(grad===nothing)
 			JJ=pa.func[iss,ifield](nothing,  xrcc)
-		else
+		elseif((grad==:dJx) || (grad==:dJssf))
 			dJxrcc=pa.dJxrc.d[iss,ifield]
 			JJ=pa.func[iss,ifield](dJxrcc,  xrcc)
+		else
+			error("invalid grad")
 		end
 
 		# dJxr <- dJxrc  apply adjoint of source filter to dJxc
 		if(grad==:dJx)
 			dJxrr=pa.dJxr.d[iss,ifield]
 			dJxrcc=pa.dJxrc.d[iss,ifield]
-			for ir=1:acq.nr[iss]
-				dJxrccc=view(dJxrcc,:,ir)
-				dJxrrr=view(dJxrr,:,ir)
-
-				Conv.mod!(pa.paconvssf, :gf, gf=dJxrrr, wav=wav, d=dJxrccc)
-				scale!(dJxrrr, inv(pa.ynorm))  # take care of scale later in the functional
+			copy!(pa.paconvssf.wav,wav)
+			for ir=1:nr
+				for i in 1:nt
+					pa.paconvssf.d[i]=dJxrcc[i,ir]
+				end
+				Conv.mod!(pa.paconvssf, :gf)
+				for i in 1:nt
+					dJxrr[i,ir]=pa.paconvssf.gf[i]
+				end
 			end
+			scale!(dJxrr, inv(pa.ynorm))  # take care of scale later in the functional
 		end
 
 		# dJssf <- dJxrc 
@@ -566,20 +588,20 @@ function error!(pa::Param_error, grad=nothing)
 			dJwav[:]=0.0 # gradient is set to zero for all
 			for ir=1:acq.nr[iss]
 				xrrr=view(xrr,:,ir)
-				dJxrccc=view(dJxrc,:,ir)
-				Conv.mod!(pa.paconvssf, :wav, gf=xxx, d=dJxrcc)
+				dJxrccc=view(dJxrcc,:,ir)
+				Conv.mod!(pa.paconvssf, :wav, gf=xrrr, d=dJxrccc)
 				for i in eachindex(dJwav)
 					dJwav[i]+=pa.paconvssf.wav[i] # stack gradient of ssf over all receivers
 				end
-				scale!(dJwav, inv(pa.ynorm))
 			end
+			scale!(dJwav, inv(pa.ynorm))
 		end
 		J += JJ 
 	end
 	J /= pa.ynorm
 
 	# spray dJx <-- dJxr
-	interp_spray!(pa.dJx, pa.dJxr, :spray)
+	interp_spray!(pa.dJx, pa.dJxr, :spray, pa=pa.painterp)
 
 	(J == 0.0) && warn("misfit computed is zero")
 
@@ -591,6 +613,40 @@ function error!(pa::Param_error, grad=nothing)
 		error_corr_squared_euclidean!(dfdx,  x; pa=pacsee)
 
 	end
+end
+
+
+function DDeConv(d::TD, wav::AbstractVector{Float64}, ϵ=1e-2)
+
+	dout=TD_zeros(d)
+	ntd=dout.tgrid.nx
+	wavv=deepcopy(wav);
+
+	paD=DeConv.ParamD(ntd=ntd,ntwav=length(wav), wav=wavv)
+
+	paD.ϵ=ϵ
+
+	DDeConv!(dout, d, paD)
+	return dout
+end
+
+
+function DDeConv!(dataout::TD, data::TD, paD)
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	for ifield = 1:length(data.fields), iss = 1:nss
+		dd=data.d[iss, ifield]
+		ddo=dataout.d[iss, ifield]
+		for ir = 1:nr[iss]
+			for it in 1:nt
+				paD.d[it]=dd[it,ir]
+			end
+			DeConv.mod!(paD)
+			for it in 1:nt
+				ddo[it,ir]=paD.gf[it]
+			end
+		end
+	end
+	return dataout
 end
 
 

@@ -265,18 +265,18 @@ type for corr_squared_euclidean
 """
 mutable struct Param_CSE
 	paxcorr::Conv.Param_xcorr
-	Ax::Matrix{Float64}
-	Ay::Matrix{Float64}
-	dAx::Matrix{Float64}
+	Ax::Vector{Matrix{Float64}}
+	Ay::Vector{Matrix{Float64}}
+	dAx::Vector{Matrix{Float64}}
 end
 
 
 function Param_CSE(nt,nr,y)
 	paxcorr=Conv.Param_xcorr(nt,collect(1:nr),norm_flag=false)
-	Ax=zeros(2*nt-1,nr*nr)
-	Ay=zeros(2*nt-1,nr*nr)
+	Ax=[zeros(2*nt-1,nr) for ir in 1:nr]
+	Ay=[zeros(2*nt-1,nr) for ir in 1:nr]
 	Conv.xcorr!(Ay,y,paxcorr)
-	dAx=zeros(2*nt-1,nr*nr)
+	dAx=[zeros(2*nt-1,nr) for ir in 1:nr]
 	return Param_CSE(paxcorr, Ax, Ay, dAx)
 end
 
@@ -286,15 +286,24 @@ function error_corr_squared_euclidean!(dfdx,  x,  pa)
 	Ax=pa.Ax
 	Ay=pa.Ay
 	dfdAx=pa.dAx
-	pa=pa.paxcorr
 
-	Conv.xcorr!(Ax, x, pa)
+	Conv.xcorr!(Ax, x, pa.paxcorr)
 
-	if(dfdx===nothing)
-		J=error_squared_euclidean!(nothing,  Ax,   Ay,   nothing, norm_flag=false)
-	else
-		J=error_squared_euclidean!(dfdAx,  Ax,   Ay,   nothing, norm_flag=false)
-		Conv.xcorr_grad!(dfdx, dfdAx, x, pa)
+	J=0.0
+	for ir in 1:length(Ax)
+		Axx=Ax[ir]
+		Ayy=Ay[ir]
+		dfdAxx=dfdAx[ir]
+
+		if(dfdx===nothing)
+			JJ=error_squared_euclidean!(nothing,  Axx,   Ayy,   nothing, norm_flag=false)
+		else
+			JJ=error_squared_euclidean!(dfdAxx,  Axx,   Ayy,   nothing, norm_flag=false)
+		end
+		J+=JJ
+	end
+	if(!(dfdx===nothing))
+		Conv.xcorr_grad!(dfdx, dfdAx, x, pa.paxcorr)
 	end
 
 	return J

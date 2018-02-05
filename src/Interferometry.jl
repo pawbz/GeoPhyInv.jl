@@ -121,7 +121,7 @@ function TD_noise_corr(data::Data.TD; tlagfrac=0.5, irref=[1],)
 	tgridc = Grid.M1D_lag(tlagfrac*tt, data.tgrid.δx)
 
 	# allocate TD
-	dataout=Data.TD_zeros(data.fields, tgridc, data.acqgeom)
+	dataout=Data.TD_zeros(data.fields, tgridc[1], data.acqgeom)
 
 	TD_noise_corr!(dataout, data, irref)
 end
@@ -130,13 +130,13 @@ function TD_noise_corr!(dataout, data, irref)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	
 	fields=data.fields
 	ntlag=Int((dataout.tgrid.nx-1)/2)
-	paxcorr=Conv.Param_xcorr(data.tgrid.nx,2*ntlag+1,irref,[ntlag, ntlag],false)
+	paxcorr=Conv.Param_xcorr(data.tgrid.nx,irref,2*ntlag+1,[ntlag, ntlag],norm_flag=false)
 
 	nto = dataout.tgrid.nx;
 	isodd(nto) || error("odd samples in output data required")
 	for ifield = 1:length(fields), iss = 1:nss
 		dd=data.d[iss, ifield]
-		ddo=dataout.d[iss, ifield]
+		ddo=[dataout.d[iss, ifield]]
 
 		Conv.xcorr!(ddo, dd, paxcorr)
 

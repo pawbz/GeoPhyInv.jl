@@ -257,11 +257,11 @@ function xcorr(A::AbstractArray{Float64}; lags=[size(A,1)-1, size(A,1)-1], iref=
 	if(iref==0)
 		iref=1:nr
 	end
-	Ax=zeros(sum(lags)+1, size(A,2)*length(iref))
+	Ax=[zeros(sum(lags)+1, nr) for i in 1:length(iref)]
 
 	nt=size(A,1)
-	ntwav=size(Ax,1)
-	pa=Param_xcorr(nt, ntwav, iref, lags, norm_flag)
+	ntwav=sum(lags)+1
+	pa=Param_xcorr(nt, iref, ntwav, lags, norm_flag=norm_flag)
 
 	return xcorr!(Ax, A, pa)
 end
@@ -273,40 +273,46 @@ And store results in Ax.
 After xcorr, the coeffcients are normalized with norm(A[:,1])
 By default, Ax has almost same positive and negative lags.
 """
-function xcorr!(Ax::AbstractArray{Float64}, A::AbstractArray{Float64}, pa)
+function xcorr!(Ax, A::AbstractArray{Float64}, pa)
 
 	nr=size(A,2)
 	iref=pa.iref
 	lags=pa.paconv.wavlags
 	norm_flag=pa.norm_flag
 
-	(size(Ax,1) ≠ sum(lags) + 1) && error("size Ax")
-	(size(Ax,2) ≠ size(A,2)*length(iref)) && error("same second dimension for Ax A")
+	any([(size(Ax[ir]) ≠ (sum(lags)+1,nr)) for ir in 1:length(Ax)]) && error("size Ax")
 
-	pa=pa.paconv
 
 	irrr=0
 	α=0.0
-	for irr in iref
-		irrr += 1
-		a=view(A,:,irr)
-		if(irrr==1 && norm_flag) # save scale reference for first column only 
-			α=(vecnorm(a)^2)
+	nt=size(A,1)
+	ntwav=sum(lags)+1
+	ir1=0
+	for ir in iref
+		ir1+=1
+		Axx=Ax[ir1]
+		for i in 1:nt
+			pa.paconv.d[i]=A[i,ir]
+		end
+		if(ir1==1 && norm_flag) # save scale reference for first column only 
+			for i in 1:nt
+				α+=A[i,ir]*A[i,ir]
+			end
 			α = (iszero(α)) ? 1.0 : inv(α) # take inverse if not zero
 		end
-		
-		for i in eachindex(pa.d)
-			pa.d[i]=a[i]
-		end
-		for ir in 1:nr
-			b=view(A,:,ir)
-			c=view(Ax,:,ir+(irrr-1)*nr)
-			for i in eachindex(pa.gf)
-				pa.gf[i]=b[i]
+		for ir2 in 1:nr
+			for i in 1:nt
+				pa.paconv.gf[i]=A[i,ir2]
 			end
-			mod!(pa, :wav)
-			copy!(c, pa.wav)
-			norm_flag && scale!(c, α)
+			mod!(pa.paconv, :wav)
+			for i in 1:ntwav
+				Axx[i,ir2]=pa.paconv.wav[i]
+			end
+			if(norm_flag) 
+				for i in 1:ntwav
+					Axx[i,ir2]/=α
+				end
+			end
 		end
 	end
 	return Ax
@@ -315,36 +321,47 @@ end
 """
 given dJdAx and A, computes dJdA
 """
-function xcorr_grad!(dA::AbstractArray{Float64}, dAx::AbstractArray{Float64}, A::AbstractArray{Float64}, pa)
+function xcorr_grad!(dA::AbstractArray{Float64}, dAx, A::AbstractArray{Float64}, pa)
 	nr=size(A,2)
+	nt=size(A,1)
 	iref=pa.iref
 	lags=pa.paconv.wavlags
-	pa=pa.paconv
-	irrr=0
-	α=0.0
-	scale!(dA, 0.0)
-	for irr in iref
-		irrr += 1
-		a=view(A,:,irr)
-		da=view(dA,:,irr)
-		
-		copy!(pa.d, a)
-		
-		for ir in 1:nr
-			b=view(A,:,ir)
-			db=view(dA,:,ir)
+	ntwav=sum(lags)+1
+	dA[:]=0.0
 
-			c=view(dAx,:,ir+(irrr-1)*nr)
+	ir1=0
+	for ir in iref
+		ir1+=1
+		dAxx=dAx[ir1]
 
-			mod!(pa, :d, wav=c, gf=b) # check
-			for i in eachindex(pa.d)
-				da[i] +=pa.d[i]
+		for ir2 in 1:nr
+
+			for i in 1:nt
+				pa.paconv.gf[i]=A[i,ir2]
+			end
+			for i in 1:ntwav
+				pa.paconv.wav[i]=dAxx[i,ir2]
 			end
 
-			mod!(pa, :gf, wav=c, d=a) # check
+			mod!(pa.paconv, :d) # check
 
-			for i in eachindex(pa.d)
-				db[i] +=pa.gf[i]
+			for i in 1:nt
+				dA[i,ir]+=pa.paconv.d[i]
+			end
+		end
+
+		for i in 1:nt
+			pa.paconv.d[i]=A[i,ir]
+		end
+
+		for ir2 in 1:nr
+			for i in 1:ntwav
+				pa.paconv.wav[i]=dAxx[i,ir2]
+			end
+
+			mod!(pa.paconv, :gf) # check
+			for i in 1:nt
+				dA[i,ir2] +=pa.paconv.gf[i]
 			end
 		end
 	end

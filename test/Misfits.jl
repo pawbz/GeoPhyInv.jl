@@ -19,7 +19,7 @@ dfdx2=similar(xvec);
 dfdwav=zeros(2*n1-1,n2)
 paconv=JuMIT.Conv.Param(ntgf=n1, ntd=n1, ntwav=2*n1-1, dims=(n2,), wavlags=[n1-1, n1-1])
 func=JuMIT.Misfits.error_acorr_weighted_norm!
-@time func(dfdx1,x,dfdwav=dfdwav, paconv=paconv)
+@btime func(dfdx1,x,dfdwav=dfdwav, paconv=paconv)
 JuMIT.Inversion.finite_difference!(x -> func(nothing, reshape(x,n1,n2),
 					    dfdwav=dfdwav, paconv=paconv), xvec, dfdx2, :central)
 
@@ -30,7 +30,7 @@ JuMIT.Inversion.finite_difference!(x -> func(nothing, reshape(x,n1,n2),
 # =================================================
 # squared euclidean after after xcorr
 # =================================================
-n1=100
+n1=50
 n2=4
 
 x=randn(n1,n2);
@@ -40,9 +40,9 @@ dfdx1=similar(x);
 xvec=vec(x)
 dfdx2=similar(xvec);
 func=JuMIT.Misfits.error_corr_squared_euclidean!
-pa=JuMIT.Misfits.Param_CSE(n1,n2)
-@time func(dfdx1,x,Ay, pa=pa)
-JuMIT.Inversion.finite_difference!(x -> func(nothing, reshape(x,n1,n2), Ay), xvec, dfdx2, :central)
+pa=JuMIT.Misfits.Param_CSE(n1,n2, y)
+@btime func(dfdx1,x,pa)
+JuMIT.Inversion.finite_difference!(x -> func(nothing, reshape(x,n1,n2),pa), xvec, dfdx2, :central)
 
 @test dfdx1 ≈ reshape(dfdx2,n1,n2)
 
@@ -99,7 +99,7 @@ J, α1 = JuMIT.Misfits.error_after_scaling(x,y)
 x=randn(100,10);
 w=randn(100,10);
 dfdx1=similar(x);
-@time JuMIT.Misfits.error_weighted_norm!(dfdx1,x,w)
+@btime JuMIT.Misfits.error_weighted_norm!(dfdx1,x,w)
 xvec=vec(x)
 dfdx2=similar(xvec);
 JuMIT.Inversion.finite_difference!(x -> JuMIT.Misfits.error_weighted_norm!(nothing, reshape(x,100,10), w), xvec, dfdx2, :central)
@@ -117,11 +117,12 @@ w=randn(100,10);
 dfdx1=similar(x);
 dfdx2=similar(x);
 
-@time JuMIT.Misfits.error_squared_euclidean!(dfdx1,x,y,w)
+@btime JuMIT.Misfits.error_squared_euclidean!(dfdx1,x,y,w)
 @time f(x)=JuMIT.Misfits.error_squared_euclidean!(nothing,x,y,w)
-@time ForwardDiff.gradient!(dfdx2,f, x);
+ForwardDiff.gradient!(dfdx2,f, x);
 
 @test dfdx1 ≈ reshape(dfdx2,100,10)
+
 
 # =================================================
 # test derivative_vector_magnitude

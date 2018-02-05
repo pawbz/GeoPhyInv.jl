@@ -4,50 +4,62 @@ using Base.Test
 using BenchmarkTools
 
 # also testing behaviour when out of bounds!!
-nx=Array(linspace(1,20,10));
-mx=Array(linspace(3,25,20));
+nx=Array(linspace(1,20,100));
+mx=Array(linspace(3,25,200));
 nz=Array(linspace(1,20,30));
 mz=Array(linspace(5,27,40));
 
-for Battrib in [:B1, :B2]
 
-	println("=====================================")
-	## 1D
-	ny=randn(length(nx));
-	# interpolate (my=f(ny))
-	my=zeros(length(mx));
-	@time JuMIT.Interpolation.interp_spray!(nx, ny, mx, my, :interp,
-			Battrib)
+Battrib=:B1
 
-	myp = randn(length(my));
+pa=JuMIT.Interpolation.Param([nx], [mx], Battrib)
+println("=====================================")
+## 1D
+ny=randn(length(nx));
+# interpolate (my=f(ny))
+my=zeros(length(mx));
+@time JuMIT.Interpolation.interp_spray!(ny, my, pa, :interp)
 
-	# spray (nyp=fˣ(myp))
-	nyp=zeros(length(nx));
-	@btime JuMIT.Interpolation.interp_spray!(mx, myp, nx, nyp, :spray, Battrib)
+myp = randn(length(my));
 
-	# dot product test
-	@test dot(my, myp) ≈ dot(ny, nyp)
+# spray (nyp=fˣ(myp))
+nyp=zeros(length(nx));
+@time JuMIT.Interpolation.interp_spray!(nyp, myp, pa, :spray)
+
+# dot product test
+@test dot(my, myp) ≈ dot(ny, nyp)
+
+"""
+Interpolation on the same grid should not change
+"""
+pa=JuMIT.Interpolation.Param([nx, nz], [nx, nz], Battrib)
+println("=====================================")
+ny=randn(length(nz), length(nx));
+my=zeros(length(nz), length(nx));
+@time JuMIT.Interpolation.interp_spray!(ny, my, pa, :interp)
+@test ny≈my
+myp = randn(size(my));
+nyp=zeros(length(nz), length(nx));
+@time JuMIT.Interpolation.interp_spray!(nyp, myp, pa, :spray)
+@test dot(my, myp) ≈ dot(ny, nyp)
+
+pa=JuMIT.Interpolation.Param([nx, nz], [mx, mz], Battrib)
+println("=====================================")
+
+## 2D
+ny=randn(length(nz), length(nx));
+# interpolate
+my=zeros(length(mz), length(mx));
+@time JuMIT.Interpolation.interp_spray!(ny, my, pa, :interp)
 
 
+myp = randn(size(my));
 
-	## 2D
-	ny=randn(length(nz), length(nx));
-	# interpolate
-	my=zeros(length(mz), length(mx));
-	@time JuMIT.Interpolation.interp_spray!(nx,nz, ny, mx,mz, my, :interp, Battrib)
+# spray
+nyp=zeros(length(nz), length(nx));
+@time JuMIT.Interpolation.interp_spray!(nyp, myp, pa, :spray)
 
-	myp = randn(size(my));
-
-	# spray
-	nyp=zeros(length(nz), length(nx));
-	@time JuMIT.Interpolation.interp_spray!(mx,mz, myp, nx,nz, nyp, :spray, Battrib)
-
-	# dot product test
-	@test dot(my, myp) ≈ dot(ny, nyp)
-end
+# dot product test
+@test dot(my, myp) ≈ dot(ny, nyp)
 
 
-
-yout=randn(1000);
-x=randn(1000);
-@btime JuMIT.Interpolation.interp_B1_1D(4, yout, 3., 4., 5., 6., 3.5)

@@ -79,6 +79,8 @@ type Param
 	mprecon::AbstractArray{Float64,2}
 	"compute data misfit"
 	paTD::Data.Param_error
+	paminterp::Interpolation.Param{Float64}
+	optims::Vector{Symbol} # :cls, xcorrcls.. ?
 	verbose::Bool
 	"synthetic or field inversion"
 	attrib::Symbol
@@ -157,13 +159,14 @@ function Param(
 	       mod_inv_parameterization::Vector{Symbol}=[:χKI, :χρI],
 	       born_flag::Bool=false,
 	       verbose::Bool=false,
-	       attrib::Symbol=:synthetic
+	       attrib::Symbol=:synthetic,
+	       optims=[:cls]
 	       )
 
 
 	# create modi according to igrid and interpolation of modm
 	modi = Models.Seismic_zeros(igrid);
-	Models.Seismic_interp_spray!(modm, modi, :interp)
+	Models.interp_spray!(modm, modi, :interp)
 
 	#
 	# need a separate model for synthetic
@@ -277,7 +280,7 @@ function Param(
 		# F
 		Fdtd.mod!(paf);
 		dobs1=paf.c.data[1]
-		Data.interp_spray!(dobs, dobs1, :interp, :B1)
+		Data.interp_spray!(dobs1, dobs, :interp, :B1)
 
 	        Fdtd.initialize!(paf.c)  # clear everything
 
@@ -289,8 +292,9 @@ function Param(
 
 	# create Parameters for data misfit
 	coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, recv_fields, acqgeom)
-	paTD=Data.Param_error(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup);
+	paTD=Data.Param_error(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
+	paminterp=Interpolation.Param([modm.mgrid.x, modm.mgrid.z], [modi.mgrid.x, modi.mgrid.z], :B2)
 	pa = Param(paf,
 	     deepcopy(acqsrc), 
 	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
@@ -302,6 +306,8 @@ function Param(
 	     deepcopy(mod_inv_parameterization),
 	     zeros(2,2), # dummy, update mprecon later
 	     paTD,
+	     paminterp,
+	     optims,
 	     verbose, attrib, true)
 
 
@@ -339,7 +345,7 @@ corresponding to `Param`.
 This number depends on the maximum lagtimes of the filters. 
 """
 function wfwi_ninv(pa::Param)
-	return  pa.w.tgridssf.nx
+	return  pa.paTD.coup.tgridssf.nx
 end
 
 """
@@ -463,7 +469,8 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 			
 			return modm, modi, gmodm, gmodi, res
 		else
-			return res
+			f = Optim.minimum(res)
+			return f
 		end
 	elseif(pa.attrib_inv == :migr)
 		storage = similar(x)
@@ -492,6 +499,33 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	else
 		error("invalid pa.attrib_inv")
 	end
+end
+
+function xwfwi!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothing, roundtrip_tol=1e-6,
+		     optim_tols=[1e-6, 1e-6])
+
+	if(ParamAM_func===nothing)
+		ParamAM_func=x->Inversion.ParamAM(x, optim_tols=optim_tols,name="Blind Decon",
+				    roundtrip_tol=roundtrip_tol, max_roundtrips=max_roundtrips,
+				    max_reroundtrips=max_reroundtrips,
+				    min_roundtrips=10,
+				    reinit_func=x->initialize!(pa),
+				    after_reroundtrip_func=x->(err!(pa); update_calsave!(pa);),
+				    )
+	end
+
+	
+	# create alternating minimization parameters
+	f1=x->FWI.xfwi!(pa, extended_trace=false)
+	f2=x->FWI.wfwi!(pa, extended_trace=false)
+	paam=ParamAM_func([f1, f2])
+
+	# do inversion
+	Inversion.go(paam)
+
+	# print errors
+	err!(pa)
+	println(" ")
 end
 
 
@@ -560,8 +594,7 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 	(mprecon_factor < 1.0)  && error("invalid mprecon_factor")
 
 	illumi = zeros(pa.modi.mgrid.nz, pa.modi.mgrid.nx)
-	Interpolation.interp_spray!(pa.modm.mgrid.x, pa.modm.mgrid.z, illum,
-	      pa.modi.mgrid.x, pa.modi.mgrid.z, illumi, :interp, :B1)
+	Interpolation.interp_spray!(illum, illumi, pa.paminterp, :interp)
 	(any(illumi .<= 0.0)) && error("illumi cannot be negative or zero")
 
 	# use log to fix scaling of illum 
@@ -702,22 +735,23 @@ function wfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	println("> wfwi: number of inversion variables:\t", length(x)) 
 
 	# initial w to x
-	Coupling_x!(pa.w, x, pa, 1)
+	Coupling_x!(x, pa, 1)
 
-	(Data.TD_iszero(pa.dcal)) && error("dcal zero wfwi")
+	(iszero(pa.paTD.y)) && error("dcal zero wfwi")
 
-	df = OnceDifferentiable(x -> func_grad_Coupling!(nothing, x, last_x, pa),
-		  (storage, x) -> func_grad_Coupling!(storage, x, last_x, pa))
+	f=x->func_grad_Coupling!(nothing, x,  pa)
+	g! =(storage,x)->func_grad_Coupling!(storage, x,  pa)
+
 	"""
 	Unbounded LBFGS inversion, only for testing
 	"""
-	res = optimize(df, x, 
+	res = optimize(f, g!, x, 
 		       LBFGS(),
 		       Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
 		       iterations = 100, store_trace = store_trace,
 		       extended_trace=extended_trace, show_trace = true))
 	"testing gradient using auto-differentiation"
-#	res = optimize(x -> func_Coupling(x, last_x, buffer1, pa), x, 
+#	res = optimize(f, x, 
 #		       LBFGS(),
 #		       Optim.Options(g_tol = 1e-12,
 #	 	       iterations = 10, store_trace = true,
@@ -726,9 +760,10 @@ function wfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	pa.verbose ? println(res) : nothing
 	# update w in pa
 
-	Coupling_x!(pa.w, Optim.minimizer(res), pa, -1)
+	Coupling_x!(Optim.minimizer(res), pa, -1)
 
-	return res
+	f = Optim.minimum(res)
+	return f
 end # wfwi
 
 """
@@ -755,7 +790,7 @@ function Seismic_x!(
 			all([iszero(modm), iszero(modi)]) && error("input modi or modm")
 
 			# 1. get modi using interpolation and modm
-			!(iszero(modm)) && Models.Seismic_interp_spray!(modm, modi, :interp)
+			!(iszero(modm)) && Models.interp_spray!(modm, modi, :interp, pa=pa.paminterp)
 		end
 
 		nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
@@ -781,7 +816,7 @@ function Seismic_x!(
 
 		# 2. interpolation from the inversion grid to the modelling grid
 		modm.mgrid = deepcopy(pa.modm.mgrid); 
-		Models.Seismic_interp_spray!(modi, modm, :interp)
+		Models.interp_spray!(modm, modi, :interp, pa=pa.paminterp)
 	else
 		error("invalid flag")
 	end
@@ -854,7 +889,7 @@ function Seismic_gx!(gmodm::Models.Seismic,
 					error("input gmodi or gmodm") : nothing
 
 		# 1. update gmodi by spraying gmodm
-		iszero(gmodm) ? nothing : Models.Seismic_interp_spray!(gmodm, gmodi, :spray)
+		iszero(gmodm) ? nothing : Models.interp_spray!(gmodm, gmodi, :spray, pa=pa.paminterp)
 
 		# 2. chain rule on gmodi 
 		Models.Seismic_chainrule!(gmodi, modi, g1, g2, pa.parameterization,-1)
@@ -880,7 +915,7 @@ function Seismic_gx!(gmodm::Models.Seismic,
 		Models.Seismic_chainrule!(gmodi, modi, g1, g2, pa.parameterization, 1)
 
 		# 2. get gradient after interpolation (just for visualization, not exact)
-		Models.Seismic_interp_spray!(gmodi, gmodm, :interp)
+		Models.interp_spray!(gmodm, gmodi, :interp, pa=pa.paminterp)
 	else
 		error("invalid flag")
 	end
@@ -916,15 +951,15 @@ function func_grad_Coupling!(storage, x::Vector{Float64},pa::Param)
 	pa.verbose ? println("computing gradient...") : nothing
 
 	# x to w 
-	Coupling_x!(pa.paTD.coup, x, pa, -1)
+	Coupling_x!(x, pa, -1)
 
 	if(storage === nothing)
 		# compute misfit 
-		f = Data.error!(paTD)
+		f = Data.error!(pa.paTD)
 		return f
 	else
-		f = Data.error!(paTD, :dJssf)
-		Coupling_gx!(storage, paTD.dJssf)
+		f = Data.error!(pa.paTD, :dJssf)
+		Coupling_gx!(storage, pa.paTD.dJssf)
 		return storage
 	end
 end
@@ -932,16 +967,23 @@ end
 """
 Convert coupling functions to x and vice versa
 """
-function Coupling_x!(w::Coupling.TD, 
-		   x::Vector{Float64}, 
+function Coupling_x!(x::Vector{Float64}, 
 		   pa::Param, 
 		   flag::Int64)
 	if(flag ==1) # convert w to x
-		x[1:pa.w.tgridssf.nx] = copy(vec(w.ssf[1,1][:]));
+		iss=1 # take only first source
+		for ifield=1:length(pa.paTD.y.fields)
+			w=pa.paTD.coup.ssf[iss,ifield]
+			for i in eachindex(x)
+				x[i]=w[i] # take only first source
+			end
+		end
 	elseif(flag == -1) # convert x to w
-		# update source functions
-		for iss=1:pa.w.acqgeom.nss, ifield=1:length(pa.w.fields)
-			w.ssf[iss, ifield][:] = copy(x)
+		for iss=1:pa.paTD.y.acqgeom.nss, ifield=1:length(pa.paTD.y.fields)
+			w=pa.paTD.coup.ssf[iss,ifield]
+			for i in eachindex(x)
+				w[i]=x[i]
+			end
 		end
 	else
 		error("invalid flag")
@@ -952,13 +994,11 @@ end
 Convert dJssf to gradient vector
 """
 function Coupling_gx!(gx, dJssf)
-	ntssf=length(dJssf)[1,1]
-	g[:]=0.0
-
-	for ifield=1:length(fields), iss=1:acq.nss
+	gx[:]=0.0
+	for ifield=1:size(dJssf,2), iss=1:size(dJssf,1)
 		dwav=dJssf[iss,ifield]
 		for i in eachindex(gx)
-			gx[i]=dwav[i]
+			gx[i]+=dwav[i]
 		end
 	end
 end

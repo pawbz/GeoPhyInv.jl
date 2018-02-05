@@ -98,6 +98,7 @@ r=zeros(n,n)
 w=zeros(n,n)
 pa=JuMIT.Conv.Param(d=s,gf=r,wav=w,dims=(n,), ntgf=n, ntd=n, ntwav=n);
 
-@btime JuMIT.Conv.mod!(pa, :d)
-@btime JuMIT.Conv.mod!(pa, :gf)
-@btime JuMIT.Conv.mod!(pa, :wav)
+@btime JuMIT.Conv.mod!(pa, :d);
+@btime JuMIT.Conv.mod!(pa, :d, d=s, gf=r);
+@btime JuMIT.Conv.mod!(pa, :gf);
+@btime JuMIT.Conv.mod!(pa, :wav);
