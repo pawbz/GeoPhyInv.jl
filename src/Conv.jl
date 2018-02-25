@@ -81,10 +81,10 @@ function Param(;ntwav=1, ntgf=1, ntd=1, dims=(),
 	(sum(dlags)+1 ≠ size(d,1)) && error("dlags")
 	(sum(wavlags)+1 ≠ size(wav,1)) && error("wavlags")
 
-	#FFTW.set_num_threads(Sys.CPU_CORES)
+	FFTW.set_num_threads(Sys.CPU_CORES)
 	nrfft=div(np2,2)+1
-	fftplan=plan_rfft(zeros(T, np2,dims...),[1])
-	ifftplan=plan_irfft(complex.(zeros(T, nrfft,dims...)),np2,[1])
+	fftplan=plan_rfft(zeros(T, np2,dims...),[1], flags=FFTW.MEASURE)
+	ifftplan=plan_irfft(complex.(zeros(T, nrfft,dims...)),np2,[1], flags=FFTW.MEASURE)
 
 	# preallocate freq domain vectors after rfft
 	dfreq=complex.(zeros(T,nrfft,dims...))
@@ -148,7 +148,9 @@ function mod!(pa::Param, attrib::Symbol;
 	if(attrib == :d)
 		A_mul_B!(pa.wavfreq, pa.fftplan, pa.wavpad)
 		A_mul_B!(pa.gffreq, pa.fftplan, pa.gfpad)
-		@. pa.dfreq = pa.gffreq * pa.wavfreq
+		for i in eachindex(pa.dfreq)
+			pa.dfreq[i] = pa.gffreq[i] * pa.wavfreq[i]
+		end
 		A_mul_B!(pa.dpad, pa.ifftplan, pa.dfreq)
 		pad_truncate!(d, pa.dpad, pa.dlags[1], pa.dlags[2], pa.np2, -1)
 		return d

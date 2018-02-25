@@ -34,12 +34,12 @@ for func_attrib in [:cls, :xcorrcls]
 
 
 	xvec=vec(pa.x.d[1,1])
-	g2=zeros(xvec)
-	JuMIT.Inversion.finite_difference!(x -> err(x), xvec, g2, :central)
+	gg2=zeros(xvec)
+	JuMIT.Inversion.finite_difference!(x -> err(x), xvec, gg2, :central)
 
 	@time JuMIT.Data.error!(pa,:dJx);
-	g1=vec(pa.dJx.d[1,1])
-	@test g1 ≈ g2
+	gg1=vec(pa.dJx.d[1,1])
+	@test gg1 ≈ gg2
 
 
 	function errw(xvec)
@@ -52,12 +52,12 @@ for func_attrib in [:cls, :xcorrcls]
 	end
 
 	xvec=vec(pa.coup.ssf[1,1])
-	g2=zeros(xvec)
-	JuMIT.Inversion.finite_difference!(x -> errw(x), xvec, g2, :central)
+	gg2=zeros(xvec)
+	JuMIT.Inversion.finite_difference!(x -> errw(x), xvec, gg2, :central)
 
 	@time JuMIT.Data.error!(pa,:dJssf);
-	g1=vec(pa.dJssf[1,1])
-	@test g1 ≈ g2
+	gg1=vec(pa.dJssf[1,1])
+	@test gg1 ≈ gg2
 
 
 end

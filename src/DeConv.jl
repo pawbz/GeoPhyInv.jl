@@ -420,7 +420,9 @@ function update_calsave!(pa)
 	f1=Misfits.error_squared_euclidean!(nothing, pa.calsave.d, pa.obs.d, nothing, norm_flag=true)
 	f2=Misfits.error_squared_euclidean!(nothing, pa.cal.d, pa.obs.d, nothing, norm_flag=true)
 	if(f2<f1)
-		pa.calsave=deepcopy(pa.cal)
+		copy!(pa.calsave.d, pa.cal.d)
+		copy!(pa.calsave.gf, pa.cal.gf)
+		copy!(pa.calsave.wav, pa.cal.wav)
 	end
 end
 
@@ -1031,16 +1033,17 @@ function phase_retrievel(Ay,
 	nr=Int(sqrt(nr1))
 	nt=Int((nt1+1)/2)
 
-	pacse=Misfits.Param_CSE(nt,nr)
+	Ayy=[Ay[:,1+(ir-1)*nr:ir*nr]for ir in 1:nr]
+	pacse=Misfits.Param_CSE(nt,nr,Ay=Ayy)
 	f=function f(x)
 		x=reshape(x,nt,nr)
-		J=Misfits.error_corr_squared_euclidean!(nothing,x,Ay, pa=pacse)
+		J=Misfits.error_corr_squared_euclidean!(nothing,x,pacse)
 		return J
 	end
 	g! =function g!(storage, x) 
 		x=reshape(x,nt,nr)
 		gg=zeros(nt,nr)
-		Misfits.error_corr_squared_euclidean!(gg, x, Ay, pa=pacse)
+		Misfits.error_corr_squared_euclidean!(gg, x, pacse)
 		copy!(storage,gg)
 	end
 

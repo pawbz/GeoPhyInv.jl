@@ -279,10 +279,11 @@ function ParamMO(;
 		f=0.0
 		storage[:]=0.0
 		for iop in 1:pa.noptim
-			pa.fvec[iop]=pa.optim_grad[iop](pa.storage_temp, x)/pa.fvec_init[iop]
+			pa.fvec[iop]=pa.optim_grad[iop](pa.storage_temp, x)*inv(pa.fvec_init[iop])
 			f += (pa.fvec[iop]*pa.αvec[iop])
+			scale!(pa.storage_temp, pa.αvec[iop]*inv(pa.fvec_init[iop]))
 			for i in eachindex(storage)
-				storage[i] += pa.storage_temp[i]*pa.αvec[iop]*inv(pa.fvec_init[iop])
+				storage[i] += pa.storage_temp[i]
 			end
 		end
 		return f

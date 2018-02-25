@@ -271,13 +271,19 @@ mutable struct Param_CSE
 end
 
 
-function Param_CSE(nt,nr,y)
+function Param_CSE(nt,nr;y=nothing, Ay=nothing)
 	paxcorr=Conv.Param_xcorr(nt,collect(1:nr),norm_flag=false)
 	Ax=[zeros(2*nt-1,nr) for ir in 1:nr]
-	Ay=[zeros(2*nt-1,nr) for ir in 1:nr]
-	Conv.xcorr!(Ay,y,paxcorr)
+	Ayy=[zeros(2*nt-1,nr) for ir in 1:nr]
+	if(!(y===nothing))
+		Conv.xcorr!(Ayy,y,paxcorr)
+	elseif(!(Ay===nothing))
+		for ir in 1:nr
+			copy!(Ayy[ir],Ay[ir])
+		end
+	end
 	dAx=[zeros(2*nt-1,nr) for ir in 1:nr]
-	return Param_CSE(paxcorr, Ax, Ay, dAx)
+	return Param_CSE(paxcorr, Ax, Ayy, dAx)
 end
 
 function error_corr_squared_euclidean!(dfdx,  x,  pa)

@@ -505,10 +505,10 @@ function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 	dJxc=zeros(y.tgrid.nx)
 
 	if(func_attrib==:cls)
-		pacse=[Misfits.Param_CSE(1, 1, zeros(1,1)) for i in 1:2, j=1:2] # dummy
+		pacse=[Misfits.Param_CSE(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
 		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	elseif(func_attrib==:xcorrcls)
-		pacse=[Misfits.Param_CSE(y.tgrid.nx, y.acqgeom.nr[iss],y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		pacse=[Misfits.Param_CSE(y.tgrid.nx, y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 		func=[(dJx,x)->Misfits.error_corr_squared_euclidean!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	end
 

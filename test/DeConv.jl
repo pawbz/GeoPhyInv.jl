@@ -2,6 +2,33 @@ using Revise
 using JuMIT
 using Base.Test
 using ForwardDiff
+using BenchmarkTools
+
+
+# a simple DeConv memory test
+ntgf = 200
+nr = 30
+tfact=20;
+gfobs=zeros(ntgf, nr)
+JuMIT.DSP.toy_green!(gfobs,bfrac=0.2, nevents=3,   afrac=[2.0, 0.5, 0.25]);
+nt = ntgf*tfact
+δt=0.0001; # results of independent of this
+tgridnoise=JuMIT.Grid.M1D(0., Float64(ntgf*tfact), ntgf*tfact)
+gfprecon, gfweights, wavprecon=JuMIT.DeConv.create_white_weights(ntgf, nt, nr)
+wavobs=randn(nt);
+pa=JuMIT.DeConv.Param(ntgf, nt, nr, gfobs=gfobs,fft_threads=true, gfprecon=gfprecon,     wavnorm_flag=false, wavobs=wavobs, verbose=false, gfweights=gfweights, mode=2);
+JuMIT.DeConv.update_func_grad!(pa,gfoptim=[:ls], gfαvec=[1.]);
+JuMIT.DeConv.initialize!(pa)
+@time JuMIT.DeConv.update_all!(pa, max_reroundtrips=1, max_roundtrips=1, roundtrip_tol=1e-6)
+JuMIT.DeConv.remove_gfprecon!(pa, all=true)
+JuMIT.DeConv.remove_gfweights!(pa, all=true)
+@time JuMIT.DeConv.update_all!(pa, max_reroundtrips=1, max_roundtrips=1, roundtrip_tol=1e-6)
+
+
+
+##
+rrrrrrr
+
 
 ntgf = 5
 nr = 10
