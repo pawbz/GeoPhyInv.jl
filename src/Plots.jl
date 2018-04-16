@@ -2,13 +2,12 @@ module Plots
 
 using PyPlot
 using StatsBase
-import JuMIT.Interpolation
+using Interpolation
+using Grid
+using Conv
 import JuMIT.Acquisition
-import JuMIT.Grid
 import JuMIT.Data
 import JuMIT.Models
-import JuMIT.Conv
-
 
 
 #"""

@@ -2,13 +2,13 @@ __precompile__()
 
 module Fdtd
 
-import JuMIT.Grid
-import JuMIT.Interpolation
+using Grid
+using Interpolation
+using Signals
 import JuMIT.Models
 import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Gallery
-import JuMIT.DSP
 using DistributedArrays
 
 #As forward modeling method, the 
@@ -335,8 +335,8 @@ function Param(;
 	end
 
 	# find maximum and minimum frequencies in the source wavelets
-	freqmin = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
-	freqmax = DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
+	freqmin = Signals.DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
+	freqmax = Signals.DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
 
 	# minimum and maximum velocities
 	vpmin = minimum(broadcast(minimum,[model.vp0, model_pert.vp0]))

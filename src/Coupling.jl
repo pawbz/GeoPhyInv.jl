@@ -18,8 +18,8 @@ before applying the time-domain filter data type  described in this module:
 module Coupling
 
 
+using Grid
 import JuMIT.Acquisition
-import JuMIT.Grid
 
 """
 Time-domain source and receiver filters.

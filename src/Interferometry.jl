@@ -2,10 +2,10 @@ __precompile__()
 
 module Interferometry
 
-import JuMIT.Grid
+using Grid
+using Conv
 import JuMIT.Acquisition
 import JuMIT.Data
-import JuMIT.Conv
 
 
 """

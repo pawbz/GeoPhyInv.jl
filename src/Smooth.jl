@@ -1,6 +1,6 @@
 module Smooth
 
-import JuMIT.DSP
+import Signals
 
 """
 ! this subroutine returns a zero phase gaussian wi
@@ -61,17 +61,17 @@ function gaussian!{N}(x::AbstractArray{Float64,N}, nwin::Vector{Int64})
 	if(N==1)
 		gwin=gaussian_filter(nwin[1])
 		xin=deepcopy(x)
-		DSP.fast_filt!(x, xin, gwin, :s)
+		Signals.DSP.fast_filt!(x, xin, gwin, :s)
 	elseif(N==2)
 		gwin1=gaussian_filter(nwin[1])
 		gwin2=gaussian_filter(nwin[2])
 		xin=deepcopy(x)
 		for i in 1:size(x,2)
-			DSP.fast_filt!(view(x,:,i), xin[:,i], gwin1, :s)
+			Signals.DSP.fast_filt!(view(x,:,i), xin[:,i], gwin1, :s)
 		end
 		xin=deepcopy(x)
 		for i in 1:size(x,1)
-			DSP.fast_filt!(view(x,i,:), xin[i,:], gwin2, :s)
+			Signals.DSP.fast_filt!(view(x,i,:), xin[i,:], gwin2, :s)
 		end
 	else
 		error("only implemented upto 2 dimensions")

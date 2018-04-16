@@ -15,16 +15,17 @@ of the `Param` after performing the inversion.
 """
 module FWI
 
-import JuMIT.Interpolation
+using Interpolation
+using Conv
+using Grid
+using Misfits
+using Inversion
+
 import JuMIT.Models
-import JuMIT.Conv
-import JuMIT.Grid
 import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Coupling
-import JuMIT.Misfits
 import JuMIT.Fdtd
-import JuMIT.Inversion
 using Optim, LineSearches
 using DistributedArrays
 
@@ -642,8 +643,10 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 		Fdtd.update_model!(pa.paf.c, pa.modm)
 
 		Fadj!(pa)	
+		println("ffLLFKF", maximum(pa.gmodm.χvp))
 	
 		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
+		println("ffLLFKF", maximum(storage))
 
 		return storage
 	end
@@ -658,13 +661,12 @@ function Fadj!(pa::Param)
 
 	pa.paf.c.activepw=[1,2]
 	pa.paf.c.illum_flag=false
-	pa.paf.c.sflags=[3, 2]
+	pa.paf.c.sflags=[3,2]
 	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
 	pa.paf.c.backprop_flag=-1
 	pa.paf.c.gmodel_flag=true
 
 	Fdtd.mod!(pa.paf);
-
 	copy!(pa.gmodm,pa.paf.c.gmodel)
 
 end

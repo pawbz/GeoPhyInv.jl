@@ -1,12 +1,14 @@
 addprocs(2)
 using JuMIT
 using Base.Test
+using Signals
+using Misfits
 
 
 model = JuMIT.Gallery.Seismic(:acou_homo1);
 acqgeom = JuMIT.Gallery.Geom(model.mgrid,:xwell);
 tgrid = JuMIT.Gallery.M1D(:acou_homo1);
-wav = JuMIT.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
+wav = Signals.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
 # source wavelet for born modelling
 acqsrc = JuMIT.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
 
@@ -28,7 +30,7 @@ JuMIT.Fdtd.mod!(pa);
 
 
 # least-squares misfit
-err = JuMIT.Misfits.TD!(nothing,rec1, pa.c.data[1])
+err = Misfits.TD!(nothing,rec1, pa.c.data[1])
 
 # normalization
 error = err[1]/dot(rec1, rec1)

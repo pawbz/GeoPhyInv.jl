@@ -2,11 +2,11 @@ __precompile__()
 
 module Analytic
 
-import JuMIT.Grid
+using Grid
+using Signals
 import JuMIT.Acquisition
 import JuMIT.Models
 import JuMIT.Data
-import JuMIT.DSP
 import JuMIT.Gallery
 
 
@@ -79,7 +79,7 @@ function mod(;
 		
 		for is=1:acqgeom.ns[iss]
 			# zero pad wavelet
-			DSP.nlag_npow2_pad_truncate!(acqsrc.wav[iss,ifield][:,is], wpow2, nt-1, 0, np2, 1)
+			Signals.DSP.nlag_npow2_pad_truncate!(acqsrc.wav[iss,ifield][:,is], wpow2, nt-1, 0, np2, 1)
 			fft!(wpow2) # source wavelet in the frequency domain
 
 			x = sx[is] - rx[ir]
@@ -126,7 +126,7 @@ function mod(;
 		ifft!(dpow2all)
 
 		# truncate
-		DSP.nlag_npow2_pad_truncate!(dtemp, dpow2all, nt-1, 0, np2, -1)
+		Signals.DSP.nlag_npow2_pad_truncate!(dtemp, dpow2all, nt-1, 0, np2, -1)
 		data.d[iss,ifield][:,ir] = dtemp
 		end
 	end

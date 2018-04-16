@@ -3,11 +3,11 @@ __precompile__()
 module Models
 
 
-import JuMIT.Grid
-import JuMIT.Interpolation
-import JuMIT.Smooth
 using DataFrames
 using CSV
+using Grid
+using Interpolation
+import JuMIT.Smooth
 
 """
 Data type fo represent a seismic model.

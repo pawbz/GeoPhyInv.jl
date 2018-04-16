@@ -9,14 +9,14 @@ seismic data.
 """
 module Data
 
+using Grid
+using Conv
+using Interpolation
+using DeConv
+using Misfits
+using Signals
 import JuMIT.Acquisition
-import JuMIT.Grid
-import JuMIT.Conv
-import JuMIT.Interpolation
 import JuMIT.Coupling
-import JuMIT.DeConv
-import JuMIT.Misfits
-import JuMIT.DSP
 using DSP
 
 """
@@ -350,13 +350,13 @@ function TDcoup!(
 	wv=zeros(w.tgridssf.nx)
 	for ifield = 1:length(fields), iss = 1:nss, ir = 1:nr[iss]
 		# receiver coupling
-	#	DSP.fast_filt!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],
+	#	Signals.DSP.fast_filt!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],
 #		 w.rf[iss, ifield][:,ir],:s)
 		# source coupling
 		sv=s.d[iss, ifield][:, ir]
 		rv=r.d[iss, ifield][:, ir]
 		wv=w.ssf[iss, ifield]
-		DSP.fast_filt!(sv, rv, wv, attrib)
+		Signals.DSP.fast_filt!(sv, rv, wv, attrib)
 		s.d[iss, ifield][:, ir]=copy(sv)
 		r.d[iss, ifield][:, ir]=copy(rv)
 		w.ssf[iss, ifield][:]=copy(wv)
@@ -402,7 +402,7 @@ function TD_weight!(
 
 	itlim = sort(broadcast(indmin,[abs(dw.tgrid.x-tlim[i]) for i in 1:2]))
 	twin=zeros(nt)
-	twin[itlim[1] : itlim[2]] = DSP.taper(ones(itlim[2]-itlim[1]+1),ttaperperc) 
+	twin[itlim[1] : itlim[2]] = Signals.DSP.taper(ones(itlim[2]-itlim[1]+1),ttaperperc) 
 
 	for ifield = 1:length(fields), iss = 1:nss
 		zo = sqrt((rz[iss][:]-mean(sz[iss])).^2) # offsets computed using mean of source position
@@ -622,7 +622,7 @@ function DDeConv(d::TD, wav::AbstractVector{Float64}, ϵ=1e-2)
 	ntd=dout.tgrid.nx
 	wavv=deepcopy(wav);
 
-	paD=DeConv.ParamD(ntd=ntd,ntwav=length(wav), wav=wavv)
+	paD=DeConv.ParamD(ntd=ntd,nts=length(wav), s=wavv)
 
 	paD.ϵ=ϵ
 
@@ -642,7 +642,7 @@ function DDeConv!(dataout::TD, data::TD, paD)
 			end
 			DeConv.mod!(paD)
 			for it in 1:nt
-				ddo[it,ir]=paD.gf[it]
+				ddo[it,ir]=paD.g[it]
 			end
 		end
 	end

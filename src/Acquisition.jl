@@ -9,10 +9,10 @@ help their construction.
 """
 module Acquisition
 
-import JuMIT.Grid
+using Grid
 import JuMIT.Models
-import JuMIT.Wavelets
-import JuMIT.DSP
+using Signals
+import JuMIT.Models
 using Distributions
 using DataFrames
 using CSV
@@ -531,9 +531,9 @@ end
 Return minimum, maximum and peak frequencies of `Src`
 """
 function freqs(src::Src)
-	freqmin = minimum([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:min) for i in 1:src.nss, j in 1:length(src.fields)])
-	freqmax = maximum([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:max) for i in 1:src.nss, j in 1:length(src.fields)])
-	freqpeak = mean([DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:peak) for i in 1:src.nss, j in 1:length(src.fields)])
+	freqmin = minimum([Signals.DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:min) for i in 1:src.nss, j in 1:length(src.fields)])
+	freqmax = maximum([Signals.DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:max) for i in 1:src.nss, j in 1:length(src.fields)])
+	freqpeak = mean([Signals.DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:peak) for i in 1:src.nss, j in 1:length(src.fields)])
 	return freqmin, freqmax, freqpeak
 end
 
@@ -574,14 +574,14 @@ the model has `nλ` wavelengths.
 
 * `mod::Models.Seismic` :
 * `nλ::Int64=10` : number of wavelengths in the mod
-* `wav_func::Function=(fqdom, tgrid)->Wavelets.ricker(fqdom,tgrid)` : which wavelet to generate, see Wavelets.jl
+* `wav_func::Function=(fqdom, tgrid)->Signals.Wavelets.ricker(fqdom,tgrid)` : which wavelet to generate, see Signals.Wavelets.jl
 * `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the model, use this fraction to increase of reduce the maximum time
 """
 function Src_fixed_mod(
 		nss::Int64, ns::Int64, fields::Vector{Symbol}; 
 		mod::Models.Seismic=nothing, 
 		nλ::Int64=10,
-		wav_func::Function=(fqdom, tgrid)->Wavelets.ricker(fqdom,tgrid),
+		wav_func::Function=(fqdom, tgrid)->Signals.Wavelets.ricker(fqdom,tgrid),
 		tmaxfrac::Float64=1.0
 		)
 
@@ -628,7 +628,7 @@ function Src_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol};
 			  tmaxfrac::Float64=1.0)
 	wavsrc = [repeat(zeros(tgrid.nx),inner=(1,ns)) for iss=1:nss, ifield=1:length(fields)] 
 	for ifield in 1:length(fields), iss in 1:nss, is in 1:ns
-		wavsrc[iss, ifield][:,is] = DSP.get_tapered_random_tmax_signal(tgrid, fmin=fmin, fmax=fmax, tmaxfrac=tmaxfrac, dist=distvec[iss], 
+		wavsrc[iss, ifield][:,is] = Signals.DSP.get_tapered_random_tmax_signal(tgrid, fmin=fmin, fmax=fmax, tmaxfrac=tmaxfrac, dist=distvec[iss], 
 								 sparsep=sparsepvec[iss])
 	end
 	src=Src(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
