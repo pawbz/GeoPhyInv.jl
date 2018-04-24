@@ -9,6 +9,7 @@ import JuMIT.Models
 import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Gallery
+using ProgressMeter
 using DistributedArrays
 
 #As forward modeling method, the 
@@ -865,7 +866,7 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 		"""
 		* don't use shared arrays inside this time loop, for speed when using multiple procs
 		"""
-		for it=1:pac.nt
+		@showprogress 1 string("modelling supersource ",iss," ") for it=1:pac.nt
 
 			advance!(pac,pap)
 		

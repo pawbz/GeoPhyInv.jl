@@ -375,7 +375,9 @@ function Seismic_chainrule!(
 			@. g2 = gp
 			@. g2 = gvp * vp * inv(ρ)
 			scale!(g2,-0.5)
-			@. g2 += gρ
+			for i in eachindex(g2)
+				g2[i] += gρ[i]
+			end
 			scale!(g2,ρ0)
 		elseif(attribs == [:χKI, :χρI])
 			chain_g1!(g1,gvp,ρ,vp,KI0)
@@ -719,18 +721,18 @@ function to resample in the model domain
 * `mod::Seismic` : model
 * `modi::Seismic` : model after interpolation
 """
-function interp_spray!(mod::Seismic, mod_out::Seismic, attrib::Symbol, Battrib::Symbol=:B2; pa=nothing)
+function interp_spray!(mod::Seismic, modi::Seismic, attrib::Symbol, Battrib::Symbol=:B2; pa=nothing)
 	if(pa===nothing)
-		pa=Interpolation.Param([mod.mgrid.x, mod.mgrid.z], [mod_out.mgrid.x, mod_out.mgrid.z], Battrib)
+		pa=Interpolation.Param([mod.mgrid.x, mod.mgrid.z], [modi.mgrid.x, modi.mgrid.z], Battrib)
 	end
 
 	"loop over fields in `Seismic`"
-	Interpolation.interp_spray!(mod.χvp, mod_out.χvp, pa, attrib)
-	Interpolation.interp_spray!(mod.χvs, mod_out.χvs, pa, attrib)
-	Interpolation.interp_spray!(mod.χρ, mod_out.χρ,  pa, attrib)
+	Interpolation.interp_spray!(mod.χvp, modi.χvp, pa, attrib)
+	Interpolation.interp_spray!(mod.χvs, modi.χvs, pa, attrib)
+	Interpolation.interp_spray!(mod.χρ, modi.χρ,  pa, attrib)
 
-	mod_out.vp0 = copy(mod.vp0); mod_out.vs0 = copy(mod.vs0); 
-	mod_out.ρ0 = copy(mod.ρ0);
+	modi.vp0 = copy(mod.vp0); modi.vs0 = copy(mod.vs0); 
+	modi.ρ0 = copy(mod.ρ0);
 end
 #
 #macro inter

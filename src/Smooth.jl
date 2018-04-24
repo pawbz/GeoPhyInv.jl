@@ -1,6 +1,6 @@
 module Smooth
 
-import Signals
+using Signals
 
 """
 ! this subroutine returns a zero phase gaussian wi

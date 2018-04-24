@@ -295,7 +295,7 @@ function Param(
 	coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, recv_fields, acqgeom)
 	paTD=Data.Param_error(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
-	paminterp=Interpolation.Param([modm.mgrid.x, modm.mgrid.z], [modi.mgrid.x, modi.mgrid.z], :B2)
+	paminterp=Interpolation.Param([modi.mgrid.x, modi.mgrid.z], [modm.mgrid.x, modm.mgrid.z], :B2)
 	pa = Param(paf,
 	     deepcopy(acqsrc), 
 	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
@@ -506,7 +506,7 @@ function xwfwi!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothin
 		     optim_tols=[1e-6, 1e-6])
 
 	if(ParamAM_func===nothing)
-		ParamAM_func=x->Inversion.ParamAM(x, optim_tols=optim_tols,name="Blind Decon",
+		ParamAM_func=x->Inversion.ParamAM(x, optim_tols=optim_tols,name="FWI with Source Wavelet Estimation",
 				    roundtrip_tol=roundtrip_tol, max_roundtrips=max_roundtrips,
 				    max_reroundtrips=max_reroundtrips,
 				    min_roundtrips=10,
@@ -517,8 +517,8 @@ function xwfwi!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothin
 
 	
 	# create alternating minimization parameters
-	f1=x->FWI.xfwi!(pa, extended_trace=false)
-	f2=x->FWI.wfwi!(pa, extended_trace=false)
+	f1=x->FWI.wfwi!(pa, extended_trace=false)
+	f2=x->FWI.xfwi!(pa, extended_trace=false)
 	paam=ParamAM_func([f1, f2])
 
 	# do inversion
@@ -595,7 +595,7 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 	(mprecon_factor < 1.0)  && error("invalid mprecon_factor")
 
 	illumi = zeros(pa.modi.mgrid.nz, pa.modi.mgrid.nx)
-	Interpolation.interp_spray!(illum, illumi, pa.paminterp, :interp)
+	Interpolation.interp_spray!(illumi, illum, pa.paminterp, :spray)
 	(any(illumi .<= 0.0)) && error("illumi cannot be negative or zero")
 
 	# use log to fix scaling of illum 
@@ -643,10 +643,8 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 		Fdtd.update_model!(pa.paf.c, pa.modm)
 
 		Fadj!(pa)	
-		println("ffLLFKF", maximum(pa.gmodm.χvp))
 	
 		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
-		println("ffLLFKF", maximum(storage))
 
 		return storage
 	end
@@ -750,7 +748,7 @@ function wfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	res = optimize(f, g!, x, 
 		       LBFGS(),
 		       Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
-		       iterations = 100, store_trace = store_trace,
+		       iterations = 1000, store_trace = store_trace,
 		       extended_trace=extended_trace, show_trace = true))
 	"testing gradient using auto-differentiation"
 #	res = optimize(f, x, 
@@ -791,8 +789,8 @@ function Seismic_x!(
 		else
 			all([iszero(modm), iszero(modi)]) && error("input modi or modm")
 
-			# 1. get modi using interpolation and modm
-			!(iszero(modm)) && Models.interp_spray!(modm, modi, :interp, pa=pa.paminterp)
+			# 1. get modi using interpolation and modm (use pa interp later, not used during inversion a lot)
+			!(iszero(modm)) && Models.interp_spray!(modm, modi, :interp)
 		end
 
 		nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
@@ -818,7 +816,7 @@ function Seismic_x!(
 
 		# 2. interpolation from the inversion grid to the modelling grid
 		modm.mgrid = deepcopy(pa.modm.mgrid); 
-		Models.interp_spray!(modm, modi, :interp, pa=pa.paminterp)
+		Models.interp_spray!(modi, modm, :interp, pa=pa.paminterp)
 	else
 		error("invalid flag")
 	end
@@ -890,8 +888,9 @@ function Seismic_gx!(gmodm::Models.Seismic,
 		all([iszero(gmodm), iszero(gmodi)]) ? 
 					error("input gmodi or gmodm") : nothing
 
+
 		# 1. update gmodi by spraying gmodm
-		iszero(gmodm) ? nothing : Models.interp_spray!(gmodm, gmodi, :spray, pa=pa.paminterp)
+		iszero(gmodm) ? nothing : Models.interp_spray!(gmodi, gmodm, :spray, pa=pa.paminterp)
 
 		# 2. chain rule on gmodi 
 		Models.Seismic_chainrule!(gmodi, modi, g1, g2, pa.parameterization,-1)
@@ -917,7 +916,7 @@ function Seismic_gx!(gmodm::Models.Seismic,
 		Models.Seismic_chainrule!(gmodi, modi, g1, g2, pa.parameterization, 1)
 
 		# 2. get gradient after interpolation (just for visualization, not exact)
-		Models.interp_spray!(gmodm, gmodi, :interp, pa=pa.paminterp)
+		Models.interp_spray!(gmodi, gmodm, :interp, pa=pa.paminterp)
 	else
 		error("invalid flag")
 	end

@@ -197,6 +197,54 @@ function TD_tr!(data::TD)
 	data.d = copy([flipdim(data.d[i,j],1) for i in 1:data.acqgeom.nss, j in 1:length(data.fields)]);
 end
 
+
+"""
+Returns the variance of data
+
+"""
+function Base.var(data1::TD)
+	σ=0.0
+	μ=mean(data1)
+	n=0
+	for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
+		for ir = 1:data1.acqgeom.nr[iss], it = 1:data1.tgrid.nx
+			n += 1
+			σ += (data1.d[iss, ifield][it, ir]-μ)^2 
+		end
+	end
+	return σ*inv(n)
+end
+
+function Base.mean(data1::TD)
+	n=0
+	μ=0.0
+	for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
+		for ir = 1:data1.acqgeom.nr[iss], it = 1:data1.tgrid.nx
+			n += 1
+			μ += data1.d[iss, ifield][it, ir]
+		end
+	end
+	return μ*inv(n)
+end
+
+function addnoise!(dataN::TD, data::TD, SNR)
+
+	σx=var(data)
+
+	σxN=sqrt(σx^2*inv(10^(SNR/10.)))
+	
+	# factor to be multiplied to each scalar
+	α=sqrt(σxN)
+	for ifield = 1:length(data.fields), iss = 1:data.acqgeom.nss 
+		for ir = 1:data.acqgeom.nr[iss], it = 1:data.tgrid.nx
+
+			dataN.d[iss, ifield][it, ir] = dataN.d[iss, ifield][it, ir] + α*randn()
+		end
+	end
+end
+
+
+
 """
 Returns dot product of data.
 
@@ -467,19 +515,19 @@ function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.acqgeom)
 	end
 
-	paconvssf=Conv.Param(ntwav=coup.tgridssf.nx, 
-		      ntd=y.tgrid.nx, 
-		      ntgf=y.tgrid.nx, 
-		      wavlags=coup.ssflags, 
+	paconvssf=Conv.Param(ssize=[coup.tgridssf.nx], 
+		      dsize=[y.tgrid.nx], 
+		      gsize=[y.tgrid.nx], 
+		      slags=coup.ssflags, 
 		      dlags=[y.tgrid.nx-1, 0], 
-		      gflags=[y.tgrid.nx-1, 0])
+		      glags=[y.tgrid.nx-1, 0])
 
-	paconvrf=Conv.Param(ntwav=coup.tgridrf.nx, 
-		      ntd=y.tgrid.nx, 
-		      ntgf=y.tgrid.nx, 
-		      wavlags=coup.rflags, 
+	paconvrf=Conv.Param(ssize=[coup.tgridrf.nx], 
+		      dsize=[y.tgrid.nx], 
+		      gsize=[y.tgrid.nx], 
+		      slags=coup.rflags, 
 		      dlags=[y.tgrid.nx-1, 0], 
-		      gflags=[y.tgrid.nx-1, 0])
+		      glags=[y.tgrid.nx-1, 0])
 
 	dJssf=deepcopy(coup.ssf)
 
@@ -543,14 +591,14 @@ function error!(pa::Param_error, grad=nothing)
 		nt=size(xrr,1)
 		nr=size(xrr,2)
 
-		copy!(pa.paconvssf.wav,wav)
+		copy!(pa.paconvssf.s,wav)
 		# xrc <- xr apply source filter to xr
 		for ir=1:nr
 			xrrr=view(xrr,:,ir)
 			for i in 1:nt
 				pa.paconvssf.d[i]=xrr[i,ir]
 			end
-			Conv.mod!(pa.paconvssf, :d, gf=xrrr, wav=wav)
+			Conv.mod!(pa.paconvssf, :d, g=xrrr, s=wav)
 			for i in 1:nt
 				xrcc[i,ir]=pa.paconvssf.d[i]
 			end
@@ -569,14 +617,14 @@ function error!(pa::Param_error, grad=nothing)
 		if(grad==:dJx)
 			dJxrr=pa.dJxr.d[iss,ifield]
 			dJxrcc=pa.dJxrc.d[iss,ifield]
-			copy!(pa.paconvssf.wav,wav)
+			copy!(pa.paconvssf.s,wav)
 			for ir=1:nr
 				for i in 1:nt
 					pa.paconvssf.d[i]=dJxrcc[i,ir]
 				end
-				Conv.mod!(pa.paconvssf, :gf)
+				Conv.mod!(pa.paconvssf, :g)
 				for i in 1:nt
-					dJxrr[i,ir]=pa.paconvssf.gf[i]
+					dJxrr[i,ir]=pa.paconvssf.g[i]
 				end
 			end
 			scale!(dJxrr, inv(pa.ynorm))  # take care of scale later in the functional
@@ -589,9 +637,9 @@ function error!(pa::Param_error, grad=nothing)
 			for ir=1:acq.nr[iss]
 				xrrr=view(xrr,:,ir)
 				dJxrccc=view(dJxrcc,:,ir)
-				Conv.mod!(pa.paconvssf, :wav, gf=xrrr, d=dJxrccc)
+				Conv.mod!(pa.paconvssf, :s, g=xrrr, d=dJxrccc)
 				for i in eachindex(dJwav)
-					dJwav[i]+=pa.paconvssf.wav[i] # stack gradient of ssf over all receivers
+					dJwav[i]+=pa.paconvssf.s[i] # stack gradient of ssf over all receivers
 				end
 			end
 			scale!(dJwav, inv(pa.ynorm))
