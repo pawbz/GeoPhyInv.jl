@@ -502,9 +502,9 @@ mutable struct Param_error
 	dJssf::Matrix{Vector{Float64}} # gradient w.r.t source filters
 	ynorm::Float64 # normalize functional with energy of y
 	coup::Coupling.TD
-	paconvssf::Conv.Param{Float64,1} # convolutional model for source filters
-	paconvrf::Conv.Param{Float64,1} # convolutional model for receiver filters
-	pacse::Matrix{Misfits.Param_CSE}
+	paconvssf::Conv.P_conv{Float64,1} # convolutional model for source filters
+	paconvrf::Conv.P_conv{Float64,1} # convolutional model for receiver filters
+	pacse::Matrix{Conv.P_misfit_xcorr}
 	func::Matrix{Function} # function to compute misfit for every ss and fields
 	painterp::Interpolation.Param{Float64}
 end
@@ -515,14 +515,14 @@ function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.acqgeom)
 	end
 
-	paconvssf=Conv.Param(ssize=[coup.tgridssf.nx], 
+	paconvssf=Conv.P_conv(ssize=[coup.tgridssf.nx], 
 		      dsize=[y.tgrid.nx], 
 		      gsize=[y.tgrid.nx], 
 		      slags=coup.ssflags, 
 		      dlags=[y.tgrid.nx-1, 0], 
 		      glags=[y.tgrid.nx-1, 0])
 
-	paconvrf=Conv.Param(ssize=[coup.tgridrf.nx], 
+	paconvrf=Conv.P_conv(ssize=[coup.tgridrf.nx], 
 		      dsize=[y.tgrid.nx], 
 		      gsize=[y.tgrid.nx], 
 		      slags=coup.rflags, 
@@ -553,10 +553,10 @@ function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 	dJxc=zeros(y.tgrid.nx)
 
 	if(func_attrib==:cls)
-		pacse=[Misfits.Param_CSE(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
+		pacse=[Conv.P_misfit_xcorr(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
 		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	elseif(func_attrib==:xcorrcls)
-		pacse=[Misfits.Param_CSE(y.tgrid.nx, y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		pacse=[Conv.P_misfit_xcorr(y.tgrid.nx, y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 		func=[(dJx,x)->Misfits.error_corr_squared_euclidean!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	end
 

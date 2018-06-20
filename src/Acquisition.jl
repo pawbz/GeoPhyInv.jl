@@ -251,15 +251,15 @@ Current implementation has only one source for every supersource.
 
 # Arguments 
 
-* `smin::Float64` : minimum coordinate for sources
-* `smax::Float64` : maximum coordinate for sources
-* `s0::Float64` : consant coordinate for sources
+* `ssmin::Float64` : minimum coordinate for sources
+* `ssmax::Float64` : maximum coordinate for sources
+* `ss0::Float64` : consant coordinate for sources
 * `rmin::Float64` : minimum coordinate for receivers
 * `rmax::Float64` : maximum coordinate for receivers
 * `r0::Float64` : consant coordinate for receivers
 * `nss::Int64` : number of supersources
 * `nr::Int64` : number of receivers
-* `sattrib::Symbol=:horizontal` : supersource array kind
+* `ssattrib::Symbol=:horizontal` : supersource array kind
   `=:vertical` : vertical array of supersources
   `=:horizontal` horizontal array of supersources
 * `rattrib::Symbol=:horizontal` : receiver array kind
@@ -275,36 +275,38 @@ Current implementation has only one source for every supersource.
 * a fixed spread acquisition geometry `Geom`
 """
 function Geom_fixed(
-	      smin::Real,
-	      smax::Real,
-	      s0::Real,
+	      ssmin::Real,
+	      ssmax::Real,
+	      ss0::Real,
 	      rmin::Real,
 	      rmax::Real,
 	      r0::Real,
 	      nss::Int64,
 	      nr::Int64,
-	      sattrib::Symbol=:horizontal,
+	      ssattrib::Symbol=:horizontal,
 	      rattrib::Symbol=:horizontal,
  	      rand_flags::Vector{Bool}=[false, false];
-	      sα::Real=0.0,
+	      ssα::Real=0.0,
 	      rα::Real=0.0,
+	      ns::Vector{Int64}=ones(Int,nss),
+	      srad::Real=0.0
 	     )
 
-	smin=Float64(smin); rmin=Float64(rmin)
-	smax=Float64(smax); rmax=Float64(rmax)
-	s0=Float64(s0); r0=Float64(r0)
-	sα=Float64(sα)*pi/180.
+	ssmin=Float64(ssmin); rmin=Float64(rmin)
+	ssmax=Float64(ssmax); rmax=Float64(rmax)
+	ss0=Float64(ss0); r0=Float64(r0)
+	ssα=Float64(ssα)*pi/180.
 	rα=Float64(rα)*pi/180.
 
 
-	sarray = isequal(nss,1) ? fill(smin,1) : (rand_flags[1] ? 
-					   rand(Uniform(minimum([smin,smax]),maximum([smin,smax])),nss) : linspace(smin,smax,nss))
-	if(sattrib==:horizontal)
-		sz = s0+(sarray-minimum(sarray))*sin(sα)/cos(sα); sx=sarray
-	elseif(sattrib==:vertical)
-		sx = s0+(sarray-minimum(sarray))*sin(sα)/cos(sα); sz=sarray
+	ssarray = isequal(nss,1) ? fill(ssmin,1) : (rand_flags[1] ? 
+					   rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : linspace(ssmin,ssmax,nss))
+	if(ssattrib==:horizontal)
+		ssz = ss0+(ssarray-minimum(ssarray))*sin(ssα)/cos(ssα); ssx=ssarray
+	elseif(ssattrib==:vertical)
+		ssx = ss0+(ssarray-minimum(ssarray))*sin(ssα)/cos(ssα); ssz=ssarray
 	else
-		error("invalid sattrib")
+		error("invalid ssattrib")
 	end
 
 	rarray = isequal(nr,1) ? fill(rmin,1) : (rand_flags[2] ? 
@@ -318,9 +320,19 @@ function Geom_fixed(
 	end
 	rxall = [rx for iss=1:nss];
 	rzall = [rz for iss=1:nss];
-	sxall = [[sx[iss]] for iss=1:nss];
-	szall = [[sz[iss]] for iss=1:nss];
-	return Geom(sxall, szall, rxall, rzall, nss, fill(1,nss), fill(nr,nss))
+	ssxall=[zeros(ns[iss]) for iss=1:nss];
+	sszall=[zeros(ns[iss]) for iss=1:nss];
+	for iss in 1:nss
+		for is in 1:ns[iss]
+			θ=rand(Uniform(-Float64(pi),Float64(pi)))
+			r=rand(Uniform(0,srad))
+			x=r*cos(θ)
+			z=r*sin(θ)
+			ssxall[iss][is]=ssx[iss]+x
+			sszall[iss][is]=ssz[iss]+z
+		end
+	end
+	return Geom(ssxall, sszall, rxall, rzall, nss, ns, fill(nr,nss))
 end
 
 """
@@ -610,7 +622,9 @@ function Src_fixed_mod(
 	tgrid=Grid.M1D(0.0, tmax, δt)
 	wav = wav_func(fqdom, tgrid);
 
-	src=Src_fixed(nss, ns, fields, wav, tgrid)
+
+	wavsrc = [hcat([wav_func(fqdom, tgrid) for is in 1:ns]...) for iss=1:nss, ifield=1:length(fields)] 
+	src=Src(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
 	print(src)
 	# choose ricker waveletes of fdom
 	return src
@@ -635,6 +649,7 @@ function Src_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol};
 	print(src)
 	return src
 end
+
 
 """
 Function that returns Src after time reversal

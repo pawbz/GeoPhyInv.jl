@@ -130,15 +130,17 @@ function TD_noise_corr!(dataout, data, irref)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	
 	fields=data.fields
 	ntlag=Int((dataout.tgrid.nx-1)/2)
-	paxcorr=Conv.Param_xcorr(data.tgrid.nx,irref,2*ntlag+1,[ntlag, ntlag],norm_flag=false)
 
 	nto = dataout.tgrid.nx;
 	isodd(nto) || error("odd samples in output data required")
 	for ifield = 1:length(fields), iss = 1:nss
+		# need param for each supersource, because of different receivers
+		paxcorr=Conv.P_xcorr(data.tgrid.nx, nr[iss], 
+		   cglags=[ntlag, ntlag], norm_flag=false,cg_indices=irref)
 		dd=data.d[iss, ifield]
 		ddo=[dataout.d[iss, ifield]]
 
-		Conv.xcorr!(ddo, dd, paxcorr)
+		Conv.mod!(paxcorr, cg=ddo, g=dd)
 
 	end
 
