@@ -366,6 +366,7 @@ function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(t
 end
 
 
+#=
 function DeConv(pa; rvec=collect(1:pa.nr), cal=pa.calsave)
 	## extract data to be plotted
 	#gfobs=reshape(pa.obs.gf, (pa.ntgf, pa.nr))
@@ -465,6 +466,7 @@ function DeConv(pa; rvec=collect(1:pa.nr), cal=pa.calsave)
 
 end
 
+=#
 function mscatter(x, y, titname="", axla=["",""])
     fact=1 
     x=x[1:fact:end]

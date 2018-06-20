@@ -12,7 +12,7 @@ module Data
 using Grid
 using Conv
 using Interpolation
-using DeConv
+#using DeConv
 using Misfits
 using Signals
 import JuMIT.Acquisition
@@ -663,7 +663,7 @@ function error!(pa::Param_error, grad=nothing)
 	end
 end
 
-
+#=
 function DDeConv(d::TD, wav::AbstractVector{Float64}, ϵ=1e-2)
 
 	dout=TD_zeros(d)
@@ -697,6 +697,7 @@ function DDeConv!(dataout::TD, data::TD, paD)
 	return dataout
 end
 
+=#
 
 
 end # module
