@@ -20,6 +20,7 @@ using Conv
 using Grid
 using Misfits
 using Inversion
+using TimerOutputs
 
 import JuMIT.Models
 import JuMIT.Acquisition
@@ -146,15 +147,15 @@ function Param(
 	       attrib_inv::Symbol,
 	       modm::Models.Seismic;
 	       # other optional 
-	       tgrid_obs::Grid.M1D=tgrid,
+	       tgrid_obs::Grid.M1D=deepcopy(tgrid),
 	       recv_fields=[:P],
-	       igrid::Grid.M2D=modm.mgrid,
+	       igrid::Grid.M2D=deepcopy(modm.mgrid),
 	       mprecon_factor::Float64=1.0,
 	       dobs::Data.TD=Data.TD_zeros(recv_fields,tgrid_obs,acqgeom),
 	       dprecon=nothing,
 	       tlagssf_fracs=0.0,
 	       tlagrf_fracs=0.0,
-	       acqsrc_obs::Acquisition.Src=acqsrc,
+	       acqsrc_obs::Acquisition.Src=deepcopy(acqsrc),
 	       modm_obs::Models.Seismic=modm,
 	       modm0::Models.Seismic=modm,
 	       mod_inv_parameterization::Vector{Symbol}=[:χKI, :χρI],
@@ -164,6 +165,8 @@ function Param(
 	       optims=[:cls]
 	       )
 
+	# make a copy of initial model
+	modm=deepcopy(modm)
 
 	# create modi according to igrid and interpolation of modm
 	modi = Models.Seismic_zeros(igrid);
@@ -379,7 +382,7 @@ package.
   * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
 """
 function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., iterations::Int64=5,
-	       f_tol::Float64=1e-5, g_tol::Float64=1e-8, x_tol::Float64=1e-5, linesearch_iterations::Int64=3)
+	       f_tol::Float64=1e-5, g_tol::Float64=1e-8, x_tol::Float64=1e-5, linesearch_iterations::Int64=3, bounded_flag=false)
 
 	# convert initial model to the inversion variable
 	x = zeros(xfwi_ninv(pa));
@@ -401,38 +404,54 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	lower_x = similar(x); upper_x = similar(x);
 	Seismic_xbound!(lower_x, upper_x, pa)
 
+	const to = TimerOutput(); # create a timer object
 	if(pa.attrib_inv == :cls)
-		f = x -> func_grad_xfwi!(nothing, x, last_x,  pa)
-		g! = (storage, x) -> func_grad_xfwi!(storage, x, last_x, pa)
-		od = OnceDifferentiable(f, g!, x)
-		"""
-		Unbounded LBFGS inversion, only for testing
-		"""
-		#res = optimize(df, x, 
-	        #		       LBFGS(),
-	 	#	     Optim.Options(g_tol = g_tol,
-		# 			iterations = iterations, store_trace = store_trace,
-		# 			extended_trace=extended_trace, show_trace = true))
+		f(x) = @timeit to "f" func_grad_xfwi!(nothing, x, last_x,  pa)
+		g!(storage, x) = @timeit to "g!" func_grad_xfwi!(storage, x, last_x, pa)
+		begin
+			reset_timer!(to)
+			if(!bounded_flag)
+				"""
+				Unbounded LBFGS inversion, only for testing
+				"""
+				@timeit to "xfwi!" begin
+					res = optimize(f, g!, x, 
+				         LBFGS(),
+				         Optim.Options(g_tol = g_tol,
+				         iterations = iterations, store_trace = store_trace,
+				         extended_trace=extended_trace, show_trace = true))
+				end
+				show(to)
+			else
 
-		"""
-		Bounded LBFGS inversion
-		"""
-		res = optimize(od, x,
+				"""
+				Bounded LBFGS inversion
+				"""
+				@timeit to "xfwi!" begin
+					res = optimize(f, g!, lower_x, upper_x, 
+					 x, Fminbox(ConjugateGradient()), 
+					 Optim.Options(show_trace=true, outer_iterations=2))
+				end
+				show(to)
+			end
+		end
+
+		#=
 			       lower_x,
 			       upper_x,
-			       Fminbox{LBFGS}(); iterations=iterations, # actual iterations
+			       x,
+			       Fminbox(LBFGS()), # actual iterations
 			       # LBFGS was behaving wierd with backtracking
-			       #linesearch = BackTracking(order=3), # to reduce the number of gradient calls
+	       # to reduce the number of gradient calls
+	       #linesearch = BackTracking(order=3), 
+	       #linesearch = Optim.LineSearches.morethuente!,
+			     Optim.Options(
 				  g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
-				  extended_trace=extended_trace,
-				  store_trace=store_trace,
-				  #linesearch = Optim.LineSearches.morethuente!,
-			     optimizer_o=Optim.Options(
-				  g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
-				  	# iterations inside every line search, I choose 3 because better performance on Rosenbrock
-		 			iterations = linesearch_iterations, 
+	       # iterations inside every line search, I choose 3 because better performance on Rosenbrock
+	#	 			outer_iterations = linesearch_iterations, 
 					#time_limit=time_limit,
 					store_trace=store_trace,extended_trace=extended_trace, show_trace=true))
+					=#
 		pa.verbose ? println(res) : nothing
 
 		# update modm and modi

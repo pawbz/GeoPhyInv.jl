@@ -78,7 +78,7 @@ Plot the velocity and density seismic models.
 			xlabel --> "x [m]"
 			ylabel --> "z [m]"
 			color --> :grays
-			title := name
+			title --> name
 			xlim := (xlim...)
 			ylim := (zlim...)
 			clim := (mmin, mmax)
