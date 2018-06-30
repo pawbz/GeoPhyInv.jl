@@ -35,21 +35,19 @@
       var is_top_frame = (window === window.parent);
         
         var pageToc = [
-          {title: "Grid", url: "#_top", children: [
-          ]},
-          {title: "Coupling", url: "#coupling", children: [
+          {title: "Coupling", url: "#_top", children: [
           ]},
           {title: "Acquisition", url: "#acquisition", children: [
           ]},
-          {title: "Interpolation", url: "#interpolation", children: [
+          {title: "Models", url: "#models", children: [
+          ]},
+          {title: "Data", url: "#data", children: [
           ]},
           {title: "Gallery", url: "#gallery", children: [
           ]},
           {title: "Fdtd", url: "#fdtd", children: [
           ]},
           {title: "Inversion", url: "#inversion", children: [
-          ]},
-          {title: "Poisson", url: "#poisson", children: [
           ]},
           {title: "Plots", url: "#plots", children: [
           ]},
@@ -179,22 +177,6 @@ if (is_top_frame) { $('body').addClass('wm-top-page'); }
     
 
     <p>There are various modules in this toolbox. Most of the times, each module has  a type variable definition and methods  that either modify the type variable or construct them.</p>
-<p><a id='Grid-1'></a></p>
-<h1 id="grid">Grid</h1>
-<p>```@autodocs
-Modules = [JuMIT.Grid]
-Order   = [:module, :type, :function]</p>
-<div class="codehilite"><pre><span></span><span class="na">&lt;a id=&#39;Wavelets-1&#39;&gt;</span><span class="o">&lt;/</span><span class="n">a</span><span class="o">&gt;</span>
-
-<span class="p">#</span> <span class="n">Wavelets</span>
-
-
-<span class="err">```@</span><span class="n">autodocs</span>
-<span class="n">Modules</span> <span class="o">=</span> <span class="o">[</span><span class="n">JuMIT</span><span class="p">.</span><span class="n">Wavelets</span><span class="o">]</span>
-<span class="n">Order</span>   <span class="o">=</span> <span class="o">[</span><span class="p">:</span><span class="n">module</span><span class="p">,</span> <span class="p">:</span><span class="n">type</span><span class="p">,</span> <span class="p">:</span><span class="n">function</span><span class="o">]</span>
-</pre></div>
-
-
 <p><a id='Coupling-1'></a></p>
 <h1 id="coupling">Coupling</h1>
 <p><a id='JuMIT.Coupling' href='#JuMIT.Coupling'>#</a>
@@ -451,614 +433,362 @@ Order   = [:module, :type, :function]</p>
 <strong><code>JuMIT.Acquisition.freqs</code></strong> &mdash; <em>Method</em>.</p>
 <p>Return minimum, maximum and peak frequencies of <code>Src</code></p>
 <p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Acquisition.jl#L542-L544' class='documenter-source'>source</a><br></p>
-<p><a id='Interpolation-1'></a></p>
-<h1 id="interpolation">Interpolation</h1>
-<p>```@autodocs
-Modules = [JuMIT.Interpolation]
-Order   = [:module, :type, :function]</p>
-<div class="codehilite"><pre><span></span><span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Models-1&#39;</span><span class="o">&gt;&lt;</span><span class="err">/a&gt;</span>
-
-<span class="err">#</span> <span class="nx">Models</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Type</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Data</span> <span class="nx">type</span> <span class="nx">fo</span> <span class="nx">represent</span> <span class="nx">a</span> <span class="nx">seismic</span> <span class="nx">model</span><span class="p">.</span> <span class="nx">A</span> <span class="nx">contrast</span> <span class="kd">function</span> <span class="k">for</span> <span class="nx">a</span> <span class="nx">model</span> <span class="nx">m</span> <span class="nx">is</span> <span class="nx">given</span> <span class="nx">by</span> <span class="nx">$χ</span><span class="p">(</span><span class="nx">m</span><span class="p">)</span> <span class="o">=</span> <span class="nx">rac</span><span class="p">{</span><span class="nx">m</span><span class="p">}{</span><span class="nx">m0</span><span class="p">}</span><span class="o">-</span><span class="mi">1</span><span class="nx">$</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Fields</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`vp0::Vector{Float64}`</span> <span class="o">:</span> <span class="p">[</span><span class="nx">vpmin</span><span class="p">,</span> <span class="nx">vpmax</span><span class="p">]</span>
-  <span class="o">*</span> <span class="sb">`vs0::Vector{Float64}`</span> <span class="o">:</span> <span class="p">[</span><span class="nx">vsmin</span><span class="p">,</span> <span class="nx">vsmax</span><span class="p">]</span>
-  <span class="o">*</span> <span class="sb">`ρ0::Vector{Float64}`</span> <span class="o">:</span> <span class="p">[</span><span class="err">ρ</span><span class="nx">min</span><span class="p">,</span> <span class="err">ρ</span><span class="nx">max</span><span class="p">]</span>
-  <span class="o">*</span> <span class="sb">`χvp::Array{Float64,2}`</span> <span class="o">:</span> <span class="nx">two</span><span class="o">-</span><span class="nx">dimensional</span> <span class="nx">contrast</span> <span class="nx">model</span> <span class="p">(</span><span class="err">χ</span><span class="p">)</span> <span class="k">for</span> <span class="nx">vp</span><span class="p">,</span> <span class="k">for</span> <span class="nx">e</span><span class="p">.</span><span class="nx">g</span><span class="p">.,</span> <span class="nx">zeros</span><span class="p">(</span><span class="nx">mgrid</span><span class="p">.</span><span class="nx">nz</span><span class="p">,</span> <span class="nx">mgrid</span><span class="p">.</span><span class="nx">nx</span><span class="p">)</span>
-  <span class="o">*</span> <span class="sb">`χvs::Array{Float64}`</span> <span class="o">:</span> <span class="nx">two</span><span class="o">-</span><span class="nx">dimensional</span> <span class="nx">contrast</span> <span class="nx">model</span> <span class="p">(</span><span class="err">χ</span><span class="p">)</span> <span class="k">for</span> <span class="nx">vs</span><span class="p">,</span> <span class="k">for</span> <span class="nx">e</span><span class="p">.</span><span class="nx">g</span><span class="p">.,</span> <span class="nx">zeros</span><span class="p">(</span><span class="nx">mgrid</span><span class="p">.</span><span class="nx">nz</span><span class="p">,</span> <span class="nx">mgrid</span><span class="p">.</span><span class="nx">nx</span><span class="p">)</span>
-  <span class="o">*</span> <span class="sb">`χρ::Array{Float64}`</span> <span class="o">:</span> <span class="nx">two</span><span class="o">-</span><span class="nx">dimensional</span> <span class="nx">contrast</span> <span class="nx">model</span> <span class="p">(</span><span class="err">χ</span><span class="p">)</span> <span class="k">for</span> <span class="nx">density</span><span class="p">,</span> <span class="k">for</span> <span class="nx">e</span><span class="p">.</span><span class="nx">g</span><span class="p">.,</span> <span class="nx">zeros</span><span class="p">(</span><span class="nx">mgrid</span><span class="p">.</span><span class="nx">nz</span><span class="p">,</span> <span class="nx">mgrid</span><span class="p">.</span><span class="nx">nx</span><span class="p">)</span>
-  <span class="o">*</span> <span class="sb">`mgrid::Grid.M2D`</span> <span class="o">:</span> <span class="nx">two</span><span class="o">-</span><span class="nx">dimensional</span> <span class="nx">grid</span> <span class="nx">to</span> <span class="nx">determine</span> <span class="nx">the</span> <span class="nx">dimensions</span> <span class="nx">of</span> <span class="nx">models</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L13-L26&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.copy!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.copy!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.copy!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Copy</span> <span class="k">for</span> <span class="sb">`Seismic`</span> <span class="nx">models</span><span class="p">.</span> <span class="nx">The</span> <span class="nx">models</span> <span class="nx">should</span> <span class="nx">have</span> <span class="nx">same</span> <span class="nx">bounds</span> <span class="nx">and</span> <span class="nx">sizes</span><span class="p">.</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L152-L154&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.isapprox-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.isapprox-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.isapprox`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Return</span> <span class="k">if</span> <span class="nx">two</span> <span class="sb">`Seismic`</span> <span class="nx">models</span> <span class="nx">have</span> <span class="nx">same</span> <span class="nx">dimensions</span> <span class="nx">and</span> <span class="nx">bounds</span><span class="p">.</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L139-L141&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.isequal-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.isequal-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.isequal`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Compare</span> <span class="k">if</span> <span class="nx">two</span> <span class="sb">`Seismic`</span> <span class="nx">models</span> <span class="nx">are</span> <span class="nx">equal</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L132&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.iszero-Tuple{JuMIT.Models.Seismic}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.iszero-Tuple{JuMIT.Models.Seismic}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.iszero`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Return</span> <span class="kc">true</span> <span class="k">if</span> <span class="nx">a</span> <span class="sb">`Seismic`</span> <span class="nx">model</span> <span class="nx">is</span> <span class="nx">just</span> <span class="nx">allocated</span> <span class="kd">with</span> <span class="nx">zeros</span><span class="p">.</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L115-L117&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.print&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.print&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.print`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Print</span> <span class="nx">information</span> <span class="nx">about</span> <span class="sb">`Seismic`</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L54-L56&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.similar-Tuple{JuMIT.Models.Seismic}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.similar-Tuple{JuMIT.Models.Seismic}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.similar`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Return</span> <span class="nx">a</span> <span class="nx">similar</span> <span class="nx">model</span> <span class="nx">to</span> <span class="nx">the</span> <span class="nx">input</span> <span class="nx">model</span><span class="p">,</span> <span class="nx">used</span> <span class="k">for</span> <span class="nx">allocation</span><span class="p">.</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L122-L124&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic_addon!-Tuple{JuMIT.Models.Seismic}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic_addon!-Tuple{JuMIT.Models.Seismic}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic_addon!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Add</span> <span class="nx">features</span> <span class="nx">to</span> <span class="nx">a</span> <span class="nx">model</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`mod::Seismic`</span> <span class="o">:</span> <span class="nx">model</span> <span class="nx">that</span> <span class="nx">is</span> <span class="nx">modified</span>
-
-<span class="o">**</span><span class="nx">Keyword</span> <span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`point_loc::Vector{Float64}=[0., 0.,]`</span> <span class="o">:</span> <span class="nx">approx</span> <span class="nx">location</span> <span class="nx">of</span> <span class="nx">point</span> <span class="nx">pert</span><span class="p">.</span>
-  <span class="o">*</span> <span class="sb">`point_pert::Float64=0.0`</span> <span class="o">:</span> <span class="nx">perturbation</span> <span class="nx">at</span> <span class="nx">the</span> <span class="nx">point</span> <span class="nx">scatterer</span>
-  <span class="o">*</span> <span class="sb">`ellip_loc::Vector{Float64}=nothing`</span> <span class="o">:</span> <span class="nx">location</span> <span class="nx">of</span> <span class="nx">center</span> <span class="nx">of</span> <span class="nx">perturbation</span><span class="p">,</span> <span class="p">[</span><span class="nx">z</span><span class="p">,</span> <span class="nx">x</span><span class="p">]</span>
-  <span class="o">*</span> <span class="sb">`ellip_rad::Float64=0.0`</span> <span class="o">:</span> <span class="nx">radius</span> <span class="nx">of</span> <span class="nx">circular</span> <span class="nx">perturbation</span>
-  <span class="o">*</span> <span class="sb">`ellip_pert::Float64=0.1`</span> <span class="o">:</span> <span class="nx">perturbation</span> <span class="nx">inside</span> <span class="nx">a</span> <span class="nx">circle</span>
-  <span class="o">*</span> <span class="sb">`rect_loc::Array{Float64}=nothing`</span> <span class="o">:</span> <span class="nx">rectangle</span> <span class="nx">location</span><span class="p">,</span> <span class="p">[</span><span class="nx">zmin</span><span class="p">,</span> <span class="nx">xmin</span><span class="p">,</span> <span class="nx">zmax</span><span class="p">,</span> <span class="nx">xmax</span><span class="p">]</span>
-  <span class="o">*</span> <span class="sb">`rect_pert::Float64=0.1`</span> <span class="o">:</span> <span class="nx">perturbation</span> <span class="k">in</span> <span class="nx">a</span> <span class="nx">rectangle</span>
-  <span class="o">*</span> <span class="sb">`randn_pert::Float64=0.0`</span> <span class="o">:</span> <span class="nx">percentage</span> <span class="nx">of</span> <span class="nx">reference</span> <span class="nx">values</span> <span class="k">for</span> <span class="nx">additive</span> <span class="nx">random</span> <span class="nx">noise</span>
-  <span class="o">*</span> <span class="sb">`fields::Vector{Symbol}=[:χvp,:χρ,:χvs]`</span> <span class="o">:</span> <span class="nx">which</span> <span class="nx">fields</span> <span class="nx">are</span> <span class="nx">to</span> <span class="nx">be</span> <span class="nx">modified</span><span class="o">?</span>
-  <span class="o">*</span> <span class="sb">`onlyin`</span> <span class="o">:</span> <span class="sb">`mod`</span> <span class="nx">is</span> <span class="nx">modified</span> <span class="nx">only</span> <span class="nx">when</span> <span class="nx">field</span> <span class="nx">values</span> <span class="nx">are</span> <span class="k">in</span> <span class="nx">these</span> <span class="nx">ranges</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L471-L489&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic_chainrule!&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic_chainrule!&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic_chainrule!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Use</span> <span class="nx">chain</span> <span class="nx">rule</span> <span class="nx">to</span> <span class="nx">output</span> <span class="nx">gradients</span> <span class="kd">with</span>  <span class="nx">respect</span> <span class="nx">to</span> <span class="err">χ</span><span class="nx">vp</span> <span class="nx">and</span> <span class="err">χρ</span> <span class="nx">from</span>  <span class="nx">gradients</span>  <span class="kd">with</span> <span class="nx">respect</span> <span class="nx">to</span> <span class="nx">KI</span> <span class="nx">and</span> <span class="err">ρ</span><span class="nx">I</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`gmod::Seismic`</span> <span class="o">:</span> <span class="nx">gradient</span> <span class="nx">model</span>
-  <span class="o">*</span> <span class="sb">`mod::Seismic`</span> <span class="o">:</span> <span class="nx">model</span> <span class="nx">required</span> <span class="k">for</span> <span class="nx">chain</span> <span class="nx">rule</span>
-  <span class="o">*</span> <span class="sb">`g1`</span> <span class="o">:</span> <span class="nx">gradient</span> <span class="nx">of</span> <span class="nx">an</span> <span class="nx">objective</span> <span class="kd">function</span> <span class="kd">with</span> <span class="nx">respect</span> <span class="sb">`attribs[1]`</span>
-  <span class="o">*</span> <span class="sb">`g2`</span> <span class="o">:</span> <span class="nx">gradient</span> <span class="nx">of</span> <span class="nx">an</span> <span class="nx">objective</span> <span class="kd">function</span> <span class="kd">with</span> <span class="nx">respect</span> <span class="sb">`attribs[2]`</span>
-  <span class="o">*</span> <span class="sb">`attribs::Vector{Symbol}=[:χKI, :χρI]`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`flag::Int64=1`</span> <span class="o">:</span>
-
-      <span class="o">*</span> <span class="sb">`=1`</span> <span class="nx">updates</span> <span class="sb">`gmod`</span> <span class="nx">using</span> <span class="sb">`g1`</span> <span class="nx">and</span> <span class="sb">`g2`</span>
-      <span class="o">*</span> <span class="sb">`=-1`</span> <span class="nx">updates</span> <span class="sb">`g1`</span> <span class="nx">and</span> <span class="sb">`g2`</span> <span class="nx">using</span> <span class="sb">`gmod`</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L305-L320&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic_get!-Tuple{Array{Float64,2},JuMIT.Models.Seismic,Symbol}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic_get!-Tuple{Array{Float64,2},JuMIT.Models.Seismic,Symbol}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic_get!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Get</span> <span class="nx">other</span> <span class="nx">dependent</span> <span class="nx">model</span> <span class="nx">parameters</span> <span class="nx">of</span> <span class="nx">a</span> <span class="nx">seismic</span> <span class="nx">model</span> <span class="nx">that</span> <span class="nx">are</span> <span class="nx">not</span> <span class="nx">present</span> <span class="k">in</span> <span class="sb">`Seismic`</span><span class="p">.</span>
-
-  <span class="o">*</span> <span class="sb">`:ρI`</span> <span class="o">:</span> <span class="nx">inverse</span> <span class="nx">of</span> <span class="nx">density</span>
-  <span class="o">*</span> <span class="sb">`:Zp`</span> <span class="o">:</span> <span class="nx">P</span><span class="o">-</span><span class="nx">wave</span> <span class="nx">impedance</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L198-L204&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic_pml_pad_trun!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic_pml_pad_trun!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic_pml_pad_trun!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">only</span> <span class="nx">padding</span> <span class="nx">implemented</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L655&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic_pml_pad_trun-Tuple{JuMIT.Models.Seismic}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic_pml_pad_trun-Tuple{JuMIT.Models.Seismic}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic_pml_pad_trun`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Extend</span> <span class="nx">a</span> <span class="nx">seismic</span> <span class="nx">model</span> <span class="nx">into</span> <span class="nx">PML</span> <span class="nx">layers</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L642-L644&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic_reparameterize!&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic_reparameterize!&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic_reparameterize!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Re</span><span class="o">-</span><span class="nx">parameterization</span> <span class="nx">routine</span>  <span class="nx">that</span> <span class="nx">modifies</span> <span class="nx">the</span> <span class="nx">fields</span>  <span class="sb">`χvp`</span> <span class="nx">and</span> <span class="sb">`χρ`</span> <span class="nx">of</span> <span class="nx">an</span> <span class="nx">input</span> <span class="nx">seismic</span> <span class="nx">model</span> <span class="nx">using</span> <span class="nx">two</span> <span class="nx">input</span> <span class="nx">vectors</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`mod::Seismic`</span> <span class="o">:</span> <span class="nx">to</span> <span class="nx">be</span> <span class="nx">updated</span>
-  <span class="o">*</span> <span class="sb">`x1::Array{Float64,2}`</span> <span class="o">:</span> <span class="nx">contrast</span> <span class="nx">of</span> <span class="nx">inverse</span> <span class="nx">bulk</span> <span class="nx">modulus</span>
-  <span class="o">*</span> <span class="sb">`x2::Array{Float64,2}`</span> <span class="o">:</span> <span class="nx">contrast</span> <span class="nx">of</span> <span class="nx">inverse</span> <span class="nx">density</span>
-  <span class="o">*</span> <span class="sb">`attribs:::Vector{Symbol}`</span> <span class="o">:</span> <span class="p">[</span><span class="o">:</span><span class="err">χ</span><span class="nx">KI</span><span class="p">,</span> <span class="o">:</span><span class="err">χρ</span><span class="nx">I</span><span class="p">]</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L271-L283&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic_smooth&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic_smooth&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic_smooth`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Apply</span> <span class="nx">smoothing</span> <span class="nx">to</span> <span class="sb">`Seismic`</span> <span class="nx">using</span> <span class="nx">a</span> <span class="nx">Gaussian</span> <span class="nx">filter</span> <span class="nx">of</span> <span class="nx">zwidth</span> <span class="nx">and</span> <span class="nx">xwidth</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`mod::Seismic`</span> <span class="o">:</span> <span class="nx">argument</span> <span class="nx">that</span> <span class="nx">is</span> <span class="nx">modified</span>
-  <span class="o">*</span> <span class="sb">`zperc::Real`</span> <span class="o">:</span> <span class="nx">smoothing</span> <span class="nx">percentage</span> <span class="k">in</span> <span class="nx">z</span><span class="o">-</span><span class="nx">direction</span>
-  <span class="o">*</span> <span class="sb">`xperc::Real=zperc`</span> <span class="o">:</span> <span class="nx">smoothing</span> <span class="nx">percentage</span> <span class="k">in</span> <span class="nx">x</span><span class="o">-</span><span class="nx">direction</span>
-
-<span class="o">**</span><span class="nx">Keyword</span> <span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`zmin::Real=mod.mgrid.z[1]`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`zmax::Real=mod.mgrid.z[end]`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`xmin::Real=mod.mgrid.x[1]`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`xmax::Real=mod.mgrid.x[end]`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`fields`</span> <span class="o">:</span> <span class="nx">fields</span> <span class="nx">of</span> <span class="nx">seismic</span> <span class="nx">model</span> <span class="nx">that</span> <span class="nx">are</span> <span class="nx">to</span> <span class="nx">be</span> <span class="nx">smooth</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L557-L573&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic_trun-Tuple{JuMIT.Models.Seismic}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic_trun-Tuple{JuMIT.Models.Seismic}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic_trun`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Return</span> <span class="nx">a</span> <span class="nx">truncated</span> <span class="nx">seismic</span> <span class="nx">model</span> <span class="nx">using</span> <span class="nx">input</span> <span class="nx">bounds</span><span class="p">.</span> <span class="nx">Note</span> <span class="nx">that</span> <span class="nx">there</span> <span class="nx">is</span> <span class="nx">no</span> <span class="nx">interpolation</span> <span class="nx">going</span> <span class="nx">on</span> <span class="nx">here</span><span class="p">,</span> <span class="nx">but</span> <span class="nx">only</span> <span class="nx">truncation</span><span class="p">,</span> <span class="nx">so</span>  <span class="nx">the</span> <span class="nx">input</span> <span class="nx">bounds</span> <span class="nx">cannot</span> <span class="nx">be</span> <span class="nx">strictly</span> <span class="nx">imposed</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`mod::Seismic`</span> <span class="o">:</span> <span class="nx">model</span> <span class="nx">that</span> <span class="nx">is</span> <span class="nx">truncated</span>
-
-<span class="o">**</span><span class="nx">Keyword</span> <span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`zmin::Float64=mod.mgrid.z[1]`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`zmax::Float64=mod.mgrid.z[end]`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`xmin::Float64=mod.mgrid.x[1]`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`xmax::Float64=mod.mgrid.x[end]`</span> <span class="o">:</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L598-L612&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.Seismic_zeros-Tuple{Grid.M2D}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.Seismic_zeros-Tuple{Grid.M2D}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.Seismic_zeros`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Return</span> <span class="sb">`Seismic`</span> <span class="kd">with</span> <span class="nx">zeros</span> <span class="nx">everywhere</span><span class="p">;</span> <span class="k">this</span> <span class="nx">method</span> <span class="nx">is</span> <span class="nx">used</span> <span class="k">for</span> <span class="nx">preallocation</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`mgrid::Grid.M2D`</span> <span class="o">:</span> <span class="nx">used</span> <span class="k">for</span> <span class="nx">sizes</span> <span class="nx">of</span> <span class="err">χ</span> <span class="nx">fields</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L96-L102&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.adjust_bounds!&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.adjust_bounds!&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.adjust_bounds!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Adjust</span> <span class="nx">the</span> <span class="nx">bounds</span> <span class="nx">and</span> <span class="nx">hence</span> <span class="nx">the</span> <span class="nx">reference</span> <span class="nx">values</span><span class="p">.</span> <span class="nx">Since</span> <span class="nx">the</span> <span class="nx">reference</span> <span class="nx">values</span> <span class="nx">are</span> <span class="nx">adjust</span> <span class="nx">the</span> <span class="err">χ</span> <span class="nx">fields</span> <span class="nx">should</span> <span class="nx">also</span> <span class="nx">be</span> <span class="nx">changed</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L80-L83&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.bounds&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.bounds&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.bounds`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Return</span> <span class="nx">medium</span> <span class="nx">property</span> <span class="nx">bounds</span> <span class="nx">based</span> <span class="nx">on</span> <span class="nx">maximum</span> <span class="nx">and</span> <span class="nx">minimum</span> <span class="nx">values</span> <span class="nx">of</span> <span class="nx">the</span> <span class="nx">array</span> <span class="nx">and</span> <span class="nx">frac</span><span class="p">.</span> <span class="nx">The</span> <span class="nx">bounds</span> <span class="nx">cannot</span> <span class="nx">be</span> <span class="nx">less</span> <span class="nx">than</span> <span class="nx">zero</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L67-L70&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.interp_spray!&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.interp_spray!&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.interp_spray!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="kd">function</span> <span class="nx">to</span> <span class="nx">resample</span> <span class="k">in</span> <span class="nx">the</span> <span class="nx">model</span> <span class="nx">domain</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`mod::Seismic`</span> <span class="o">:</span> <span class="nx">model</span>
-  <span class="o">*</span> <span class="sb">`modi::Seismic`</span> <span class="o">:</span> <span class="nx">model</span> <span class="nx">after</span> <span class="nx">interpolation</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L718-L724&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.pml_pad_trun!&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.pml_pad_trun!&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.pml_pad_trun!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">PML</span> <span class="nx">Extend</span> <span class="nx">a</span> <span class="nx">model</span> <span class="nx">on</span> <span class="nx">all</span> <span class="nx">four</span> <span class="nx">sides</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L681-L683&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.χ&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.χ&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.χ`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Return</span> <span class="nx">dimensionless</span> <span class="nx">contrast</span> <span class="nx">model</span> <span class="nx">parameter</span> <span class="nx">using</span> <span class="nx">the</span> <span class="nx">reference</span> <span class="nx">value</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`mod::Array{Float64}`</span> <span class="o">:</span> <span class="nx">subsurface</span> <span class="nx">parameter</span>
-  <span class="o">*</span> <span class="sb">`mod0::Vector{Float64}`</span> <span class="o">:</span> <span class="nx">reference</span> <span class="nx">value</span> <span class="nx">is</span> <span class="nx">mean</span> <span class="nx">of</span> <span class="k">this</span> <span class="nx">vector</span>
-  <span class="o">*</span> <span class="sb">`flag::Int64=1`</span> <span class="o">:</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L414-L422&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Models.χg&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Models.χg&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Models.χg`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Gradients</span> <span class="nx">Return</span> <span class="nx">contrast</span> <span class="nx">model</span> <span class="nx">parameter</span> <span class="nx">using</span> <span class="nx">the</span> <span class="nx">reference</span> <span class="nx">value</span><span class="p">.</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L448-L452&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Data-1&#39;</span><span class="o">&gt;&lt;</span><span class="err">/a&gt;</span>
-
-<span class="err">#</span> <span class="nx">Data</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Module</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">This</span> <span class="kr">module</span> <span class="nx">defines</span> <span class="nx">the</span> <span class="nx">data</span> <span class="nx">types</span> <span class="nx">related</span> <span class="nx">to</span> <span class="nx">seismic</span> <span class="nx">data</span><span class="o">:</span>
-
-  <span class="o">*</span> <span class="sb">`TD`</span> <span class="o">:</span> <span class="nx">time</span> <span class="nx">domain</span> <span class="nx">representation</span>
-
-<span class="nx">It</span> <span class="nx">also</span> <span class="nx">provides</span> <span class="nx">methods</span> <span class="nx">that</span> <span class="nx">apply</span> <span class="nx">source</span> <span class="nx">and</span> <span class="nx">receiver</span> <span class="nx">filters</span> <span class="nx">onto</span>  <span class="nx">seismic</span> <span class="nx">data</span><span class="p">.</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L3-L9&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.Param_error&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.Param_error&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.Param_error`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Type</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Calculate</span> <span class="nx">the</span> <span class="nx">distance</span> <span class="nx">between</span> <span class="nx">the</span> <span class="nx">observed</span> <span class="nx">data</span> <span class="sb">`y`</span> <span class="nx">and</span> <span class="nx">the</span> <span class="nx">calculated</span> <span class="nx">data</span> <span class="sb">`x`</span><span class="p">.</span> <span class="nx">The</span> <span class="nx">time</span> <span class="nx">grid</span> <span class="nx">of</span> <span class="nx">the</span> <span class="nx">observed</span> <span class="nx">data</span> <span class="nx">can</span> <span class="nx">be</span> <span class="nx">different</span> <span class="nx">from</span> <span class="nx">that</span> <span class="nx">of</span> <span class="nx">the</span> <span class="nx">modelled</span> <span class="nx">data</span><span class="p">.</span> <span class="nx">The</span> <span class="nx">acqistion</span> <span class="nx">geometry</span> <span class="nx">of</span> <span class="nx">both</span> <span class="nx">the</span> <span class="nx">data</span> <span class="nx">sets</span> <span class="nx">should</span> <span class="nx">be</span> <span class="nx">the</span> <span class="nx">same</span><span class="p">.</span>
-
-<span class="nx">If</span> <span class="sb">`J`</span> <span class="nx">is</span> <span class="nx">the</span> <span class="nx">distance</span><span class="p">,</span> <span class="nx">the</span> <span class="nx">gradient</span> <span class="nx">of</span> <span class="nx">the</span> <span class="nx">misfit</span> <span class="nx">w</span><span class="p">.</span><span class="nx">r</span><span class="p">.</span><span class="nx">t</span> <span class="nx">to</span> <span class="nx">the</span> <span class="nx">calculated</span> <span class="nx">data</span> <span class="nx">is</span> <span class="nx">returned</span> <span class="kr">as</span> <span class="sb">`dJx`</span>
-
-  <span class="o">*</span> <span class="sb">`w`</span> <span class="nx">used</span> <span class="k">for</span> <span class="nx">data</span> <span class="nx">preconditioning</span>
-  <span class="o">*</span> <span class="sb">`coupling`</span> <span class="nx">source</span> <span class="nx">and</span> <span class="nx">receiver</span> <span class="nx">coupling</span> <span class="nx">functions</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L484-L492&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.TD&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.TD&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.TD`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Type</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Time</span> <span class="nx">domain</span> <span class="nx">representation</span> <span class="nx">of</span> <span class="nx">Seismic</span> <span class="nx">Data</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Fields</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`d::Array{Array{Float64,2},2}`</span> <span class="o">:</span> <span class="nx">data</span>
-  <span class="o">*</span> <span class="sb">`fields::Vector{Symbol}`</span> <span class="o">:</span> <span class="nx">components</span> <span class="nx">recorded</span> <span class="nx">at</span> <span class="nx">each</span> <span class="nx">receiver</span>
-  <span class="o">*</span> <span class="sb">`tgrid::Grid.M1D`</span> <span class="o">:</span> <span class="nx">grid</span> <span class="nx">to</span> <span class="nx">represent</span> <span class="nx">time</span>
-  <span class="o">*</span> <span class="sb">`acqgeom::Acquisition.Geom`</span> <span class="o">:</span> <span class="nx">acquisition</span> <span class="nx">geometry</span> <span class="nx">used</span> <span class="nx">to</span> <span class="nx">generate</span> <span class="nx">the</span> <span class="nx">data</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L22-L31&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.LinAlg.dot-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.LinAlg.dot-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.LinAlg.dot`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Returns</span> <span class="nx">dot</span> <span class="nx">product</span> <span class="nx">of</span> <span class="nx">data</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`data1::TD`</span> <span class="o">:</span> <span class="nx">data</span> <span class="mi">1</span>
-  <span class="o">*</span> <span class="sb">`data2::TD`</span> <span class="o">:</span> <span class="nx">data</span> <span class="mi">2</span>
-
-<span class="o">**</span><span class="nx">Return</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="nx">dot</span> <span class="nx">product</span> <span class="kr">as</span> <span class="sb">`Float64`</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L248-L259&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.copy!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.copy!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.copy!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Copy</span> <span class="sb">`TD`</span><span class="s1">&#39;s, which are similar.</span>
-
-
-<span class="s1">&lt;a target=&#39;</span><span class="nx">_blank</span><span class="s1">&#39; href=&#39;</span><span class="nx">https</span><span class="o">:</span><span class="c1">//github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L71-L73&#39; class=&#39;documenter-source&#39;&gt;source&lt;/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.isapprox-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.isapprox-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.isapprox`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Return</span> <span class="k">if</span> <span class="nx">two</span> <span class="sb">`TD`</span><span class="s1">&#39;s have same dimensions and bounds.</span>
-
-
-<span class="s1">&lt;a target=&#39;</span><span class="nx">_blank</span><span class="s1">&#39; href=&#39;</span><span class="nx">https</span><span class="o">:</span><span class="c1">//github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L55-L57&#39; class=&#39;documenter-source&#39;&gt;source&lt;/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.isequal-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.isequal-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.isequal`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Compare</span> <span class="k">if</span> <span class="nx">two</span> <span class="sb">`TD`</span><span class="s1">&#39;s  are equal</span>
-
-
-<span class="s1">&lt;a target=&#39;</span><span class="nx">_blank</span><span class="s1">&#39; href=&#39;</span><span class="nx">https</span><span class="o">:</span><span class="c1">//github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L48&#39; class=&#39;documenter-source&#39;&gt;source&lt;/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.iszero-Tuple{JuMIT.Data.TD}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.iszero-Tuple{JuMIT.Data.TD}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.iszero`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Returns</span> <span class="kt">bool</span> <span class="nx">depending</span> <span class="nx">on</span> <span class="k">if</span> <span class="nx">input</span> <span class="sb">`data::TD`</span> <span class="nx">has</span> <span class="nx">all</span> <span class="nx">zeros</span> <span class="nx">or</span> <span class="nx">not</span><span class="p">.</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L182-L184&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Base.var-Tuple{JuMIT.Data.TD}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#Base.var-Tuple{JuMIT.Data.TD}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`Base.var`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Returns</span> <span class="nx">the</span> <span class="nx">variance</span> <span class="nx">of</span> <span class="nx">data</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L201-L204&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.TD_normalize&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.TD_normalize&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.TD_normalize`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Normalize</span> <span class="nx">time</span><span class="o">-</span><span class="nx">domain</span> <span class="nx">seismic</span> <span class="nx">data</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`data::TD`</span> <span class="o">:</span> <span class="nx">input</span> <span class="nx">data</span>
-  <span class="o">*</span> <span class="sb">`attrib::Symbol`</span> <span class="o">:</span> <span class="nx">decide</span> <span class="nx">kind</span> <span class="nx">of</span> <span class="nx">normalization</span>
-
-      <span class="o">*</span> <span class="sb">`=:recrms`</span> <span class="nx">the</span> <span class="nx">record</span> <span class="nx">at</span> <span class="nx">every</span> <span class="nx">receiver</span> <span class="nx">is</span> <span class="nx">normalized</span> <span class="kd">with</span> <span class="nx">its</span> <span class="nx">RMS</span> <span class="nx">value</span>
-      <span class="o">*</span> <span class="sb">`=:recmax`</span> <span class="nx">the</span> <span class="nx">record</span> <span class="nx">at</span> <span class="nx">every</span> <span class="nx">receiver</span> <span class="nx">is</span> <span class="nx">normalized</span> <span class="kd">with</span> <span class="nx">its</span> <span class="nx">maximum</span> <span class="nx">value</span>
-
-<span class="o">**</span><span class="nx">Return</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="nx">normalized</span> <span class="nx">data</span> <span class="kr">as</span> <span class="sb">`TD`</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L275-L288&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.TD_ones-Tuple{Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.TD_ones-Tuple{Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.TD_ones`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Same</span> <span class="kr">as</span> <span class="sb">`TD_zeros`</span><span class="p">,</span> <span class="nx">except</span> <span class="k">for</span> <span class="nx">returning</span> <span class="nx">ones</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L175&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.TD_tr!-Tuple{JuMIT.Data.TD}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.TD_tr!-Tuple{JuMIT.Data.TD}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.TD_tr!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Time</span> <span class="nx">reverse</span> <span class="nx">the</span> <span class="nx">records</span> <span class="nx">of</span> <span class="nx">each</span> <span class="nx">receiver</span> <span class="k">in</span> <span class="sb">`TD`</span> 
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`data::TD`</span> <span class="o">:</span> <span class="nx">input</span> <span class="nx">data</span> <span class="nx">that</span> <span class="nx">is</span> <span class="nx">modified</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L189-L195&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.TD_urpos-Tuple{Array{Float64,N} where N,Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom,Int64,Tuple{Array{Float64,1},Array{Float64,1}}}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.TD_urpos-Tuple{Array{Float64,N} where N,Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom,Int64,Tuple{Array{Float64,1},Array{Float64,1}}}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.TD_urpos`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Construct</span> <span class="nx">TD</span> <span class="nx">using</span> <span class="nx">data</span> <span class="nx">at</span> <span class="nx">all</span> <span class="nx">the</span> <span class="nx">unique</span> <span class="nx">receiver</span> <span class="nx">positions</span> <span class="k">for</span> <span class="nx">all</span> <span class="nx">supersources</span><span class="p">.</span>
-
-  <span class="o">*</span> <span class="sb">`d::Array{Float64}`</span> <span class="o">:</span> <span class="nx">the</span> <span class="nx">data</span> <span class="nx">matrix</span> <span class="nx">ordered</span> <span class="k">in</span> <span class="nx">order</span> <span class="nx">such</span> <span class="nx">that</span> <span class="nx">time</span><span class="o">-</span><span class="nx">domain</span> <span class="nx">modelling</span> <span class="nx">schemes</span> <span class="nx">are</span> <span class="nx">fast</span><span class="p">,</span> <span class="nx">i</span><span class="p">.</span><span class="nx">e</span><span class="p">.,</span> <span class="p">[</span><span class="nx">irec</span><span class="p">,</span><span class="nx">ifield</span><span class="p">,</span><span class="nx">it</span><span class="p">,</span><span class="nx">nss</span><span class="p">]</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L343-L349&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.TD_weight!-Tuple{JuMIT.Data.TD}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.TD_weight!-Tuple{JuMIT.Data.TD}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.TD_weight!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Apply</span> <span class="nx">different</span> <span class="nx">weighting</span> <span class="nx">functions</span> <span class="nx">to</span> <span class="sb">`TD`</span><span class="p">.</span> <span class="nx">Use</span> <span class="k">this</span> <span class="nx">method</span> <span class="nx">to</span> <span class="nx">create</span> <span class="nx">a</span>  <span class="nx">data</span> <span class="nx">preconditioning</span> <span class="nx">matrix</span>
-
-<span class="o">**</span><span class="nx">Arguments</span> <span class="nx">Modified</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`dw::TD`</span> <span class="o">:</span>
-
-<span class="o">**</span><span class="nx">Keyword</span> <span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`offsetlim::Vector{Float64}=[-Inf,Inf]`</span> <span class="o">:</span> <span class="p">[</span><span class="nx">xoffsetlim</span><span class="p">,</span> <span class="nx">zoffsetlim</span><span class="p">],</span> <span class="nx">where</span> <span class="nx">the</span> <span class="nx">records</span> <span class="kd">with</span> <span class="nx">offsets</span> <span class="o">&gt;</span> <span class="sb">`offsetlim`</span> <span class="nx">are</span> <span class="nx">given</span> <span class="nx">zero</span> <span class="nx">weight</span>
-  <span class="o">*</span> <span class="sb">`tlim::Vector{Float64}=[dw.tgrid.x[1], dw.tgrid.x[end]]`</span> <span class="o">:</span> <span class="p">[</span><span class="nx">tminimum</span><span class="p">,</span> <span class="nx">tmaximum</span><span class="p">],</span> <span class="nx">time</span> <span class="nx">mute</span> <span class="nb">window</span>
-  <span class="o">*</span> <span class="sb">`offsetpow::Vector{Float64}=[0.0,0.0]`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`tpow::Float64=0.0`</span> <span class="o">:</span>
-  <span class="o">*</span> <span class="sb">`ttaperperc::Float64=0.`</span> <span class="o">:</span> <span class="nx">taper</span> <span class="nb">window</span> <span class="nx">percentage</span> <span class="k">for</span> <span class="nx">time</span> <span class="nb">window</span>
-  <span class="o">*</span> <span class="nx">NOTE</span>: <span class="kt">if</span> <span class="nx">more</span> <span class="nx">than</span> <span class="nx">one</span> <span class="nx">simultaneous</span> <span class="nx">source</span> <span class="nx">are</span> <span class="nx">present</span><span class="p">,</span> <span class="nx">their</span> <span class="nx">mean</span> <span class="nx">position</span> <span class="nx">is</span> <span class="nx">considered</span> <span class="nx">to</span> <span class="nx">calculate</span> <span class="nx">offset</span><span class="p">.</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L415-L432&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.TD_zeros-Tuple{Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.TD_zeros-Tuple{Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.TD_zeros`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Method</span> <span class="nx">used</span> <span class="nx">to</span> <span class="nx">preallocate</span> <span class="sb">`TD`</span> <span class="kd">with</span> <span class="nx">zeros</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`fields::Vector{Symbol}`</span> <span class="o">:</span> <span class="kt">number</span> <span class="nx">of</span> <span class="nx">components</span>
-  <span class="o">*</span> <span class="sb">`tgrid::Grid.M1D`</span> <span class="o">:</span> <span class="nx">time</span> <span class="nx">domain</span> <span class="nx">grid</span>
-  <span class="o">*</span> <span class="sb">`acqgeom::Acquisition.Geom`</span> <span class="o">:</span> <span class="nx">acquisition</span> <span class="nx">geometry</span>
-
-<span class="o">**</span><span class="nx">Return</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="nx">data</span> <span class="kd">with</span> <span class="nx">zeros</span> <span class="kr">as</span> <span class="sb">`TD`</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L147-L159&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.TDcoup!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD,JuMIT.Coupling.TD,Symbol}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.TDcoup!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD,JuMIT.Coupling.TD,Symbol}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.TDcoup!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Apply</span> <span class="nx">source</span> <span class="nx">and</span> <span class="nx">receiver</span> <span class="nx">coupling</span> <span class="nx">functions</span> <span class="nx">to</span> <span class="nx">TD</span><span class="p">.</span> <span class="nx">Currently</span><span class="p">,</span> <span class="nx">only</span> <span class="nx">source</span> <span class="nx">filters</span> <span class="nx">are</span> <span class="nx">applied</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`s::TD`</span> <span class="o">:</span> <span class="nx">input</span> <span class="nx">data</span>
-  <span class="o">*</span> <span class="sb">`r::TD`</span> <span class="o">:</span> <span class="nx">input</span> <span class="nx">data</span>
-  <span class="o">*</span> <span class="sb">`w::Coupling.TD`</span> <span class="o">:</span> <span class="nx">input</span> <span class="nx">source</span> <span class="nx">and</span> <span class="nx">receiver</span> <span class="nx">filters</span>
-  <span class="o">*</span> <span class="sb">`attrib::Symbol`</span> <span class="o">:</span> <span class="nx">attribute</span> <span class="nx">to</span> 
-
-      <span class="o">*</span> <span class="sb">`=:s`</span> <span class="nx">to</span> <span class="nx">apply</span> <span class="sb">`w`</span> <span class="nx">to</span> <span class="sb">`r`</span> <span class="nx">and</span> <span class="nx">modify</span> <span class="sb">`s`</span>
-      <span class="o">*</span> <span class="sb">`=:r`</span> <span class="nx">to</span> <span class="nx">apply</span> <span class="nx">adjoint</span> <span class="nx">of</span> <span class="sb">`w`</span> <span class="nx">to</span> <span class="sb">`s`</span> <span class="nx">and</span> <span class="nx">modify</span> <span class="sb">`r`</span>
-      <span class="o">*</span> <span class="sb">`=:w`</span> <span class="nx">modify</span> <span class="sb">`w`</span> <span class="nx">using</span> <span class="sb">`r`</span> <span class="nx">and</span> <span class="sb">`s`</span>
-
-<span class="nx">TODO</span>: <span class="kt">need</span> <span class="nx">to</span> <span class="nx">work</span> <span class="nx">on</span> <span class="nx">parallelization</span> <span class="nx">and</span> <span class="nx">speed</span> <span class="nx">up</span> <span class="nx">here</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L372-L387&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.interp-Tuple{JuMIT.Data.TD,Grid.M1D}&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.interp-Tuple{JuMIT.Data.TD,Grid.M1D}&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.interp`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nx">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Method</span> <span class="nx">to</span> <span class="nx">resample</span> <span class="nx">data</span> <span class="k">in</span> <span class="nx">time</span><span class="p">.</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`data::TD`</span> <span class="o">:</span> <span class="nx">input</span> <span class="nx">data</span> <span class="nx">of</span> <span class="nx">type</span> <span class="sb">`TD`</span>
-  <span class="o">*</span> <span class="sb">`tgrid::Grid.M1D`</span> <span class="o">:</span> <span class="nx">resampling</span> <span class="k">in</span> <span class="nx">time</span> <span class="nx">according</span> <span class="nx">to</span> <span class="k">this</span> <span class="nx">time</span> <span class="nx">grid</span>
-
-<span class="o">**</span><span class="nx">Return</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="nx">data</span> <span class="nx">after</span> <span class="nx">resampling</span> <span class="kr">as</span> <span class="sb">`TD`</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L91-L102&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;JuMIT.Data.interp_spray!&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;#JuMIT.Data.interp_spray!&#39;</span><span class="o">&gt;</span><span class="err">#</span><span class="o">&lt;</span><span class="err">/a&gt;</span>
-<span class="o">**</span><span class="sb">`JuMIT.Data.interp_spray!`</span><span class="o">**</span> <span class="o">&amp;</span><span class="nx">mdash</span><span class="p">;</span> <span class="o">*</span><span class="nb">Function</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="nx">Method</span> <span class="nx">to</span> <span class="nx">resample</span> <span class="nx">data</span> <span class="k">in</span> <span class="nx">time</span><span class="p">.</span> <span class="nx">Can</span> <span class="nx">reduce</span> <span class="nx">allocations</span> <span class="o">=========</span>
-
-<span class="o">**</span><span class="nx">Arguments</span><span class="o">**</span>
-
-  <span class="o">*</span> <span class="sb">`data::TD`</span> <span class="o">:</span> <span class="nx">input</span> <span class="nx">data</span> <span class="nx">of</span> <span class="nx">type</span> <span class="sb">`TD`</span>
-  <span class="o">*</span> <span class="sb">`dataout::TD`</span> <span class="o">:</span> <span class="nx">preallocated</span> <span class="nx">data</span> <span class="nx">of</span> <span class="nx">type</span> <span class="sb">`TD`</span> <span class="nx">that</span> <span class="nx">is</span> <span class="nx">modified</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">target</span><span class="o">=</span><span class="s1">&#39;_blank&#39;</span> <span class="nx">href</span><span class="o">=</span><span class="s1">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L116-L124&#39;</span> <span class="kr">class</span><span class="o">=</span><span class="s1">&#39;documenter-source&#39;</span><span class="o">&gt;</span><span class="nx">source</span><span class="o">&lt;</span><span class="err">/a&gt;&lt;br&gt;</span>
-
-
-<span class="o">&lt;</span><span class="nx">a</span> <span class="nx">id</span><span class="o">=</span><span class="s1">&#39;Misfits-1&#39;</span><span class="o">&gt;&lt;</span><span class="err">/a&gt;</span>
-
-<span class="err">#</span> <span class="nx">Misfits</span>
-
-
-<span class="sb">```@autodocs</span>
-<span class="sb">Modules = [JuMIT.Misfits]</span>
-<span class="sb">Order   = [:module, :type, :function]</span>
-</pre></div>
-
-
+<p><a id='Models-1'></a></p>
+<h1 id="models">Models</h1>
+<p><a id='JuMIT.Models.Seismic' href='#JuMIT.Models.Seismic'>#</a>
+<strong><code>JuMIT.Models.Seismic</code></strong> &mdash; <em>Type</em>.</p>
+<p>Data type fo represent a seismic model. A contrast function for a model m is given by $χ(m) = rac{m}{m0}-1$.</p>
+<p><strong>Fields</strong></p>
+<ul>
+<li><code>vp0::Vector{Float64}</code> : [vpmin, vpmax]</li>
+<li><code>vs0::Vector{Float64}</code> : [vsmin, vsmax]</li>
+<li><code>ρ0::Vector{Float64}</code> : [ρmin, ρmax]</li>
+<li><code>χvp::Array{Float64,2}</code> : two-dimensional contrast model (χ) for vp, for e.g., zeros(mgrid.nz, mgrid.nx)</li>
+<li><code>χvs::Array{Float64}</code> : two-dimensional contrast model (χ) for vs, for e.g., zeros(mgrid.nz, mgrid.nx)</li>
+<li><code>χρ::Array{Float64}</code> : two-dimensional contrast model (χ) for density, for e.g., zeros(mgrid.nz, mgrid.nx)</li>
+<li><code>mgrid::Grid.M2D</code> : two-dimensional grid to determine the dimensions of models</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L13-L26' class='documenter-source'>source</a><br></p>
+<p><a id='Base.copy!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}' href='#Base.copy!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}'>#</a>
+<strong><code>Base.copy!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Copy for <code>Seismic</code> models. The models should have same bounds and sizes.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L152-L154' class='documenter-source'>source</a><br></p>
+<p><a id='Base.isapprox-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}' href='#Base.isapprox-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}'>#</a>
+<strong><code>Base.isapprox</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return if two <code>Seismic</code> models have same dimensions and bounds.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L139-L141' class='documenter-source'>source</a><br></p>
+<p><a id='Base.isequal-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}' href='#Base.isequal-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}'>#</a>
+<strong><code>Base.isequal</code></strong> &mdash; <em>Method</em>.</p>
+<p>Compare if two <code>Seismic</code> models are equal</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L132' class='documenter-source'>source</a><br></p>
+<p><a id='Base.iszero-Tuple{JuMIT.Models.Seismic}' href='#Base.iszero-Tuple{JuMIT.Models.Seismic}'>#</a>
+<strong><code>Base.iszero</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return true if a <code>Seismic</code> model is just allocated with zeros.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L115-L117' class='documenter-source'>source</a><br></p>
+<p><a id='Base.print' href='#Base.print'>#</a>
+<strong><code>Base.print</code></strong> &mdash; <em>Function</em>.</p>
+<p>Print information about <code>Seismic</code></p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L54-L56' class='documenter-source'>source</a><br></p>
+<p><a id='Base.similar-Tuple{JuMIT.Models.Seismic}' href='#Base.similar-Tuple{JuMIT.Models.Seismic}'>#</a>
+<strong><code>Base.similar</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return a similar model to the input model, used for allocation.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L122-L124' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.Seismic_addon!-Tuple{JuMIT.Models.Seismic}' href='#JuMIT.Models.Seismic_addon!-Tuple{JuMIT.Models.Seismic}'>#</a>
+<strong><code>JuMIT.Models.Seismic_addon!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Add features to a model.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>mod::Seismic</code> : model that is modified</li>
+</ul>
+<p><strong>Keyword Arguments</strong></p>
+<ul>
+<li><code>point_loc::Vector{Float64}=[0., 0.,]</code> : approx location of point pert.</li>
+<li><code>point_pert::Float64=0.0</code> : perturbation at the point scatterer</li>
+<li><code>ellip_loc::Vector{Float64}=nothing</code> : location of center of perturbation, [z, x]</li>
+<li><code>ellip_rad::Float64=0.0</code> : radius of circular perturbation</li>
+<li><code>ellip_pert::Float64=0.1</code> : perturbation inside a circle</li>
+<li><code>rect_loc::Array{Float64}=nothing</code> : rectangle location, [zmin, xmin, zmax, xmax]</li>
+<li><code>rect_pert::Float64=0.1</code> : perturbation in a rectangle</li>
+<li><code>randn_pert::Float64=0.0</code> : percentage of reference values for additive random noise</li>
+<li><code>fields::Vector{Symbol}=[:χvp,:χρ,:χvs]</code> : which fields are to be modified?</li>
+<li><code>onlyin</code> : <code>mod</code> is modified only when field values are in these ranges</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L471-L489' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.Seismic_chainrule!' href='#JuMIT.Models.Seismic_chainrule!'>#</a>
+<strong><code>JuMIT.Models.Seismic_chainrule!</code></strong> &mdash; <em>Function</em>.</p>
+<p>Use chain rule to output gradients with  respect to χvp and χρ from  gradients  with respect to KI and ρI.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>gmod::Seismic</code> : gradient model</li>
+<li><code>mod::Seismic</code> : model required for chain rule</li>
+<li><code>g1</code> : gradient of an objective function with respect <code>attribs[1]</code></li>
+<li><code>g2</code> : gradient of an objective function with respect <code>attribs[2]</code></li>
+<li><code>attribs::Vector{Symbol}=[:χKI, :χρI]</code> :</li>
+<li>
+<p><code>flag::Int64=1</code> :</p>
+<ul>
+<li><code>=1</code> updates <code>gmod</code> using <code>g1</code> and <code>g2</code></li>
+<li><code>=-1</code> updates <code>g1</code> and <code>g2</code> using <code>gmod</code></li>
+</ul>
+</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L305-L320' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.Seismic_get!-Tuple{Array{Float64,2},JuMIT.Models.Seismic,Symbol}' href='#JuMIT.Models.Seismic_get!-Tuple{Array{Float64,2},JuMIT.Models.Seismic,Symbol}'>#</a>
+<strong><code>JuMIT.Models.Seismic_get!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Get other dependent model parameters of a seismic model that are not present in <code>Seismic</code>.</p>
+<ul>
+<li><code>:ρI</code> : inverse of density</li>
+<li><code>:Zp</code> : P-wave impedance</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L198-L204' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.Seismic_pml_pad_trun!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}' href='#JuMIT.Models.Seismic_pml_pad_trun!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}'>#</a>
+<strong><code>JuMIT.Models.Seismic_pml_pad_trun!</code></strong> &mdash; <em>Method</em>.</p>
+<p>only padding implemented</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L655' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.Seismic_pml_pad_trun-Tuple{JuMIT.Models.Seismic}' href='#JuMIT.Models.Seismic_pml_pad_trun-Tuple{JuMIT.Models.Seismic}'>#</a>
+<strong><code>JuMIT.Models.Seismic_pml_pad_trun</code></strong> &mdash; <em>Method</em>.</p>
+<p>Extend a seismic model into PML layers</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L642-L644' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.Seismic_reparameterize!' href='#JuMIT.Models.Seismic_reparameterize!'>#</a>
+<strong><code>JuMIT.Models.Seismic_reparameterize!</code></strong> &mdash; <em>Function</em>.</p>
+<p>Re-parameterization routine  that modifies the fields  <code>χvp</code> and <code>χρ</code> of an input seismic model using two input vectors.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>mod::Seismic</code> : to be updated</li>
+<li><code>x1::Array{Float64,2}</code> : contrast of inverse bulk modulus</li>
+<li><code>x2::Array{Float64,2}</code> : contrast of inverse density</li>
+<li><code>attribs:::Vector{Symbol}</code> : [:χKI, :χρI]</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L271-L283' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.Seismic_smooth' href='#JuMIT.Models.Seismic_smooth'>#</a>
+<strong><code>JuMIT.Models.Seismic_smooth</code></strong> &mdash; <em>Function</em>.</p>
+<p>Apply smoothing to <code>Seismic</code> using a Gaussian filter of zwidth and xwidth</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>mod::Seismic</code> : argument that is modified</li>
+<li><code>zperc::Real</code> : smoothing percentage in z-direction</li>
+<li><code>xperc::Real=zperc</code> : smoothing percentage in x-direction</li>
+</ul>
+<p><strong>Keyword Arguments</strong></p>
+<ul>
+<li><code>zmin::Real=mod.mgrid.z[1]</code> :</li>
+<li><code>zmax::Real=mod.mgrid.z[end]</code> :</li>
+<li><code>xmin::Real=mod.mgrid.x[1]</code> :</li>
+<li><code>xmax::Real=mod.mgrid.x[end]</code> :</li>
+<li><code>fields</code> : fields of seismic model that are to be smooth</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L557-L573' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.Seismic_trun-Tuple{JuMIT.Models.Seismic}' href='#JuMIT.Models.Seismic_trun-Tuple{JuMIT.Models.Seismic}'>#</a>
+<strong><code>JuMIT.Models.Seismic_trun</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return a truncated seismic model using input bounds. Note that there is no interpolation going on here, but only truncation, so  the input bounds cannot be strictly imposed.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>mod::Seismic</code> : model that is truncated</li>
+</ul>
+<p><strong>Keyword Arguments</strong></p>
+<ul>
+<li><code>zmin::Float64=mod.mgrid.z[1]</code> :</li>
+<li><code>zmax::Float64=mod.mgrid.z[end]</code> :</li>
+<li><code>xmin::Float64=mod.mgrid.x[1]</code> :</li>
+<li><code>xmax::Float64=mod.mgrid.x[end]</code> :</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L598-L612' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.Seismic_zeros-Tuple{Grid.M2D}' href='#JuMIT.Models.Seismic_zeros-Tuple{Grid.M2D}'>#</a>
+<strong><code>JuMIT.Models.Seismic_zeros</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return <code>Seismic</code> with zeros everywhere; this method is used for preallocation.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>mgrid::Grid.M2D</code> : used for sizes of χ fields</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L96-L102' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.adjust_bounds!' href='#JuMIT.Models.adjust_bounds!'>#</a>
+<strong><code>JuMIT.Models.adjust_bounds!</code></strong> &mdash; <em>Function</em>.</p>
+<p>Adjust the bounds and hence the reference values. Since the reference values are adjust the χ fields should also be changed</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L80-L83' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.bounds' href='#JuMIT.Models.bounds'>#</a>
+<strong><code>JuMIT.Models.bounds</code></strong> &mdash; <em>Function</em>.</p>
+<p>Return medium property bounds based on maximum and minimum values of the array and frac. The bounds cannot be less than zero</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L67-L70' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.interp_spray!' href='#JuMIT.Models.interp_spray!'>#</a>
+<strong><code>JuMIT.Models.interp_spray!</code></strong> &mdash; <em>Function</em>.</p>
+<p>function to resample in the model domain</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>mod::Seismic</code> : model</li>
+<li><code>modi::Seismic</code> : model after interpolation</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L718-L724' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.pml_pad_trun!' href='#JuMIT.Models.pml_pad_trun!'>#</a>
+<strong><code>JuMIT.Models.pml_pad_trun!</code></strong> &mdash; <em>Function</em>.</p>
+<p>PML Extend a model on all four sides</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L681-L683' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.χ' href='#JuMIT.Models.χ'>#</a>
+<strong><code>JuMIT.Models.χ</code></strong> &mdash; <em>Function</em>.</p>
+<p>Return dimensionless contrast model parameter using the reference value.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>mod::Array{Float64}</code> : subsurface parameter</li>
+<li><code>mod0::Vector{Float64}</code> : reference value is mean of this vector</li>
+<li><code>flag::Int64=1</code> :</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L414-L422' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Models.χg' href='#JuMIT.Models.χg'>#</a>
+<strong><code>JuMIT.Models.χg</code></strong> &mdash; <em>Function</em>.</p>
+<p>Gradients Return contrast model parameter using the reference value.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Models.jl#L448-L452' class='documenter-source'>source</a><br></p>
+<p><a id='Data-1'></a></p>
+<h1 id="data">Data</h1>
+<p><a id='JuMIT.Data' href='#JuMIT.Data'>#</a>
+<strong><code>JuMIT.Data</code></strong> &mdash; <em>Module</em>.</p>
+<p>This module defines the data types related to seismic data:</p>
+<ul>
+<li><code>TD</code> : time domain representation</li>
+</ul>
+<p>It also provides methods that apply source and receiver filters onto  seismic data.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L3-L9' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.Param_error' href='#JuMIT.Data.Param_error'>#</a>
+<strong><code>JuMIT.Data.Param_error</code></strong> &mdash; <em>Type</em>.</p>
+<p>Calculate the distance between the observed data <code>y</code> and the calculated data <code>x</code>. The time grid of the observed data can be different from that of the modelled data. The acqistion geometry of both the data sets should be the same.</p>
+<p>If <code>J</code> is the distance, the gradient of the misfit w.r.t to the calculated data is returned as <code>dJx</code></p>
+<ul>
+<li><code>w</code> used for data preconditioning</li>
+<li><code>coupling</code> source and receiver coupling functions</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L484-L492' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.TD' href='#JuMIT.Data.TD'>#</a>
+<strong><code>JuMIT.Data.TD</code></strong> &mdash; <em>Type</em>.</p>
+<p>Time domain representation of Seismic Data.</p>
+<p><strong>Fields</strong></p>
+<ul>
+<li><code>d::Array{Array{Float64,2},2}</code> : data</li>
+<li><code>fields::Vector{Symbol}</code> : components recorded at each receiver</li>
+<li><code>tgrid::Grid.M1D</code> : grid to represent time</li>
+<li><code>acqgeom::Acquisition.Geom</code> : acquisition geometry used to generate the data</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L22-L31' class='documenter-source'>source</a><br></p>
+<p><a id='Base.LinAlg.dot-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}' href='#Base.LinAlg.dot-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}'>#</a>
+<strong><code>Base.LinAlg.dot</code></strong> &mdash; <em>Method</em>.</p>
+<p>Returns dot product of data.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>data1::TD</code> : data 1</li>
+<li><code>data2::TD</code> : data 2</li>
+</ul>
+<p><strong>Return</strong></p>
+<ul>
+<li>dot product as <code>Float64</code></li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L248-L259' class='documenter-source'>source</a><br></p>
+<p><a id='Base.copy!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}' href='#Base.copy!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}'>#</a>
+<strong><code>Base.copy!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Copy <code>TD</code>'s, which are similar.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L71-L73' class='documenter-source'>source</a><br></p>
+<p><a id='Base.isapprox-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}' href='#Base.isapprox-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}'>#</a>
+<strong><code>Base.isapprox</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return if two <code>TD</code>'s have same dimensions and bounds.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L55-L57' class='documenter-source'>source</a><br></p>
+<p><a id='Base.isequal-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}' href='#Base.isequal-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}'>#</a>
+<strong><code>Base.isequal</code></strong> &mdash; <em>Method</em>.</p>
+<p>Compare if two <code>TD</code>'s  are equal</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L48' class='documenter-source'>source</a><br></p>
+<p><a id='Base.iszero-Tuple{JuMIT.Data.TD}' href='#Base.iszero-Tuple{JuMIT.Data.TD}'>#</a>
+<strong><code>Base.iszero</code></strong> &mdash; <em>Method</em>.</p>
+<p>Returns bool depending on if input <code>data::TD</code> has all zeros or not.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L182-L184' class='documenter-source'>source</a><br></p>
+<p><a id='Base.var-Tuple{JuMIT.Data.TD}' href='#Base.var-Tuple{JuMIT.Data.TD}'>#</a>
+<strong><code>Base.var</code></strong> &mdash; <em>Method</em>.</p>
+<p>Returns the variance of data</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L201-L204' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.TD_normalize' href='#JuMIT.Data.TD_normalize'>#</a>
+<strong><code>JuMIT.Data.TD_normalize</code></strong> &mdash; <em>Function</em>.</p>
+<p>Normalize time-domain seismic data.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>data::TD</code> : input data</li>
+<li>
+<p><code>attrib::Symbol</code> : decide kind of normalization</p>
+<ul>
+<li><code>=:recrms</code> the record at every receiver is normalized with its RMS value</li>
+<li><code>=:recmax</code> the record at every receiver is normalized with its maximum value</li>
+</ul>
+</li>
+</ul>
+<p><strong>Return</strong></p>
+<ul>
+<li>normalized data as <code>TD</code></li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L275-L288' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.TD_ones-Tuple{Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom}' href='#JuMIT.Data.TD_ones-Tuple{Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom}'>#</a>
+<strong><code>JuMIT.Data.TD_ones</code></strong> &mdash; <em>Method</em>.</p>
+<p>Same as <code>TD_zeros</code>, except for returning ones</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L175' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.TD_tr!-Tuple{JuMIT.Data.TD}' href='#JuMIT.Data.TD_tr!-Tuple{JuMIT.Data.TD}'>#</a>
+<strong><code>JuMIT.Data.TD_tr!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Time reverse the records of each receiver in <code>TD</code> </p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>data::TD</code> : input data that is modified</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L189-L195' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.TD_urpos-Tuple{Array{Float64,N} where N,Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom,Int64,Tuple{Array{Float64,1},Array{Float64,1}}}' href='#JuMIT.Data.TD_urpos-Tuple{Array{Float64,N} where N,Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom,Int64,Tuple{Array{Float64,1},Array{Float64,1}}}'>#</a>
+<strong><code>JuMIT.Data.TD_urpos</code></strong> &mdash; <em>Method</em>.</p>
+<p>Construct TD using data at all the unique receiver positions for all supersources.</p>
+<ul>
+<li><code>d::Array{Float64}</code> : the data matrix ordered in order such that time-domain modelling schemes are fast, i.e., [irec,ifield,it,nss]</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L343-L349' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.TD_weight!-Tuple{JuMIT.Data.TD}' href='#JuMIT.Data.TD_weight!-Tuple{JuMIT.Data.TD}'>#</a>
+<strong><code>JuMIT.Data.TD_weight!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Apply different weighting functions to <code>TD</code>. Use this method to create a  data preconditioning matrix</p>
+<p><strong>Arguments Modified</strong></p>
+<ul>
+<li><code>dw::TD</code> :</li>
+</ul>
+<p><strong>Keyword Arguments</strong></p>
+<ul>
+<li><code>offsetlim::Vector{Float64}=[-Inf,Inf]</code> : [xoffsetlim, zoffsetlim], where the records with offsets &gt; <code>offsetlim</code> are given zero weight</li>
+<li><code>tlim::Vector{Float64}=[dw.tgrid.x[1], dw.tgrid.x[end]]</code> : [tminimum, tmaximum], time mute window</li>
+<li><code>offsetpow::Vector{Float64}=[0.0,0.0]</code> :</li>
+<li><code>tpow::Float64=0.0</code> :</li>
+<li><code>ttaperperc::Float64=0.</code> : taper window percentage for time window</li>
+<li>NOTE: if more than one simultaneous source are present, their mean position is considered to calculate offset.</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L415-L432' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.TD_zeros-Tuple{Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom}' href='#JuMIT.Data.TD_zeros-Tuple{Array{Symbol,1},Grid.M1D,JuMIT.Acquisition.Geom}'>#</a>
+<strong><code>JuMIT.Data.TD_zeros</code></strong> &mdash; <em>Method</em>.</p>
+<p>Method used to preallocate <code>TD</code> with zeros.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>fields::Vector{Symbol}</code> : number of components</li>
+<li><code>tgrid::Grid.M1D</code> : time domain grid</li>
+<li><code>acqgeom::Acquisition.Geom</code> : acquisition geometry</li>
+</ul>
+<p><strong>Return</strong></p>
+<ul>
+<li>data with zeros as <code>TD</code></li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L147-L159' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.TDcoup!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD,JuMIT.Coupling.TD,Symbol}' href='#JuMIT.Data.TDcoup!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD,JuMIT.Coupling.TD,Symbol}'>#</a>
+<strong><code>JuMIT.Data.TDcoup!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Apply source and receiver coupling functions to TD. Currently, only source filters are applied.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>s::TD</code> : input data</li>
+<li><code>r::TD</code> : input data</li>
+<li><code>w::Coupling.TD</code> : input source and receiver filters</li>
+<li>
+<p><code>attrib::Symbol</code> : attribute to </p>
+<ul>
+<li><code>=:s</code> to apply <code>w</code> to <code>r</code> and modify <code>s</code></li>
+<li><code>=:r</code> to apply adjoint of <code>w</code> to <code>s</code> and modify <code>r</code></li>
+<li><code>=:w</code> modify <code>w</code> using <code>r</code> and <code>s</code></li>
+</ul>
+</li>
+</ul>
+<p>TODO: need to work on parallelization and speed up here</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L372-L387' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.interp-Tuple{JuMIT.Data.TD,Grid.M1D}' href='#JuMIT.Data.interp-Tuple{JuMIT.Data.TD,Grid.M1D}'>#</a>
+<strong><code>JuMIT.Data.interp</code></strong> &mdash; <em>Method</em>.</p>
+<p>Method to resample data in time.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>data::TD</code> : input data of type <code>TD</code></li>
+<li><code>tgrid::Grid.M1D</code> : resampling in time according to this time grid</li>
+</ul>
+<p><strong>Return</strong></p>
+<ul>
+<li>data after resampling as <code>TD</code></li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L91-L102' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Data.interp_spray!' href='#JuMIT.Data.interp_spray!'>#</a>
+<strong><code>JuMIT.Data.interp_spray!</code></strong> &mdash; <em>Function</em>.</p>
+<p>Method to resample data in time. Can reduce allocations =========</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>data::TD</code> : input data of type <code>TD</code></li>
+<li><code>dataout::TD</code> : preallocated data of type <code>TD</code> that is modified</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Data.jl#L116-L124' class='documenter-source'>source</a><br></p>
 <p><a id='Gallery-1'></a></p>
 <h1 id="gallery">Gallery</h1>
 <p><a id='JuMIT.Gallery.Geom-Tuple{Grid.M2D,Symbol}' href='#JuMIT.Gallery.Geom-Tuple{Grid.M2D,Symbol}'>#</a>
@@ -1307,67 +1037,59 @@ Order   = [:module, :type, :function]</p>
 <p>```@autodocs
 Modules = [JuMIT.Inversion]
 Order   = [:module, :type, :function]</p>
-<div class="codehilite"><pre><span></span><span class="na">&lt;a id=&#39;Interferometry-1&#39;&gt;</span><span class="o">&lt;/</span><span class="n">a</span><span class="o">&gt;</span>
+<div class="codehilite"><pre><span></span><span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;Interferometry-1&#39;</span><span class="nt">&gt;&lt;/a&gt;</span>
 
-<span class="p">#</span> <span class="n">Interferometry</span>
+# Interferometry
 
-<span class="na">&lt;a id=&#39;JuMIT.Interferometry.TD_noise_corr-Tuple{JuMIT.Data.TD}&#39; href=&#39;#JuMIT.Interferometry.TD_noise_corr-Tuple{JuMIT.Data.TD}&#39;&gt;</span><span class="p">#</span><span class="o">&lt;/</span><span class="n">a</span><span class="o">&gt;</span>
-<span class="o">**</span><span class="err">`</span><span class="n">JuMIT</span><span class="p">.</span><span class="n">Interferometry</span><span class="p">.</span><span class="n">TD_noise_corr</span><span class="err">`</span><span class="o">**</span> <span class="o">&amp;</span><span class="n">mdash</span><span class="err">;</span> <span class="o">*</span><span class="n">Method</span><span class="o">*</span><span class="p">.</span>
-
-
-
-<span class="n">Correlating</span> <span class="n">noise</span> <span class="n">records</span> <span class="k">with</span> <span class="n">reference</span> <span class="n">records</span>
-
-  <span class="o">*</span> <span class="err">`</span><span class="n">irref</span><span class="err">`</span> <span class="p">:</span> <span class="n">reference</span> <span class="n">receiver</span>
-
-
-<span class="na">&lt;a target=&#39;_blank&#39; href=&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Interferometry.jl#L113-L116&#39; class=&#39;documenter-source&#39;&gt;</span><span class="n">source</span><span class="o">&lt;/</span><span class="n">a</span><span class="o">&gt;&lt;</span><span class="n">br</span><span class="o">&gt;</span>
-
-<span class="na">&lt;a id=&#39;JuMIT.Interferometry.TD_virtual_diff-Tuple{JuMIT.Data.TD}&#39; href=&#39;#JuMIT.Interferometry.TD_virtual_diff-Tuple{JuMIT.Data.TD}&#39;&gt;</span><span class="p">#</span><span class="o">&lt;/</span><span class="n">a</span><span class="o">&gt;</span>
-<span class="o">**</span><span class="err">`</span><span class="n">JuMIT</span><span class="p">.</span><span class="n">Interferometry</span><span class="p">.</span><span class="n">TD_virtual_diff</span><span class="err">`</span><span class="o">**</span> <span class="o">&amp;</span><span class="n">mdash</span><span class="err">;</span> <span class="o">*</span><span class="n">Method</span><span class="o">*</span><span class="p">.</span>
+<span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;JuMIT.Interferometry.TD_noise_corr-Tuple{JuMIT.Data.TD}&#39;</span> <span class="na">href=</span><span class="s">&#39;#JuMIT.Interferometry.TD_noise_corr-Tuple{JuMIT.Data.TD}&#39;</span><span class="nt">&gt;</span>#<span class="nt">&lt;/a&gt;</span>
+**`JuMIT.Interferometry.TD_noise_corr`** <span class="ni">&amp;mdash;</span> *Method*.
 
 
 
-<span class="n">enhance</span> <span class="n">diffractions</span> <span class="ow">in</span> <span class="n">the</span> <span class="err">`</span><span class="n">TD</span><span class="err">`</span>
+Correlating noise records with reference records
 
-<span class="o">**</span><span class="n">Keyword</span> <span class="n">Arguments</span><span class="o">**</span>
-
-<span class="err">`</span><span class="n">λdom</span><span class="p">::</span><span class="n">Float64</span><span class="o">=</span><span class="mf">0.0</span><span class="err">`</span> <span class="p">:</span> <span class="n">distance</span> <span class="n">between</span> <span class="n">receivers</span> <span class="n">must</span> <span class="n">be</span> <span class="n">greater</span> <span class="n">than</span> <span class="n">twice</span> <span class="n">central</span> <span class="n">wavelength</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">λdom</span> <span class="p">(</span><span class="n">Shapiro</span> <span class="mi">2005</span><span class="p">)</span> <span class="err">`</span><span class="n">tlag</span><span class="p">::</span><span class="n">Float64</span><span class="o">=</span><span class="n">data</span><span class="p">.</span><span class="n">tgrid</span><span class="p">.</span><span class="n">x</span><span class="o">[</span><span class="k">end</span><span class="o">]-</span><span class="n">data</span><span class="p">.</span><span class="n">tgrid</span><span class="p">.</span><span class="n">x</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="err">`</span> <span class="p">:</span> <span class="n">maximum</span> <span class="n">lag</span> <span class="n">time</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">output</span> <span class="n">traces</span> 
+  * `irref` : reference receiver
 
 
-<span class="na">&lt;a target=&#39;_blank&#39; href=&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Interferometry.jl#L11-L19&#39; class=&#39;documenter-source&#39;&gt;</span><span class="n">source</span><span class="o">&lt;/</span><span class="n">a</span><span class="o">&gt;&lt;</span><span class="n">br</span><span class="o">&gt;</span>
+<span class="nt">&lt;a</span> <span class="na">target=</span><span class="s">&#39;_blank&#39;</span> <span class="na">href=</span><span class="s">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Interferometry.jl#L113-L116&#39;</span> <span class="na">class=</span><span class="s">&#39;documenter-source&#39;</span><span class="nt">&gt;</span>source<span class="nt">&lt;/a&gt;&lt;br&gt;</span>
+
+<span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;JuMIT.Interferometry.TD_virtual_diff-Tuple{JuMIT.Data.TD}&#39;</span> <span class="na">href=</span><span class="s">&#39;#JuMIT.Interferometry.TD_virtual_diff-Tuple{JuMIT.Data.TD}&#39;</span><span class="nt">&gt;</span>#<span class="nt">&lt;/a&gt;</span>
+**`JuMIT.Interferometry.TD_virtual_diff`** <span class="ni">&amp;mdash;</span> *Method*.
 
 
-<span class="na">&lt;a id=&#39;CICA-1&#39;&gt;</span><span class="o">&lt;/</span><span class="n">a</span><span class="o">&gt;</span>
 
-<span class="p">#</span> <span class="n">CICA</span>
+enhance diffractions in the `TD`
+
+**Keyword Arguments**
+
+`λdom::Float64=0.0` : distance between receivers must be greater than twice central wavelength, 2*λdom (Shapiro 2005) `tlag::Float64=data.tgrid.x[end]-data.tgrid.x[1]` : maximum lag time in the output traces 
 
 
-<span class="err">```@</span><span class="n">autodocs</span>
-<span class="n">Modules</span> <span class="o">=</span> <span class="o">[</span><span class="n">JuMIT</span><span class="p">.</span><span class="n">CICA</span><span class="o">]</span>
-<span class="n">Order</span>   <span class="o">=</span> <span class="o">[</span><span class="p">:</span><span class="n">module</span><span class="p">,</span> <span class="p">:</span><span class="n">type</span><span class="p">,</span> <span class="p">:</span><span class="n">function</span><span class="o">]</span>
+<span class="nt">&lt;a</span> <span class="na">target=</span><span class="s">&#39;_blank&#39;</span> <span class="na">href=</span><span class="s">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Interferometry.jl#L11-L19&#39;</span> <span class="na">class=</span><span class="s">&#39;documenter-source&#39;</span><span class="nt">&gt;</span>source<span class="nt">&lt;/a&gt;&lt;br&gt;</span>
+
+
+<span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;Poisson-1&#39;</span><span class="nt">&gt;&lt;/a&gt;</span>
+
+# Poisson
+
+<span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;JuMIT.Poisson&#39;</span> <span class="na">href=</span><span class="s">&#39;#JuMIT.Poisson&#39;</span><span class="nt">&gt;</span>#<span class="nt">&lt;/a&gt;</span>
+**`JuMIT.Poisson`** <span class="ni">&amp;mdash;</span> *Module*.
+
+
+
+This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media, i.e. media having spatially varying (space-dependent) medium parameters. The following functionality is currently available in this module:
+
+  * &#39;Forward&#39; problem: given the source, and the conductivity distribution, solve for the electrical potential ψ:
 </pre></div>
 
 
-<p><a id='Poisson-1'></a></p>
-<h1 id="poisson">Poisson</h1>
-<p><a id='JuMIT.Poisson' href='#JuMIT.Poisson'>#</a>
-<strong><code>JuMIT.Poisson</code></strong> &mdash; <em>Module</em>.</p>
-<p>This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media, i.e. media having spatially varying (space-dependent) medium parameters. The following functionality is currently available in this module:</p>
-<ul>
-<li>'Forward' problem: given the source, and the conductivity distribution, solve for the electrical potential ψ:</li>
-</ul>
-<div class="codehilite"><pre><span></span> <span class="nt">Example</span> <span class="nt">problem</span><span class="o">:</span> <span class="nt">solve</span> <span class="nt">Aψ</span><span class="o">=</span><span class="err">∇⋅</span><span class="nt">j</span><span class="o">;</span> <span class="nt">A</span><span class="o">=</span><span class="err">∇⋅</span><span class="o">(</span><span class="nt">σ</span><span class="o">(</span><span class="nt">x</span><span class="o">,</span><span class="nt">z</span><span class="o">)</span><span class="err">∇</span><span class="o">),</span> <span class="nt">for</span> <span class="nt">ψ</span><span class="o">.</span>
+<p>Example problem: solve Aψ=∇⋅j; A=∇⋅(σ(x,z)∇), for ψ.</p>
+<div class="codehilite"><pre><span></span>  * &#39;Inverse&#39; problem: given wave propagation related pore pressure, and mechanical medium properties, calculate the source term:
 </pre></div>
 
 
-<ul>
-<li>'Inverse' problem: given wave propagation related pore pressure, and mechanical medium properties, calculate the source term:</li>
-</ul>
-<div class="codehilite"><pre><span></span> <span class="nt">Example</span> <span class="nt">problem</span><span class="o">:</span> <span class="nt">solve</span> <span class="nt">Aψ</span><span class="o">=</span><span class="nt">-</span><span class="err">∇⋅</span><span class="nt">j</span><span class="o">;</span> <span class="nt">A</span><span class="o">=</span><span class="err">∇⋅</span><span class="o">(</span><span class="cp">[</span><span class="nx">Q</span><span class="o">*</span><span class="nx">k</span><span class="p">/</span><span class="nx">η</span><span class="cp">]</span><span class="o">(</span><span class="nt">x</span><span class="o">,</span><span class="nt">z</span><span class="o">)</span><span class="err">∇</span><span class="nt">B</span><span class="o">*</span><span class="nt">P</span><span class="o">),</span> <span class="nt">for</span> <span class="err">∇⋅</span><span class="nt">j</span><span class="o">;</span>
-</pre></div>
-
-
+<p>Example problem: solve Aψ=-∇⋅j; A=∇⋅(<a href="./x,z">Q*k/η</a>∇B*P), for ∇⋅j;
+```</p>
 <ul>
 <li>The Boundary Value Problem that is currently implemented assumes Neumann boundary conditions at all boundaries.</li>
 </ul>
@@ -1433,7 +1155,6 @@ Order   = [:module, :type, :function]</p>
 <li><code>attrib::Symbol=:wav</code> : specify type of plot</li>
 </ul>
 <p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Plots.jl#L257-L268' class='documenter-source'>source</a><br></p>
-<p>%## Another Section %<code>@contents %Pages = [ %    "modeling/page1.md"  %    ] %Depth = 2 %</code> %  %<code>@contents %Pages = [ %    "tutorials/page1.md", %    ] %Depth = 2 %</code></p>
 <p><a id='Index-1'></a></p>
 <h1 id="index">Index</h1>
 <ul>
@@ -1448,21 +1169,21 @@ Order   = [:module, :type, :function]</p>
 <li><a href=".#JuMIT.Data.TD"><code>JuMIT.Data.TD</code></a></li>
 <li><a href=".#JuMIT.Fdtd.Param-Tuple{}"><code>JuMIT.Fdtd.Param</code></a></li>
 <li><a href=".#JuMIT.Fdtd.Paramc"><code>JuMIT.Fdtd.Paramc</code></a></li>
-<li><a href=".#JuMIT.Fdtd.Paramp-Tuple{UnitRange{Int64},JuMIT.Fdtd.Paramc}"><code>JuMIT.Fdtd.Paramp</code></a></li>
 <li><a href=".#JuMIT.Fdtd.Paramp"><code>JuMIT.Fdtd.Paramp</code></a></li>
-<li><a href=".#JuMIT.Fdtd.Paramss-Tuple{Int64,JuMIT.Fdtd.Paramc}"><code>JuMIT.Fdtd.Paramss</code></a></li>
+<li><a href=".#JuMIT.Fdtd.Paramp-Tuple{UnitRange{Int64},JuMIT.Fdtd.Paramc}"><code>JuMIT.Fdtd.Paramp</code></a></li>
 <li><a href=".#JuMIT.Fdtd.Paramss"><code>JuMIT.Fdtd.Paramss</code></a></li>
+<li><a href=".#JuMIT.Fdtd.Paramss-Tuple{Int64,JuMIT.Fdtd.Paramc}"><code>JuMIT.Fdtd.Paramss</code></a></li>
 <li><a href=".#JuMIT.Models.Seismic"><code>JuMIT.Models.Seismic</code></a></li>
 <li><a href=".#Base.LinAlg.dot-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.LinAlg.dot</code></a></li>
-<li><a href=".#Base.copy!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.copy!</code></a></li>
 <li><a href=".#Base.copy!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}"><code>Base.copy!</code></a></li>
-<li><a href=".#Base.isapprox-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}"><code>Base.isapprox</code></a></li>
+<li><a href=".#Base.copy!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.copy!</code></a></li>
 <li><a href=".#Base.isapprox-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.isapprox</code></a></li>
+<li><a href=".#Base.isapprox-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}"><code>Base.isapprox</code></a></li>
+<li><a href=".#Base.isequal"><code>Base.isequal</code></a></li>
 <li><a href=".#Base.isequal-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}"><code>Base.isequal</code></a></li>
 <li><a href=".#Base.isequal-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.isequal</code></a></li>
-<li><a href=".#Base.isequal"><code>Base.isequal</code></a></li>
-<li><a href=".#Base.iszero-Tuple{JuMIT.Data.TD}"><code>Base.iszero</code></a></li>
 <li><a href=".#Base.iszero-Tuple{JuMIT.Models.Seismic}"><code>Base.iszero</code></a></li>
+<li><a href=".#Base.iszero-Tuple{JuMIT.Data.TD}"><code>Base.iszero</code></a></li>
 <li><a href=".#Base.print"><code>Base.print</code></a></li>
 <li><a href=".#Base.print"><code>Base.print</code></a></li>
 <li><a href=".#Base.print"><code>Base.print</code></a></li>
@@ -1525,10 +1246,10 @@ Order   = [:module, :type, :function]</p>
 <li><a href=".#JuMIT.Models.χ"><code>JuMIT.Models.χ</code></a></li>
 <li><a href=".#JuMIT.Models.χg"><code>JuMIT.Models.χg</code></a></li>
 <li><a href=".#JuMIT.Poisson.solve-Tuple{Any,Any,Int64}"><code>JuMIT.Poisson.solve</code></a></li>
-<li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.Seismic}"><code>RecipesBase.apply_recipe</code></a></li>
-<li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.TD}"><code>RecipesBase.apply_recipe</code></a></li>
 <li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.Src}"><code>RecipesBase.apply_recipe</code></a></li>
+<li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.TD}"><code>RecipesBase.apply_recipe</code></a></li>
 <li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.Geom}"><code>RecipesBase.apply_recipe</code></a></li>
+<li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.Seismic}"><code>RecipesBase.apply_recipe</code></a></li>
 </ul>
 
   <br>
@@ -1567,5 +1288,5 @@ Order   = [:module, :type, :function]</p>
 </html>
 <!--
 MkDocs version : 0.17.4
-Build Date UTC : 2018-06-30 19:36:50
+Build Date UTC : 2018-06-30 19:42:19
 -->
