@@ -47,7 +47,11 @@
           ]},
           {title: "Fdtd", url: "#fdtd", children: [
           ]},
-          {title: "Inversion", url: "#inversion", children: [
+          {title: "FWI", url: "#fwi", children: [
+          ]},
+          {title: "Interferometry", url: "#interferometry", children: [
+          ]},
+          {title: "Poisson", url: "#poisson", children: [
           ]},
           {title: "Plots", url: "#plots", children: [
           ]},
@@ -1032,64 +1036,247 @@ if (is_top_frame) { $('body').addClass('wm-top-page'); }
 <strong><code>JuMIT.Fdtd.update_model!</code></strong> &mdash; <em>Function</em>.</p>
 <p>Update the <code>Seismic</code> models in <code>Paramc</code> without additional memory allocation. This routine is used during FWI, where medium parameters are itertively updated. </p>
 <p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Fdtd.jl#L491-L494' class='documenter-source'>source</a><br></p>
-<p><a id='Inversion-1'></a></p>
-<h1 id="inversion">Inversion</h1>
-<p>```@autodocs
-Modules = [JuMIT.Inversion]
-Order   = [:module, :type, :function]</p>
-<div class="codehilite"><pre><span></span><span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;Interferometry-1&#39;</span><span class="nt">&gt;&lt;/a&gt;</span>
-
-# Interferometry
-
-<span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;JuMIT.Interferometry.TD_noise_corr-Tuple{JuMIT.Data.TD}&#39;</span> <span class="na">href=</span><span class="s">&#39;#JuMIT.Interferometry.TD_noise_corr-Tuple{JuMIT.Data.TD}&#39;</span><span class="nt">&gt;</span>#<span class="nt">&lt;/a&gt;</span>
-**`JuMIT.Interferometry.TD_noise_corr`** <span class="ni">&amp;mdash;</span> *Method*.
-
-
-
-Correlating noise records with reference records
-
-  * `irref` : reference receiver
-
-
-<span class="nt">&lt;a</span> <span class="na">target=</span><span class="s">&#39;_blank&#39;</span> <span class="na">href=</span><span class="s">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Interferometry.jl#L113-L116&#39;</span> <span class="na">class=</span><span class="s">&#39;documenter-source&#39;</span><span class="nt">&gt;</span>source<span class="nt">&lt;/a&gt;&lt;br&gt;</span>
-
-<span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;JuMIT.Interferometry.TD_virtual_diff-Tuple{JuMIT.Data.TD}&#39;</span> <span class="na">href=</span><span class="s">&#39;#JuMIT.Interferometry.TD_virtual_diff-Tuple{JuMIT.Data.TD}&#39;</span><span class="nt">&gt;</span>#<span class="nt">&lt;/a&gt;</span>
-**`JuMIT.Interferometry.TD_virtual_diff`** <span class="ni">&amp;mdash;</span> *Method*.
-
-
-
-enhance diffractions in the `TD`
-
-**Keyword Arguments**
-
-`λdom::Float64=0.0` : distance between receivers must be greater than twice central wavelength, 2*λdom (Shapiro 2005) `tlag::Float64=data.tgrid.x[end]-data.tgrid.x[1]` : maximum lag time in the output traces 
-
-
-<span class="nt">&lt;a</span> <span class="na">target=</span><span class="s">&#39;_blank&#39;</span> <span class="na">href=</span><span class="s">&#39;https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Interferometry.jl#L11-L19&#39;</span> <span class="na">class=</span><span class="s">&#39;documenter-source&#39;</span><span class="nt">&gt;</span>source<span class="nt">&lt;/a&gt;&lt;br&gt;</span>
-
-
-<span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;Poisson-1&#39;</span><span class="nt">&gt;&lt;/a&gt;</span>
-
-# Poisson
-
-<span class="nt">&lt;a</span> <span class="na">id=</span><span class="s">&#39;JuMIT.Poisson&#39;</span> <span class="na">href=</span><span class="s">&#39;#JuMIT.Poisson&#39;</span><span class="nt">&gt;</span>#<span class="nt">&lt;/a&gt;</span>
-**`JuMIT.Poisson`** <span class="ni">&amp;mdash;</span> *Module*.
-
-
-
-This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media, i.e. media having spatially varying (space-dependent) medium parameters. The following functionality is currently available in this module:
-
-  * &#39;Forward&#39; problem: given the source, and the conductivity distribution, solve for the electrical potential ψ:
+<p><a id='FWI-1'></a></p>
+<h1 id="fwi">FWI</h1>
+<p><a id='JuMIT.FWI' href='#JuMIT.FWI'>#</a>
+<strong><code>JuMIT.FWI</code></strong> &mdash; <em>Module</em>.</p>
+<p>This module defines a type called <code>Param</code> that is to be constructed  before performing  and kind of inversion. The following functionality is currently added in this module:</p>
+<ul>
+<li>a simple RTM</li>
+<li>full-waveform inversion</li>
+<li>source and receiver filter inversion</li>
+</ul>
+<p>Once a <code>Param</code> object is constructed, the following routines update certain fields of the <code>Param</code> after performing the inversion.</p>
+<ul>
+<li><code>xfwi!</code> : updates the initial subsurface models in <code>Param</code> using its observed data</li>
+<li><code>wfwi!</code> : updates the source and receiver filters in <code>Param</code> using its observed data</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L3-L15' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.Param' href='#JuMIT.FWI.Param'>#</a>
+<strong><code>JuMIT.FWI.Param</code></strong> &mdash; <em>Type</em>.</p>
+<p>FWI Parameters</p>
+<p><strong>Fields</strong></p>
+<ul>
+<li><code>mgrid::Grid.M2D</code> : modelling grid</li>
+<li><code>igrid::Grid.M2D</code> : inversion grid</li>
+<li><code>acqsrc::Acquisition.Src</code> : base source wavelet for modelling data</li>
+<li><code>acqgeom::Acquisition.Geom</code> : acquisition geometry</li>
+<li><code>tgrid::Grid.M1D</code> :</li>
+<li><code>attrib_mod::Symbol</code></li>
+<li><code>model_obs</code> : model used for generating observed data</li>
+<li><code>model0</code> : background velocity model (only used during Born modeling and inversion)</li>
+<li><code>parameterization</code> : a vector of Symbols specifying parameterization of the inversion vector</li>
+<li><code>verbose</code> : print level on STOUT</li>
+<li><code>attrib</code> : synthetic or real</li>
+</ul>
+<p>TODO: add an extra attribute for coupling functions inversion and modelling</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L34-L52' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.Param-Tuple{JuMIT.Acquisition.Src,JuMIT.Acquisition.Geom,Grid.M1D,Symbol,Symbol,JuMIT.Models.Seismic}' href='#JuMIT.FWI.Param-Tuple{JuMIT.Acquisition.Src,JuMIT.Acquisition.Geom,Grid.M1D,Symbol,Symbol,JuMIT.Models.Seismic}'>#</a>
+<strong><code>JuMIT.FWI.Param</code></strong> &mdash; <em>Method</em>.</p>
+<p>Constructor for <code>Param</code></p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>acqsrc::Acquisition.Src</code> : source time functions</li>
+<li><code>acqgeom::Acquisition.Geom</code> : acquisition geometry</li>
+<li><code>tgrid::Grid.M1D</code> : modelling time grid</li>
+<li><code>attrib_mod::Symbol</code> : modelling attribute</li>
+<li><code>attrib_inv::Symbol</code> : inversion attribute</li>
+<li><code>modm::Models.Seismic</code> : seismic model on modelling mesh</li>
+</ul>
+<p><strong>Optional Arguments</strong></p>
+<ul>
+<li><code>tgrid_obs::Grid.M1D</code> : time grid for observed data</li>
+<li><code>igrid::Grid.M2D=modm.mgrid</code> : inversion grid if different from the modelling grid, i.e., <code>modm.mgrid</code></li>
+<li>
+<p><code>mprecon_factor::Float64=1</code> : factor to control model preconditioner, always greater than 1</p>
+<ul>
+<li><code>=1</code> means the preconditioning is switched off</li>
+<li><code>&gt;1</code> means the preconditioning is switched on, larger the mprecon_factor, stronger the applied preconditioner becomes</li>
+<li><code>dobs::Data.TD</code> : observed data</li>
+<li><code>dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.acqgeom)</code> : data preconditioning, defaults to one</li>
+<li><code>tlagssf_fracs=0.0</code> : maximum lagtime of unknown source filter</li>
+<li><code>tlagrf_fracs=0.0</code> : maximum lagtime of unknown receiver filter</li>
+<li><code>acqsrc_obs::Acquisition.Src=acqsrc</code> : source wavelets to generate <em>observed data</em>; can be different from <code>acqsrc</code></li>
+<li><code>modm_obs::Models.Seismic=modm</code> : actual seismic model to generate <em>observed data</em></li>
+<li><code>modm0::Models.Seismic=modm</code> : background seismic model for Born modelling and inversion (still being tested)</li>
+<li><code>mod_inv_parameterization::Vector{Symbol}=[:χKI, :χρI]</code> : subsurface parameterization</li>
+<li><code>verbose::Bool=false</code> : print level on STDOUT during inversion</li>
+<li>
+<p><code>attrib::Symbol=:synthetic</code> : an attribute to control class</p>
+</li>
+<li>
+<p><code>=:synthetic</code> synthetic data inversion</p>
+</li>
+<li><code>=:field</code> field data inversion</li>
+</ul>
+</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L110-L141' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.AdjGeom-Tuple{JuMIT.Acquisition.Geom}' href='#JuMIT.FWI.AdjGeom-Tuple{JuMIT.Acquisition.Geom}'>#</a>
+<strong><code>JuMIT.FWI.AdjGeom</code></strong> &mdash; <em>Method</em>.</p>
+<p>Modify the input acquisition geometry  such that the adjoint source time functions can  be propagated from the receiver positions. The number of supersources will remain the same. All the recievers will be fired as simultaneous sources.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L944-L950' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.Coupling_gx!-Tuple{Any,Any}' href='#JuMIT.FWI.Coupling_gx!-Tuple{Any,Any}'>#</a>
+<strong><code>JuMIT.FWI.Coupling_gx!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Convert dJssf to gradient vector</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L1013-L1015' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.Coupling_x!-Tuple{Array{Float64,1},JuMIT.FWI.Param,Int64}' href='#JuMIT.FWI.Coupling_x!-Tuple{Array{Float64,1},JuMIT.FWI.Param,Int64}'>#</a>
+<strong><code>JuMIT.FWI.Coupling_x!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Convert coupling functions to x and vice versa</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L987-L989' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.F!' href='#JuMIT.FWI.F!'>#</a>
+<strong><code>JuMIT.FWI.F!</code></strong> &mdash; <em>Function</em>.</p>
+<p>Perform a forward simulation. This simulation is common for both functional and gradient calculation. During the computation of the gradient, we need an adjoint simulation. Update the buffer, which consists of the modelled data and boundary values for adjoint calculation.</p>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>x::Vector{Float64}</code> : inversion variable</li>
+<li><code>last_x::Vector{Float64}</code> : buffer is only updated when x!=last_x, and modified such that last_x=x</li>
+<li><code>pa::Param</code> : parameters that are constant during the inversion</li>
+<li><code>modm::Models.Seismic</code> :</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L552-L565' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.Fadj!-Tuple{JuMIT.FWI.Param}' href='#JuMIT.FWI.Fadj!-Tuple{JuMIT.FWI.Param}'>#</a>
+<strong><code>JuMIT.FWI.Fadj!</code></strong> &mdash; <em>Method</em>.</p>
+<ul>
+<li>use x and update model in pa</li>
+<li>compute gradient</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L673-L676' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.Seismic_gx!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic,JuMIT.Models.Seismic,JuMIT.Models.Seismic,Array{Float64,1},JuMIT.FWI.Param,Int64}' href='#JuMIT.FWI.Seismic_gx!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic,JuMIT.Models.Seismic,JuMIT.Models.Seismic,Array{Float64,1},JuMIT.FWI.Param,Int64}'>#</a>
+<strong><code>JuMIT.FWI.Seismic_gx!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Convert gradient vector to <code>Seismic</code> type and vice versa This will be different from the previous one, once  the parameterizations come in</p>
+<ul>
+<li><code>gmodm::Models.Seismic</code> : gradient model on the modelling grid</li>
+<li><code>modm::Models.Seismic</code> : model on the modelling grid</li>
+<li><code>gmodi::Models.Seismic</code> : gradient model on the inversion grid</li>
+<li><code>modi::Models.Seismic</code> : model on the inversion grid</li>
+<li><code>gx::Vector{Float64}</code> : gradient vector</li>
+<li><code>pa::Param</code> :</li>
+<li>
+<p><code>flag::Int64</code> :</p>
+<ul>
+<li><code>=1</code> update the vector <code>gx</code> using <code>gmod</code></li>
+<li><code>=-1</code> update gmod</li>
+</ul>
+</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L876-L890' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.Seismic_x!-Tuple{Any,JuMIT.Models.Seismic,Array{Float64,1},JuMIT.FWI.Param,Int64}' href='#JuMIT.FWI.Seismic_x!-Tuple{Any,JuMIT.Models.Seismic,Array{Float64,1},JuMIT.FWI.Param,Int64}'>#</a>
+<strong><code>JuMIT.FWI.Seismic_x!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Convert <code>Seismic</code> model to x and vice versa</p>
+<ul>
+<li><code>modm</code> : seismic model on modelling grid (input nothing to not use it)</li>
+<li><code>modi::Models.Seismic</code> : seismic model on inversion grid</li>
+<li><code>x::Vector{Float64}</code> : inversion vector</li>
+<li><code>pa::Param</code> : fwi parameters</li>
+<li>
+<p><code>flag::Int64</code> : </p>
+<ul>
+<li><code>=1</code> converts either modm or modi to x</li>
+<li><code>=-1</code> updates both modm and modi using x</li>
+</ul>
+</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L788-L798' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.Seismic_xbound!-Tuple{Any,Any,Any}' href='#JuMIT.FWI.Seismic_xbound!-Tuple{Any,Any,Any}'>#</a>
+<strong><code>JuMIT.FWI.Seismic_xbound!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return bound vectors for the <code>Seismic</code> model,  depeding on paramaterization</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L844-L847' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.build_mprecon!' href='#JuMIT.FWI.build_mprecon!'>#</a>
+<strong><code>JuMIT.FWI.build_mprecon!</code></strong> &mdash; <em>Function</em>.</p>
+<p>build a model precon</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L610' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.func_grad_Coupling!-Tuple{Any,Array{Float64,1},JuMIT.FWI.Param}' href='#JuMIT.FWI.func_grad_Coupling!-Tuple{Any,Array{Float64,1},JuMIT.FWI.Param}'>#</a>
+<strong><code>JuMIT.FWI.func_grad_Coupling!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return functional and gradient of the CLS objective </p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L966-L968' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.func_grad_xfwi!-Tuple{Any,Array{Float64,1},Array{Float64,1},JuMIT.FWI.Param}' href='#JuMIT.FWI.func_grad_xfwi!-Tuple{Any,Array{Float64,1},Array{Float64,1},JuMIT.FWI.Param}'>#</a>
+<strong><code>JuMIT.FWI.func_grad_xfwi!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return functional and gradient of the CLS objective </p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L638-L640' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.hessian_xfwi!-Tuple{Any,Any}' href='#JuMIT.FWI.hessian_xfwi!-Tuple{Any,Any}'>#</a>
+<strong><code>JuMIT.FWI.hessian_xfwi!</code></strong> &mdash; <em>Method</em>.</p>
+<p>outdated</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L693-L695' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.update_adjsrc!-Tuple{Any,JuMIT.Data.TD,Any}' href='#JuMIT.FWI.update_adjsrc!-Tuple{Any,JuMIT.Data.TD,Any}'>#</a>
+<strong><code>JuMIT.FWI.update_adjsrc!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Convert the data <code>TD</code> to <code>Src</code> after time reversal.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L94-L96' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.wfwi!-Tuple{JuMIT.FWI.Param}' href='#JuMIT.FWI.wfwi!-Tuple{JuMIT.FWI.Param}'>#</a>
+<strong><code>JuMIT.FWI.wfwi!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Update pa.w</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L743-L745' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.wfwi_ninv-Tuple{JuMIT.FWI.Param}' href='#JuMIT.FWI.wfwi_ninv-Tuple{JuMIT.FWI.Param}'>#</a>
+<strong><code>JuMIT.FWI.wfwi_ninv</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return the number of inversion variables for source and receiver filter inversion  corresponding to <code>Param</code>. This number depends on the maximum lagtimes of the filters. </p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L346-L350' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.xfwi!-Tuple{JuMIT.FWI.Param}' href='#JuMIT.FWI.xfwi!-Tuple{JuMIT.FWI.Param}'>#</a>
+<strong><code>JuMIT.FWI.xfwi!</code></strong> &mdash; <em>Method</em>.</p>
+<p>Full Waveform Inversion using <code>Optim</code> package. This method updates <code>pa.modm</code> and <code>pa.dcal</code>. More details about the optional parameters can be found in the documentation of the <code>Optim</code>  package. <code>pa.modi</code> is used as initial model if non-zero.</p>
+<p><strong>Arguments that are modified</strong></p>
+<ul>
+<li><code>pa::Param</code> : inversion parameters</li>
+</ul>
+<p><strong>Optional Arguments</strong></p>
+<ul>
+<li><code>extended_trace::Bool=true</code> : save extended trace</li>
+<li><code>time_limit=Float64=2.0*60.</code> : time limit for inversion (testing)</li>
+<li><code>iterations::Int64=5</code> : maximum number of iterations</li>
+<li><code>linesearch_iterations::Int64=3</code> : maximum number of line search iterations</li>
+<li><code>f_tol::Float64=1e-5</code> : functional tolerance</li>
+<li><code>g_tol::Float64=1e-8</code> : gradient tolerance</li>
+<li><code>x_tol::Float64=1e-5</code> : model tolerance</li>
+</ul>
+<p><strong>Outputs</strong></p>
+<ul>
+<li>
+<p>depending on  <code>pa.attrib_inv</code></p>
+<ul>
+<li><code>=:cls</code> classic least-squares inversion using adjoint state method</li>
+<li><code>=:migr</code> return gradient at the first iteration, i.e., a migration image</li>
+<li><code>=:migr_finite_difference</code> same as above but <em>not</em> using adjoint state method; time consuming; only for testing, TODO: implement autodiff here</li>
+</ul>
+</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L355-L383' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.FWI.xfwi_ninv-Tuple{JuMIT.FWI.Param}' href='#JuMIT.FWI.xfwi_ninv-Tuple{JuMIT.FWI.Param}'>#</a>
+<strong><code>JuMIT.FWI.xfwi_ninv</code></strong> &mdash; <em>Method</em>.</p>
+<p>Return the number of inversion variables for FWI corresponding to <code>Param</code>. This number of inversion variables depend on the size of inversion mesh.</p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/FWI.jl#L338-L341' class='documenter-source'>source</a><br></p>
+<p><a id='Interferometry-1'></a></p>
+<h1 id="interferometry">Interferometry</h1>
+<p><a id='JuMIT.Interferometry.TD_noise_corr-Tuple{JuMIT.Data.TD}' href='#JuMIT.Interferometry.TD_noise_corr-Tuple{JuMIT.Data.TD}'>#</a>
+<strong><code>JuMIT.Interferometry.TD_noise_corr</code></strong> &mdash; <em>Method</em>.</p>
+<p>Correlating noise records with reference records</p>
+<ul>
+<li><code>irref</code> : reference receiver</li>
+</ul>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Interferometry.jl#L113-L116' class='documenter-source'>source</a><br></p>
+<p><a id='JuMIT.Interferometry.TD_virtual_diff-Tuple{JuMIT.Data.TD}' href='#JuMIT.Interferometry.TD_virtual_diff-Tuple{JuMIT.Data.TD}'>#</a>
+<strong><code>JuMIT.Interferometry.TD_virtual_diff</code></strong> &mdash; <em>Method</em>.</p>
+<p>enhance diffractions in the <code>TD</code></p>
+<p><strong>Keyword Arguments</strong></p>
+<p><code>λdom::Float64=0.0</code> : distance between receivers must be greater than twice central wavelength, 2*λdom (Shapiro 2005) <code>tlag::Float64=data.tgrid.x[end]-data.tgrid.x[1]</code> : maximum lag time in the output traces </p>
+<p><a target='_blank' href='https://github.com/pawbz/JuMIT.jl/blob/b64538648c84b1096e121bd925f9f366f6f44f87/src/Interferometry.jl#L11-L19' class='documenter-source'>source</a><br></p>
+<p><a id='Poisson-1'></a></p>
+<h1 id="poisson">Poisson</h1>
+<p><a id='JuMIT.Poisson' href='#JuMIT.Poisson'>#</a>
+<strong><code>JuMIT.Poisson</code></strong> &mdash; <em>Module</em>.</p>
+<p>This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media, i.e. media having spatially varying (space-dependent) medium parameters. The following functionality is currently available in this module:</p>
+<ul>
+<li>'Forward' problem: given the source, and the conductivity distribution, solve for the electrical potential ψ:</li>
+</ul>
+<div class="codehilite"><pre><span></span> <span class="nt">Example</span> <span class="nt">problem</span><span class="o">:</span> <span class="nt">solve</span> <span class="nt">Aψ</span><span class="o">=</span><span class="err">∇⋅</span><span class="nt">j</span><span class="o">;</span> <span class="nt">A</span><span class="o">=</span><span class="err">∇⋅</span><span class="o">(</span><span class="nt">σ</span><span class="o">(</span><span class="nt">x</span><span class="o">,</span><span class="nt">z</span><span class="o">)</span><span class="err">∇</span><span class="o">),</span> <span class="nt">for</span> <span class="nt">ψ</span><span class="o">.</span>
 </pre></div>
 
 
-<p>Example problem: solve Aψ=∇⋅j; A=∇⋅(σ(x,z)∇), for ψ.</p>
-<div class="codehilite"><pre><span></span>  * &#39;Inverse&#39; problem: given wave propagation related pore pressure, and mechanical medium properties, calculate the source term:
+<ul>
+<li>'Inverse' problem: given wave propagation related pore pressure, and mechanical medium properties, calculate the source term:</li>
+</ul>
+<div class="codehilite"><pre><span></span> <span class="nt">Example</span> <span class="nt">problem</span><span class="o">:</span> <span class="nt">solve</span> <span class="nt">Aψ</span><span class="o">=</span><span class="nt">-</span><span class="err">∇⋅</span><span class="nt">j</span><span class="o">;</span> <span class="nt">A</span><span class="o">=</span><span class="err">∇⋅</span><span class="o">(</span><span class="cp">[</span><span class="nx">Q</span><span class="o">*</span><span class="nx">k</span><span class="p">/</span><span class="nx">η</span><span class="cp">]</span><span class="o">(</span><span class="nt">x</span><span class="o">,</span><span class="nt">z</span><span class="o">)</span><span class="err">∇</span><span class="nt">B</span><span class="o">*</span><span class="nt">P</span><span class="o">),</span> <span class="nt">for</span> <span class="err">∇⋅</span><span class="nt">j</span><span class="o">;</span>
 </pre></div>
 
 
-<p>Example problem: solve Aψ=-∇⋅j; A=∇⋅(<a href="./x,z">Q*k/η</a>∇B*P), for ∇⋅j;
-```</p>
 <ul>
 <li>The Boundary Value Problem that is currently implemented assumes Neumann boundary conditions at all boundaries.</li>
 </ul>
@@ -1161,12 +1348,15 @@ This module represents an explicit, direct sparse 2D finite-difference Poisson s
 <li><a href=".#JuMIT.Acquisition"><code>JuMIT.Acquisition</code></a></li>
 <li><a href=".#JuMIT.Coupling"><code>JuMIT.Coupling</code></a></li>
 <li><a href=".#JuMIT.Data"><code>JuMIT.Data</code></a></li>
+<li><a href=".#JuMIT.FWI"><code>JuMIT.FWI</code></a></li>
 <li><a href=".#JuMIT.Poisson"><code>JuMIT.Poisson</code></a></li>
 <li><a href=".#JuMIT.Acquisition.Geom"><code>JuMIT.Acquisition.Geom</code></a></li>
 <li><a href=".#JuMIT.Acquisition.Src"><code>JuMIT.Acquisition.Src</code></a></li>
 <li><a href=".#JuMIT.Coupling.TD"><code>JuMIT.Coupling.TD</code></a></li>
 <li><a href=".#JuMIT.Data.Param_error"><code>JuMIT.Data.Param_error</code></a></li>
 <li><a href=".#JuMIT.Data.TD"><code>JuMIT.Data.TD</code></a></li>
+<li><a href=".#JuMIT.FWI.Param-Tuple{JuMIT.Acquisition.Src,JuMIT.Acquisition.Geom,Grid.M1D,Symbol,Symbol,JuMIT.Models.Seismic}"><code>JuMIT.FWI.Param</code></a></li>
+<li><a href=".#JuMIT.FWI.Param"><code>JuMIT.FWI.Param</code></a></li>
 <li><a href=".#JuMIT.Fdtd.Param-Tuple{}"><code>JuMIT.Fdtd.Param</code></a></li>
 <li><a href=".#JuMIT.Fdtd.Paramc"><code>JuMIT.Fdtd.Paramc</code></a></li>
 <li><a href=".#JuMIT.Fdtd.Paramp"><code>JuMIT.Fdtd.Paramp</code></a></li>
@@ -1177,11 +1367,11 @@ This module represents an explicit, direct sparse 2D finite-difference Poisson s
 <li><a href=".#Base.LinAlg.dot-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.LinAlg.dot</code></a></li>
 <li><a href=".#Base.copy!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}"><code>Base.copy!</code></a></li>
 <li><a href=".#Base.copy!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.copy!</code></a></li>
-<li><a href=".#Base.isapprox-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}"><code>Base.isapprox</code></a></li>
 <li><a href=".#Base.isapprox-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.isapprox</code></a></li>
-<li><a href=".#Base.isequal-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.isequal</code></a></li>
-<li><a href=".#Base.isequal-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}"><code>Base.isequal</code></a></li>
+<li><a href=".#Base.isapprox-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}"><code>Base.isapprox</code></a></li>
 <li><a href=".#Base.isequal"><code>Base.isequal</code></a></li>
+<li><a href=".#Base.isequal-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic}"><code>Base.isequal</code></a></li>
+<li><a href=".#Base.isequal-Tuple{JuMIT.Data.TD,JuMIT.Data.TD}"><code>Base.isequal</code></a></li>
 <li><a href=".#Base.iszero-Tuple{JuMIT.Models.Seismic}"><code>Base.iszero</code></a></li>
 <li><a href=".#Base.iszero-Tuple{JuMIT.Data.TD}"><code>Base.iszero</code></a></li>
 <li><a href=".#Base.print"><code>Base.print</code></a></li>
@@ -1189,8 +1379,8 @@ This module represents an explicit, direct sparse 2D finite-difference Poisson s
 <li><a href=".#Base.print"><code>Base.print</code></a></li>
 <li><a href=".#Base.similar-Tuple{JuMIT.Models.Seismic}"><code>Base.similar</code></a></li>
 <li><a href=".#Base.var-Tuple{JuMIT.Data.TD}"><code>Base.var</code></a></li>
-<li><a href=".#JuMIT.Acquisition.Geom_add!-Tuple{JuMIT.Acquisition.Geom,Array{JuMIT.Acquisition.Geom,1}}"><code>JuMIT.Acquisition.Geom_add!</code></a></li>
 <li><a href=".#JuMIT.Acquisition.Geom_add!-Tuple{JuMIT.Acquisition.Geom,Array{Float64,1},Array{Float64,1},Symbol}"><code>JuMIT.Acquisition.Geom_add!</code></a></li>
+<li><a href=".#JuMIT.Acquisition.Geom_add!-Tuple{JuMIT.Acquisition.Geom,Array{JuMIT.Acquisition.Geom,1}}"><code>JuMIT.Acquisition.Geom_add!</code></a></li>
 <li><a href=".#JuMIT.Acquisition.Geom_advance"><code>JuMIT.Acquisition.Geom_advance</code></a></li>
 <li><a href=".#JuMIT.Acquisition.Geom_boundary-Tuple{JuMIT.Acquisition.Geom,Grid.M2D,Symbol}"><code>JuMIT.Acquisition.Geom_boundary</code></a></li>
 <li><a href=".#JuMIT.Acquisition.Geom_check-Tuple{JuMIT.Acquisition.Geom,Grid.M2D}"><code>JuMIT.Acquisition.Geom_check</code></a></li>
@@ -1218,6 +1408,23 @@ This module represents an explicit, direct sparse 2D finite-difference Poisson s
 <li><a href=".#JuMIT.Data.TDcoup!-Tuple{JuMIT.Data.TD,JuMIT.Data.TD,JuMIT.Coupling.TD,Symbol}"><code>JuMIT.Data.TDcoup!</code></a></li>
 <li><a href=".#JuMIT.Data.interp-Tuple{JuMIT.Data.TD,Grid.M1D}"><code>JuMIT.Data.interp</code></a></li>
 <li><a href=".#JuMIT.Data.interp_spray!"><code>JuMIT.Data.interp_spray!</code></a></li>
+<li><a href=".#JuMIT.FWI.AdjGeom-Tuple{JuMIT.Acquisition.Geom}"><code>JuMIT.FWI.AdjGeom</code></a></li>
+<li><a href=".#JuMIT.FWI.Coupling_gx!-Tuple{Any,Any}"><code>JuMIT.FWI.Coupling_gx!</code></a></li>
+<li><a href=".#JuMIT.FWI.Coupling_x!-Tuple{Array{Float64,1},JuMIT.FWI.Param,Int64}"><code>JuMIT.FWI.Coupling_x!</code></a></li>
+<li><a href=".#JuMIT.FWI.F!"><code>JuMIT.FWI.F!</code></a></li>
+<li><a href=".#JuMIT.FWI.Fadj!-Tuple{JuMIT.FWI.Param}"><code>JuMIT.FWI.Fadj!</code></a></li>
+<li><a href=".#JuMIT.FWI.Seismic_gx!-Tuple{JuMIT.Models.Seismic,JuMIT.Models.Seismic,JuMIT.Models.Seismic,JuMIT.Models.Seismic,Array{Float64,1},JuMIT.FWI.Param,Int64}"><code>JuMIT.FWI.Seismic_gx!</code></a></li>
+<li><a href=".#JuMIT.FWI.Seismic_x!-Tuple{Any,JuMIT.Models.Seismic,Array{Float64,1},JuMIT.FWI.Param,Int64}"><code>JuMIT.FWI.Seismic_x!</code></a></li>
+<li><a href=".#JuMIT.FWI.Seismic_xbound!-Tuple{Any,Any,Any}"><code>JuMIT.FWI.Seismic_xbound!</code></a></li>
+<li><a href=".#JuMIT.FWI.build_mprecon!"><code>JuMIT.FWI.build_mprecon!</code></a></li>
+<li><a href=".#JuMIT.FWI.func_grad_Coupling!-Tuple{Any,Array{Float64,1},JuMIT.FWI.Param}"><code>JuMIT.FWI.func_grad_Coupling!</code></a></li>
+<li><a href=".#JuMIT.FWI.func_grad_xfwi!-Tuple{Any,Array{Float64,1},Array{Float64,1},JuMIT.FWI.Param}"><code>JuMIT.FWI.func_grad_xfwi!</code></a></li>
+<li><a href=".#JuMIT.FWI.hessian_xfwi!-Tuple{Any,Any}"><code>JuMIT.FWI.hessian_xfwi!</code></a></li>
+<li><a href=".#JuMIT.FWI.update_adjsrc!-Tuple{Any,JuMIT.Data.TD,Any}"><code>JuMIT.FWI.update_adjsrc!</code></a></li>
+<li><a href=".#JuMIT.FWI.wfwi!-Tuple{JuMIT.FWI.Param}"><code>JuMIT.FWI.wfwi!</code></a></li>
+<li><a href=".#JuMIT.FWI.wfwi_ninv-Tuple{JuMIT.FWI.Param}"><code>JuMIT.FWI.wfwi_ninv</code></a></li>
+<li><a href=".#JuMIT.FWI.xfwi!-Tuple{JuMIT.FWI.Param}"><code>JuMIT.FWI.xfwi!</code></a></li>
+<li><a href=".#JuMIT.FWI.xfwi_ninv-Tuple{JuMIT.FWI.Param}"><code>JuMIT.FWI.xfwi_ninv</code></a></li>
 <li><a href=".#JuMIT.Fdtd.get_rhovxI-Tuple{Array{Float64,N} where N}"><code>JuMIT.Fdtd.get_rhovxI</code></a></li>
 <li><a href=".#JuMIT.Fdtd.get_rhovzI-Tuple{Array{Float64,N} where N}"><code>JuMIT.Fdtd.get_rhovzI</code></a></li>
 <li><a href=".#JuMIT.Fdtd.mod!"><code>JuMIT.Fdtd.mod!</code></a></li>
@@ -1246,10 +1453,10 @@ This module represents an explicit, direct sparse 2D finite-difference Poisson s
 <li><a href=".#JuMIT.Models.χ"><code>JuMIT.Models.χ</code></a></li>
 <li><a href=".#JuMIT.Models.χg"><code>JuMIT.Models.χg</code></a></li>
 <li><a href=".#JuMIT.Poisson.solve-Tuple{Any,Any,Int64}"><code>JuMIT.Poisson.solve</code></a></li>
-<li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.Src}"><code>RecipesBase.apply_recipe</code></a></li>
-<li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.TD}"><code>RecipesBase.apply_recipe</code></a></li>
 <li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.Geom}"><code>RecipesBase.apply_recipe</code></a></li>
+<li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.TD}"><code>RecipesBase.apply_recipe</code></a></li>
 <li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.Seismic}"><code>RecipesBase.apply_recipe</code></a></li>
+<li><a href=".#RecipesBase.apply_recipe-Tuple{Dict{Symbol,Any},JuMIT.Plots.Src}"><code>RecipesBase.apply_recipe</code></a></li>
 </ul>
 
   <br>
@@ -1288,5 +1495,5 @@ This module represents an explicit, direct sparse 2D finite-difference Poisson s
 </html>
 <!--
 MkDocs version : 0.17.4
-Build Date UTC : 2018-06-30 19:42:55
+Build Date UTC : 2018-06-30 19:44:10
 -->
