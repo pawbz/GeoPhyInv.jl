@@ -6,56 +6,12 @@ using RecipesBase
 using Interpolation
 using Grid
 using Conv
+using ImageFiltering
 import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Models
 
 @userplot Seismic
-
-@recipe function f(p::Seismic; fields=[:vp, :ρ], xlim=nothing, zlim=nothing, geom=nothing) 
-
-	model=p.args[1]
-	(xlim===nothing) && (xlim=[model.mgrid.x[1],model.mgrid.x[end]])
-	(zlim===nothing) && (zlim=[model.mgrid.z[1],model.mgrid.z[end]])
-
-	#indices
-	ixmin = Interpolation.indminn(model.mgrid.x, xlim[1])[1]; ixmax = Interpolation.indminn(model.mgrid.x, xlim[2])[1]
-	izmin = Interpolation.indminn(model.mgrid.z, zlim[1])[1]; izmax = Interpolation.indminn(model.mgrid.z, zlim[2])[1]
-
-	nrow = (model.mgrid.nx <= model.mgrid.nz) ? 1 : length(fields)
-	ncol = (model.mgrid.nx <= model.mgrid.nz) ? length(fields) : 1
-
-	ar=div(model.mgrid.nx,model.mgrid.nz)
-
-	layout := (nrow,ncol)
-	for (i,iff) in enumerate(fields)
-
-		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
-		m = Models.Seismic_get(model, fields[i])[izmin:izmax,ixmin:ixmax]
-		mx = model.mgrid.x[ixmin:ixmax]
-		mz = model.mgrid.z[izmin:izmax]
-		@series begin        
-			subplot := i
-			aspect_ratio := ar
-			seriestype := :heatmap
-			legend := true
-			xlabel := "x"
-			ylabel := "z"
-			color := :grays
-			yflip := true
-	#		l := :plot
-			title := string(iff)
-			xlim := (xlim...)
-			ylim := (zlim...)
-			w := 1
-			mx, mz, m
-		end
-
-		if(!(geom===nothing))
-		end
-	end
-
-end
 
 
 """
@@ -70,10 +26,65 @@ Plot the velocity and density seismic models.
 * `xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]]` : minimum and maximum limits of the second dimension while plotting
 * `zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]]` : minimum and maximum limits of the first dimension while plotting
 * `fields::Vector{Symbol}=[:vp, :ρ]` : fields that are to be plotted, see Models.Seismic_get
-* `overlay_model=nothing` : use a overlay model
-* `use_bounds=false` : impose bounds from the model or not?
+* `contrast_flag=false` : plot only the edges of the model
 
 """
+
+@recipe function f(p::Seismic; fields=[:vp, :ρ], 
+		   xlim=nothing, zlim=nothing, geom=nothing,
+		   contrast_flag=false
+		   ) 
+
+	model=p.args[1]
+	(xlim===nothing) && (xlim=[model.mgrid.x[1],model.mgrid.x[end]])
+	(zlim===nothing) && (zlim=[model.mgrid.z[1],model.mgrid.z[end]])
+
+	#indices
+	ixmin = Interpolation.indminn(model.mgrid.x, xlim[1])[1]; ixmax = Interpolation.indminn(model.mgrid.x, xlim[2])[1]
+	izmin = Interpolation.indminn(model.mgrid.z, zlim[1])[1]; izmax = Interpolation.indminn(model.mgrid.z, zlim[2])[1]
+
+	nrow = (model.mgrid.nx <= model.mgrid.nz) ? 1 : length(fields)
+	ncol = (model.mgrid.nx <= model.mgrid.nz) ? length(fields) : 1
+
+	layout := (nrow,ncol)
+	for (i,iff) in enumerate(fields)
+		name=replace(string(iff), "ρ", "rho")
+		name=replace(name, "χ", "contrast\t")
+
+		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
+		m = Models.Seismic_get(model, fields[i])[izmin:izmax,ixmin:ixmax]
+		mx = model.mgrid.x[ixmin:ixmax]
+		mz = model.mgrid.z[izmin:izmax]
+		if(contrast_flag)
+			mmin=minimum(m)
+			mmax=maximum(m)
+			m=imfilter(m, Kernel.Laplacian())
+			mmmin=minimum(m)
+			mmmax=maximum(m)
+			for j in eachindex(m)
+				m[j]=mmin+((m[j]-mmmin)*inv(mmmax-mmmin))*(mmax-mmin)
+			end
+
+		end
+		@series begin        
+			subplot := i
+			aspect_ratio := :equal
+			seriestype := :heatmap
+			legend --> true
+			xlabel --> "x"
+			ylabel --> "z"
+			color --> :grays
+			title := name
+			xlim := (xlim...)
+			ylim := (zlim...)
+			#yflip := true
+			mx, mz, m
+		end
+
+	end
+
+end
+
 function Seismic(model::Models.Seismic;
 		 xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]],
 		 zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]],

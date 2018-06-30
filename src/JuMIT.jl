@@ -23,6 +23,7 @@ include("Analytic.jl")
 include("Fdtd.jl")
 include("FWI.jl")
 include("Interferometry.jl")
+include("SAC.jl")
 include("Plots.jl")
 
 end # module
