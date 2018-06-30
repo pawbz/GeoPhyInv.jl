@@ -1,6 +1,5 @@
 module Plots
 
-using PyPlot
 using StatsBase
 using RecipesBase
 using Interpolation
@@ -11,9 +10,10 @@ import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Models
 
+function dummy_()
+end
+
 @userplot Seismic
-
-
 """
 Plot the velocity and density seismic models.
 
@@ -27,15 +27,17 @@ Plot the velocity and density seismic models.
 * `zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]]` : minimum and maximum limits of the first dimension while plotting
 * `fields::Vector{Symbol}=[:vp, :ρ]` : fields that are to be plotted, see Models.Seismic_get
 * `contrast_flag=false` : plot only the edges of the model
+* `use_bounds=false` : adjust `clim` to the bounds in the seismic model
 
 """
-
-@recipe function f(p::Seismic; fields=[:vp, :ρ], 
+@recipe function fseismic(p::Seismic;
+		   fields=[:vp, :ρ], 
 		   xlim=nothing, zlim=nothing, geom=nothing,
-		   contrast_flag=false
-		   ) 
-
+		   contrast_flag=false,
+		   use_bounds=false,
+		  ) 
 	model=p.args[1]
+
 	(xlim===nothing) && (xlim=[model.mgrid.x[1],model.mgrid.x[end]])
 	(zlim===nothing) && (zlim=[model.mgrid.z[1],model.mgrid.z[end]])
 
@@ -46,13 +48,14 @@ Plot the velocity and density seismic models.
 	nrow = (model.mgrid.nx <= model.mgrid.nz) ? 1 : length(fields)
 	ncol = (model.mgrid.nx <= model.mgrid.nz) ? length(fields) : 1
 
+
 	layout := (nrow,ncol)
 	for (i,iff) in enumerate(fields)
 		name=replace(string(iff), "ρ", "rho")
 		name=replace(name, "χ", "contrast\t")
 
 		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
-		m = Models.Seismic_get(model, fields[i])[izmin:izmax,ixmin:ixmax]
+		m = Models.Seismic_get(model, iff)[izmin:izmax,ixmin:ixmax]
 		mx = model.mgrid.x[ixmin:ixmax]
 		mz = model.mgrid.z[izmin:izmax]
 		if(contrast_flag)
@@ -64,68 +67,28 @@ Plot the velocity and density seismic models.
 			for j in eachindex(m)
 				m[j]=mmin+((m[j]-mmmin)*inv(mmmax-mmmin))*(mmax-mmin)
 			end
-
 		end
+		mmin = use_bounds ? Models.Seismic_get(model, f0)[1] : minimum(m)
+		mmax = use_bounds ? Models.Seismic_get(model, f0)[2] : maximum(m)
 		@series begin        
 			subplot := i
 			aspect_ratio := :equal
 			seriestype := :heatmap
 			legend --> true
-			xlabel --> "x"
-			ylabel --> "z"
+			xlabel --> "x [m]"
+			ylabel --> "z [m]"
 			color --> :grays
 			title := name
 			xlim := (xlim...)
 			ylim := (zlim...)
+			clim := (mmin, mmax)
 			#yflip := true
 			mx, mz, m
 		end
-
 	end
 
 end
-
-function Seismic(model::Models.Seismic;
-		 xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]],
-		 zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]],
-		 fields::Vector{Symbol}=[:vp, :ρ],
-		 overlay_model=nothing,
-		 use_bounds=false,
-		 )
-	#indices
-	ixmin = Interpolation.indminn(model.mgrid.x, xlim[1])[1]; ixmax = Interpolation.indminn(model.mgrid.x, xlim[2])[1]
-	izmin = Interpolation.indminn(model.mgrid.z, zlim[1])[1]; izmax = Interpolation.indminn(model.mgrid.z, zlim[2])[1]
-	nrow = (model.mgrid.nx > model.mgrid.nz) ? length(fields) : 1
-	ncol = (model.mgrid.nx > model.mgrid.nz) ? 1 : length(fields)
-	for i in 1:length(fields)
-		(length(fields) ≠1) && subplot(nrow,ncol,i)
-
-		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
-		m = Models.Seismic_get(model, fields[i])[izmin:izmax,ixmin:ixmax]
-		ext = [model.mgrid.x[ixmin], model.mgrid.x[ixmax], model.mgrid.z[izmax], model.mgrid.z[izmin],]
-		vmin = use_bounds ? Models.Seismic_get(model, f0)[1] : minimum(m)
-		vmax = use_bounds ? Models.Seismic_get(model, f0)[2] : maximum(m)
-		ax = imshow(m,		     cmap="gray", 		     extent=ext, vmin=vmin, vmax=vmax)
-			 xlabel("\$x\$ (m)");
-			 ylabel("\$z\$ (m)");
-			 title(string(fields[i]))
-			 (length(fields) ≠1) && colorbar(ax, fraction=0.046, pad=0.04);
-
-		if(!(overlay_model ===  nothing))
-			# remove mean in the backgroud model
-			mbg = Models.Seismic_get(overlay_model, fields[i])[izmin:izmax,ixmin:ixmax]
-			mbg -= mean(mbg)
-			mbgmax=maximum(abs, mbg)
-			axbg = imshow(mbg,cmap="PiYG", alpha=0.3, vmin=-1.0*mbgmax, vmax=mbgmax, extent=ext)
-		end
-	 end
-	 tight_layout()
-	 subplots_adjust(top=0.88)
-
-end
-
-
-
+#
 
 #"""
 #save current fig using matlab2tikz
@@ -163,6 +126,13 @@ end
 
 @userplot Geom
 
+"""
+Plot acquisition geometry `Acquisition.Geom` on
+and model grid `M2D`.
+
+`attrib::Symbol=:unique` : default; plots unique source and receiver positions
+`ssvec::Vector{Int64}` : plot source and receivers of only these supersources
+"""
 @recipe function fgeom(p::Geom; ssvec=nothing, fields=[:s, :r])
 	geom=p.args[1]
 	if(ssvec===nothing)
@@ -202,17 +172,17 @@ end
 	end
 
 	@series begin        
-		subplot := 1
-		markersize := 5
+		subplot --> 1
+		markersize --> 7
 		legend := false
 		seriestype := :scatter
 		markercolor := :blue
 		rx, rz
 	end
 	@series begin        
-		subplot := 1
+		subplot --> 1
 		legend := false
-		markersize := 5
+		markersize --> 7
 		markercolor := :red
 		markershape := :star5
 		seriestype := :scatter
@@ -222,48 +192,6 @@ end
 
 end
 	
-"""
-Plot acquisition geometry `Acquisition.Geom` on
-and model grid `M2D`.
-
-`attrib::Symbol=:unique` : default; plots unique source and receiver positions
-`ssvec::Vector{Int64}` : plot source and receivers of only these supersources
-"""
-function Geom(geom::Acquisition.Geom; ssvec=nothing, fields=[:s, :r])
-	if(ssvec===nothing)
-		if(:r ∈ fields)
-			urpos = Acquisition.Geom_get([geom],:urpos)
-			b = plot(urpos[2], urpos[1], "v", color="blue",ms=10)
-		else
-			b=nothing
-		end
-		if(:s ∈ fields)
-			uspos = Acquisition.Geom_get([geom],:uspos)
-			a = plot(uspos[2], uspos[1], "*", color="red",ms=15)
-		else
-			a=nothing
-		end
-	else
-		if(:r ∈ fields)
-			rxpos = [geom.rx[iss] for iss in ssvec]
-			rzpos = [geom.rz[iss] for iss in ssvec]
-			b = plot(vcat(rxpos...), vcat(rzpos...), "v", color="blue",ms=10)
-		else
-			b=nothing
-		end
-		if(:s ∈ fields)
-			sxpos = [geom.sx[iss] for iss in ssvec]
-			szpos = [geom.sz[iss] for iss in ssvec]
-			a = plot(vcat(sxpos...), vcat(szpos...), "*", color="red",ms=15)
-		else
-			a=nothing
-		end
-	end
-	# return handles for sources and receivers individually to modify later
-	return [a,b]
-end
-
-
 
 @userplot Spectrum
 
@@ -307,8 +235,8 @@ Plot the source wavelet used for acquisition.
 	@series begin        
 		subplot := 1
 		legend := false
-		ylabel := "time (s)"
-		xlabel := "amplitude" 
+		xlabel := "time [s]"
+		ylabel := "amplitude" 
 		tgrid.x, wav 
 	end
 
@@ -317,17 +245,15 @@ Plot the source wavelet used for acquisition.
 	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
 	@series begin        
 		subplot := 2
-		ylabel := "power (dB)"
-		xlabel := "frequency (Hz)"
+		ylabel := "power [dB]"
+		xlabel := "frequency [Hz]"
 		legend := false
 		fgrid.x, powwavdb
 	end
 
 end
 
-
-
-
+@userplot TD
 """
 Plot time-domain data of type `Data.TD`
 
@@ -336,148 +262,59 @@ Plot time-domain data of type `Data.TD`
 
 # Keyword Arguments
 * `ssvec::Vector{Vector{Int64}}=fill([1], length(td))` : supersource vector to be plotted
-* `fieldvec::Vector{Int64}=[1]` : field vector to be plotted
+* `fields::Vector{Int64}=[1]` : field vector to be plotted
 * `tr_flag::Bool=false` : plot time-reversed data when true
 * `attrib::Symbol=:wav` : specify type of plot
 """
-function TD(td::Vector{Data.TD}; ssvec::Vector{Vector{Int64}}=fill([1], length(td)),
-	    fields::Vector{Symbol}=[:P],
-	    tr_flag::Bool=false, attrib::Symbol=:wav,
-	    wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
-	    bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
+@recipe function ptd(p::TD;
+	    fields=[:P],
+            tr_flag=false, 
+            ssvec=[1],
+	    wclip_perc=0.0,
+	    bclip_perc=0.0,
 	    )
 
-	for id=1:length(td)
+	    #wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
+	    #bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
+	   
+	dat=p.args[1]
+	any(ssvec .> dat.acqgeom.nss) && error("invalid ssvec")
+	ns = length(ssvec);
+	nr = maximum(dat.acqgeom.nr);
+	dd=getfield(dat,fieldnames(dat)[1])
+	fieldvec = findin(dat.fields, fields)
+	if(tr_flag)
+		dp = hcat(dd[ssvec,fieldvec][end:-1:1,:]...);
+		dz = dat.tgrid.x
+		dx = 1:size(dp,2)
+	else
+		dp = hcat(dd[ssvec,fieldvec][:,:]...);
+		dz = dat.tgrid.x[end:-1:1]
+		dx = 1:size(dp,2)
+	end
 
-		fieldvec = findin(td[id].fields, fields)
-		any(ssvec[id] .> td[id].acqgeom.nss) && error("invalid ssvec")
-		ns = length(ssvec[id]);
-		nr = maximum(td[id].acqgeom.nr);
-		if(tr_flag)
-			dp = hcat(td[id].d[ssvec[id],fieldvec][end:-1:1,:]...);
-			extent=[1, nr*ns*length(fieldvec), td[id].tgrid.x[1],td[id].tgrid.x[end],]
-		else
-			dp = hcat(td[id].d[ssvec[id],fieldvec][:,:]...);
-			extent=[1, nr*ns*length(fieldvec), td[id].tgrid.x[end],td[id].tgrid.x[1],]
-		end
-		if(attrib == :seis)
-			subplot(1,length(td),id)
-			imshow(dp, cmap="gray",aspect="auto", extent=extent, vmin=bclip[id], vmax=wclip[id])
-			title("common shot gather")
-			xlabel("receiver index");
-			ylabel("\$t\$ (s)");
-			colorbar();
-			tight_layout()
-		elseif(attrib == :wav)
-			tspectra(td[id].tgrid,dp)
-		else
-			error("invalid attrib")
-		end
+	dmin=maximum(dp)
+	dmax=minimum(dp)
+	offset=abs(dmax-dmin)
+	dmin=dmin+bclip_perc*inv(100)*offset
+	dmax=dmax-wclip_perc*inv(100)*offset
+	@series begin        
+		subplot := 1
+		aspect_ratio --> length(dz)/length(dx)
+		seriestype := :heatmap
+		legend --> true
+		xlabel --> "receiver index"
+		ylabel --> "time [s]"
+		color --> :grays
+		clim := (dmin, dmax)
+		#yflip := true
+		dx, dz, dp
 	end
 end
 
 
+
 #=
-function DeConv(pa; rvec=collect(1:pa.nr), cal=pa.calsave)
-	## extract data to be plotted
-	#gfobs=reshape(pa.obs.gf, (pa.ntgf, pa.nr))
-	#gf=reshape(cal.gf, (pa.ntgf, pa.nr))
-	#dobs=real.(reshape(pa.obs.d, (pa.nt, pa.nr)))
-	#dcal=real.(reshape(cal.d, (pa.nt, pa.nr)))
-	gfobs=pa.obs.gf
-	gf=cal.gf
-	dobs=pa.obs.d
-	dcal=cal.d
-	wavobs=pa.obs.wav[:,1];
-	wavcal=cal.wav[:,1];
-	
-
-	nrow=9
-	ncol=2
-	iff=0
-	fig=figure(figsize=(12,15))
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(wavobs)
-	title("Actual S")
-	grid()
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(gfobs[:,rvec])
-	title("Actual GG*")
-	grid()
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(wavcal)
-	title("Estimated S")
-	grid()
-	#
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(gf[:,rvec])
-	title("Estimated GG*")
-	grid()
-	#-----------------------
-	awavobs=autocor(wavobs, 1:pa.nt-1, demean=true)
-	awav=autocor(wavcal, 1:pa.nt-1, demean=true)
-	wavli= any(isnan.(awavobs)) ? maximum(abs,awav) : max(maximum(abs,awavobs), maximum(abs,awav))
-	agfobs=hcat(Conv.xcorr(pa.obs.gf, iref=[1])...) # compute xcorr with reference gf
-	agf=hcat(Conv.xcorr(cal.gf, iref=[1])...) # compute xcorr with reference gf
-	agfvec=-size(pa.obs.gf,1)+1:1:size(pa.obs.gf,1)-1
-	gfli=max(maximum(abs,agfobs), maximum(abs,agf))
-	#-----------------------
-	iff += 1;subplot(nrow,ncol,iff)
-	(any(isnan.(awavobs))) || plot(awavobs)
-	#ylim(-wavli, wavli)
-	title("Actual SS\$^*\$")
-	grid()
-	#
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(awav)
-	#ylim(-wavli, wavli)
-	title("Estimated SS\$^*\$")
-	grid()
-	#
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(agfvec, agfobs[:,rvec])
-	ylim(-gfli, gfli)
-	grid()
-	title("Actual GG\$^*\$")
-	#
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(agfvec, agf[:,rvec])
-	ylim(-gfli, gfli)
-	title("Estimated GG\$^*\$")
-	grid()
-	#
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(dobs[:,rvec])
-	title("Actual D")
-	grid()
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(dcal[:,rvec])
-	title("Estimated D")
-	grid()
-	#
-	iff += 1;subplot(nrow,ncol,iff)
-	mscatter(awavobs, awav, "Crossplot - SS\$^*\$")
-	iff += 1;subplot(nrow,ncol,iff)
-	mscatter(agfobs, agf, "Crossplot - GG\$^*\$")
-	iff += 1;subplot(nrow,ncol,iff)
-	mscatter(dobs, dcal, "Crossplot - D")
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(pa.gfprecon[:,rvec])
-	title("G PRECON")
-	grid()
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(pa.wavprecon)
-	title("WAVPRECON")
-	grid()
-	iff += 1;subplot(nrow,ncol,iff)
-	plot(pa.gfweights[:,rvec])
-	title("G WEIGHTS")
-	grid()
-	tight_layout()
-
-end
-
-=#
 function mscatter(x, y, titname="", axla=["",""])
     fact=1 
     x=x[1:fact:end]
@@ -535,5 +372,6 @@ function myhist(s, dist)
     title("Marginal Densities")
     return nothing
 end
+=#
 
 end # module

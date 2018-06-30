@@ -7,6 +7,7 @@ using DataFrames
 using CSV
 using Grid
 using Interpolation
+using ImageFiltering
 import JuMIT.Smooth
 
 """
@@ -559,39 +560,39 @@ Apply smoothing to `Seismic` using a Gaussian filter of zwidth and xwidth
 # Arguments
 
 * `mod::Seismic` : argument that is modified
-* `zperc::Float64` : smoothing percentage in z-direction
-* `xperc::Float64=zperc` : smoothing percentage in x-direction
+* `zperc::Real` : smoothing percentage in z-direction
+* `xperc::Real=zperc` : smoothing percentage in x-direction
 
 # Keyword Arguments
 
-* `zmin::Float64=mod.mgrid.z[1]` : 
-* `zmax::Float64=mod.mgrid.z[end]` : 
-* `xmin::Float64=mod.mgrid.x[1]` : 
-* `xmax::Float64=mod.mgrid.x[end]` : 
+* `zmin::Real=mod.mgrid.z[1]` : 
+* `zmax::Real=mod.mgrid.z[end]` : 
+* `xmin::Real=mod.mgrid.x[1]` : 
+* `xmax::Real=mod.mgrid.x[end]` : 
+* `fields` : fields of seismic model that are to be smooth
 """
-function Seismic_smooth!(mod::Seismic, zperc::Float64, xperc::Float64=zwidth;
-			 zmin::Float64=mod.mgrid.z[1], zmax::Float64=mod.mgrid.z[end],
-			 xmin::Float64=mod.mgrid.x[1], xmax::Float64=mod.mgrid.x[end] 
+function Seismic_smooth(mod::Seismic, zperc::Real, xperc::Real=zperc;
+		 zmin::Real=mod.mgrid.z[1], zmax::Real=mod.mgrid.z[end],
+		 xmin::Real=mod.mgrid.x[1], xmax::Real=mod.mgrid.x[end],
+		 fields=[:χvp, :χρ, :χvs]
 			)
-	xwidth = xperc * 0.01 * abs(mod.mgrid.x[end]-mod.mgrid.x[1])
-	zwidth = zperc * 0.01 * abs(mod.mgrid.z[end]-mod.mgrid.z[1])
+	xwidth = Float64(xperc) * 0.01 * abs(mod.mgrid.x[end]-mod.mgrid.x[1])
+	zwidth = Float64(zperc) * 0.01 * abs(mod.mgrid.z[end]-mod.mgrid.z[1])
 	xnwin=Int(div(xwidth,mod.mgrid.δx*2.))
 	znwin=Int(div(zwidth,mod.mgrid.δz*2.))
 
-	izmin = Interpolation.indminn(mod.mgrid.z, zmin, 1)[1]
-	izmax = Interpolation.indminn(mod.mgrid.z, zmax, 1)[1]
-	ixmin = Interpolation.indminn(mod.mgrid.x, xmin, 1)[1]
-	ixmax = Interpolation.indminn(mod.mgrid.x, xmax, 1)[1]
+	izmin = Interpolation.indminn(mod.mgrid.z, Float64(zmin), 1)[1]
+	izmax = Interpolation.indminn(mod.mgrid.z, Float64(zmax), 1)[1]
+	ixmin = Interpolation.indminn(mod.mgrid.x, Float64(xmin), 1)[1]
+	ixmax = Interpolation.indminn(mod.mgrid.x, Float64(xmax), 1)[1]
 
-	# calculate means
-	mχvp = mean(mod.χvp);	mχvs = mean(mod.χvs);	mχρ = mean(mod.χρ)
-	# remove means before Gaussian filtering
-	mod.χvp -= mχvp; mod.χvs -= mχvs; mod.χρ -= mχρ
-	Smooth.gaussian!(view(mod.χvp, izmin:izmax, ixmin:ixmax),[znwin,xnwin])
-	Smooth.gaussian!(view(mod.χρ, izmin:izmax, ixmin:ixmax),[znwin,xnwin])
-	Smooth.gaussian!(view(mod.χvs, izmin:izmax, ixmin:ixmax),[znwin,xnwin])
-	# add mean back
-	mod.χvp += mχvp; mod.χvs += mχvs; mod.χρ += mχρ
+	modg=deepcopy(mod)
+	for (i,iff) in enumerate(fields)
+		m=view(getfield(mod, iff),izmin:izmax,ixmin:ixmax)
+		mg=view(getfield(modg, iff),izmin:izmax,ixmin:ixmax)
+		imfilter!(mg, m, Kernel.gaussian([znwin,xnwin]));
+	end
+	return modg
 end
 
 """

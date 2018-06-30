@@ -1,7 +1,9 @@
 module Smooth
 
+using Conv
 using Signals
 
+#=
 """
 ! this subroutine returns a zero phase gaussian wi
 ndow in time domain
@@ -55,23 +57,30 @@ n1,&     ! first dimension of dat
 n2,&     ! second dimension of dat
 nwin&    ! half of the width of the gaussian window used for smoothing
 """
-function gaussian!{N}(x::AbstractArray{Float64,N}, nwin::Vector{Int64})
+function gaussian{N}(x::AbstractArray{Float64,N}, nwin::Vector{Int64})
+	xsize=[size(x)...]
+
+	pa=P_conv(dsize=xsize, ssize=ssize, gsize=xsize,)
 
 	# convolution with a Gaussian window
 	if(N==1)
 		gwin=gaussian_filter(nwin[1])
 		xin=deepcopy(x)
-		Signals.DSP.fast_filt!(x, xin, gwin, :s)
+		Conv.conv!(x, xin, gwin, :d)
 	elseif(N==2)
 		gwin1=gaussian_filter(nwin[1])
 		gwin2=gaussian_filter(nwin[2])
 		xin=deepcopy(x)
 		for i in 1:size(x,2)
-			Signals.DSP.fast_filt!(view(x,:,i), xin[:,i], gwin1, :s)
+			xx=view(x,:,i)
+			xxin=view(xin,:,i)
+			Conv.conv!(xx, xxin, gwin1, :d)
 		end
 		xin=deepcopy(x)
 		for i in 1:size(x,1)
-			Signals.DSP.fast_filt!(view(x,i,:), xin[i,:], gwin2, :s)
+			xx=view(x,i,:)
+			xxin=view(xin,i,:)
+			Conv.conv!(xx, xxin, gwin2, :d)
 		end
 	else
 		error("only implemented upto 2 dimensions")
@@ -80,5 +89,9 @@ function gaussian!{N}(x::AbstractArray{Float64,N}, nwin::Vector{Int64})
 end
 
 
-
+=#
+function gaussian!{N}(xg::Array{Float64,N}, 
+		      x::Array{Float64,N}, pa)
+	Conv.mod!(pa, :d, d=xg, g=x)
+end
 end
