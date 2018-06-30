@@ -1,8 +1,8 @@
-site_name:        SeismicInversionToolbox.jl
+site_name:        Julia Modeling and Inversion Toolbox
 repo_url:         https://github.com/pawbz/JuMIT.jl
-site_description: Description
-site_author:      pawbz
-theme: readthedocs
+site_description: Seismic Waveform Modeling and Inversion
+site_author:      Pawan Bharadwaj
+theme: windmill
 
 extra_css:
           - assets/Documenter.css
@@ -25,11 +25,9 @@ extra_css:
 docs_dir: 'build'
 
 pages:
-          - Home: home.md
-          - Reference: index.md
-          - Tutorial:
-              - Title 1: tutorials/page1.md
-          - Another Section:
-              - Title 1: modeling/page1.md
+          - Home: index.md
+          - Reference: reference.md
+          - Tutorials: tut.md
+
 
 
