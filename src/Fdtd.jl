@@ -190,16 +190,29 @@ function initialize_boundary!(pap::Paramp)
 end
 
 function initialize!(pac::Paramc)
-	pac.grad_modtt_stack[:]=0.0
-	pac.grad_modrrvx_stack[:]=0.0
-	pac.grad_modrrvz_stack[:]=0.0
-	pac.grad_modrr_stack[:]=0.0
-	pac.illum_stack[:]=0.0
+	# need explicit loops while zeroing out Shared Matrices? "fill!" takes memory!!!
+	for i in eachindex(pac.grad_modtt_stack)
+		pac.grad_modtt_stack[i]=0.0
+	end
+	for i in eachindex(pac.grad_modrrvx_stack)
+		pac.grad_modrrvx_stack[i]=0.0
+	end
+	for i in eachindex(pac.grad_modrrvz_stack)
+		pac.grad_modrrvz_stack[i]=0.
+	end
+	for i in eachindex(pac.grad_modrr_stack)
+		pac.grad_modrr_stack[i]=0.0
+	end
+	for i in eachindex(pac.illum_stack)
+		pac.illum_stack[i]=0.0
+	end
 	for ipw=1:pac.npw
 		dat=pac.data[ipw]
 		fill!(dat, 0.0)
 	end
-	pac.datamat[:]=0.0
+	for i in eachindex(pac.datamat)
+		pac.datamat[i]=0.0
+	end
 	fill!(pac.gmodel, 0.0)
 end
 
@@ -331,9 +344,7 @@ function Param(;
 	irfields = findin([:P, :Vx, :Vz], rfields)
 
 
-	if(verbose)
-		println(string("number of super sources:\t",nss))	
-	end
+	(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
 	# find maximum and minimum frequencies in the source wavelets
 	freqmin = Signals.DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
@@ -342,7 +353,7 @@ function Param(;
 	# minimum and maximum velocities
 	vpmin = minimum(broadcast(minimum,[model.vp0, model_pert.vp0]))
 	vpmax = maximum(broadcast(maximum,[model.vp0, model_pert.vp0]))
-	verbose ? println("minimum and maximum velocities:\t",vpmin,"\t",vpmax) : nothing
+	verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
 
 
 	check_fd_stability(vpmin, vpmax, model.mgrid.δx, model.mgrid.δz, freqmin, freqmax, tgridmod.δx, verbose)
@@ -852,10 +863,6 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 
 		iss=pap.ss[issp].iss
 
-		if(pac.verbose)
-			println("modelling supershot:\t", iss)
-		end
-		
 		if(pac.backprop_flag==-1)
 			"initial conditions from boundary for first propagating field only"
 			boundary_force_snap_p!(issp,pac,pap.ss,pap)
@@ -1475,15 +1482,15 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 	δs_temp=vpmin/5.0/freqmax;
 	δs_max = maximum([δx, δz])
 	all(δs_max .> δs_temp) ? 
-			warn(string("spatial sampling\t",δs_max,"\ndecrease spatial sampling below:\t",δs_temp), once=true) :
-			(verbose && println("spatial sampling\t",δs_max,"\tcan be as high as:\t",δs_temp))
+			warn(string("spatial sampling\t",δs_max,"\ndecrease spatial sampling below:\t",δs_temp), once=true, prefix="Fdtd: ") :
+			info(string("spatial sampling\t",δs_max,"\tcan be as high as:\t",δs_temp), prefix="Fdtd: ")
 
 	# check time sampling
 	δs_min = minimum([δx, δz])
 	δt_temp=0.5*δs_min/vpmax
 	all(δt .> δt_temp) ? 
-			warn(string("time sampling\t",δt,"\ndecrease time sampling below:\t",δt_temp), once=true) :
-			(verbose &&  println("time sampling\t",δt,"\tcan be as high as:\t",δt_temp))
+			warn(string("time sampling\t",δt,"\ndecrease time sampling below:\t",δt_temp), once=true, prefix="Fdtd: ") :
+			info(string("Fdtd: time sampling\t",δt,"\tcan be as high as:\t",δt_temp),prefix="Fdtd: ")
 
 end
 

@@ -80,7 +80,7 @@ type Param
 	"model preconditioning"
 	mprecon::AbstractArray{Float64,2}
 	"compute data misfit"
-	paTD::Data.Param_error
+	paTD::Data.P_misfit
 	paminterp::Interpolation.Param{Float64}
 	optims::Vector{Symbol} # :cls, xcorrcls.. ?
 	verbose::Bool
@@ -296,7 +296,7 @@ function Param(
 
 	# create Parameters for data misfit
 	coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, recv_fields, acqgeom)
-	paTD=Data.Param_error(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
+	paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
 	paminterp=Interpolation.Param([modi.mgrid.x, modi.mgrid.z], [modm.mgrid.x, modm.mgrid.z], :B2)
 	pa = Param(paf,
@@ -452,7 +452,7 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 					#time_limit=time_limit,
 					store_trace=store_trace,extended_trace=extended_trace, show_trace=true))
 					=#
-		pa.verbose ? println(res) : nothing
+		pa.verbose && println(res)
 
 		# update modm and modi
 		Seismic_x!(pa.modm, pa.modi, Optim.minimizer(res), pa, -1)
@@ -487,11 +487,10 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 				Seismic_gx!(gmodm[itr],modm[itr],gmodi[itr],modi[itr],Optim.trace(res)[itr].metadata["g(x)"],pa,-1)
 			end
 			
-			return modm, modi, gmodm, gmodi, res
 		else
 			f = Optim.minimum(res)
-			return f
 		end
+		return res
 	elseif(pa.attrib_inv == :migr)
 		storage = similar(x)
 		func_grad_xfwi!(storage, x, last_x,  pa)
@@ -646,10 +645,10 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 
 	if(storage === nothing)
 		# compute misfit 
-		f = Data.error!(pa.paTD)
+		f = Data.func_grad!(pa.paTD)
 		return f
 	else
-		f = Data.error!(pa.paTD, :dJx)
+		f = Data.func_grad!(pa.paTD, :dJx)
 
 		# adjoint sources
 		update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)

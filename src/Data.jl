@@ -490,7 +490,7 @@ If `J` is the distance, the gradient of the misfit w.r.t to the calculated data 
 * `w` used for data preconditioning
 * `coupling` source and receiver coupling functions
 """
-mutable struct Param_error
+mutable struct P_misfit
 	x::TD # modelled data
 	y::TD # observed data
 	w::TD # weights
@@ -509,7 +509,7 @@ mutable struct Param_error
 	painterp::Interpolation.Param{Float64}
 end
 
-function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
+function P_misfit(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 
 	if(coup===nothing)
 		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.acqgeom)
@@ -560,14 +560,14 @@ function Param_error(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 		func=[(dJx,x)->Misfits.error_corr_squared_euclidean!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	end
 
-	pa=Param_error(x,y,w,xr,xrc,dJxr,dJxrc,
+	pa=P_misfit(x,y,w,xr,xrc,dJxr,dJxrc,
 		    dJx,dJssf,ynorm,coup,paconvssf, paconvrf, pacse, func, painterp)
 
 
 	return pa
 end
 
-function error!(pa::Param_error, grad=nothing)
+function func_grad!(pa::P_misfit, grad=nothing)
 
 	tgrid = pa.x.tgrid;
 	acq = pa.x.acqgeom;

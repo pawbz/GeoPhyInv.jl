@@ -325,7 +325,7 @@ function Geom_fixed(
 	for iss in 1:nss
 		for is in 1:ns[iss]
 			θ=rand(Uniform(-Float64(pi),Float64(pi)))
-			r=rand(Uniform(0,srad))
+			r = iszero(srad) ? 0.0 : rand(Uniform(0,srad))
 			x=r*cos(θ)
 			z=r*sin(θ)
 			ssxall[iss][is]=ssx[iss]+x

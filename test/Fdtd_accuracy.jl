@@ -1,15 +1,16 @@
-addprocs(2)
+#addprocs(2)
 using JuMIT
 using Base.Test
 using Signals
 using Misfits
+using BenchmarkTools
 
 
 model = JuMIT.Gallery.Seismic(:acou_homo1);
 acqgeom = JuMIT.Gallery.Geom(model.mgrid,:xwell);
 tgrid = JuMIT.Gallery.M1D(:acou_homo1);
 wav = Signals.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
-# source wavelet for born modelling
+# source wavelet for modelling
 acqsrc = JuMIT.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
 
 
@@ -26,11 +27,13 @@ pa=JuMIT.Fdtd.Param(npw=1,model=model,
     acqgeom=[acqgeom], acqsrc=[acqsrc],
         sflags=[2], rflags=[1],
 	    tgridmod=tgrid, verbose=true );
-JuMIT.Fdtd.mod!(pa);
+
+@btime JuMIT.Fdtd.mod!(pa);
 
 
 # least-squares misfit
-err = Misfits.TD!(nothing,rec1, pa.c.data[1])
+paerr=JuMIT.Data.P_misfit(rec1, pa.c.data[1])
+err = JuMIT.Data.func_grad!(paerr)
 
 # normalization
 error = err[1]/dot(rec1, rec1)

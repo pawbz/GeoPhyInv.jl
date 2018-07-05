@@ -76,7 +76,7 @@ Gallery of `Seismic` models.
   * `attrib=:seismic_marmousi2_downhole` : boxed marmousi2 for downhole seismic experiments  
 
 """
-function Seismic(attrib::Symbol, δ::Float64=0.0)
+function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 	bfrac=0.1; 
 	if((attrib == :acou_homo1))
 		vp0 = [1500., 3500.] # bounds for vp
@@ -142,13 +142,13 @@ function Seismic(attrib::Symbol, δ::Float64=0.0)
 		error("invalid attrib")
 	end
 	if(δ==0.0)
-		Models.print(model,string(attrib))
+		verbose && Models.print(model,string(attrib))
 		return model
 	elseif(δ > 0.0)
 		mgrid_out=Grid.M2D_resamp(model.mgrid,δ,δ,)
 		model_out=Models.Seismic_zeros(mgrid_out)
 		Models.interp_spray!(model, model_out, :interp, :B1)
-		Models.print(model_out,string(attrib))
+		verbose && Models.print(model_out,string(attrib))
 		return model_out
 	else
 		error("invalid δ")

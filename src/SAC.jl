@@ -35,11 +35,11 @@ end
 function stackamp(T)
 
 
-	tgrid=Grid.M1D(Float64(T[1].b), Float64(T[1].e), Float64(T[1].delta))
+	npts=Int64(maximum(getfield.(T,:npts)))
+	tgrid=Grid.M1D(Float64(T[1].b), Float64(T[1].e), npts)
 	fgrid=Grid.M1D_rfft(tgrid)
 
 	ampstack=zeros(fgrid.nx)
-	npts=maximum(getfield.(T,:npts))
 
 	@showprogress 1 "Processing..." for ir in eachindex(T)
 		TT=T[ir]

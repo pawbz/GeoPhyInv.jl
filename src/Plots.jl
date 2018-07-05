@@ -32,32 +32,24 @@ Plot the velocity and density seismic models.
 """
 @recipe function fseismic(p::Seismic;
 		   fields=[:vp, :ρ], 
-		   xlim=nothing, zlim=nothing, geom=nothing,
 		   contrast_flag=false,
 		   use_bounds=false,
 		  ) 
 	model=p.args[1]
 
-	(xlim===nothing) && (xlim=[model.mgrid.x[1],model.mgrid.x[end]])
-	(zlim===nothing) && (zlim=[model.mgrid.z[1],model.mgrid.z[end]])
-
-	#indices
-	ixmin = Interpolation.indminn(model.mgrid.x, xlim[1])[1]; ixmax = Interpolation.indminn(model.mgrid.x, xlim[2])[1]
-	izmin = Interpolation.indminn(model.mgrid.z, zlim[1])[1]; izmax = Interpolation.indminn(model.mgrid.z, zlim[2])[1]
-
 	nrow = (model.mgrid.nx <= model.mgrid.nz) ? 1 : length(fields)
 	ncol = (model.mgrid.nx <= model.mgrid.nz) ? length(fields) : 1
 
 
-	layout := (nrow,ncol)
+	layout --> (nrow,ncol)
 	for (i,iff) in enumerate(fields)
 		name=replace(string(iff), "ρ", "rho")
 		name=replace(name, "χ", "contrast\t")
 
 		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
-		m = Models.Seismic_get(model, iff)[izmin:izmax,ixmin:ixmax]
-		mx = model.mgrid.x[ixmin:ixmax]
-		mz = model.mgrid.z[izmin:izmax]
+		m = Models.Seismic_get(model, iff)
+		mx = model.mgrid.x
+		mz = model.mgrid.z
 		if(contrast_flag)
 			mmin=minimum(m)
 			mmax=maximum(m)
@@ -78,11 +70,11 @@ Plot the velocity and density seismic models.
 			xlabel --> "x [m]"
 			ylabel --> "z [m]"
 			color --> :grays
+			#xlim --> (mx[1], mx[end])
+			#zlim --> (mz[1], mz[end])
 			title --> name
-			xlim := (xlim...)
-			ylim := (zlim...)
-			clim := (mmin, mmax)
-			#yflip := true
+			clim --> (mmin, mmax)
+			yflip := true
 			mx, mz, m
 		end
 	end
@@ -140,13 +132,11 @@ and model grid `M2D`.
 			urpos = Acquisition.Geom_get([geom],:urpos)
 			rx=urpos[2]
 			rz=urpos[1]
-			#b = plot(urpos[2], urpos[1], "v", color="blue",ms=10)
 		else
 			b=nothing
 		end
 		if(:s ∈ fields)
 			uspos = Acquisition.Geom_get([geom],:uspos)
-			#a = plot(uspos[2], uspos[1], "*", color="red",ms=15)
 			sx=uspos[2]
 			sz=uspos[1]
 		else
@@ -156,7 +146,6 @@ and model grid `M2D`.
 		if(:r ∈ fields)
 			rxpos = [geom.rx[iss] for iss in ssvec]
 			rzpos = [geom.rz[iss] for iss in ssvec]
-			#b = plot(vcat(rxpos...), vcat(rzpos...), "v", color="blue",ms=10)
 			rx=vcat(rxpos...); rz=vcat(rzpos...)
 		else
 			b=nothing
@@ -164,7 +153,6 @@ and model grid `M2D`.
 		if(:s ∈ fields)
 			sxpos = [geom.sx[iss] for iss in ssvec]
 			szpos = [geom.sz[iss] for iss in ssvec]
-			#a = plot(vcat(sxpos...), vcat(szpos...), "*", color="red",ms=15)
 			sx=vcat(sxpos...); sz=vcat(szpos...)
 		else
 			a=nothing
@@ -174,17 +162,18 @@ and model grid `M2D`.
 	@series begin        
 		subplot --> 1
 		markersize --> 7
-		legend := false
+		legend --> false
 		seriestype := :scatter
 		markercolor := :blue
+		markershape := :utriangle
 		rx, rz
 	end
 	@series begin        
 		subplot --> 1
-		legend := false
+		legend --> false
 		markersize --> 7
 		markercolor := :red
-		markershape := :star5
+		markershape := :star7
 		seriestype := :scatter
 		sx, sz
 	end
@@ -293,8 +282,8 @@ Plot time-domain data of type `Data.TD`
 		dx = 1:size(dp,2)
 	end
 
-	dmin=maximum(dp)
-	dmax=minimum(dp)
+	dmin=minimum(dp)
+	dmax=maximum(dp)
 	offset=abs(dmax-dmin)
 	dmin=dmin+bclip_perc*inv(100)*offset
 	dmax=dmax-wclip_perc*inv(100)*offset
@@ -306,8 +295,8 @@ Plot time-domain data of type `Data.TD`
 		xlabel --> "receiver index"
 		ylabel --> "time [s]"
 		color --> :grays
-		clim := (dmin, dmax)
-		#yflip := true
+		clim --> (dmin, dmax)
+		yflip := true
 		dx, dz, dp
 	end
 end
