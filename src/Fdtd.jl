@@ -10,6 +10,7 @@ import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Gallery
 using ProgressMeter
+using TimerOutputs
 using DistributedArrays
 
 #As forward modeling method, the 
@@ -344,7 +345,7 @@ function Param(;
 	irfields = findin([:P, :Vx, :Vz], rfields)
 
 
-	(verbose) &&	println(string("\t> number of super sources:\t",nss))	
+	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
 	# find maximum and minimum frequencies in the source wavelets
 	freqmin = Signals.DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
@@ -353,7 +354,7 @@ function Param(;
 	# minimum and maximum velocities
 	vpmin = minimum(broadcast(minimum,[model.vp0, model_pert.vp0]))
 	vpmax = maximum(broadcast(maximum,[model.vp0, model_pert.vp0]))
-	verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
+	#verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
 
 
 	check_fd_stability(vpmin, vpmax, model.mgrid.δx, model.mgrid.δz, freqmin, freqmax, tgridmod.δx, verbose)
@@ -683,42 +684,57 @@ Author: Pawan Bharadwaj
 """
 @fastmath function mod!(pa::Param=Param())
 
+	const to = TimerOutput(); # create a timer object
+
+	reset_timer!(to)
+
 	# zero out all the results stored in pa.c
-	initialize!(pa.c)
+
+
+	@timeit to "initialize!" begin
+		initialize!(pa.c) 
 	
-	# zero out results stored per worker
-	@sync begin
-		for (ip, p) in enumerate(procs(pa.p))
-			@async remotecall_wait(p) do 
-				initialize!(localpart(pa.p))
+		# zero out results stored per worker
+		@sync begin
+			for (ip, p) in enumerate(procs(pa.p))
+				@async remotecall_wait(p) do 
+					initialize!(localpart(pa.p))
+				end
 			end
 		end
 	end
 
 
-	# all localparts of DArray are input to this method
-	# parallelization over shots
-	@sync begin
-		for (ip, p) in enumerate(procs(pa.p))
-			@async remotecall_wait(p) do 
-				mod_per_proc!(pa.c, localpart(pa.p))
+	@timeit to "mod_per_proc!" begin
+		# all localparts of DArray are input to this method
+		# parallelization over shots
+		@sync begin
+			for (ip, p) in enumerate(procs(pa.p))
+				@async remotecall_wait(p) do 
+					mod_per_proc!(pa.c, localpart(pa.p))
+				end
 			end
 		end
 	end
 
-	# stack gradients and illum over sources
-	@sync begin
-		for (ip, p) in enumerate(procs(pa.p))
-			@sync remotecall_wait(p) do 
-				(pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
-				(pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
+	@timeit to "stack_grads!" begin
+		# stack gradients and illum over sources
+		@sync begin
+			for (ip, p) in enumerate(procs(pa.p))
+				@sync remotecall_wait(p) do 
+					(pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
+					(pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
+				end
 			end
 		end
 	end
 
-	# update gradient model using grad_modtt_stack, grad_modrr_stack
-	update_gmodel!(pa.c)
+	@timeit to "update gmodel" begin
+		# update gradient model using grad_modtt_stack, grad_modrr_stack
+		update_gmodel!(pa.c)
+	end
 
+	@timeit to "record data" begin
 	for ipw in pa.c.activepw
 		if(pa.c.rflags[ipw] ≠ 0) # record only if rflags is non-zero
 			for ifield in 1:length(pa.c.irfields)
@@ -735,6 +751,8 @@ Author: Pawan Bharadwaj
 			end
 		end
 	end
+	end
+	pa.c.verbose && show(to)	
 	return nothing
 end
 
@@ -869,11 +887,15 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 			boundary_force_snap_vxvz!(issp,pac,pap.ss,pap)
 		end
 
+		prog = Progress(pac.nt, dt=1, desc="\tmodeling supershot $iss/$(pac.acqgeom[1].nss) ", 
+		  		color=:white) 
 		# time_loop
 		"""
 		* don't use shared arrays inside this time loop, for speed when using multiple procs
 		"""
-		@showprogress 1 string("modelling supersource ",iss," ") for it=1:pac.nt
+		for it=1:pac.nt
+
+			pac.verbose && next!(prog, :white)
 
 			advance!(pac,pap)
 		
@@ -1478,19 +1500,32 @@ end
 
 function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::Float64, freqmin::Float64, freqmax::Float64, δt::Float64, verbose::Bool)
 
+
 	# check spatial sampling
-	δs_temp=vpmin/5.0/freqmax;
+	δs_temp=round(vpmin/5.0/freqmax,2);
 	δs_max = maximum([δx, δz])
-	all(δs_max .> δs_temp) ? 
-			warn(string("spatial sampling\t",δs_max,"\ndecrease spatial sampling below:\t",δs_temp), once=true, prefix="Fdtd: ") :
-			info(string("spatial sampling\t",δs_max,"\tcan be as high as:\t",δs_temp), prefix="Fdtd: ")
+	str1=@sprintf("%0.2e",δs_max)
+	str2=@sprintf("%0.2e",δs_temp)
+	if(str1 ≠ str2)
+		if(all(δs_max .> δs_temp)) 
+			warn("decrease spatial sampling ($str1) below $str2", once=false)
+		else
+			info("spatial sampling ($str1) can be as high as $str2")
+		end
+	end
 
 	# check time sampling
 	δs_min = minimum([δx, δz])
 	δt_temp=0.5*δs_min/vpmax
-	all(δt .> δt_temp) ? 
-			warn(string("time sampling\t",δt,"\ndecrease time sampling below:\t",δt_temp), once=true, prefix="Fdtd: ") :
-			info(string("Fdtd: time sampling\t",δt,"\tcan be as high as:\t",δt_temp),prefix="Fdtd: ")
+	str1=@sprintf("%0.2e", δt)
+	str2=@sprintf("%0.2e", δt_temp)
+	if(str1 ≠ str2)
+		if(all(δt .> δt_temp))
+			warn("decrease time sampling ($str1) below $str2", once=false)
+		else
+			info("time sampling ($str1) can be as high as $str2")
+		end
+	end
 
 end
 

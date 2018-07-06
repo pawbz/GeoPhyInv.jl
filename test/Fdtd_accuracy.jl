@@ -35,8 +35,8 @@ pa=JuMIT.Fdtd.Param(npw=1,model=model,
 paerr=JuMIT.Data.P_misfit(rec1, pa.c.data[1])
 err = JuMIT.Data.func_grad!(paerr)
 
-# normalization
-error = err[1]/dot(rec1, rec1)
+# normalized error
+error = err[1]
 
 # desired accuracy?
 @test error<1e-2

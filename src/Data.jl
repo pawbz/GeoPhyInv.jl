@@ -557,7 +557,7 @@ function P_misfit(x,y;w=nothing, coup=nothing, func_attrib=:cls)
 		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	elseif(func_attrib==:xcorrcls)
 		pacse=[Conv.P_misfit_xcorr(y.tgrid.nx, y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
-		func=[(dJx,x)->Misfits.error_corr_squared_euclidean!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->Conv.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	end
 
 	pa=P_misfit(x,y,w,xr,xrc,dJxr,dJxrc,
