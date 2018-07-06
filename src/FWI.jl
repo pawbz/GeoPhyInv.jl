@@ -429,17 +429,7 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 				"""
 				@timeit to "xfwi!" begin
 					res = optimize(f, g!, lower_x, upper_x, 
-					 x, Fminbox(ConjugateGradient()), 
-					 Optim.Options(show_trace=true, outer_iterations=2))
-				end
-				show(to)
-			end
-		end
-
-		#=
-			       lower_x,
-			       upper_x,
-			       x,
+					 x,  
 			       Fminbox(LBFGS()), # actual iterations
 			       # LBFGS was behaving wierd with backtracking
 	       # to reduce the number of gradient calls
@@ -451,7 +441,10 @@ function xfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 	#	 			outer_iterations = linesearch_iterations, 
 					#time_limit=time_limit,
 					store_trace=store_trace,extended_trace=extended_trace, show_trace=true))
-					=#
+				end
+				show(to)
+			end
+		end
 		pa.verbose && println(res)
 
 		# update modm and modi
@@ -709,6 +702,7 @@ function hessian_xfwi!(loc, pa)
 	# put perturbed x into model_pert and model_perti
 	Seismic_x!(model_pert, model_perti, x, pa, -1)		
 
+	#=
 	# generate Born Data
 	(pa.paf.c.born_flag==false) && error("need born flag")
 	
@@ -736,8 +730,8 @@ function hessian_xfwi!(loc, pa)
 	Seismic_gx!(pa.gmodm,pa.modm0,pa.gmodi,model_m0i,gx,pa,1) 
 
 	return pa.gmodi, model_pert, model_perti
+	=#
 end
-
 
 """
 Update pa.w
