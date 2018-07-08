@@ -110,6 +110,7 @@ function Base.fill!(mod::Seismic, k::Float64=0.0)
 	mod.χvp[:]=k
 	mod.χρ[:]=k
 	mod.χvs[:]=k
+	return mod
 end
 
 """
@@ -488,7 +489,7 @@ Add features to a model.
 * `onlyin` : `mod` is modified only when field values are in these ranges 
 """
 function Seismic_addon!(mod::Seismic; 
-		       point_loc::Vector{Float64}=[0., 0.,],
+		       point_loc=[0., 0.,],
 		       point_pert::Float64=0.0,
 		       ellip_loc=[0., 0.,],
 		       ellip_rad=0.0,
@@ -506,8 +507,8 @@ function Seismic_addon!(mod::Seismic;
 
 	temp = zeros(mod.mgrid.nz, mod.mgrid.nx)
 
-	ipointlocx = Interpolation.indminn(mod.mgrid.x, point_loc[2], 1)[1] 
-	ipointlocz = Interpolation.indminn(mod.mgrid.z, point_loc[1], 1)[1] 
+	ipointlocx = Interpolation.indminn(mod.mgrid.x, Float64(point_loc[2]), 1)[1] 
+	ipointlocz = Interpolation.indminn(mod.mgrid.z, Float64(point_loc[1]), 1)[1] 
 	temp[ipointlocz, ipointlocx] += point_pert
 
 	if(!(ellip_pert == 0.0))

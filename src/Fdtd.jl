@@ -381,6 +381,7 @@ function Param(;
 	modtt = Models.Seismic_get(exmodel, :KI)
 
 	if(born_flag)
+		(npw≠2) && error("born_flag needs npw=2")
 		isapprox(exmodel, exmodel_pert) || error("pertrubed model should be similar to background model")
 		"inverse density contrasts for Born Modelling"
 		modrr_pert = Models.Seismic_get(exmodel_pert, :ρI)
@@ -552,6 +553,7 @@ function update_acqsrc!(pa::Param, acqsrc::Vector{Acquisition.Src}, sflags=nothi
 				for is in 1:length(pap.ss)
 					iss=pap.ss[is].iss
 					wavelets=pap.ss[is].wavelets
+					initialize_wavelets!(iss, wavelets)
 					fill_wavelets!(iss, wavelets, pa.c.acqsrc, pa.c.sflags)
 				end
 			end
@@ -650,7 +652,8 @@ function Paramss(iss::Int64, pac::Paramc)
 
 
 	pass=Paramss(iss,wavelets,ssprayw,records,rinterpolatew,
-	      isx1,isx2,isz1,isz2,irx1,irx2,irz1,irz2,boundary,snaps,illum,born_svalue_stack,
+	      isx1,isx2,isz1,isz2,irx1,irx2,irz1,irz2,boundary,snaps,illum, 
+	      born_svalue_stack,
 	      grad_modtt,grad_modrrvx,grad_modrrvz)
 
 
@@ -688,10 +691,8 @@ Author: Pawan Bharadwaj
 
 	reset_timer!(to)
 
-	# zero out all the results stored in pa.c
-
-
 	@timeit to "initialize!" begin
+		# zero out all the results stored in pa.c
 		initialize!(pa.c) 
 	
 		# zero out results stored per worker
@@ -958,6 +959,7 @@ end # mod_per_shot
 	adding source to pressure field at [it] 
 	"""
 	for ipw in pac.activepw
+	if(pac.sflags[ipw] ≠ 0) # only if sflags is non-zero
 	for (ifields, ifield) in enumerate(pac.isfields[ipw])
 	@simd for is = 1:acqgeom[ipw].ns[iss]
 		"""
@@ -986,6 +988,7 @@ end # mod_per_shot
 			source_term * 
 			ssprayw[ipw][4,is] * 
 			modttI[isz2[ipw][is], isx2[ipw][is]]
+	end
 	end
 	end
 	end
@@ -1441,17 +1444,34 @@ function get_rhovzI!(rhovzI, rhoI::Array{Float64})
 end # get_rhovzI
 
 
+
+function initialize_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2})
+
+	npw = size(wavelets,1)
+	nt = size(wavelets,2)
+	ns, snfield = size(wavelets[1,1])
+	for ipw=1:npw, it=1:nt
+		for ifield=1:snfield, is=1:ns
+			wavelets[ipw,it][is,ifield] = 0.0
+		end
+	end
+end
+
+
 function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc::Array{Acquisition.Src}, sflags::Vector{Int64})
 
 	npw = size(wavelets,1)
 	nt = size(wavelets,2)
 	δt = acqsrc[1].tgrid.δx
 	for ipw=1:npw
-		ns, snfield = size(wavelets[ipw])
+		ns, snfield = size(wavelets[ipw,1]) # ns may vary with ipw
 		for ifield=1:snfield, is=1:ns
 			snt = acqsrc[ipw].tgrid.nx;
 			if(sflags[ipw] == 0)
-				nothing # just put zeros, no sources added
+				# nothing # just put zeros, no sources added
+				for it=1:nt
+					wavelets[ipw,it][is,ifield] = 0.0
+				end
 			elseif(sflags[ipw] == 1)
 				"ϕ[t] = s[t]"
 				for it=1:snt

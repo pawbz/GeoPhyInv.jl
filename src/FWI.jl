@@ -132,7 +132,7 @@ Constructor for `Param`
 * `tlagrf_fracs=0.0` : maximum lagtime of unknown receiver filter
 * `acqsrc_obs::Acquisition.Src=acqsrc` : source wavelets to generate *observed data*; can be different from `acqsrc`
 * `modm_obs::Models.Seismic=modm` : actual seismic model to generate *observed data*
-* `modm0::Models.Seismic=modm` : background seismic model for Born modelling and inversion (still being tested)
+* `modm0::Models.Seismic=fill!(modm,0.0)` : background seismic model for Born modelling and inversion
 * `mod_inv_parameterization::Vector{Symbol}=[:χKI, :χρI]` : subsurface parameterization
 * `verbose::Bool=false` : print level on STDOUT during inversion 
 * `attrib::Symbol=:synthetic` : an attribute to control class
@@ -157,7 +157,7 @@ function Param(
 	       tlagrf_fracs=0.0,
 	       acqsrc_obs::Acquisition.Src=deepcopy(acqsrc),
 	       modm_obs::Models.Seismic=modm,
-	       modm0::Models.Seismic=modm,
+	       modm0::Models.Seismic=fill!(deepcopy(modm),0.0),
 	       mod_inv_parameterization::Vector{Symbol}=[:χKI, :χρI],
 	       born_flag::Bool=false,
 	       verbose::Bool=false,
@@ -579,26 +579,33 @@ function F!(pa::Param, x, last_x=[0.0])
 	end
 end
 
-function Fborn!(pa::Param, model_pert)
-	# update model in the forward engine
-	Fdtd.update_model!(pa.paf.c, pa.modm0, model_pert)
+"""
+Born modeling with `modm` as the perturbed model and `modm0` as the background model.
+"""
+function Fborn!(pa::Param)
+	# update background and perturbed models in the forward engine
+	Fdtd.update_model!(pa.paf.c, pa.modm0, pa.modm)
 
-	pa.paf.c.activepw=[1,2]
-	pa.paf.c.illum_flag=false
-	pa.paf.c.sflags=[2, 0]
-	pa.paf.c.rflags=[0, 1]
+	pa.paf.c.activepw=[1,2] # two wavefields are active
+	pa.paf.c.illum_flag=false 
+	pa.paf.c.sflags=[2, 0] # no sources on second wavefield
+	pa.paf.c.rflags=[0, 1] # record only after first scattering
 
+	# source wavelets (for second wavefield, they are dummy)
 	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
-	pa.paf.c.backprop_flag=1
-	pa.paf.c.gmodel_flag=false
-	pa.paf.c.born_flag=true
 
+	pa.paf.c.backprop_flag=1 # store boundary values for gradient later
+	pa.paf.c.gmodel_flag=false # no gradient
+	
+	# switch on born scattering
+	pa.paf.c.born_flag=true
 
 	Fdtd.mod!(pa.paf);
 	dcal=pa.paf.c.data[2]
 	copy!(pa.paTD.x,dcal)
 
 end
+
 "build a model precon"
 function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 	"illum cannot be zero when building mprecon"
@@ -634,6 +641,7 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 
 	pa.verbose && println("computing gradient...")
 
+	# do forward modelling, apply F x
 	F!(pa, x, last_x)
 
 	if(storage === nothing)
@@ -641,20 +649,22 @@ function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, p
 		f = Data.func_grad!(pa.paTD)
 		return f
 	else
+		# compute functional and get ∇_d J (adjoint sources)
 		f = Data.func_grad!(pa.paTD, :dJx)
 
-		# adjoint sources
+		# update adjoint sources after time reversal
 		update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
-		Fdtd.update_acqsrc!(pa.paf, [pa.acqsrc, pa.adjsrc])
 
-		# x to model
+		# project x, which lives in modi, on to model space (modm)
 		Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
 
-		# do adjoint modelling here
+		# put modm into Fdtd
 		Fdtd.update_model!(pa.paf.c, pa.modm)
 
+		# do adjoint modelling here with adjoint sources Fᵀ F P x
 		Fadj!(pa)	
 	
+		# adjoint of interpolation
 		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
 
 		return storage
@@ -663,74 +673,86 @@ end # func_grad_xfwi!
 
 
 """
-* use x and update model in pa
-* compute gradient
+Perform adjoint modelling in `paf` using adjoint sources `adjsrc`.
 """
 function Fadj!(pa::Param)
 
+	# both wavefields are active
 	pa.paf.c.activepw=[1,2]
+
+	# no need of illum during adjoint modeling
 	pa.paf.c.illum_flag=false
-	pa.paf.c.sflags=[3,2]
-	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
+
+	# force boundaries in first pw and back propagation for second pw
+	pa.paf.c.sflags=[3,2] 
 	pa.paf.c.backprop_flag=-1
+
+	# update source wavelets in paf using adjoint sources
+	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
+
+	# require gradient
 	pa.paf.c.gmodel_flag=true
 
+	# adjoint modelling
 	Fdtd.mod!(pa.paf);
-	copy!(pa.gmodm,pa.paf.c.gmodel)
 
+	# copy gradient
+	copy!(pa.gmodm,pa.paf.c.gmodel)
 end
 
 
-
 """
-outdated
+Return the inversion variable of `xfwi` with mostly zeros and 
+non-zero at only one element corresponding to a location `loc`.
+
+Note: this method will modify `modm` and `modi`.
 """
-function hessian_xfwi!(loc, pa)
-
-	model_pert = deepcopy(pa.modm)
-	model_m0i = deepcopy(pa.modi)
-
+function xfwi_pert_x(pa,loc)
+	# allocate
 	x = zeros(xfwi_ninv(pa))
-	gx = similar(x)
-	# put modm0  into m0i and x
-	Seismic_x!(pa.modm0, model_m0i, x, pa, 1)		
+	return xfwi_pert_x!(x,pa,loc)
+end
+"""
+"""
+function xfwi_pert_x!(x, pa, loc)
 
-	model_perti = deepcopy(model_m0i)
-	Models.Seismic_addon!(model_m0i, point_loc=loc, point_pert=0.1) 
+	fill!(pa.modm, 0.0)
+	fill!(pa.modi, 0.0)
 
-	Seismic_x!(nothing, model_m0i, x, pa, 1)		
-	# put perturbed x into model_pert and model_perti
-	Seismic_x!(model_pert, model_perti, x, pa, -1)		
+	# add a point perturbation
+	Models.Seismic_addon!(pa.modi, point_loc=loc, point_pert=0.1) 
 
-	#=
+	# update x
+	Seismic_x!(nothing, pa.modi, x, pa, 1)		
+
+	return x
+end
+
+
+"""
+xx = Fadj * Fborn * x
+"""
+function Fadj_Fborn_x!(xx, x, pa)
+
+	# put  x into pa
+	Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
+
 	# generate Born Data
 	(pa.paf.c.born_flag==false) && error("need born flag")
-	
+	Fborn!(pa)
 
-	Fborn!(pa, model_pert)
-
-	
-	# apply coupling to the modeled data
-	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :s)
-
-	# compute gradient w.r.t. calculated data
-	Data.TDcoup!(pa.wdcal, pa.dcal, pa.w, :r)
+	#f = Data.func_grad!(pa.paTD, :dJx)
 
 	# adjoint sources
-	update_adjsrc!(pa.adjsrc, pa.dcal, pa.adjacqgeom)
-	Fdtd.update_acqsrc!(pa.pafa, [pa.acqsrc, pa.adjsrc])
+	update_adjsrc!(pa.adjsrc, pa.paTD.x, pa.adjacqgeom)
 
 	# adjoint simulation
-	Fdtd.mod!(npw=2, model=pa.modm0,
-		acqgeom=[pa.acqgeom, pa.adjacqgeom], acqsrc=[pa.acqsrc, pa.adjsrc], sflags=[3, 2],
-		backprop_flag=-1, boundary=pa.buffer, 
-		gmodel=pa.gmodm, 
-		tgridmod=pa.dcal.tgrid, gmodel_flag=true, verbose=pa.verbose)
+	Fadj!(pa)
 
-	Seismic_gx!(pa.gmodm,pa.modm0,pa.gmodi,model_m0i,gx,pa,1) 
+	# adjoint of interpolation
+	Seismic_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, xx, pa, 1) 
 
-	return pa.gmodi, model_pert, model_perti
-	=#
+	return pa
 end
 
 """
