@@ -133,7 +133,10 @@ Constructor for `Param`
 * `acqsrc_obs::Acquisition.Src=acqsrc` : source wavelets to generate *observed data*; can be different from `acqsrc`
 * `modm_obs::Models.Seismic=modm` : actual seismic model to generate *observed data*
 * `modm0::Models.Seismic=fill!(modm,0.0)` : background seismic model for Born modelling and inversion
-* `mod_inv_parameterization::Vector{Symbol}=[:χKI, :χρI]` : subsurface parameterization
+* `parameterization::Vector{Symbol}` : subsurface parameterization
+  * `=[:χvp, :χρ, :null]` for velocity and density inversion
+  * `=[:null, :χρ, :null]` for density-only inversion
+  * `=[:χvp, :null, :null]` for velocity-only inversion
 * `verbose::Bool=false` : print level on STDOUT during inversion 
 * `attrib::Symbol=:synthetic` : an attribute to control class
   * `=:synthetic` synthetic data inversion
@@ -158,7 +161,7 @@ function Param(
 	       acqsrc_obs::Acquisition.Src=deepcopy(acqsrc),
 	       modm_obs::Models.Seismic=modm,
 	       modm0::Models.Seismic=fill!(deepcopy(modm),0.0),
-	       mod_inv_parameterization::Vector{Symbol}=[:χKI, :χρI],
+	       parameterization::Vector{Symbol}=[:χvp, :χρ, :null],
 	       born_flag::Bool=false,
 	       verbose::Bool=false,
 	       attrib::Symbol=:synthetic,
@@ -307,7 +310,7 @@ function Param(
 	     attrib_mod, attrib_inv, 
 	     deepcopy(modm), deepcopy(modm0), modi, 
 	     gmodm,gmodi,
-	     deepcopy(mod_inv_parameterization),
+	     parameterization,
 	     zeros(2,2), # dummy, update mprecon later
 	     paTD,
 	     paminterp,
@@ -340,7 +343,7 @@ Return the number of inversion variables for FWI corresponding to `Param`.
 This number of inversion variables depend on the size of inversion mesh.
 """
 function xfwi_ninv(pa::Param)
-	return 2*pa.modi.mgrid.nz*pa.modi.mgrid.nx
+	return pa.modi.mgrid.nz*pa.modi.mgrid.nx*count(pa.parameterization.≠:null)
 end
 
 """
@@ -627,7 +630,7 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 	#illumi = 1.0 + log.(1. + (mprecon_factor-1) * illumi) # illumi now lies between 1.0 and some value depending on how large illumi is
 	illumi = (1. + (mprecon_factor-1) * illumi) # illumi now lies between 1.0 and some value depending on how large illumi is
 
-	illumi = vcat(vec(illumi), vec(illumi))
+	illumi = vcat([vec(illumi) for i in 1:count(pa.parameterization.≠:null)]...)
 
 	length(illumi) == xfwi_ninv(pa) ? nothing : error("something went wrong with creating mprecon")
 	pa.mprecon = spdiagm(illumi,(0),xfwi_ninv(pa), xfwi_ninv(pa))
@@ -720,7 +723,7 @@ function xfwi_pert_x!(x, pa, loc)
 	fill!(pa.modi, 0.0)
 
 	# add a point perturbation
-	Models.Seismic_addon!(pa.modi, point_loc=loc, point_pert=0.1) 
+	Models.Seismic_addon!(pa.modi, point_loc=loc, point_pert=0.1, fields=[:χvp]) 
 
 	# update x
 	Seismic_x!(nothing, pa.modi, x, pa, 1)		
@@ -819,7 +822,7 @@ function Seismic_x!(
 		    flag::Int64)
 	if(flag ==1) # convert modm or modi to x
 		if(modm===nothing)
-			all([iszero(modi)]) && error("input modi") 
+			iszero(modi) && error("input modi") 
 		else
 			all([iszero(modm), iszero(modi)]) && error("input modi or modm")
 
@@ -827,29 +830,21 @@ function Seismic_x!(
 			!(iszero(modm)) && Models.interp_spray!(modm, modi, :interp)
 		end
 
-		nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
 		# 2. re-parameterization on the inversion grid (include other parameterizations here)
-		x[1:nznx] = copy(vec(Models.Seismic_get(modi,pa.parameterization[1])));
-		x[nznx+1:2*nznx] = copy(vec(Models.Seismic_get(modi,pa.parameterization[2])));
+		Models.Seismic_get!(x,modi,pa.parameterization)
 
 		# apply preconditioner
-		x[:] =  copy(pa.mprecon * x)
+#		x[:] =  copy(pa.mprecon * x)
 
 	elseif(flag == -1) # convert x to mod
 
-		nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx
-		modi.mgrid = deepcopy(pa.modi.mgrid); 
-		modi.vp0 = pa.modm.vp0; modi.vs0 = pa.modm.vs0; modi.ρ0 = pa.modm.ρ0;
-
 		# apply preconditioner 
-		Px = copy(pa.mprecon \ x)
+#		Px = copy(pa.mprecon \ x)
 
 		# 1. re-parameterization on the inversion grid
-		Models.Seismic_reparameterize!(modi, reshape(Px[1:nznx],pa.modi.mgrid.nz, pa.modi.mgrid.nx), 
-			     reshape(Px[nznx+1:2*nznx],pa.modi.mgrid.nz,pa.modi.mgrid.nx), pa.parameterization)
+		Models.Seismic_reparameterize!(modi,x,pa.parameterization) 
 
 		# 2. interpolation from the inversion grid to the modelling grid
-		modm.mgrid = deepcopy(pa.modm.mgrid); 
 		Models.interp_spray!(modi, modm, :interp, pa=pa.paminterp)
 	else
 		error("invalid flag")
@@ -911,43 +906,32 @@ function Seismic_gx!(gmodm::Models.Seismic,
 	             pa::Param,
 	             flag::Int64 
 		      )
-	nznx=modi.mgrid.nz*modi.mgrid.nx
-	g1=zeros(nznx); g2 =zeros(nznx)
-	isapprox(gmodm, modm) ? nothing : error("gmodm, modm dimensions")
-	isapprox(gmodi, modi) ? nothing : error("gmodi, modi dimensions")
-	length(gx) == xfwi_ninv(pa) ? nothing : error("gx dimensions")
+	!(isapprox(gmodm, modm)) && error("gmodm, modm dimensions")
+	!(isapprox(gmodi, modi)) && error("gmodi, modi dimensions")
+	!(length(gx) == xfwi_ninv(pa)) && error("gx dimensions")
 	if(flag ==1) # convert gmod to gx
 
 		# either gmodi or gmodm should be nonzero
 		all([iszero(gmodm), iszero(gmodi)]) ? 
 					error("input gmodi or gmodm") : nothing
 
-
 		# 1. update gmodi by spraying gmodm
-		iszero(gmodm) ? nothing : Models.interp_spray!(gmodi, gmodm, :spray, pa=pa.paminterp)
+		!(iszero(gmodm)) && Models.interp_spray!(gmodi, gmodm, :spray, pa=pa.paminterp)
 
 		# 2. chain rule on gmodi 
-		Models.Seismic_chainrule!(gmodi, modi, g1, g2, pa.parameterization,-1)
-
-		# 3. copy 
-		gx[1:nznx] = copy(g1);
-		gx[nznx+1:2*nznx] = copy(g2)
+		Models.Seismic_chainrule!(gmodi, modi, gx, pa.parameterization,-1)
 
 		# modify gradient as mprecon is applied to the model vector 
-		gx[:] = copy(pa.mprecon \ gx)
+#		gx[:] = copy(pa.mprecon \ gx)
 
 	elseif(flag == -1) # convert gx to mod
 		# this flag is only used while visuavalizing the gradient vector,
 		# the operations are not exact adjoint of flag==1
-
 		# apply preconditioner, commented as the gx to mod is inexact
-
 		#gx =  copy(pa.mprecon * gx)
 
 		# 1. chain rule depending on re-parameterization
-		#    and 
-		g1 = gx[1:nznx]; g2 = gx[nznx+1:2*nznx];
-		Models.Seismic_chainrule!(gmodi, modi, g1, g2, pa.parameterization, 1)
+		Models.Seismic_chainrule!(gmodi, modi, gx, pa.parameterization, 1)
 
 		# 2. get gradient after interpolation (just for visualization, not exact)
 		Models.interp_spray!(gmodi, gmodm, :interp, pa=pa.paminterp)

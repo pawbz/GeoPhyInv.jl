@@ -94,7 +94,7 @@ type Paramc
 	modrr_pert::Matrix{Float64}
 	δmodrrvx::Matrix{Float64}
 	δmodrrvz::Matrix{Float64}
-	grad_modtt_stack::SharedMatrix{Float64}
+	grad_stack::SharedVector{Float64} # contains gmodtt and gmodrr
 	grad_modrrvx_stack::SharedMatrix{Float64}
 	grad_modrrvz_stack::SharedMatrix{Float64}
 	grad_modrr_stack::Matrix{Float64}
@@ -192,8 +192,8 @@ end
 
 function initialize!(pac::Paramc)
 	# need explicit loops while zeroing out Shared Matrices? "fill!" takes memory!!!
-	for i in eachindex(pac.grad_modtt_stack)
-		pac.grad_modtt_stack[i]=0.0
+	for i in eachindex(pac.grad_stack)
+		pac.grad_stack[i]=0.0
 	end
 	for i in eachindex(pac.grad_modrrvx_stack)
 		pac.grad_modrrvx_stack[i]=0.0
@@ -425,7 +425,7 @@ function Param(;
 	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax,
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
-	grad_modtt_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
+	grad_stack=SharedVector{Float64}(2*nzd*nxd)
 	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	grad_modrr_stack=zeros(nzd,nxd)
@@ -447,7 +447,7 @@ function Param(;
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modtt, modttI,modrr,modrrvx,modrrvz,
 	    δmodtt,modrr_pert,δmodrrvx,δmodrrvz,
-	    grad_modtt_stack,grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,
+	    grad_stack,grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,
 	    illum_flag,illum_stack,
 	    backprop_flag,
 	    snaps_flag,
@@ -511,16 +511,16 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 
 	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model)
 
-	Models.Seismic_get!(pac.modttI, pac.exmodel, :K) 
+	Models.Seismic_get!(pac.modttI, pac.exmodel, [:K]) 
 
-	Models.Seismic_get!(pac.modrr, pac.exmodel, :ρI)
+	Models.Seismic_get!(pac.modrr, pac.exmodel, [:ρI])
 	get_rhovxI!(pac.modrrvx, pac.modrr)
 	get_rhovzI!(pac.modrrvz, pac.modrr)
 
 	if(pac.born_flag && !(model_pert === nothing))
 		copy!(pac.model_pert, model_pert)
 		Models.Seismic_pml_pad_trun!(pac.exmodel_pert, pac.model_pert);
-		Models.Seismic_get!(pac.modrr_pert, pac.exmodel_pert, :ρI)
+		Models.Seismic_get!(pac.modrr_pert, pac.exmodel_pert, [:ρI])
 		get_rhovxI!(pac.δmodrrvx, pac.modrr_pert)
 		get_rhovzI!(pac.δmodrrvz, pac.modrr_pert)
 		for i in eachindex(pac.δmodrrvx)
@@ -528,7 +528,7 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 			pac.δmodrrvz[i] -= pac.modrrvz[i]
 		end
 
-		Models.Seismic_get!(pac.δmodtt, pac.exmodel_pert, :KI)
+		Models.Seismic_get!(pac.δmodtt, pac.exmodel_pert, [:KI])
 		for i in eachindex(pac.δmodtt)
 			pac.δmodtt[i] -= pac.modtt[i]
 		end
@@ -825,25 +825,36 @@ end
 function stack_grads!(pac::Paramc, pap::Paramp)
 	np=pac.model.mgrid.npml
 	nx, nz=pac.nx, pac.nz
+	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
 
 	# theses are SharedArrays
-	gmodtt=pac.grad_modtt_stack
+	grad_stack=pac.grad_stack
 	gmodrrvx=pac.grad_modrrvx_stack
 	gmodrrvz=pac.grad_modrrvz_stack
 	pass=pap.ss
 	for issp in 1:length(pass)
 		gs=pass[issp].grad_modtt
 		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		@. gmodtt += gss
+		for i in 1:nznxd
+			grad_stack[i]+=gss[i]  # only update gmodtt
+		end
 		gs=pass[issp].grad_modrrvx
 		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		@. gmodrrvx += gss
+		for i in 1:nznxd
+			gmodrrvx[i] += gss[i]
+		end
 		gs=pass[issp].grad_modrrvz
 		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		@. gmodrrvz += gss
+		for i in 1:nznxd
+			gmodrrvz[i] += gss[i]
+		end
 	end
 	# combine rrvx and rrvz
 	grad_modrr!(pac::Paramc)
+	for i in 1:nznxd
+		grad_stack[nznxd+i]+=pac.grad_modrr_stack[i]  # update gmodrr
+	end
+
 end
 
 function stack_illums!(pac::Paramc, pap::Paramp)
@@ -860,18 +871,22 @@ end
 
 
 function update_gmodel!(pac::Paramc)
-	KI0=Models.Seismic_get(pac.model,:KI0)
-	ρI0=Models.Seismic_get(pac.model,:ρI0)
-	gmodtt=view(pac.grad_modtt_stack,:)
-	gmodrr=view(pac.grad_modrr_stack,:)
+	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
+	KI0=mean(Models.Seismic_get(pac.model,:KI0))
+	ρI0=mean(Models.Seismic_get(pac.model,:ρI0))
+	g=view(pac.grad_stack,:)
 	
-	Models.χg!(gmodtt,KI0,1)
-	Models.χg!(gmodrr,ρI0,1)
+	for i in 1:nznxd
+		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],KI0,1)
+		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],ρI0,1)
+	end
 
-	Models.Seismic_chainrule!(pac.gmodel, pac.model,gmodtt, gmodrr, [:χKI, :χρI], 1)
+	Models.Seismic_chainrule!(pac.gmodel, pac.model, pac.grad_stack, [:χKI, :χρI, :null], 1)
 
-	Models.χg!(gmodtt,KI0,-1)
-	Models.χg!(gmodrr,ρI0,-1)
+	for i in 1:nznxd
+		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],KI0,-1)
+		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],ρI0,-1)
+	end
 end
 
 # modelling for each processor
