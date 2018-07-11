@@ -605,7 +605,7 @@ function Src_fixed_mod(
 	# dominant wavelength using mod dimensions
 	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nλ)
 	# average P velocity
-	vavg=Models.χ([mean(mod.χvp)], mod.vp0, -1)[1]
+	vavg=Models.χ([mean(mod.χvp)], mod.ref.vp, -1)[1]
 
 	fqdom = vavg/λdom
 

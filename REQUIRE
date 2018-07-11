@@ -1,20 +1,11 @@
 julia 0.6
 DataFrames
 ImageFiltering
-JLD
 CSV
-Distances
 TimerOutputs
 RecipesBase
 ForwardDiff
-Conda
-Polynomials
-Documenter
 Optim
-MultivariateStats
 Distributions
-Interpolations
 StatsBase
-DSP
 DistributedArrays
-FFTW

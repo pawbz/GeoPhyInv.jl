@@ -1,6 +1,6 @@
 
 # some mem tests
-mod=randn(1000); mod0=[2.0]
+mod=randn(1000); mod0=2.0
 @btime JuMIT.Models.χ!(mod,mod0,1)
 @btime JuMIT.Models.χ!(mod,mod0,-1)
 @btime JuMIT.Models.χg!(mod,mod0,1)
@@ -9,14 +9,22 @@ mod=randn(1000); mod0=[2.0]
 # some model
 mgrid = Grid.M2D(0.0, 10., 0., 10., .05,.05,2);
 model = JuMIT.Models.Seismic_zeros(mgrid);
-model.vp0=[2100.,2200.]; model.vs0=[-1., -1.]; model.ρ0=[2100., 2300.]
+vp0=[2100.,2200.];vs0=[-1., -1.]; ρ0=[2100., 2300.]
+JuMIT.Models.adjust_bounds!(model, vp0,vs0,ρ0);
+
 JuMIT.Models.Seismic_addon!(model, randn_perc=1e-3)
 nznx = model.mgrid.nz * model.mgrid.nx;
 
+# test copy!
+model_new=deepcopy(model)
+JuMIT.Models.Seismic_addon!(model_new, randn_perc=1e-3)
+
+@btime copy!(model_new, model)
+@test isequal(model_new, model) 
+
 # allocation of model0
 model0 = JuMIT.Models.Seismic_zeros(model.mgrid);
-model0.vp0 = model.vp0; model0.ρ0 = model.ρ0; model0.mgrid = deepcopy(model.mgrid);
-model0.vs0 = model.vs0;
+JuMIT.Models.adjust_bounds!(model0, model);
 
 for attribvec in [[:χKI,:χρI,:null], [:χKI,:null,:null], [:null,:χρ,:null], [:null,:χρ,:null], [:χvp,:χρ,:null]]
 	x=zeros(nznx*count(attribvec.≠:null));

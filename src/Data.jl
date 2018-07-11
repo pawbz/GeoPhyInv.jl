@@ -78,6 +78,7 @@ function Base.copy!(dataout::TD, data::TD)
 		for iss=1:data.acqgeom.nss, ifield=1:length(data.fields)
 			ddout=dout[iss,ifield]
 			ddin=din[iss,ifield]
+			# don't use explicit loop here, slow!
 			copy!(ddout,ddin)
 		end
 		return dataout

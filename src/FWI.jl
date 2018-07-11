@@ -195,6 +195,8 @@ function Param(
 
 	# create modi according to igrid and interpolation of modm
 	modi = Models.Seismic_zeros(igrid);
+	# update bounds
+	Models.adjust_bounds!(modi, modm)
 	Models.interp_spray!(modm, modi, :interp)
 
 	# allocate prior inputs
@@ -364,9 +366,13 @@ function Param(
 	dcal=pa.paf.c.data[1]
 	copy!(pa.paTD.x, dcal)
 
+	# default weights are 1.0
+	pa.mx.w[:]=1.0
 
 	# update priori and priorw in pa to defaults
 	update_prior!(pa)
+	
+
 
 	return pa
 end
@@ -835,18 +841,18 @@ function Seismic_xbound!(lower_x, upper_x, pa)
 	bound1 = similar(lower_x)
 	# create a Seismic model with minimum possible values
 	modbound = deepcopy(pa.modi);
-	modbound.χvp = Models.χ(fill(modbound.vp0[1], size(modbound.χvp)), modbound.vp0)
-	modbound.χvs = Models.χ(fill(modbound.vs0[1], size(modbound.χvs)), modbound.vs0)
-	modbound.χρ = Models.χ(fill(modbound.ρ0[1], size(modbound.χρ)), modbound.ρ0)
+	modbound.χvp = Models.χ(fill(modbound.vp0[1], size(modbound.χvp)), modbound.ref.vp)
+	modbound.χvs = Models.χ(fill(modbound.vs0[1], size(modbound.χvs)), modbound.ref.vs)
+	modbound.χρ = Models.χ(fill(modbound.ρ0[1], size(modbound.χρ)), modbound.ref.ρ)
 
 	Seismic_x!(nothing, modbound, bound1, pa, 1) # update lower_x using such a model
 
 
 	bound2=similar(upper_x)
 	# create a Seismic model with maximum possible values
-	modbound.χvp = Models.χ(fill(modbound.vp0[2], size(modbound.χvp)), modbound.vp0)
-	modbound.χvs = Models.χ(fill(modbound.vs0[2], size(modbound.χvs)), modbound.vs0)
-	modbound.χρ = Models.χ(fill(modbound.ρ0[2], size(modbound.χρ)), modbound.ρ0)
+	modbound.χvp = Models.χ(fill(modbound.vp0[2], size(modbound.χvp)), modbound.ref.vp)
+	modbound.χvs = Models.χ(fill(modbound.vs0[2], size(modbound.χvs)), modbound.ref.vs)
+	modbound.χρ = Models.χ(fill(modbound.ρ0[2], size(modbound.χρ)), modbound.ref.ρ)
 
 	Seismic_x!(nothing, modbound, bound2, pa, 1) # update upper_x using such a model
 

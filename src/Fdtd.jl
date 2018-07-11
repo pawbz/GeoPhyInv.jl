@@ -872,20 +872,18 @@ end
 
 function update_gmodel!(pac::Paramc)
 	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
-	KI0=mean(Models.Seismic_get(pac.model,:KI0))
-	ρI0=mean(Models.Seismic_get(pac.model,:ρI0))
 	g=view(pac.grad_stack,:)
 	
 	for i in 1:nznxd
-		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],KI0,1)
-		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],ρI0,1)
+		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],pac.model.ref.KI,1)
+		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],pac.model.ref.ρI,1)
 	end
 
 	Models.Seismic_chainrule!(pac.gmodel, pac.model, pac.grad_stack, [:χKI, :χρI, :null], 1)
 
 	for i in 1:nznxd
-		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],KI0,-1)
-		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],ρI0,-1)
+		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],pac.model.ref.KI,-1)
+		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],pac.model.ref.ρI,-1)
 	end
 end
 

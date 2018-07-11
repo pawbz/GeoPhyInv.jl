@@ -11,6 +11,21 @@ using ImageFiltering
 import JuMIT.Smooth
 
 """
+Store reference model parameters
+"""
+type Seismic_ref{T<:Real}
+	vp::T
+	vs::T
+	ρ::T
+	K::T
+	μ::T
+	KI::T
+	μI::T
+	ρI::T
+end
+
+
+"""
 Data type fo represent a seismic model.
 A contrast function for a model m is given by ``χ(m) = \frac{m}{m0}-1``.
 
@@ -32,8 +47,15 @@ type Seismic
 	χvs::Array{Float64,2}
 	χρ::Array{Float64,2}
 	mgrid::Grid.M2D
+	# all derived fields from previous
+	K0::Vector{Float64}
+	μ0::Vector{Float64}
+	KI0::Vector{Float64}
+	μI0::Vector{Float64}
+	ρI0::Vector{Float64}
+	ref::Seismic_ref{Float64}
 	"adding conditions that are to be false while construction"
-	Seismic(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid) = 
+	Seismic(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid,K0,μ0,KI0,μI0,ρI0,ref) = 
 		any([
 		     any(vp0.<0.0), 
 		     any(vs0.<0.0),
@@ -48,7 +70,28 @@ type Seismic
 		     size(χvs) != (length(mgrid.z), length(mgrid.x)), # dimension check
 		     size(χρ) != (length(mgrid.z), length(mgrid.x)) # dimension check
 		    ]) ? 
-		       error("error in Seismic construction") : new(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid)
+		       error("error in Seismic construction") : new(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid,K0,μ0,KI0,μI0,ρI0,ref)
+end
+
+function Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, mgrid::Grid.M2D)
+	mod=Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, mgrid,
+	    zeros(2), zeros(2), zeros(2), zeros(2), zeros(2),
+	    Seismic_ref(zeros(8)...))
+	update_derived!(mod)
+	return mod
+end
+
+
+# update the derived fields of the Seisimc model
+function update_derived!(mod::Seismic)
+	"note that: mean(K0) ≠ 1/mean(KI0)"
+	mod.K0 = mod.vp0 .* mod.vp0 .* mod.ρ0; 
+	mod.KI0 = flipdim(inv.(mod.K0),1);
+	ρ0 = mod.ρ0; 
+	mod.ρI0 = flipdim(inv.(ρ0),1);
+	mod.μ0 = mod.vs0 .* mod.vs0 .* mod.ρ0;
+	mod.μI0 = flipdim(inv.(mod.μ0),1);
+	mod.ref = Seismic_ref(mean.([mod.vp0,mod.vs0,mod.ρ0,mod.K0,mod.μ0,mod.KI0,mod.μI0,mod.ρI0])...)
 end
 
 """
@@ -77,6 +120,18 @@ function bounds(mod::Array{Float64}, frac::Float64=0.1)
 	return bounds
 end
 
+
+function adjust_bounds!(mod::Seismic,mod0::Seismic)
+	adjust_bounds!(mod,mod0.vp0,mod0.vs0,mod0.ρ0)
+end
+
+function adjust_bounds!(mod::Seismic,vp0::Vector{Float64},vs0::Vector{Float64},ρ0::Vector{Float64})
+	copy!(mod.vp0, vp0)
+	copy!(mod.vs0, vs0)
+	copy!(mod.ρ0, ρ0)
+	update_derived!(mod)
+end
+
 """
 Adjust the bounds and hence the reference values.
 Since the reference values are adjust the χ fields should also be changed
@@ -90,6 +145,7 @@ function adjust_bounds!(mod::Seismic, frac::Float64=0.1)
 		setfield!(mod, f0, m0)
 		setfield!(mod, f, χ(m, m0, 1))
 	end
+	update_derived!(mod)
 	return mod
 end
 
@@ -131,8 +187,8 @@ end
 
 
 "Compare if two `Seismic` models are equal"
-function Base.isequal(mod1::Seismic, mod2::Seismic)
-	fnames = fieldnames(Seismic)
+function Base.isequal(mod1::T, mod2::T) where {T<:Union{Seismic,Seismic_ref}}
+	fnames = fieldnames(T)
 	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
 	return all(vec)
 end
@@ -159,9 +215,7 @@ function Base.copy!(modo::Seismic, mod::Seismic)
 		for f in [:χvp, :χρ, :χvs]
 			modof=getfield(modo,f)
 			modf=getfield(mod,f)
-			for i in eachindex(modf)
-				modof[i]=modf[i]
-			end
+			copy!(modof,modf)
 		end
 		return modo
 	else
@@ -170,31 +224,10 @@ function Base.copy!(modo::Seismic, mod::Seismic)
 end
 
 function Seismic_get(mod::Seismic, attrib::Symbol)
-	K0 = mod.vp0 .* mod.vp0 .* mod.ρ0; 
-	KI0 = flipdim(K0.^(-1.0),1);
-	"note that: mean(K0) ≠ 1/mean(KI0)"
-	ρ0 = mod.ρ0; ρI0 = flipdim(ρ0.^(-1.0),1);
-	μ0 = mod.vs0 .* mod.vs0 .* mod.ρ0;
-	if(attrib == :ρ0)
-		return mod.ρ0;
-	elseif(attrib == :vp0)
-		return mod.vp0;
-	elseif(attrib == :vs0)
-		return mod.vs0;
-	elseif(attrib == :ρI0)
-		return ρI0
-	elseif(attrib == :K0)
-		return K0
-	elseif(attrib == :μ0)
-		return μ0
-	elseif(attrib == :KI0)
-		return KI0
-	else
-		# allocate
-		rout=zeros(mod.mgrid.nz, mod.mgrid.nx)
-		Seismic_get!(rout, mod, [attrib])
-		return rout
-	end
+	# allocate
+	rout=zeros(mod.mgrid.nz, mod.mgrid.nx)
+	Seismic_get!(rout, mod, [attrib])
+	return rout
 end
 
 """
@@ -205,60 +238,49 @@ that are not present in `Seismic`.
 * `:Zp` : P-wave impedance
 """
 function Seismic_get!(x, mod::Seismic, attribvec::Vector{Symbol})
-	K0 = mod.vp0 .* mod.vp0 .* mod.ρ0; 
-	KI0 = flipdim(K0.^(-1.0),1);
-	"note that: mean(K0) ≠ 1/mean(KI0)"
-	ρ0 = mod.ρ0; ρI0 = flipdim(ρ0.^(-1.0),1);
-	μ0 = mod.vs0 .* mod.vs0 .* mod.ρ0;
-	ρ=mod.χρ; χ!(ρ, mod.ρ0,-1) # undo it later
-	vp=mod.χvp; χ!(vp, mod.vp0,-1) # undo it later
-	vs=mod.χvs; χ!(vs, mod.vs0,-1) # undo it later
+	ρ=mod.χρ; χ!(ρ, mod.ref.ρ,-1) # undo it later
+	vp=mod.χvp; χ!(vp, mod.ref.vp,-1) # undo it later
+	vs=mod.χvs; χ!(vs, mod.ref.vs,-1) # undo it later
 	nznx=length(ρ)
 	(length(x)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
 	i0=0; 
 	for attrib in attribvec
 		if(attrib ≠:null)
 		if(attrib == :ρI)
-			for i in 1:nznx; x[i0+i]=inv(ρ[i]); end
+			@inbounds for i in 1:nznx; x[i0+i]=inv(ρ[i]); end
 		elseif(attrib == :ρ)
-			for i in 1:nznx; x[i0+i]=ρ[i]; end
+			@inbounds for i in 1:nznx; x[i0+i]=ρ[i]; end
 		elseif(attrib == :vp)
-			for i in 1:nznx; x[i0+i]=vp[i]; end
+			@inbounds for i in 1:nznx; x[i0+i]=vp[i]; end
 		elseif(attrib == :vs)
-			for i in 1:nznx; x[i0+i]=vs[i]; end
+			@inbounds for i in 1:nznx; x[i0+i]=vs[i]; end
 		elseif(attrib == :χρI)
-			temp=mean(ρI0)
-			for i in 1:nznx; x[i0+i]=χ(inv(ρ[i]),temp,1); end
+			@inbounds for i in 1:nznx; x[i0+i]=χ(inv(ρ[i]),mod.ref.ρI,1); end
 		elseif(attrib == :χρ)
-			temp=mean(mod.ρ0)
-			for i in 1:nznx; x[i0+i]=χ(ρ[i],temp,1); end
+			@inbounds for i in 1:nznx; x[i0+i]=χ(ρ[i],mod.ref.ρ,1); end
 		elseif(attrib == :χvp)
-			temp=mean(mod.vp0)
-			for i in 1:nznx; x[i0+i]=χ(vp[i],temp,1); end
+			@inbounds for i in 1:nznx; x[i0+i]=χ(vp[i],mod.ref.vp,1); end
 		elseif(attrib == :χK)
-			temp=mean(K0)
-			for i in 1:nznx; x[i0+i]=χ(vp[i]*vp[i]*ρ[i],temp,1); end
+			@inbounds for i in 1:nznx; x[i0+i]=χ(vp[i]*vp[i]*ρ[i],mod.ref.K,1); end
 		elseif(attrib == :χμ)
-			temp=mean(μ0)
-			for i in 1:nznx; x[i0+i]=χ(vs[i]*vs[i]*ρ[i],temp,1); end
+			@inbounds for i in 1:nznx; x[i0+i]=χ(vs[i]*vs[i]*ρ[i],mod.ref.μ,1); end
 		elseif(attrib == :χKI)
-			temp=mean(KI0)
-			for i in 1:nznx; x[i0+i]=χ(inv(vp[i]*vp[i]*ρ[i]),temp,1); end
+			@inbounds for i in 1:nznx; x[i0+i]=χ(inv(vp[i]*vp[i]*ρ[i]),mod.ref.KI,1); end
 		elseif(attrib == :KI)
-			for i in 1:nznx; x[i0+i]=inv(vp[i]*vp[i]*ρ[i]); end
+			@inbounds for i in 1:nznx; x[i0+i]=inv(vp[i]*vp[i]*ρ[i]); end
 		elseif(attrib == :K)
-			for i in 1:nznx; x[i0+i]=vp[i]*vp[i]*ρ[i]; end
+			@inbounds for i in 1:nznx; x[i0+i]=vp[i]*vp[i]*ρ[i]; end
 		elseif(attrib == :Zp)
-			for i in 1:nznx; x[i0+i]=vp[i]*ρ[i]; end
+			@inbounds for i in 1:nznx; x[i0+i]=vp[i]*ρ[i]; end
 		else
 			error("invalid attrib")
 		end
 		i0+=nznx
 		end
 	end
-	χ!(ρ, mod.ρ0,1) 
-	χ!(vp, mod.vp0,1)
-	χ!(vs, mod.vp0,1)
+	χ!(ρ, mod.ref.ρ,1) 
+	χ!(vp, mod.ref.vp,1)
+	χ!(vs, mod.ref.vs,1)
 	return x
 end
 
@@ -284,35 +306,26 @@ function Seismic_reparameterize!(
 	nznx=mod.mgrid.nz*mod.mgrid.nx
 	(length(x)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
 	if(attribvec == [:χKI, :χρI, :null]) 
-		vp0=mean(mod.vp0)
-		ρ0=mean(mod.ρ0)
-		KI0=mean(Seismic_get(mod,:KI0))
-		ρI0=mean(Seismic_get(mod,:ρI0))
-		K0=mean(Seismic_get(mod,:K0))
-		for i in 1:nznx 
-			K=inv(χ(x[i],KI0,-1))
-			ρ=inv(χ(x[nznx+i],ρI0,-1))
-			mod.χvp[i]=χ(sqrt(K*inv(ρ)),vp0,1)
-			mod.χρ[i]=χ(ρ,ρ0,1)
+		@inbounds for i in 1:nznx 
+			K=inv(χ(x[i],mod.ref.KI,-1))
+			ρ=inv(χ(x[nznx+i],mod.ref.ρI,-1))
+			mod.χvp[i]=χ(sqrt(K*inv(ρ)),mod.ref.vp,1)
+			mod.χρ[i]=χ(ρ,mod.ref.ρ,1)
 		end
 	elseif(attribvec == [:χKI, :null, :null]) 
-		vp0=mean(mod.vp0)
-		ρ0=mean(mod.ρ0)
-		KI0=mean(Seismic_get(mod,:KI0))
-		K0=mean(Seismic_get(mod,:K0))
-		for i in 1:nznx 
-			K=inv(χ(x[i],KI0,-1))
-			ρ=χ(mod.χρ[i],ρ0,-1)
-			mod.χvp[i]=χ(sqrt(K*inv(ρ)),vp0,1)
-			mod.χρ[i]=χ(ρ,ρ0,1)
+		@inbounds for i in 1:nznx 
+			K=inv(χ(x[i],mod.ref.KI,-1))
+			ρ=χ(mod.χρ[i],mod.ref.ρ,-1)
+			mod.χvp[i]=χ(sqrt(K*inv(ρ)),mod.ref.vp,1)
+			mod.χρ[i]=χ(ρ,mod.ref.ρ,1)
 		end
 	elseif(attribvec == [:χvp, :χρ, :null]) 
-		for i in 1:nznx; mod.χvp[i]=x[i]; end
-		for i in 1:nznx; mod.χρ[i]=x[nznx+i]; end
+		@inbounds for i in 1:nznx; mod.χvp[i]=x[i]; end
+		@inbounds for i in 1:nznx; mod.χρ[i]=x[nznx+i]; end
 	elseif(attribvec == [:null, :χρ, :null]) 
-		for i in 1:nznx; mod.χρ[i]=x[i]; end
+		@inbounds for i in 1:nznx; mod.χρ[i]=x[i]; end
 	elseif(attribvec == [:χvp, :null, :null]) 
-		for i in 1:nznx; mod.χvp[i]=x[i]; end
+		@inbounds for i in 1:nznx; mod.χvp[i]=x[i]; end
 	else
 		error("invalid attribvec")
 	end
@@ -346,79 +359,75 @@ function Seismic_chainrule!(
 	nznx=mod.mgrid.nz*mod.mgrid.nx
 	(length(g)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
 
-	ρ=mod.χρ; χ!(ρ, mod.ρ0,-1) # undo it later
-	vp=mod.χvp; χ!(vp, mod.vp0,-1) # undo it later
-	vs=mod.χvs; χ!(vs, mod.vs0,-1) # undo it later
-	KI0=mean(Seismic_get(mod,:KI0))
-	ρI0=mean(Seismic_get(mod,:ρI0))
-	K0 = mean(Seismic_get(mod, :K0))
-	vp0=mean(mod.vp0);	vs0=mean(mod.vs0);	ρ0=mean(mod.ρ0)
+	ρ=mod.χρ; χ!(ρ, mod.ref.ρ,-1) # undo it later
+	vp=mod.χvp; χ!(vp, mod.ref.vp,-1) # undo it later
+	vs=mod.χvs; χ!(vs, mod.ref.vs,-1) # undo it later
 	if(flag == 1)
 		if(attribvec == [:χKI, :χρI, :null]) 
-			for i in 1:nznx
-				g[i]=χg(g[i],KI0,-1)
-				g[nznx+i]=χg(g[nznx+i],ρI0,-1)
+			@inbounds for i in 1:nznx
+				g[i]=χg(g[i],mod.ref.KI,-1)
+				g[nznx+i]=χg(g[nznx+i],mod.ref.ρI,-1)
 				# gradient w.r.t  χρ
 				gmod.χρ[i]= -1.*abs2(inv(ρ[i]))*g[nznx+i]-inv(vp[i]*vp[i]*ρ[i]*ρ[i])*g[i]
 				# gradient w.r.t χvp
 				gmod.χvp[i] = -2.*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
-				g[i]=χg(g[i],KI0,1)
-				g[nznx+i]=χg(g[nznx+i],ρI0,1)
+				g[i]=χg(g[i],mod.ref.KI,1)
+				g[nznx+i]=χg(g[nznx+i],mod.ref.ρI,1)
 			end
-			χg!(gmod.χρ,ρ0,1)
-			χg!(gmod.χvp,vp0,1)
+			χg!(gmod.χρ,mod.ref.ρ,1)
+			χg!(gmod.χvp,mod.ref.vp,1)
 		elseif(attribvec == [:χKI, :null, :null]) 
-			for i in 1:nznx
-				g[i]=χg(g[i],KI0,-1)
+			@inbounds for i in 1:nznx
+				g[i]=χg(g[i],mod.ref.KI,-1)
 				# gradient w.r.t χvp
 				gmod.χvp[i] = -2.*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
-				g[i]=χg(g[i],KI0,1)
+				g[i]=χg(g[i],mod.ref.KI,1)
 			end
-			χg!(gmod.χvp,vp0,1)
+			χg!(gmod.χvp,mod.ref.vp,1)
 
 		elseif(attribvec == [:χvp, :χρ, :null]) 
-			for i in 1:nznx; gmod.χvp[i]=g[i]; end
-			for i in 1:nznx; gmod.χρ[i]=g[nznx+i]; end
+			@inbounds for i in 1:nznx; gmod.χvp[i]=g[i]; end
+			@inbounds for i in 1:nznx; gmod.χρ[i]=g[nznx+i]; end
 		elseif(attribvec == [:null, :χρ, :null]) 
-			for i in 1:nznx; gmod.χρ[i]=g[i]; end
+			@inbounds for i in 1:nznx; gmod.χρ[i]=g[i]; end
 		elseif(attribvec == [:χvp, :null, :null]) 
-			for i in 1:nznx; gmod.χvp[i]=g[i]; end
+			@inbounds for i in 1:nznx; gmod.χvp[i]=g[i]; end
 		else
 			error("invalid attribs")
 		end
 	elseif(flag == -1)
 		if(attribvec == [:χKI, :χρI, :null])
-			χg!(gmod.χvp, mod.vp0, -1) # undo it later
-			χg!(gmod.χρ, mod.ρ0, -1) # undo it later
+			χg!(gmod.χvp, mod.ref.vp, -1) # undo it later
+			χg!(gmod.χρ, mod.ref.ρ, -1) # undo it later
 			gvp = gmod.χvp
 			gρ = gmod.χρ
-			@simd for i in 1:nznx
-				g[i] = -0.5 * KI0 * gvp[i] * ρ[i] *  vp[i]^3
+			@inbounds for i in 1:nznx
+				g[i] = -0.5 * mod.ref.KI * gvp[i] * ρ[i] *  vp[i]^3
 			end
-			@simd for i in 1:nznx
-				g[nznx+i] = (gρ[i] * ρI0 * -1. * ρ[i]*ρ[i]) + 
-					(0.5 * ρI0 .* gvp[i] .*  vp[i] .* ρ[i])
+			@inbounds for i in 1:nznx
+				g[nznx+i] = (gρ[i] * mod.ref.ρI * -1. * ρ[i]*ρ[i]) + 
+					(0.5 * mod.ref.ρI .* gvp[i] .*  vp[i] .* ρ[i])
 			end
-			χg!(gvp,mod.vp0,1)
-			χg!(gρ,mod.ρ0,1)
+			χg!(gvp,mod.ref.vp,1)
+			χg!(gρ,mod.ref.ρ,1)
 		elseif(attribvec == [:χKI, :null, :null])
-			χg!(gmod.χvp, mod.vp0, -1) # undo it later
+			χg!(gmod.χvp, mod.ref.vp, -1) # undo it later
 			gvp = gmod.χvp
-			@simd for i in 1:nznx
-				g[i] = -0.5 * KI0 * gvp[i] * ρ[i] *  vp[i]^3
+			@inbounds for i in 1:nznx
+				g[i] = -0.5 * mod.ref.KI * gvp[i] * ρ[i] *  vp[i]^3
 			end
-			χg!(gvp,mod.vp0,1)
+			χg!(gvp,mod.ref.vp,1)
 		elseif(attribvec == [:χvp, :χρ, :null]) 
-			@simd for i in 1:nznx
+			@inbounds for i in 1:nznx
 				g[i] = gmod.χvp[i]
 				g[nznx+i] = gmod.χρ[i]
 			end
 		elseif(attribvec == [:χvp, :null, :null]) 
-			@simd for i in 1:nznx
+			@inbounds for i in 1:nznx
 				g[i] = gmod.χvp[i]
 			end
 		elseif(attribvec == [:null, :χρ, :null]) 
-			@simd for i in 1:nznx
+			@inbounds for i in 1:nznx
 				g[i] = gmod.χρ[i]
 			end
 		else
@@ -427,9 +436,9 @@ function Seismic_chainrule!(
 	else
 		error("invalid flag")
 	end
-	χ!(ρ, mod.ρ0,1) 
-	χ!(vp, mod.vp0,1)
-	χ!(vs, mod.vp0,1)
+	χ!(ρ, mod.ref.ρ,1) 
+	χ!(vp, mod.ref.vp,1)
+	χ!(vs, mod.ref.vs,1)
 end
 
 
@@ -442,24 +451,24 @@ reference value.
 * `mod0::Vector{Float64}` : reference value is mean of this vector
 * `flag::Int64=1` : 
 """
-function χ(mod::AbstractArray{Float64}, mod0, flag::Int64=1)
+function χ(mod::AbstractArray{T}, mod0::T, flag::Int64=1) where {T<:Real}
 	mod_out=copy(mod)
 	χ!(mod_out, mod0, flag)
 	return mod_out
 end
-function χ!(mod::AbstractArray{Float64}, mod0, flag::Int64=1)
-	m0 = mean(mod0)
+function χ!(mod::AbstractArray{T}, mod0::T, flag::Int64=1) where {T<:Real}
+	m0 = mod0
 	if(flag == 1)
 		if(iszero(m0))
 			return nothing
 		else
-			@simd for i in eachindex(mod)
+			@inbounds for i in eachindex(mod)
 				mod[i] = ((mod[i] - m0) * inv(m0))
 			end
 			return mod 
 		end
 	elseif(flag == -1)
-		@simd for i in eachindex(mod)
+		@inbounds for i in eachindex(mod)
 			mod[i] = mod[i] * m0 + m0
 		end
 		return mod 
@@ -479,17 +488,16 @@ Gradients
 Return contrast model parameter using the
 reference value.
 """
-function χg(mod::AbstractArray{Float64}, mod0, flag::Int64=1)
+function χg(mod::AbstractArray{T}, mod0::T, flag::Int64=1) where {T<:Real}
 	mod_out=copy(mod)
 	χg!(mod_out, mod0, flag)
 	return mod_out
 end
-function χg!(mod::AbstractArray{Float64}, mod0, flag::Int64=1)
+function χg!(mod::AbstractArray{T}, mod0::T, flag::Int64=1) where {T<:Real}
 	if(flag == 1)
-		m0 = mean(mod0)
-		scale!(mod, m0)
+		scale!(mod, mod0)
 	elseif(flag == -1)
-		m0 = inv(mean(mod0))
+		m0 = inv(mod0)
 		scale!(mod, m0)
 	end
 	return mod
@@ -667,6 +675,7 @@ function Seismic_trun(mod::Seismic;
 	
 	# allocate model
 	mod_trun = Seismic_zeros(mgrid_trun)
+	adjust_bounds!(mod_trun, mod)
 
 	for f in [:χvp, :χvs, :χρ]
 		f0 = Symbol((replace("$(f)", "χ", "")),0)
@@ -682,9 +691,7 @@ Extend a seismic model into PML layers
 """
 function Seismic_pml_pad_trun(mod::Seismic)
 	modex=Seismic_zeros(Grid.M2D_pml_pad_trun(mod.mgrid))
-	copy!(modex.vp0, mod.vp0)
-	copy!(modex.vs0, mod.vs0)
-	copy!(modex.ρ0, mod.ρ0)
+	adjust_bounds!(modex,mod)
 	Seismic_pml_pad_trun!(modex, mod)
 
 	return modex
@@ -692,14 +699,14 @@ end
 
 "only padding implemented"
 function Seismic_pml_pad_trun!(modex::Seismic, mod::Seismic)
-	vp=mod.χvp; χ!(vp,mod.vp0,-1)
-	vs=mod.χvs; χ!(vs,mod.vs0,-1)
-	ρ=mod.χρ; χ!(ρ,mod.ρ0,-1)
+	vp=mod.χvp; χ!(vp,mod.ref.vp,-1)
+	vs=mod.χvs; χ!(vs,mod.ref.vs,-1)
+	ρ=mod.χρ; χ!(ρ,mod.ref.ρ,-1)
 
 	vpex=modex.χvp; vsex=modex.χvs; ρex=modex.χρ;
 	pml_pad_trun!(vpex,vp,1);	pml_pad_trun!(vsex,vs,1);	pml_pad_trun!(ρex,ρ,1)
-	χ!(vpex,modex.vp0,1);	χ!(vsex,modex.vs0,1);	χ!(ρex,modex.ρ0,1)
-	χ!(vp,mod.vp0,1);	χ!(vs,mod.vs0,1);	χ!(ρ,mod.ρ0,1)
+	χ!(vpex,modex.ref.vp,1);	χ!(vsex,modex.ref.vs,1);	χ!(ρex,modex.ref.ρ,1)
+	χ!(vp,mod.ref.vp,1);	χ!(vs,mod.ref.vs,1);	χ!(ρ,mod.ref.ρ,1)
 end
 
 function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
@@ -770,9 +777,8 @@ function interp_spray!(mod::Seismic, modi::Seismic, attrib::Symbol, Battrib::Sym
 	Interpolation.interp_spray!(mod.χvs, modi.χvs, pa, attrib)
 	Interpolation.interp_spray!(mod.χρ, modi.χρ,  pa, attrib)
 
-	modi.vp0 = copy(mod.vp0); modi.vs0 = copy(mod.vs0); 
-	modi.ρ0 = copy(mod.ρ0);
 end
+
 #
 #macro inter
 
@@ -789,6 +795,7 @@ function save(mod::Seismic, folder; N=100)
 	nx=length(x)
 	nz=length(z)
 	modo=Seismic_zeros(mgrid)
+	adjust_bounds!(modo, mod)
 	interp_spray!(mod, modo, :interp)
 
 	for m in [:vp, :ρ, :Zp]

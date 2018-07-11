@@ -14,8 +14,8 @@ wav = Signals.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
 acqsrc = JuMIT.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
 
 
-vp0=mean(JuMIT.Models.χ(model.χvp,model.vp0,-1))
-ρ0=mean(JuMIT.Models.χ(model.χρ,model.ρ0,-1))
+vp0=mean(JuMIT.Models.χ(model.χvp,model.ref.vp,-1))
+ρ0=mean(JuMIT.Models.χ(model.χρ,model.ref.ρ,-1))
 rec1 = JuMIT.Analytic.mod(vp0=vp0,
             model_pert=model,
 		             ρ0=ρ0,

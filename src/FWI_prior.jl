@@ -12,6 +12,7 @@ function update_prior!(pa; priori=nothing, priorw=nothing, priorm=nothing)
 			copy!(pa.priori, pa.modi)
 		else
 			Models.interp_spray!(priorm, pa.priori, :interp)
+			copy!(pa.priori, pa.modi)
 		end
 	else
 		!(isapprox(priori,pa.modi)) && error("priori model has to be on igrid")
@@ -26,8 +27,6 @@ function update_prior!(pa; priori=nothing, priorw=nothing, priorm=nothing)
 		copy!(pa.priorw, priorw)
 		# update pa.mx.w
 		Seismic_x!(nothing, pa.priorw, pa.mx.w, pa, 1)
-	else
-		pa.mx.w[:]=1.0
 	end
 
 end
