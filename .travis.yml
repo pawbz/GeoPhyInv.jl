@@ -28,6 +28,7 @@ matrix:
 ## uncomment the following lines to override the default test script
 script:
   - julia -e 'Pkg.clone("https://github.com/pawbz/Misfits.jl.git")'
+  - julia -e 'Pkg.clone("https://github.com/pawbz/Signals.jl.git")'
   - julia -e 'Pkg.clone("https://github.com/pawbz/Conv.jl.git")'
   - julia -e 'Pkg.clone("https://github.com/pawbz/Inversion.jl.git")'
   - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("JuMIT"); Pkg.test("JuMIT"; coverage=true)'
