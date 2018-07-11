@@ -73,6 +73,8 @@ type Param
 	modm0::Models.Seismic
 	"Seismic on inversion grid"
 	modi::Models.Seismic
+	"prior model on the inversion grid"
+	"prior weights on the inversion grid"
 	"gradient Seismic model on modeling grid"
 	gmodm::Models.Seismic
 	"gradient Seismic on inversion grid"
