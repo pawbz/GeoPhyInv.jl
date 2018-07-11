@@ -65,8 +65,6 @@ type Param
 	adjacqgeom::Acquisition.Geom
 	"modeling attribute"
 	attrib_mod::Symbol
-	"inversion attribute"
-	attrib_inv::Symbol
 	"Seismic model on modeling grid"
 	modm::Models.Seismic
 	"background Seismic model"
@@ -74,7 +72,9 @@ type Param
 	"Seismic on inversion grid"
 	modi::Models.Seismic
 	"prior model on the inversion grid"
+	priori::Models.Seismic
 	"prior weights on the inversion grid"
+	priorw::Models.Seismic
 	"gradient Seismic model on modeling grid"
 	gmodm::Models.Seismic
 	"gradient Seismic on inversion grid"
@@ -136,7 +136,6 @@ Constructor for `Param`
 * `acqgeom::Acquisition.Geom` : acquisition geometry
 * `tgrid::Grid.M1D` : modelling time grid
 * `attrib_mod::Symbol` : modelling attribute
-* `attrib_inv::Symbol` : inversion attribute
 * `modm::Models.Seismic` : seismic model on modelling mesh 
 
 # Optional Arguments
@@ -170,7 +169,6 @@ function Param(
 	       acqgeom::Acquisition.Geom,
 	       tgrid::Grid.M1D,
 	       attrib_mod::Symbol, 
-	       attrib_inv::Symbol,
 	       modm::Models.Seismic;
 	       # other optional 
 	       tgrid_obs::Grid.M1D=deepcopy(tgrid),
@@ -199,7 +197,10 @@ function Param(
 	modi = Models.Seismic_zeros(igrid);
 	Models.interp_spray!(modm, modi, :interp)
 
-	#
+	# allocate prior inputs
+	priori=similar(modi)
+	priorw=similar(modi)
+
 	# need a separate model for synthetic
 	if(attrib == :synthetic) 
 		((attrib_mod == :fdtd_hborn) | (attrib_mod == :fdtd_born)) && 
@@ -336,8 +337,9 @@ function Param(
 	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
-	     attrib_mod, attrib_inv, 
+	     attrib_mod,  
 	     deepcopy(modm), deepcopy(modm0), modi, 
+	     priori, priorw,
 	     gmodm,gmodi,
 	     parameterization,
 	     zeros(2,2), # dummy, update mprecon later
@@ -362,6 +364,9 @@ function Param(
 	dcal=pa.paf.c.data[1]
 	copy!(pa.paTD.x, dcal)
 
+
+	# update priori and priorw in pa to defaults
+	update_prior!(pa)
 
 	return pa
 end
@@ -479,6 +484,7 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 
 	# update modm and modi using minimizer of Optim
 	Seismic_x!(pa.modm, pa.modi, Optim.minimizer(res), pa, -1)
+	Seismic_x!(nothing, pa.modi, pa.mx.x, pa, 1)
 
 	# update calculated data at the last iteration --> pa.paTD.x
 	pa.paf.c.activepw=[1,]

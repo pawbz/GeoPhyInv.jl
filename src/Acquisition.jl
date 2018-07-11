@@ -405,6 +405,10 @@ end
 
 """
 Appends the input a vector of acquisition geometries.
+"Merge" `Geom` objects in `geomv` to `geom1`.
+Typically you have one acquisition, 
+you change it and want to create the macro acquisition
+where the supersources of both acquisitions are appended.
 """
 function Geom_add!(geom1::Geom, geomv::Vector{Geom})
 	for igeom=1:length(geomv)
