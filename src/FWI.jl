@@ -50,7 +50,7 @@ FWI Parameters
 
 TODO: add an extra attribute for coupling functions inversion and modelling
 """
-type Param
+type Param{Tdatamisfit}
 	"model inversion variable"
 	mx::Inversion.X
 	"forward modelling parameters for"
@@ -84,7 +84,7 @@ type Param
 	"model preconditioning"
 	mprecon::AbstractArray{Float64,2}
 	"compute data misfit"
-	paTD::Data.P_misfit
+	paTD::Tdatamisfit
 	paminterp::Interpolation.Param{Float64}
 	optims::Vector{Symbol} # :cls, xcorrcls.. ?
 	verbose::Bool
@@ -115,8 +115,17 @@ include("FWI_prior.jl")
 Convert the data `TD` to `Src` after time reversal.
 """
 function update_adjsrc!(adjsrc, δdat::Data.TD, adjacqgeom)
-	for i in 1:adjacqgeom.nss, j in 1:length(δdat.fields)
-		adjsrc.wav[i,j] = (flipdim(δdat.d[i,j],1))
+	nt=δdat.tgrid.nx
+	for i in 1:adjacqgeom.nss
+		for j in 1:length(δdat.fields)
+			wav=adjsrc.wav[i,j] 
+			dat=δdat.d[i,j]
+			for ir in 1:δdat.acqgeom.nr[i]
+				for it in 1:nt
+					@inbounds wav[it,ir]=dat[nt-it+1,ir]
+				end
+			end
+		end
 	end
 	return nothing
 end
@@ -325,8 +334,13 @@ function Param(
 	iszero(dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
 
 	# create Parameters for data misfit
-	coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, recv_fields, acqgeom)
-	paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
+	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, recv_fields, acqgeom)
+	# choose the data misfit
+	#	(iszero(tlagssf_fracs)) 
+ 	# tlagssf_fracs==[0.0] | tlagssf_fracs=[0.0])
+	# paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
+
+	paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon);
 
 	paminterp=Interpolation.Param([modi.mgrid.x, modi.mgrid.z], [modm.mgrid.x, modm.mgrid.z], igrid_interp_scheme)
 
@@ -462,8 +476,8 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 	initialize!(pa)
 
 	const to = TimerOutput(); # create a timer object
-	f(x) = @timeit to "f" fg!(nothing, x, pa.mx.last_x,  pa, obj)
-	g!(storage, x) = @timeit to "g!" fg!(storage, x, pa.mx.last_x, pa, obj)
+	f(x) = @timeit to "f" ζfunc(x, pa.mx.last_x,  pa, obj)
+	g!(storage, x) = @timeit to "g!" ζgrad!(storage, x, pa.mx.last_x, pa, obj)
 	begin
 		reset_timer!(to)
 		if(!bounded_flag)
@@ -547,7 +561,7 @@ function xfwi!(pa::Param, obj::Migr)
 
 	g1=pa.mx.gm[1]
 	@timeit to "fg!" begin
-		func_grad_xfwi!(g1, pa.mx.x, pa.mx.last_x,  pa)
+		grad!(g1, pa.mx.x, pa.mx.last_x,  pa)
 	end
 	pa.verbose && show(pa)
 
@@ -646,69 +660,69 @@ end
 """
 Return functional and gradient of the LS objective 
 """
-function func_grad_xfwi!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
-
-	pa.verbose && println("computing gradient...")
+function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 
 	# do forward modelling, apply F x
 	F!(pa, x, last_x)
 
-	if(storage === nothing)
-		# compute misfit 
-		f = Data.func_grad!(pa.paTD)
-		return f
-	else
-		# compute functional and get ∇_d J (adjoint sources)
-		f = Data.func_grad!(pa.paTD, :dJx)
-
-		# update adjoint sources after time reversal
-		update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
-
-		# project x, which lives in modi, on to model space (modm)
-		Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
-
-		# put modm into Fdtd
-		Fdtd.update_model!(pa.paf.c, pa.modm)
-
-		# do adjoint modelling here with adjoint sources Fᵀ F P x
-		Fadj!(pa)	
-	
-		# adjoint of interpolation
-		Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
-
-		return storage
-	end
-end # func_grad_xfwi!
-
-
-function fg!(storage, x, last_x, pa::Param, ::LS)
-	f=func_grad_xfwi!(storage, x, last_x, pa)
+	# compute misfit 
+	f = Data.func_grad!(pa.paTD)
 	return f
 end
 
+function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 
-function fg!(storage, x, last_x, pa::Param, obj::LS_prior)
-	if(storage===nothing)
-		f1=func_grad_xfwi!(nothing, x, last_x, pa)
-	else
-		g1=pa.mx.gm[1]
-		f1=func_grad_xfwi!(g1, x, last_x, pa)
-	end
+	# do forward modelling, apply F x (inactive when applied on same model)
+	F!(pa, x, last_x)
 
-	if(storage===nothing)
-		f2=Misfits.error_squared_euclidean!(nothing, x, pa.mx.prior, pa.mx.w, norm_flag=false)
-	else
-		g2=pa.mx.gm[2]
-		f2=Misfits.error_squared_euclidean!(g2, x, pa.mx.prior, pa.mx.w, norm_flag=false)
-	end
+	# compute functional and get ∇_d J (adjoint sources)
+	f = Data.func_grad!(pa.paTD, :dJx);
 
-	f=f1*obj.α[1]+f2*obj.α[2]
-	if(!(storage===nothing))
-		for i in eachindex(storage)
-			@inbounds storage[i]=g1[i]*obj.α[1]+g2[i]*obj.α[2]
-		end
+	# update adjoint sources after time reversal
+	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
+
+	# do adjoint modelling here with adjoint sources Fᵀ F P x
+	Fadj!(pa)	
+
+	# adjoint of interpolation
+	Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,storage,pa,1) 
+
+	return storage
+end 
+
+
+
+function ζfunc(x, last_x, pa::Param, ::LS)
+	return func(x, last_x, pa)
+end
+
+
+function ζgrad!(storage, x, last_x, pa::Param, ::LS)
+	return grad!(storage, x, last_x, pa)
+end
+
+
+function ζfunc(x, last_x, pa::Param, obj::LS_prior)
+	f1=func(x, last_x, pa)
+
+	f2=Misfits.error_squared_euclidean!(nothing, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+
+	return f1*obj.α[1]+f2*obj.α[2]
+end
+
+function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior)
+	g1=pa.mx.gm[1]
+	grad!(g1, x, last_x, pa)
+
+	g2=pa.mx.gm[2]
+	Misfits.error_squared_euclidean!(g2, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+
+	scale!(g1, obj.α[1])
+	scale!(g2, obj.α[2])
+	for i in eachindex(storage)
+		@inbounds storage[i]=g1[i]+g2[i]
 	end
-	return f
+	return storage
 end
 
 """

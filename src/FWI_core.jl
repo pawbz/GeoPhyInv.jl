@@ -16,11 +16,12 @@ and boundary values for adjoint calculation.
 """
 function F!(pa::Param, x, last_x=[0.0])
 	if(x!=last_x)
-		pa.verbose && println("updating buffer")
-		(size(last_x)==size(x)) && (last_x[:] = x[:])
+		copy!(last_x, x)
 
 		if(!(x===nothing))
+			# project x, which lives in modi, on to model space (modm)
 			Seismic_x!(pa.modm, pa.modi, x, pa, -1)		
+
 			# update model in the forward engine
 			Fdtd.update_model!(pa.paf.c, pa.modm)
 		end

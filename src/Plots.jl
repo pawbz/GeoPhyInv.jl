@@ -60,8 +60,8 @@ Plot the velocity and density seismic models.
 				m[j]=mmin+((m[j]-mmmin)*inv(mmmax-mmmin))*(mmax-mmin)
 			end
 		end
-		mmin = use_bounds ? Models.Seismic_get(model, f0)[1] : minimum(m)
-		mmax = use_bounds ? Models.Seismic_get(model, f0)[2] : maximum(m)
+		mmin = use_bounds ? getfield(model, f0)[1] : minimum(m)
+		mmax = use_bounds ? getfield(model, f0)[2] : maximum(m)
 		@series begin        
 			subplot := i
 			aspect_ratio := :equal
@@ -159,23 +159,27 @@ and model grid `M2D`.
 		end
 	end
 
-	@series begin        
-		subplot --> 1
-		markersize --> 7
-		legend --> false
-		seriestype := :scatter
-		markercolor := :blue
-		markershape := :utriangle
-		rx, rz
+	if(:r ∈ fields)
+		@series begin        
+			subplot --> 1
+			markersize --> 7
+			legend --> false
+			seriestype := :scatter
+			markercolor := :blue
+			markershape := :utriangle
+			rx, rz
+		end
 	end
-	@series begin        
-		subplot --> 1
-		legend --> false
-		markersize --> 7
-		markercolor := :red
-		markershape := :star7
-		seriestype := :scatter
-		sx, sz
+	if(:s ∈ fields)
+		@series begin        
+			subplot --> 1
+			legend --> false
+			markersize --> 7
+			markercolor := :red
+			markershape := :star7
+			seriestype := :scatter
+			sx, sz
+		end
 	end
 
 

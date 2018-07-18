@@ -125,10 +125,10 @@ function adjust_bounds!(mod::Seismic,mod0::Seismic)
 	adjust_bounds!(mod,mod0.vp0,mod0.vs0,mod0.ρ0)
 end
 
-function adjust_bounds!(mod::Seismic,vp0::Vector{Float64},vs0::Vector{Float64},ρ0::Vector{Float64})
-	copy!(mod.vp0, vp0)
-	copy!(mod.vs0, vs0)
-	copy!(mod.ρ0, ρ0)
+function adjust_bounds!(mod::Seismic,vp0::Vector{T},vs0::Vector{T},ρ0::Vector{T}) where {T<:Real}
+	copy!(mod.vp0, Float64.(vp0))
+	copy!(mod.vs0, Float64.(vs0))
+	copy!(mod.ρ0, Float64.(ρ0))
 	update_derived!(mod)
 end
 
@@ -143,7 +143,7 @@ function adjust_bounds!(mod::Seismic, frac::Float64=0.1)
 		m = Seismic_get(mod, fm)
 		m0 = bounds(m, frac)
 		setfield!(mod, f0, m0)
-		setfield!(mod, f, χ(m, m0, 1))
+		setfield!(mod, f, χ(m, mean(m0), 1))
 	end
 	update_derived!(mod)
 	return mod
