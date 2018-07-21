@@ -29,6 +29,7 @@ import JuMIT.Coupling
 import JuMIT.Fdtd
 using Optim, LineSearches
 using DistributedArrays
+using Calculus
 
 
 """
@@ -86,7 +87,6 @@ type Param{Tdatamisfit}
 	"compute data misfit"
 	paTD::Tdatamisfit
 	paminterp::Interpolation.Param{Float64}
-	optims::Vector{Symbol} # :cls, xcorrcls.. ?
 	verbose::Bool
 	"synthetic or field inversion"
 	attrib::Symbol
@@ -182,7 +182,7 @@ function Param(
 	       # other optional 
 	       tgrid_obs::Grid.M1D=deepcopy(tgrid),
 	       recv_fields=[:P],
-	       igrid::Grid.M2D=deepcopy(modm.mgrid),
+	       igrid::Grid.M2D=nothing,
 	       igrid_interp_scheme::Symbol=:B2,
 	       mprecon_factor::Float64=1.0,
 	       dobs::Data.TD=Data.TD_zeros(recv_fields,tgrid_obs,acqgeom),
@@ -196,11 +196,23 @@ function Param(
 	       born_flag::Bool=false,
 	       verbose::Bool=false,
 	       attrib::Symbol=:synthetic,
-	       optims=[:cls]
 	       )
 
 	# make a copy of initial model
 	modm=deepcopy(modm)
+
+	if(igrid===nothing)
+		igrid=deepcopy(modm.mgrid)
+	end
+	# igrid has to truncated because the gradient evaluation 
+	# is inaccurate on boundaries
+	mg=modm.mgrid
+	igrid=Grid.M2D(max(mg.x[3],igrid.x[1]),
+		min(igrid.x[end],mg.x[end-2]),
+		max(igrid.z[1],mg.z[3]),
+		min(igrid.z[end],mg.z[end-2]),
+		 		igrid.δx,igrid.δz,igrid.npml)
+
 
 	# create modi according to igrid and interpolation of modm
 	modi = Models.Seismic_zeros(igrid);
@@ -361,7 +373,6 @@ function Param(
 	     zeros(2,2), # dummy, update mprecon later
 	     paTD,
 	     paminterp,
-	     optims,
 	     verbose, attrib, true)
 
 
@@ -552,8 +563,6 @@ Return gradient at the first iteration, i.e., a migration image
 """
 function xfwi!(pa::Param, obj::Migr)
 
-	println("updating modm and modi...")
-	println("> xfwi: number of inversion variables:\t", xfwi_ninv(pa)) 
 
 	initialize!(pa)
 
@@ -567,7 +576,6 @@ function xfwi!(pa::Param, obj::Migr)
 
 	# convert gradient vector to model
 	Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,g1,pa,-1)
-	println("maximum value of g(x):\t",  maximum(g1))
 
 	# leave buffer update flag to true before leaving xfwi
 	pa.buffer_update_flag = true
@@ -586,7 +594,9 @@ function xfwi!(pa::Param, obj::Migr_fd)
 	initialize!(pa)
 	gx=pa.mx.gm[1]
 
-	f(x) = @timeit to "f" fg!(nothing, x, pa.mx.last_x,  pa, LS())
+	println("> number of functional evaluations:\t", xfwi_ninv(pa)) 
+
+	f(x) = @timeit to "f" ζfunc(x, pa.mx.last_x,  pa, LS())
 	#
 	gx = Calculus.gradient(f,pa.mx.x) # allocating new gradient vector here
 	
@@ -595,7 +605,6 @@ function xfwi!(pa::Param, obj::Migr_fd)
 	# convert gradient vector to model
 	Seismic_gx!(pa.gmodm,pa.modm,pa.gmodi,pa.modi,gx,pa,-1)
 
-	#println("maximum value of g(x):\t",  maximum(gx))
 	return pa.gmodi
 end
 

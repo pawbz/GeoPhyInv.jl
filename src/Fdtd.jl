@@ -823,7 +823,7 @@ function grad_modrr_sprayrrvz!(grad_modrr_stack,grad_modrrvz_stack)
 end
 
 function stack_grads!(pac::Paramc, pap::Paramp)
-	np=pac.model.mgrid.npml
+	np=pac.model.mgrid.npml # to truncate the gradients in PML region
 	nx, nz=pac.nx, pac.nz
 	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
 
@@ -872,7 +872,6 @@ end
 
 function update_gmodel!(pac::Paramc)
 	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
-	g=view(pac.grad_stack,:)
 	
 	for i in 1:nznxd
 		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],pac.model.ref.KI,1)
