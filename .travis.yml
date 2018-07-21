@@ -33,7 +33,6 @@ script:
   - julia -e 'Pkg.clone("https://github.com/pawbz/Grid.jl.git")'
   - julia -e 'Pkg.clone("https://github.com/pawbz/Interpolation.jl.git")'
   - julia -e 'Pkg.clone("https://github.com/pawbz/Inversion.jl.git")'
-  - julia -e 'Pkg.clone("https://github.com/anowacki/SAC.jl")'
   - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("JuMIT"); Pkg.test("JuMIT"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
