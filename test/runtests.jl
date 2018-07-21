@@ -4,7 +4,8 @@ using Base.Test
 using BenchmarkTools
 using Grid
 
-tests = ["Fdtd_accuracy", "Fdtd_backprop", "Poisson_testscript_RandomEigenfns", 
+tests = ["Fdtd_accuracy", "Fdtd_backprop", 
+	 # "Poisson_testscript_RandomEigenfns", 
 	"Models", "Data", "FWI_grad_test"]
 
 println("Running tests:")
