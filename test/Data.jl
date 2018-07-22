@@ -1,4 +1,3 @@
-using Revise
 using JuMIT
 using Base.Test
 using BenchmarkTools

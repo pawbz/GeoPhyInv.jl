@@ -769,7 +769,7 @@ function to resample in the model domain
 """
 function interp_spray!(mod::Seismic, modi::Seismic, attrib::Symbol, Battrib::Symbol=:B2; pa=nothing)
 	if(pa===nothing)
-		pa=Interpolation.Param([mod.mgrid.x, mod.mgrid.z], [modi.mgrid.x, modi.mgrid.z], Battrib)
+		pa=Interpolation.Kernel([mod.mgrid.x, mod.mgrid.z], [modi.mgrid.x, modi.mgrid.z], Battrib)
 	end
 
 	"loop over fields in `Seismic`"

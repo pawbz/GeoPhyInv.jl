@@ -88,6 +88,9 @@ function Fadj!(pa::Param)
 	# require gradient
 	pa.paf.c.gmodel_flag=true
 
+	# no need to record data
+	pa.paf.c.rflags=[0,0]
+
 	# adjoint modelling
 	Fdtd.mod!(pa.paf);
 

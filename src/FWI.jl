@@ -86,7 +86,7 @@ type Param{Tdatamisfit}
 	mprecon::AbstractArray{Float64,2}
 	"compute data misfit"
 	paTD::Tdatamisfit
-	paminterp::Interpolation.Param{Float64}
+	paminterp::Interpolation.Kernel_2D{Float64}
 	verbose::Bool
 	"synthetic or field inversion"
 	attrib::Symbol
@@ -354,7 +354,7 @@ function Param(
 
 	paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon);
 
-	paminterp=Interpolation.Param([modi.mgrid.x, modi.mgrid.z], [modm.mgrid.x, modm.mgrid.z], igrid_interp_scheme)
+	paminterp=Interpolation.Kernel([modi.mgrid.x, modi.mgrid.z], [modm.mgrid.x, modm.mgrid.z], igrid_interp_scheme)
 
 
 	mx=Inversion.X(modi.mgrid.nz*modi.mgrid.nx*count(parameterization.≠:null),2)

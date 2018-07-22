@@ -12,6 +12,6 @@ println("Running tests:")
 
 for t in tests
 	fp = string(t, ".jl")
-	println(" * $(fp)")
+	println(" *********** $(fp) ***************")
 	include(fp)
 end

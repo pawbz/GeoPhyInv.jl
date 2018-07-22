@@ -177,7 +177,7 @@ function interp_spray!(data::TD, dataout::TD, attrib=:interp, Battrib=:B1; pa=no
 	xin=data.tgrid.x
 	xout=dataout.tgrid.x
 	if(pa===nothing)
-		pa=Interpolation.Param([xin], [xout], :B1)
+		pa=Interpolation.Kernel([xin], [xout], :B1)
 	end
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dat=data.d[iss,ifield]
