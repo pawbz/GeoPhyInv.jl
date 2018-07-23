@@ -25,13 +25,9 @@ x=JuMIT.Data.TD_ones(fields,tgrid1,acqgeom)
 	@time JuMIT.Data.func_grad!(pa,:dJx);
 	gg1=vec(pa.dJx)
 
-	function err(x)
-		copy!(pa.x, x)
-		return JuMIT.Data.func_grad!(pa)
-	end
 
 	xvec=vec(pa.x)
-	gg2=Calculus.gradient(x -> err(x), xvec)
+	gg2=Calculus.gradient(x -> (copy!(pa.x, x); return JuMIT.Data.func_grad!(pa)), xvec)
 
 	# check gradient with Finite Differencing
 	@test gg1 ≈ gg2
