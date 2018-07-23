@@ -241,7 +241,8 @@ function Param(
 	# generate modelled data, border values, etc.
 	if(attrib_mod == :fdtd)
 		paf=Fdtd.Param(npw=2, model=modm, born_flag=born_flag,
-			acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], sflags=[3, 2],
+			acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], 
+			sflags=[3, 2], rflags=[1, 1],
 			backprop_flag=1, 
 			tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=true)
 

@@ -94,6 +94,9 @@ function Fadj!(pa::Param)
 	# adjoint modelling
 	Fdtd.mod!(pa.paf);
 
+	# put rflags back
+	pa.paf.c.rflags=[1,1]
+
 	# copy gradient
 	copy!(pa.gmodm,pa.paf.c.gmodel)
 end

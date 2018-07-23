@@ -35,7 +35,9 @@ x=JuMIT.Data.TD_ones(fields,tgrid1,acqgeom)
 
 	# check gradient with Finite Differencing
 	@test gg1 ≈ gg2
-	end
+end
+
+#=
 
 
 rrrrrr
@@ -90,3 +92,4 @@ end
 
 
 
+=#
