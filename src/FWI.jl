@@ -21,6 +21,7 @@ using Grid
 using Misfits
 using Inversion
 using TimerOutputs
+using Ipopt
 
 import JuMIT.Models
 import JuMIT.Acquisition
@@ -480,7 +481,7 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 	   f_tol=1e-5, 
 	   g_tol=1e-8, 
 	   x_tol=1e-5, ),
-	       bounded_flag=false)
+	       bounded_flag=false, solver=nothing, ipopt_options=nothing)
 
 	println("updating modm and modi...")
 	println("> xfwi: number of inversion variables:\t", xfwi_ninv(pa)) 
@@ -501,21 +502,75 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 			end
 			show(to)
 		else
-
-			"""
+            """
 			Bounded LBFGS inversion
 			"""
-			@timeit to "xfwi!" begin
+            if solver == :ipopt
+                #@timeit to "xfwi!" begin
+                #prob = createProblem(n, x_L, x_U, m, g_L, g_U, 8, 10,
+                #                eval_f, eval_g, eval_grad_f, eval_jac_g, eval_h)
+                
+                # Define the function used by IPOPT
+                
+                function eval_f(x)
+                    return ζfunc(x, pa.mx.last_x,  pa, obj)
+                end
+                
+                
+                function eval_grad_f(x, grad_f)
+                    ζgrad!(grad_f, x, pa.mx.last_x, pa, obj)
+                end
+                
+                
+                function void_g(x, g)
+                    
+                end
+                
+                function void_g_jac(x, mode, rows, cols, values)
+                    
+                end
+                
+                prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, Array{Float64}(0), Array{Float64}(0), 0, 0,
+                                eval_f, void_g, eval_grad_f, void_g_jac, nothing)
+                
+                addOption(prob, "hessian_approximation", "limited-memory")
+                
+                if ipopt_options !== nothing
+                    for i in 1:size(ipopt_options)[1]
+                        addOption(prob, ipopt_options[i][1], ipopt_options[i][2])
+                    end
+                end
+                
+                prob.x = pa.mx.x
+                    
+                res = solveProblem(prob)
+                #end
+            else
+                @timeit to "xfwi!" begin
 				res = optimize(f, g!, pa.mx.lower_x, pa.mx.upper_x, 
 				 pa.mx.x, Fminbox(optim_scheme), optim_options)
-			end
+                end
+            end
+			
 			show(to)
 		end
 	end
-	pa.verbose && println(res)
+    if solver == :ipopt
+        pa.verbose && println(ApplicationReturnStatus[res])
+        println(prob.x)
+        #println(prob.obj_val)   
+    else
+        pa.verbose && println(res)
+    end
+	
 
 	# update modm and modi using minimizer of Optim
-	Seismic_x!(pa.modm, pa.modi, Optim.minimizer(res), pa, -1)
+    if solver == :ipopt
+        Seismic_x!(pa.modm, pa.modi, prob.x, pa, -1)
+    else
+        Seismic_x!(pa.modm, pa.modi, Optim.minimizer(res), pa, -1)
+    end
+	
 	Seismic_x!(nothing, pa.modi, pa.mx.x, pa, 1)
 
 	# update calculated data at the last iteration --> pa.paTD.x
