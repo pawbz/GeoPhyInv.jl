@@ -22,6 +22,7 @@ using Misfits
 using Inversion
 using TimerOutputs
 using LinearMaps
+using Ipopt
 
 import JuMIT.Models
 import JuMIT.Acquisition
@@ -422,7 +423,7 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 	   f_tol=1e-5, 
 	   g_tol=1e-8, 
 	   x_tol=1e-5, ),
-	       bounded_flag=false)
+	       bounded_flag=false, solver=nothing, ipopt_options=nothing)
 
 	global to
 	reset_timer!(to)
@@ -434,31 +435,72 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 
 	f(x) = ζfunc(x, pa.mx.last_x,  pa, obj)
 	g!(storage, x) = ζgrad!(storage, x, pa.mx.last_x, pa, obj)
-	begin
-		if(!bounded_flag)
-			"""
-			Unbounded LBFGS inversion, only for testing
-			"""
-			@timeit to "xfwi!" begin
-				res = optimize(f, g!, pa.mx.x, optim_scheme, optim_options)
-			end
-			show(to)
-		else
-
-			"""
-			Bounded LBFGS inversion
-			"""
-			@timeit to "xfwi!" begin
-				res = optimize(f, g!, pa.mx.lower_x, pa.mx.upper_x, 
-				 pa.mx.x, Fminbox(optim_scheme), optim_options)
-			end
-			show(to)
+	if(!bounded_flag)
+		"""
+		Unbounded LBFGS inversion, only for testing
+		"""
+		@timeit to "xfwi!" begin
+			res = optimize(f, g!, pa.mx.x, optim_scheme, optim_options)
 		end
+	else
+		"""
+		Bounded LBFGS inversion
+		"""
+		if solver == :ipopt
+			function eval_f(x)
+			    return ζfunc(x, pa.mx.last_x,  pa, obj)
+			end
+
+
+			function eval_grad_f(x, grad_f)
+			    ζgrad!(grad_f, x, pa.mx.last_x, pa, obj)
+			end
+
+
+			function void_g(x, g)
+			    
+			end
+
+			function void_g_jac(x, mode, rows, cols, values)
+			    
+			end
+
+			prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, Array{Float64}(0), Array{Float64}(0), 0, 0,
+					eval_f, void_g, eval_grad_f, void_g_jac, nothing)
+
+			addOption(prob, "hessian_approximation", "limited-memory")
+
+			if ipopt_options !== nothing
+			    for i in 1:size(ipopt_options)[1]
+				addOption(prob, ipopt_options[i][1], ipopt_options[i][2])
+			    end
+			end
+
+			prob.x = pa.mx.x
+			    
+			res = solveProblem(prob)
+		else
+			@timeit to "xfwi!" begin
+			res = optimize(f, g!, pa.mx.lower_x, pa.mx.upper_x, 
+			pa.mx.x, Fminbox(optim_scheme), optim_options)
+                end
 	end
-	pa.verbose && println(res)
+	show(to)
+	if solver == :ipopt
+		pa.verbose && println(ApplicationReturnStatus[res])
+		#println(prob.x)
+		#println(prob.obj_val)   
+	else
+		pa.verbose && println(res)
+	end
+	
 
 	# update modm and modi using minimizer of Optim
-	x_to_modm!(pa, Optim.minimizer(res))
+	if solver == :ipopt
+		x_to_modm!(pa, prob.x)
+	else
+		x_to_modm!(pa, Optim.minimizer(res))
+	end
 
 	# update calculated data at the last iteration --> pa.paTD.x
 	F!(pa, nothing, pa.attrib_mod)
