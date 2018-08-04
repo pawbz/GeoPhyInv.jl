@@ -99,7 +99,8 @@ function mod(;
 						@simd for iz=1:nz
 							if(δmodtt[iz,ix] ≠ 0.0)
 								term += (G0_homo_acou(sx[is]-mesh_x[ix], sz[is]-mesh_z[iz], k, ρ0)[1] 
-									 * G0_homo_acou(rx[ir]-mesh_x[ix], rz[ir]-mesh_z[iz], k, ρ0)[1] .* ω .* ω .* δmodtt[iz,ix]) #* δx * δz
+									 * G0_homo_acou(rx[ir]-mesh_x[ix], rz[ir]-mesh_z[iz], k, ρ0)[1] .* ω .* ω .* δmodtt[iz,ix]) * δx * δz
+								# factor due to integration
 							end
 						end
 					end

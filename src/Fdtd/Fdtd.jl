@@ -49,7 +49,7 @@ Modelling parameters common for all supersources
 
 
 """
-type Paramc
+mutable struct Paramc
 	jobname::Symbol
 	npw::Int64 
 	activepw::Vector{Int64}
@@ -120,7 +120,7 @@ end
 """
 Modelling parameters per every supersource for each worker
 """
-type Paramss
+mutable struct Paramss
 	iss::Int64
 	wavelets::Matrix{Matrix{Float64}}
 	ssprayw::Vector{Matrix{Float64}}
@@ -147,7 +147,7 @@ end
 Parameters per every worker, not necessarily for every supersource.
 Note that a single worker can take care of multiple supersources.
 """
-type Paramp
+mutable struct Paramp
 	ss::Vector{Paramss}
 	p::Array{Float64,4}
 	pp::Array{Float64,4}
@@ -160,7 +160,7 @@ type Paramp
 	memory_dvz_dz::Array{Float64,3}
 end
 
-type Param
+mutable struct Param
 	p::DistributedArrays.DArray{Paramp,1,Paramp} # distributed parameters among workers
 	c::Paramc # common parameters
 end
@@ -660,6 +660,14 @@ function Paramss(iss::Int64, pac::Paramc)
 	return pass
 end
 
+include("source.jl")
+include("receiver.jl")
+include("core.jl")
+include("gradient.jl")
+include("born.jl")
+include("boundary.jl")
+
+
 """
 This method updated the input `Fdtd.Param` after the wave propagation.
 
@@ -799,64 +807,6 @@ end
 	#return [Data.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
 	#		       tgridmod, acqgeom[1]) for iprop in 1:npw]
 
-
-function grad_modrr!(pac::Paramc)
-	@simd for i in eachindex(pac.grad_modrr_stack)
-		@inbounds pac.grad_modrr_stack[i] = (pac.grad_modrrvx_stack[i] + pac.grad_modrrvz_stack[i]) * (0.5)
-	end
-	grad_modrr_sprayrrvx!(pac.grad_modrr_stack,pac.grad_modrrvx_stack)
-	grad_modrr_sprayrrvz!(pac.grad_modrr_stack,pac.grad_modrrvz_stack)
-end
-function grad_modrr_sprayrrvx!(grad_modrr_stack,grad_modrrvx_stack)
-	for ix=2:size(grad_modrr_stack,2)-1
-		for iz=2:size(grad_modrr_stack,1)-1
-			@inbounds grad_modrr_stack[iz,ix+1] +=  0.5e0 * grad_modrrvx_stack[iz,ix]
-		end
-	end
-end
-function grad_modrr_sprayrrvz!(grad_modrr_stack,grad_modrrvz_stack)
-	for ix=2:size(grad_modrr_stack,2)-1
-		for iz=2:size(grad_modrr_stack,1)-1
-			@inbounds grad_modrr_stack[iz+1,ix] +=  0.5e0 * grad_modrrvz_stack[iz,ix]
-		end
-	end
-end
-
-function stack_grads!(pac::Paramc, pap::Paramp)
-	np=pac.model.mgrid.npml # to truncate the gradients in PML region
-	nx, nz=pac.nx, pac.nz
-	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
-
-	# theses are SharedArrays
-	grad_stack=pac.grad_stack
-	gmodrrvx=pac.grad_modrrvx_stack
-	gmodrrvz=pac.grad_modrrvz_stack
-	pass=pap.ss
-	for issp in 1:length(pass)
-		gs=pass[issp].grad_modtt
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		for i in 1:nznxd
-			grad_stack[i]+=gss[i]  # only update gmodtt
-		end
-		gs=pass[issp].grad_modrrvx
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		for i in 1:nznxd
-			gmodrrvx[i] += gss[i]
-		end
-		gs=pass[issp].grad_modrrvz
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		for i in 1:nznxd
-			gmodrrvz[i] += gss[i]
-		end
-	end
-	# combine rrvx and rrvz
-	grad_modrr!(pac::Paramc)
-	for i in 1:nznxd
-		grad_stack[nznxd+i]+=pac.grad_modrr_stack[i]  # update gmodrr
-	end
-
-end
-
 function stack_illums!(pac::Paramc, pap::Paramp)
 	np=pac.model.mgrid.npml
 	nx, nz=pac.nx, pac.nz
@@ -870,21 +820,6 @@ function stack_illums!(pac::Paramc, pap::Paramp)
 end
 
 
-function update_gmodel!(pac::Paramc)
-	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
-	
-	for i in 1:nznxd
-		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],pac.model.ref.KI,1)
-		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],pac.model.ref.ρI,1)
-	end
-
-	Models.Seismic_chainrule!(pac.gmodel, pac.model, pac.grad_stack, [:χKI, :χρI, :null], 1)
-
-	for i in 1:nznxd
-		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],pac.model.ref.KI,-1)
-		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],pac.model.ref.ρI,-1)
-	end
-end
 
 # modelling for each processor
 function mod_per_proc!(pac::Paramc, pap::Paramp) 
@@ -915,14 +850,14 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 			# force p[1] on boundaries
 			(pac.backprop_flag==-1) && boundary_force!(it,issp,pac,pap.ss,pap)
 	 
-			add_source!(it, issp, iss, pac, pap.ss, pap)
+			add_source!(it, issp, iss, pac, pap.ss, pap, Source_B0())
 
 			(pac.born_flag) && add_born_sources!(issp, pac, pap.ss, pap)
 
 			# record boundaries after time reversal already
 			(pac.backprop_flag==1) && boundary_save!(pac.nt-it+1,issp,pac,pap.ss,pap)
 
-			record!(it, issp, iss, pac, pap.ss, pap)
+			record!(it, issp, iss, pac, pap.ss, pap, Receiver_B0())
 
 			(pac.gmodel_flag) && compute_gradient!(issp, pac, pap.ss, pap)
 
@@ -955,268 +890,7 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 	end # source_loop
 end # mod_per_shot
 
-# This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
-	# aliases
-	p=pap.p;
-	wavelets=pass[issp].wavelets
-	acqgeom=pac.acqgeom
-	isx1=pass[issp].isx1
-	isx2=pass[issp].isx2
-	isz1=pass[issp].isz1
-	isz2=pass[issp].isz2
-	ssprayw=pass[issp].ssprayw
-	modttI=pac.modttI
-	"""
-	adding source to pressure field at [it] 
-	"""
-	for ipw in pac.activepw
-	if(pac.sflags[ipw] ≠ 0) # only if sflags is non-zero
-	for (ifields, ifield) in enumerate(pac.isfields[ipw])
-	@simd for is = 1:acqgeom[ipw].ns[iss]
-		"""
-		use wavelets at [it], i.e., sum of source terms
-		until [it-1]
-		division of source term with δx and δz (see Jan's fdelmodc manual)
-		"""
-		source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
-		
-		"""
-		multiplication with modttI
-		"""
-		p[isz1[ipw][is], isx1[ipw][is],ifield, ipw] += 
-			source_term * 
-			ssprayw[ipw][1,is] * 
-			modttI[isz1[ipw][is], isx1[ipw][is]]  
-		p[isz1[ipw][is], isx2[ipw][is],ifield, ipw] += 
-			source_term * 
-			ssprayw[ipw][2,is] * 
-			modttI[isz1[ipw][is], isx2[ipw][is]]
-		p[isz2[ipw][is], isx1[ipw][is],ifield, ipw] += 
-			source_term * 
-			ssprayw[ipw][3,is] * 
-			modttI[isz2[ipw][is], isx1[ipw][is]]
-		p[isz2[ipw][is], isx2[ipw][is],ifield, ipw] += 
-			source_term * 
-			ssprayw[ipw][4,is] * 
-			modttI[isz2[ipw][is], isx2[ipw][is]]
-	end
-	end
-	end
-	end
-end
 
-
-# This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
-	p=pap.p
-	rinterpolatew=pass[issp].rinterpolatew
-	irx1=pass[issp].irx1
-	irx2=pass[issp].irx2
-	irz1=pass[issp].irz1
-	irz2=pass[issp].irz2
-
-	for ipw in pac.activepw
-		recs=pass[issp].records[ipw]
-		for (ifieldr, ifield) in enumerate(pac.irfields)
-			@simd for ir = 1:pac.acqgeom[ipw].nr[iss]
-				recs[it,ir,ifieldr]= 
-				(
-				p[irz1[ipw][ir],irx1[ipw][ir],ifield,ipw]*
-				rinterpolatew[ipw][1,ir]+
-				p[irz1[ipw][ir],irx2[ipw][ir],ifield,ipw]*
-				rinterpolatew[ipw][2,ir]+
-				p[irz2[ipw][ir],irx1[ipw][ir],ifield,ipw]*
-				rinterpolatew[ipw][3,ir]+
-				p[irz2[ipw][ir],irx2[ipw][ir],ifield,ipw]*
-				rinterpolatew[ipw][4,ir]
-				)
-		end
-	end
-	end
-end
-
-# This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function compute_gradient!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
-	# aliases
-	p=pap.p
-	pp=pap.pp
-	ppp=pap.ppp
-	dpdx=pap.dpdx
-	dpdz=pap.dpdz
-	δtI=pac.δtI
-	grad_modtt=pass[issp].grad_modtt
-	grad_modrrvx=pass[issp].grad_modrrvx
-	grad_modrrvz=pass[issp].grad_modrrvz
-
-	gmodtt!(grad_modtt,p,pp,ppp,pac.nx,pac.nz,δtI)
-	gmodrrvx!(grad_modrrvx,dpdx,pac.nx,pac.nz)
-	gmodrrvz!(grad_modrrvz,dpdz,pac.nx,pac.nz)
-end
-@inbounds @fastmath function gmodtt!(grad_modtt,p,pp,ppp,nx,nz,δtI,)
-	for ix=1:nx
-		@simd for iz=1:nz
-			# p at [it], pp at [it-1]	# dpdx and dpdz at [it]	# gradients w.r.t inverse of modtt, i.e., 1/rho/c^2 
-			@inbounds grad_modtt[iz,ix] += ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δtI * δtI) *  pp[iz,ix,1,2])
-		end
-	end
-end
-@inbounds @fastmath function gmodrrvx!(grad_modrrvx,dpdx,nx,nz)
-	for ix=1:nx
-		@simd for iz=1:nz
-			# gradient w.r.t. inverse of rho on vx and vz grids
-			@inbounds grad_modrrvx[iz,ix] += (- dpdx[iz,ix,1,2]*dpdx[iz,ix,1,1])
-		end
-	end
-
-end
-@inbounds @fastmath function gmodrrvz!(grad_modrrvz,dpdz,nx,nz)
-	for ix=1:nx
-		@simd for iz=1:nz
-			# gradient w.r.t. inverse of rho on vx and vz grids
-			@inbounds grad_modrrvz[iz,ix] += (- dpdz[iz,ix,1,2]*dpdz[iz,ix,1,1])
-		end
-	end
-end
-
-@inbounds @fastmath function scale_gradient!(issp::Int64,pass::Vector{Paramss},δ)
-	grad_modtt=pass[issp].grad_modtt
-	grad_modrrvx=pass[issp].grad_modrrvx
-	grad_modrrvz=pass[issp].grad_modrrvz
-	"gradient is formed by intergration over time, hence multiply with δt, but why not?"
-	"I don't completely understand where the factors δx and δz are coming from..."
-	"probably the source term should not be multiplied by δxI and δzI during adjoint propagation"
-	scale!(grad_modtt,δ)
-	scale!(grad_modrrvx,δ)
-	scale!(grad_modrrvz,δ)
-end
-
-
-
-
-@inbounds @fastmath function advance!(pac::Paramc, pap::Paramp)
-	# aliases
-	p=pap.p; pp=pap.pp; ppp=pap.ppp;
-	dpdx=pap.dpdx; dpdz=pap.dpdz;
-	memory_dp_dx=pap.memory_dp_dx; memory_dp_dz=pap.memory_dp_dz; memory_dvx_dx=pap.memory_dvx_dx; memory_dvz_dz=pap.memory_dvz_dz
-	modttI=pac.modttI; modrrvx=pac.modrrvx; modrrvz=pac.modrrvz
-	δx24I=pac.δx24I; δz24I=pac.δz24I; δt=pac.δt
-	nx=pac.nx; nz=pac.nz
-	a_x=pac.a_x; b_x=pac.b_x; k_xI=pac.k_xI; a_x_half=pac.a_x_half; b_x_half=pac.b_x_half; k_x_halfI=pac.k_x_halfI 
-	a_z=pac.a_z; b_z=pac.b_z; k_zI=pac.k_zI; a_z_half=pac.a_z_half; b_z_half=pac.b_z_half; k_z_halfI=pac.k_z_halfI
-
-	pppppp!(p,pp,ppp,pac.activepw)
-
-	"""
-	compute dpdx and dpdz at [it-1] for all propagating fields
-	"""
-	update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz,pac.activepw)
-	update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz,pac.activepw)
-
-	"""
-	update velocity at [it-1/2] using 
-	velocity at [it-3/2] and dpdx and dpdz at [it-1] 
-	"""
-	update_vx!(p, dpdx, δt, modrrvx, nx, nz,pac.activepw)
-	update_vz!(p, dpdz, δt, modrrvz, nx, nz,pac.activepw)
-
-
-	dvdx!(dpdx,p,memory_dvx_dx,b_x,a_x,k_xI,nz,nx,δx24I,pac.activepw)
-	dvdz!(dpdz,p,memory_dvz_dz,b_z,a_z,k_zI,nz,nx,δz24I,pac.activepw)
-
-	"""
-	compute pressure at [it] using p at [it-1] and dvxdx
-	and dvzdz at [it-1/2]
-	"""
-	pvzvx!(p,dpdx,dpdz,modttI,nz,nx,δt,pac.activepw)
-
-end
-function pppppp!(p,pp,ppp,activepw)
-	for ipw in activepw, ifi in 1:size(p,3), ix in 1:size(p,2)
-		@simd for iz in 1:size(p,1)
-			@inbounds ppp[iz,ix,ifi,ipw]=pp[iz,ix,ifi,ipw]
-			@inbounds pp[iz,ix,ifi,ipw]=p[iz,ix,ifi,ipw]
-		end
-	end
-end
-
-@inbounds @fastmath function dvdx!(dpdx,p,memory_dvx_dx,b_x,a_x,k_xI,nz,nx,δx24I,activepw)
-	for ipw in activepw
-		for ix=3:nx-2
-		@simd for iz=3:nz-2
-			@inbounds dpdx[iz,ix,2,ipw] = (27.e0*p[iz,ix,2,ipw]-27.e0*p[iz,ix-1,2,ipw]-p[iz,ix+1,2,ipw]+p[iz,ix-2,2,ipw]) * (δx24I)
-			@inbounds memory_dvx_dx[iz,ix,ipw] = b_x[ix] * memory_dvx_dx[iz,ix,ipw] + a_x[ix] * dpdx[iz,ix,2,ipw] # pml 
-			@inbounds dpdx[iz,ix,2,ipw] = dpdx[iz,ix,2,ipw] * k_xI[ix] + memory_dvx_dx[iz,ix,ipw] # pml
-		end
-		end
-	end
-end
-
-@inbounds @fastmath function dvdz!(dpdz,p,memory_dvz_dz,b_z,a_z,k_zI,nz,nx,δz24I,activepw)
-	for ipw in activepw
-		for ix=3:nx-2
-		@simd for iz=3:nz-2
-			@inbounds dpdz[iz,ix,3,ipw] = (27.e0*p[iz,ix,3,ipw]-27.e0*p[iz-1,ix,3,ipw]-p[iz+1,ix,3,ipw]+p[iz-2,ix,3,ipw]) * (δz24I)
-			@inbounds memory_dvz_dz[iz,ix,ipw] = b_z[iz] * memory_dvz_dz[iz,ix,ipw] + a_z[iz] * dpdz[iz,ix,3,ipw] # pml
-			@inbounds dpdz[iz,ix,3,ipw] = dpdz[iz,ix,3,ipw] * k_zI[iz] + memory_dvz_dz[iz,ix,ipw] # pml
-		end
-		end
-	end
-end
-
-@inbounds @fastmath function pvzvx!(p,dpdx,dpdz,modttI,nz,nx,δt,activepw)
-	for ipw in activepw
-		for ix=3:nx-2
-		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,1,ipw] += (modttI[iz,ix] * (dpdx[iz,ix,2,ipw] + dpdz[iz,ix,3,ipw])) * δt #* boundary_p(iz,ix)
-		end
-		end
-	end
-end
-
-@inbounds @fastmath function update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz,activepw)
-	for ipw in activepw
-		for ix = 3:nx-2
-		@simd for iz = 3:nz-2
-			@inbounds dpdx[iz,ix,1,ipw] = (27.e0*p[iz,ix+1,1,ipw]-27.e0*p[iz,ix,1,ipw]-p[iz,ix+2,1,ipw]+p[iz,ix-1,1,ipw]) * (δx24I)
-			@inbounds memory_dp_dx[iz,ix,ipw] = b_x_half[ix] * memory_dp_dx[iz,ix,ipw] + a_x_half[ix] * dpdx[iz,ix,1,ipw] # pml
-			@inbounds dpdx[iz,ix,1,ipw] = dpdx[iz,ix,1,ipw] * k_x_halfI[ix] + memory_dp_dx[iz,ix,ipw] # pml
-		end
-		end
-	end
-end
-
-@inbounds @fastmath function update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz,activepw)
-	for ipw in activepw
-		for ix = 3:nx-2
-		@simd for iz = 3:nz-2
-			@inbounds dpdz[iz,ix,1,ipw] = (27.e0*p[iz+1,ix,1,ipw]-27.e0*p[iz,ix,1,ipw]-p[iz+2,ix,1,ipw]+p[iz-1,ix,1,ipw]) * (δz24I)
-			@inbounds memory_dp_dz[iz,ix,ipw] = b_z_half[iz] * memory_dp_dz[iz,ix,ipw] + a_z_half[iz] * dpdz[iz,ix,1,ipw] # pml
-			@inbounds dpdz[iz,ix,1,ipw] = dpdz[iz,ix,1,ipw] * k_z_halfI[iz] + memory_dp_dz[iz,ix,ipw] # pml
-		end
-		end
-	end
-end
-
-@inbounds @fastmath function update_vx!(p, dpdx, δt, modrrvx,  nx, nz,activepw)
-	for ipw in activepw
-		for ix=3:nx-2
-		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,2,ipw] += (dpdx[iz,ix,1,ipw]) * δt * modrrvx[iz,ix] #* boundary_vx(iz,ix)
-		end
-		end
-	end
-end
-
-@inbounds @fastmath function update_vz!(p, dpdz, δt,  modrrvz, nx, nz,activepw)
-	for ipw in activepw
-		for ix=3:nx-2
-		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,3,ipw] +=  (dpdz[iz,ix,1,ipw]) * δt * modrrvz[iz,ix] #* boundary_vz(iz,ix)
-		end
-		end
-	end
-end
 
 
 # Need illumination to estimate the approximate diagonal of Hessian
@@ -1226,184 +900,6 @@ end
 	illum=pass[issp].illum
 	pp=view(p,:,:,1,1)
 	@. illum += pp * pp
-end
-
-
-function add_born_sources!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
-
-	born_svalue_stack=pass[issp].born_svalue_stack
-	δx24I=pac.δx24I; δz24I=pac.δz24I; 
-	δxI=pac.δxI; δzI=pac.δzI; 
-	δt=pac.δt
-	δtI=pac.δtI
-	δmodtt=pac.δmodtt; modttI=pac.modttI;
-	δmodrrvx=pac.δmodrrvx; δmodrrvz=pac.δmodrrvz
-	nx=pac.nx; nz=pac.nz
-	p=pap.p; pp=pap.pp; ppp=pap.ppp;
-	dpdx=pap.dpdx; dpdz=pap.dpdz;
-
-	# secondary sources for Born modeling
-	# adding born sources from pressure(:,:,1) to pressure(:,:,2)
-	# upto until [it-2]
-	# lambdaI scatterrer source term at [it-1]
-	# p is at [it], pp is at [it-1], ppp is at [it-2]
-	# dpdx is at [it-1] and dpdz is at [it-1]
-	# modrrvx scatterrer source term at [it-1]
-	# modrrvz scatterrer source term at [it-1]
-
-	born_stacktt!(born_svalue_stack,p,pp,ppp,δmodtt,nx,nz,δtI,δt)
-	born_stackrrvx!(born_svalue_stack,dpdx,δmodrrvx,nx,nz,δx24I,δt)
-	born_stackrrvz!(born_svalue_stack,dpdz,δmodrrvz,nx,nz,δz24I,δt)
-	born_stack!(p,born_svalue_stack,modttI,nx,nz,δt)
-end
-@inbounds @fastmath function born_stacktt!(born_svalue_stack,p,pp,ppp,δmodtt,nx,nz,δtI,δt)
-	for ix=3:nx-2
-		@simd for iz=3:nz-2
-			born_svalue_stack[iz,ix] += 
-			δt * ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δmodtt[iz, ix] * δtI * δtI)) 
-		end
-	end
-end
-@inbounds @fastmath function born_stackrrvx!(born_svalue_stack,dpdx,δmodrrvx,nx,nz,δx24I,δt)
-	for ix=3:nx-2
-		@simd for iz=3:nz-2
-			born_svalue_stack[iz,ix] += 
-				δt * ((27.e0*dpdx[iz,ix,1,1] * δmodrrvx[iz,ix] -27.e0*dpdx[iz,ix-1,1,1] * δmodrrvx[iz,ix-1] -dpdx[iz,ix+1,1,1] * δmodrrvx[iz,ix+1] +dpdx[iz,ix-2,1,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) 
-		end
-	end
-
-end
-@inbounds @fastmath function born_stackrrvz!(born_svalue_stack,dpdz,δmodrrvz,nx,nz,δz24I,δt)
-	for ix=3:nx-2
-		@simd for iz=3:nz-2
-			born_svalue_stack[iz,ix] += 
-				δt * ((27.e0*dpdz[iz,ix,1,1] * δmodrrvz[iz,ix] -27.e0*dpdz[iz-1,ix,1,1] * δmodrrvz[iz-1,ix] -dpdz[iz+1,ix,1,1] * δmodrrvz[iz+1,ix] +dpdz[iz-2,ix,1,1] * δmodrrvz[iz-2,ix] ) * (δz24I))  
-
-		end
-	end
-end
-@inbounds @fastmath function born_stack!(p,born_svalue_stack,modttI,nx,nz,δt)
-	for ix=3:nx-2
-		@simd for iz=3:nz-2
-			p[iz,ix,1,2] += born_svalue_stack[iz,ix] * δt * modttI[iz,ix] #* δxI * δzI 
-		end
-	end
-end
-
-@inbounds @fastmath function boundary_force_snap_p!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
-	p=pap.p
-	boundary=pass[issp].boundary[5]
-	ps=view(p,:,:,1,1)
-	bs=view(boundary,:,:,1)
-	copy!(ps,bs)
-end
-@inbounds @fastmath function boundary_force_snap_vxvz!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
-	# initial conditions from boundary for first propagating field only
-	p=pap.p
-	boundary=pass[issp].boundary[5]
-	ps=view(p,:,:,2,1)
-	bs=view(boundary,:,:,2)
-	copy!(ps,bs)
-	ps=view(p,:,:,3,1)
-	bs=view(boundary,:,:,3)
-	copy!(ps,bs)
-end
-@fastmath @inbounds function boundary_force!(it::Int64,issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
-	boundary=pass[issp].boundary
-	p=pap.p
-	ibx0=pac.ibx0; ibz0=pac.ibz0; ibx1=pac.ibx1; ibz1=pac.ibz1
-	boundaryf_l!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	boundaryf_r!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	boundaryf_t!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	boundaryf_b!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-end
-@fastmath @inbounds function boundaryf_l!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	for ix=1:3
-		@simd for iz=1:ibz1-ibz0+1
-			p[ibz0+iz-1,ibx0+ix-1,1,1] = boundary[4][iz,ix,it]
-		end
-	end
-end
-@fastmath @inbounds function boundaryf_r!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	for ix=1:3
-		@simd for iz=1:ibz1-ibz0+1
-			p[ibz0+iz-1,ibx1-ix+1,1,1] = boundary[2][iz,ix,it]
-		end
-	end
-end
-@fastmath @inbounds function boundaryf_t!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	@simd for ix=1:ibx1-ibx0+1
-		for iz=1:3
-			p[ibz0+iz-1,ibx0+ix-1,1,1] = boundary[1][iz,ix,it]
-		end
-	end
-end
-@fastmath @inbounds function boundaryf_b!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	@simd for ix=1:ibx1-ibx0+1
-		for iz=1:3
-			p[ibz1-iz+1,ibx0+ix-1,1,1] = boundary[3][iz,ix,it]
-		end
-	end
-end
-
-
-@inbounds @fastmath function boundary_save_snap_p!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
-	p=pap.p
-	boundary=pass[issp].boundary[5]
-	ps=view(p,:,:,1,1)
-	bs=view(boundary,:,:,1)
-	copy!(bs, ps)
-end
-@inbounds @fastmath function boundary_save_snap_vxvz!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
-	p=pap.p
-	boundary=pass[issp].boundary[5]
-	#vx
-	bs=view(boundary,:,:,2)
-	ps=view(p,:,:,2,1)
-	copy!(bs, ps)
-	scale!(bs,-1.)
-	# vz
-	bs=view(boundary,:,:,3)
-	ps=view(p,:,:,3,1)
-	copy!(bs, ps)
-	scale!(bs,-1.)
-end
-@fastmath @inbounds function boundary_save!(it::Int64,issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
-	boundary=pass[issp].boundary
-	p=pap.p
-	ibx0=pac.ibx0; ibz0=pac.ibz0; ibx1=pac.ibx1; ibz1=pac.ibz1
-	boundarys_l!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	boundarys_r!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	boundarys_t!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	boundarys_b!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-end
-@fastmath @inbounds function boundarys_l!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	for ix=1:3
-		@simd for iz=1:ibz1-ibz0+1
-			boundary[4][iz,ix,it] = p[ibz0+iz-1,ibx0+ix-1,1,1] 
-		end
-	end
-end
-@fastmath @inbounds function boundarys_r!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	for ix=1:3
-		@simd for iz=1:ibz1-ibz0+1
-			boundary[2][iz,ix,it] = p[ibz0+iz-1,ibx1-ix+1,1,1]
-		end
-	end
-end
-@fastmath @inbounds function boundarys_t!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	@simd for ix=1:ibx1-ibx0+1
-		for iz=1:3
-			boundary[1][iz,ix,it] = p[ibz0+iz-1,ibx0+ix-1,1,1]
-		end
-	end
-end
-@fastmath @inbounds function boundarys_b!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
-	@simd for ix=1:ibx1-ibx0+1
-		for iz=1:3
-			boundary[3][iz,ix,it] = p[ibz1-iz+1,ibx0+ix-1,1,1]
-		end
-	end
 end
 
 
@@ -1469,65 +965,6 @@ function initialize_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2})
 	end
 end
 
-
-function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc::Array{Acquisition.Src}, sflags::Vector{Int64})
-
-	npw = size(wavelets,1)
-	nt = size(wavelets,2)
-	δt = acqsrc[1].tgrid.δx
-	for ipw=1:npw
-		ns, snfield = size(wavelets[ipw,1]) # ns may vary with ipw
-		for ifield=1:snfield, is=1:ns
-			snt = acqsrc[ipw].tgrid.nx;
-			if(sflags[ipw] == 0)
-				# nothing # just put zeros, no sources added
-				for it=1:nt
-					wavelets[ipw,it][is,ifield] = 0.0
-				end
-			elseif(sflags[ipw] == 1)
-				"ϕ[t] = s[t]"
-				for it=1:snt
-					source_term = acqsrc[ipw].wav[iss,ifield][it,is]
-					wavelets[ipw,it][is,ifield] = source_term
-				end
-			elseif(sflags[ipw] == 2)
-				"ϕ[t] = ∑₁ᵗ⁻¹ s[t]"
-				source_term_stack = 0.0;
-				if(ifield == 1)
-					for it=1:snt-1
-						source_term_stack += (acqsrc[ipw].wav[iss,ifield][it,is] .* δt)
-						wavelets[ipw,it+1][is,ifield] = source_term_stack
-					end
-				else
-					for it=2:snt-1
-						source_term_stack += (((acqsrc[ipw].wav[iss,ifield][it,is] .* δt) +
-						   (acqsrc[ipw].wav[iss,ifield][it-1,is] .* δt)) * 0.5)
-						wavelets[ipw,it+1][is,ifield] = source_term_stack
-					end
-
-				end
-				if(nt > snt)
-					wavelets[ipw,snt+1:end][is,ifield] = wavelets[ipw,snt][is,ifield]
-				end
-			elseif(sflags[ipw] == 3)
-				"use this to add source sink: need during adjoint propagation from boundary"
-				"multiplication with -1 for subtraction"
-				"time reversal"
-				"as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
-				"ϕ[t] = "
-				source_term_stack = 0.0;
-				for it=1:snt-1
-					source_term_stack += (acqsrc[ipw].wav[iss,ifield][it,is] .* δt)
-					wavelets[ipw,nt-it+1][is,ifield] = -1.0 * source_term_stack
-				end
-				if(nt > snt)
-					nt_diff = nt-snt
-					wavelets[ipw,1:nt_diff+1][is,ifield] = wavelets[ipw,nt_diff+2][is,ifield]
-				end
-			end
-		end
-	end
-end
 
 
 function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::Float64, freqmin::Float64, freqmax::Float64, δt::Float64, verbose::Bool)

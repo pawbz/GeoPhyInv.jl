@@ -6,6 +6,9 @@ using BenchmarkTools
 
 
 
+const J=JuMIT
+const JF=JuMIT.FWI
+
 model = JuMIT.Gallery.Seismic(:acou_homo2);
 JuMIT.Models.Seismic_addon!(model, ellip_rad=50., ellip_loc=[500.,0.],ellip_pert=0.1,randn_perc=0.0, fields=[:χvp,:χρ])
 
@@ -16,7 +19,7 @@ acqgeom = JuMIT.Acquisition.Geom_circ(nss=1,nr=20,rad=[900.,900.])
 acqsrc=JuMIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=3)
 tgrid=acqsrc.tgrid
 
-pa=JuMIT.FWI.Param(acqsrc, acqgeom, tgrid, :fdtd, model0, 
+pa=JuMIT.FWI.Param(acqsrc, acqgeom, tgrid, JF.ModFdtd(), model0, 
 		     modm_obs=model,  
 		     igrid_interp_scheme=:B2,    
 		     igrid=Grid.M2D_resamp(model.mgrid,150.,150.,),     

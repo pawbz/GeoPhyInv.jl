@@ -39,7 +39,7 @@ A contrast function for a model m is given by ``χ(m) = \frac{m}{m0}-1``.
 * `χρ::Array{Float64}` : two-dimensional contrast model (χ) for density, for e.g., zeros(mgrid.nz, mgrid.nx)
 * `mgrid::Grid.M2D` : two-dimensional grid to determine the dimensions of models
 """
-type Seismic
+mutable struct Seismic
 	vp0::Vector{Float64}
 	vs0::Vector{Float64}
 	ρ0::Vector{Float64}

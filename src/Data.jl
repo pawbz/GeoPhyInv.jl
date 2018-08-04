@@ -66,6 +66,19 @@ function Base.isapprox(dat1::TD, dat2::TD)
 	return (all(vec) & all(vec2))
 end
 
+function Base.length(data::TD)
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	l=0
+	for ifield = 1:length(data.fields), iss = 1:nss
+		for ir = 1:nr[iss]
+			for it in 1:nt
+				l+=1
+			end
+		end
+	end
+	return l
+end
+
 """
 Return a vec of data object sorted in the order
 time, receivers, supersource, fields
@@ -79,19 +92,6 @@ function Base.vec(data::TD)
 	end
 	return v
 end
-
-"""
-Fill with randn values
-"""
-function Base.randn!(data::TD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
-	for ifield = 1:length(data.fields), iss = 1:nss
-		dd=data.d[iss, ifield]
-		randn!(dd)
-	end
-	return data
-end
-
 
 
 """
@@ -112,6 +112,36 @@ function Base.copy!(dataout::TD, v::Vector{Float64})
 	end
 	return dataout
 end
+
+function Base.copy!(v::Vector{Float64}, data::TD)
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	d=getfield(data, :d)
+	i0=0
+	for iss=1:nss, ifield=1:length(data.fields)
+		dd=d[iss,ifield]
+		for ir = 1:nr[iss]
+			for it in 1:nt
+				v[i0+it]=dd[it,ir]
+			end
+			i0+=nt
+		end
+	end
+	return v
+end
+
+"""
+Fill with randn values
+"""
+function Base.randn!(data::TD)
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	for ifield = 1:length(data.fields), iss = 1:nss
+		dd=data.d[iss, ifield]
+		randn!(dd)
+	end
+	return data
+end
+
+
 
 
 

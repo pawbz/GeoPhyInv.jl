@@ -19,14 +19,14 @@ function update_prior!(pa; priori=nothing, priorw=nothing, priorm=nothing)
 		copy!(pa.priori, priori)
 	end
 	# update pa.mx.prior
-	Seismic_x!(nothing, pa.priori, pa.mx.prior, pa, 1)
+	Models.Seismic_get!(pa.mx.prior,pa.priori,pa.parameterization)
 
 
 	if(!(priorw===nothing))
 		!(isapprox(priorw,modi)) && error("priorw model has to be on igrid")
 		copy!(pa.priorw, priorw)
 		# update pa.mx.w
-		Seismic_x!(nothing, pa.priorw, pa.mx.w, pa, 1)
+		Models.Seismic_get!(pa.mx.w,pa.priorw,pa.parameterization)
 	end
 
 end

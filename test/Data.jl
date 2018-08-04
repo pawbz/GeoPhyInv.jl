@@ -3,6 +3,7 @@ using Base.Test
 using BenchmarkTools
 using Calculus
 
+const JD=JuMIT.Data
 
 
 fields=[:P]
@@ -14,6 +15,20 @@ tgrid2=Grid.M1D(0.,1.,10);
 acqgeom=JuMIT.Acquisition.Geom_fixed(10,10,10,10,10,10,10,10)
 
 x=JuMIT.Data.TD_ones(fields,tgrid1,acqgeom)
+
+
+yvec=randn(length(x))
+xvec=similar(yvec)
+
+@testset "testing copy!" begin
+	@btime copy!(x, yvec);
+
+	@btime copy!(xvec, x);
+
+	@test xvec == yvec
+end
+
+
 
 @testset "simple LS error: x and y same time grid" begin
 	y=JuMIT.Data.TD_ones(fields,tgrid1,acqgeom)
