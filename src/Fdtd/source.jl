@@ -78,36 +78,37 @@ struct Source_B0 end
 	"""
 	for ipw in pac.activepw
 	if(pac.sflags[ipw] ≠ 0) # only if sflags is non-zero
-	for (ifields, ifield) in enumerate(pac.isfields[ipw])
-	@simd for is = 1:acqgeom[ipw].ns[iss]
-		"""
-		use wavelets at [it], i.e., sum of source terms
-		until [it-1]
-		division of source term with δx and δz (see Jan's fdelmodc manual)
-		"""
-		source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
-		
-		"""
-		multiplication with modttI
-		"""
-		p[isz1[ipw][is], isx1[ipw][is],ifield, ipw] += 
-			source_term * 
-			ssprayw[ipw][1,is] * 
-			modttI[isz1[ipw][is], isx1[ipw][is]]  
-		p[isz1[ipw][is], isx2[ipw][is],ifield, ipw] += 
-			source_term * 
-			ssprayw[ipw][2,is] * 
-			modttI[isz1[ipw][is], isx2[ipw][is]]
-		p[isz2[ipw][is], isx1[ipw][is],ifield, ipw] += 
-			source_term * 
-			ssprayw[ipw][3,is] * 
-			modttI[isz2[ipw][is], isx1[ipw][is]]
-		p[isz2[ipw][is], isx2[ipw][is],ifield, ipw] += 
-			source_term * 
-			ssprayw[ipw][4,is] * 
-			modttI[isz2[ipw][is], isx2[ipw][is]]
-	end
-	end
+		pw=p[ipw]	
+		for (ifields, ifield) in enumerate(pac.isfields[ipw])
+		@simd for is = 1:acqgeom[ipw].ns[iss]
+			"""
+			use wavelets at [it], i.e., sum of source terms
+			until [it-1]
+			division of source term with δx and δz (see Jan's fdelmodc manual)
+			"""
+			source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
+			
+			"""
+			multiplication with modttI
+			"""
+			pw[isz1[ipw][is], isx1[ipw][is],ifield] += 
+				source_term * 
+				ssprayw[ipw][1,is] * 
+				modttI[isz1[ipw][is], isx1[ipw][is]]  
+			pw[isz1[ipw][is], isx2[ipw][is],ifield] += 
+				source_term * 
+				ssprayw[ipw][2,is] * 
+				modttI[isz1[ipw][is], isx2[ipw][is]]
+			pw[isz2[ipw][is], isx1[ipw][is],ifield] += 
+				source_term * 
+				ssprayw[ipw][3,is] * 
+				modttI[isz2[ipw][is], isx1[ipw][is]]
+			pw[isz2[ipw][is], isx2[ipw][is],ifield] += 
+				source_term * 
+				ssprayw[ipw][4,is] * 
+				modttI[isz2[ipw][is], isx2[ipw][is]]
+		end
+		end
 	end
 	end
 end
@@ -129,20 +130,21 @@ end
 	"""
 	for ipw in pac.activepw
 	if(pac.sflags[ipw] ≠ 0) # only if sflags is non-zero
-	for (ifields, ifield) in enumerate(pac.isfields[ipw])
-	@simd for is = 1:acqgeom[ipw].ns[iss]
-		"""
-		use wavelets at [it], i.e., sum of source terms
-		until [it-1]
-		division of source term with δx and δz (see Jan's fdelmodc manual)
-		"""
-		source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
-		
-		"""
-		multiplication with modttI
-		"""
-		p[isz1[ipw][is], isx1[ipw][is],ifield, ipw] += 	source_term * modttI[isz1[ipw][is], isx1[ipw][is]]  
-	end
+		pw=p[ipw]
+		for (ifields, ifield) in enumerate(pac.isfields[ipw])
+		@simd for is = 1:acqgeom[ipw].ns[iss]
+			"""
+			use wavelets at [it], i.e., sum of source terms
+			until [it-1]
+			division of source term with δx and δz (see Jan's fdelmodc manual)
+			"""
+			source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
+			
+			"""
+			multiplication with modttI
+			"""
+			pw[isz1[ipw][is], isx1[ipw][is],ifield] += source_term * modttI[isz1[ipw][is], isx1[ipw][is]]  
+		end
 	end
 	end
 	end

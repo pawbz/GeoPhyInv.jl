@@ -16,6 +16,9 @@ and boundary values for adjoint calculation.
 """
 function F!(pa::Param, x, ::ModFdtd)
 
+	# initialize boundary, as we will record them now
+	Fdtd.initialize_boundary!(pa.paf)
+
 	if(!(x===nothing))
 		# project x, which lives in modi, on to model space (modm)
 		x_to_modm!(pa, x)
@@ -43,6 +46,8 @@ end
 Born modeling with `modm` as the perturbed model and `modm0` as the background model.
 """
 function F!(pa::Param, x, ::ModFdtdBorn)
+	# switch on born scattering
+	pa.paf.c.born_flag=true
 
 	if(!(x===nothing))
 		# project x, which lives in modi, on to model space (modm)
@@ -63,13 +68,12 @@ function F!(pa::Param, x, ::ModFdtdBorn)
 	pa.paf.c.backprop_flag=1 # store boundary values for gradient later
 	pa.paf.c.gmodel_flag=false # no gradient
 	
-	# switch on born scattering
-	pa.paf.c.born_flag=true
 
 	Fdtd.mod!(pa.paf);
 	dcal=pa.paf.c.data[2]
 	copy!(pa.paTD.x,dcal)
 
+	pa.paf.c.born_flag=false
 end
 
 
@@ -77,6 +81,9 @@ end
 Perform adjoint modelling in `paf` using adjoint sources `adjsrc`.
 """
 function Fadj!(pa::Param)
+
+	# require gradient
+	pa.paf.c.gmodel_flag=true
 
 	# both wavefields are active
 	pa.paf.c.activepw=[1,2]
@@ -94,8 +101,6 @@ function Fadj!(pa::Param)
 	# update source wavelets in paf using adjoint sources
 	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
 
-	# require gradient
-	pa.paf.c.gmodel_flag=true
 
 	# no need to record data
 	pa.paf.c.rflags=[0,0]
@@ -106,8 +111,7 @@ function Fadj!(pa::Param)
 	# put rflags back
 	pa.paf.c.rflags=[1,1]
 
-	# copy gradient
-	copy!(pa.gmodm,pa.paf.c.gmodel)
+	return pa.paf.c.gradient
 end
 
 """

@@ -13,18 +13,19 @@ struct Receiver_B1 end
 	irz2=pass[issp].irz2
 
 	for ipw in pac.activepw
+		pw=p[ipw]
 		recs=pass[issp].records[ipw]
 		for (ifieldr, ifield) in enumerate(pac.irfields)
 			@simd for ir = 1:pac.acqgeom[ipw].nr[iss]
 				recs[it,ir,ifieldr]= 
 				(
-				p[irz1[ipw][ir],irx1[ipw][ir],ifield,ipw]*
+				pw[irz1[ipw][ir],irx1[ipw][ir],ifield]*
 				rinterpolatew[ipw][1,ir]+
-				p[irz1[ipw][ir],irx2[ipw][ir],ifield,ipw]*
+				pw[irz1[ipw][ir],irx2[ipw][ir],ifield]*
 				rinterpolatew[ipw][2,ir]+
-				p[irz2[ipw][ir],irx1[ipw][ir],ifield,ipw]*
+				pw[irz2[ipw][ir],irx1[ipw][ir],ifield]*
 				rinterpolatew[ipw][3,ir]+
-				p[irz2[ipw][ir],irx2[ipw][ir],ifield,ipw]*
+				pw[irz2[ipw][ir],irx2[ipw][ir],ifield]*
 				rinterpolatew[ipw][4,ir]
 				)
 		end
@@ -42,10 +43,11 @@ end
 	irz1=pass[issp].irz1
 
 	for ipw in pac.activepw
+		pw=p[ipw]
 		recs=pass[issp].records[ipw]
 		for (ifieldr, ifield) in enumerate(pac.irfields)
 			@simd for ir = 1:pac.acqgeom[ipw].nr[iss]
-				recs[it,ir,ifieldr]=(p[irz1[ipw][ir],irx1[ipw][ir],ifield,ipw])
+				recs[it,ir,ifieldr]=(pw[irz1[ipw][ir],irx1[ipw][ir],ifield])
 		end
 	end
 	end

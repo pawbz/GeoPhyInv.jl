@@ -490,7 +490,7 @@ function TDcoup!(
 end # TDcoup
 
 
-include("Data_misfits.jl")
+include("misfits.jl")
 
 #=
 function DDeConv(d::TD, wav::AbstractVector{Float64}, ϵ=1e-2)

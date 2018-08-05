@@ -28,35 +28,41 @@ function add_born_sources!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap:
 	born_stack!(p,born_svalue_stack,modttI,nx,nz,δt)
 end
 @inbounds @fastmath function born_stacktt!(born_svalue_stack,p,pp,ppp,δmodtt,nx,nz,δtI,δt)
+	pppw=ppp[1]
+	ppw=pp[1]
+	pw=p[1]
 	for ix=3:nx-2
 		@simd for iz=3:nz-2
 			born_svalue_stack[iz,ix] += 
-			δt * ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δmodtt[iz, ix] * δtI * δtI)) 
+			δt * ((-1.0 * (pppw[iz, ix, 1] + pw[iz, ix,  1] - 2.0 * ppw[iz, ix,  1]) * δmodtt[iz, ix] * δtI * δtI)) 
 		end
 	end
 end
 @inbounds @fastmath function born_stackrrvx!(born_svalue_stack,dpdx,δmodrrvx,nx,nz,δx24I,δt)
+	dpdxw=dpdx[1]
 	for ix=3:nx-2
 		@simd for iz=3:nz-2
 			born_svalue_stack[iz,ix] += 
-				δt * ((27.e0*dpdx[iz,ix,1,1] * δmodrrvx[iz,ix] -27.e0*dpdx[iz,ix-1,1,1] * δmodrrvx[iz,ix-1] -dpdx[iz,ix+1,1,1] * δmodrrvx[iz,ix+1] +dpdx[iz,ix-2,1,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) 
+				δt * ((27.e0*dpdxw[iz,ix,1] * δmodrrvx[iz,ix] -27.e0*dpdxw[iz,ix-1,1] * δmodrrvx[iz,ix-1] -dpdxw[iz,ix+1,1] * δmodrrvx[iz,ix+1] +dpdxw[iz,ix-2,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) 
 		end
 	end
 
 end
 @inbounds @fastmath function born_stackrrvz!(born_svalue_stack,dpdz,δmodrrvz,nx,nz,δz24I,δt)
+	dpdzw=dpdz[1]
 	for ix=3:nx-2
 		@simd for iz=3:nz-2
 			born_svalue_stack[iz,ix] += 
-				δt * ((27.e0*dpdz[iz,ix,1,1] * δmodrrvz[iz,ix] -27.e0*dpdz[iz-1,ix,1,1] * δmodrrvz[iz-1,ix] -dpdz[iz+1,ix,1,1] * δmodrrvz[iz+1,ix] +dpdz[iz-2,ix,1,1] * δmodrrvz[iz-2,ix] ) * (δz24I))  
+				δt * ((27.e0*dpdzw[iz,ix,1] * δmodrrvz[iz,ix] -27.e0*dpdzw[iz-1,ix,1] * δmodrrvz[iz-1,ix] -dpdzw[iz+1,ix,1] * δmodrrvz[iz+1,ix] +dpdzw[iz-2,ix,1] * δmodrrvz[iz-2,ix] ) * (δz24I))  
 
 		end
 	end
 end
 @inbounds @fastmath function born_stack!(p,born_svalue_stack,modttI,nx,nz,δt)
+	pw2=p[2]
 	for ix=3:nx-2
 		@simd for iz=3:nz-2
-			p[iz,ix,1,2] += born_svalue_stack[iz,ix] * modttI[iz,ix] * δt  #* δxI * δzI 
+			pw2[iz,ix,1] += born_svalue_stack[iz,ix] * modttI[iz,ix] * δt  #* δxI * δzI 
 		end
 	end
 end

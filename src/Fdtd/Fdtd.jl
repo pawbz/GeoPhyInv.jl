@@ -33,7 +33,7 @@ using DistributedArrays
 Modelling parameters common for all supersources
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
-* `gmodel::Models.Seismic=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
+* `gradient::Vector{Float64}=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
 * `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]`
 * `illum::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx)` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
@@ -95,6 +95,7 @@ mutable struct Paramc
 	δmodrrvx::Matrix{Float64}
 	δmodrrvz::Matrix{Float64}
 	grad_stack::SharedVector{Float64} # contains gmodtt and gmodrr
+	gradient::Vector{Float64}  # output gradient vector
 	grad_modrrvx_stack::SharedMatrix{Float64}
 	grad_modrrvz_stack::SharedMatrix{Float64}
 	grad_modrr_stack::Matrix{Float64}
@@ -104,7 +105,6 @@ mutable struct Paramc
 	snaps_flag::Bool
 	itsnaps::Vector{Int64}
 	born_flag::Bool
-	gmodel::Models.Seismic
 	gmodel_flag::Bool
 	ibx0::Int64
 	ibz0::Int64
@@ -149,15 +149,15 @@ Note that a single worker can take care of multiple supersources.
 """
 mutable struct Paramp
 	ss::Vector{Paramss}
-	p::Array{Float64,4}
-	pp::Array{Float64,4}
-	ppp::Array{Float64,4}
-	dpdx::Array{Float64,4}
-	dpdz::Array{Float64,4}
-	memory_dp_dx::Array{Float64,3}
-	memory_dp_dz::Array{Float64,3}
-	memory_dvx_dx::Array{Float64,3}
-	memory_dvz_dz::Array{Float64,3}
+	p::Vector{Array{Float64,3}}
+	pp::Vector{Array{Float64,3}}
+	ppp::Vector{Array{Float64,3}}
+	dpdx::Vector{Array{Float64,3}}
+	dpdz::Vector{Array{Float64,3}}
+	memory_dp_dx::Vector{Array{Float64,2}}
+	memory_dp_dz::Vector{Array{Float64,2}}
+	memory_dvx_dx::Vector{Array{Float64,2}}
+	memory_dvz_dz::Vector{Array{Float64,2}}
 end
 
 mutable struct Param
@@ -181,11 +181,21 @@ function initialize!(pap::Paramp)
 	end
 end
 
-function initialize_boundary!(pap::Paramp)
-	for issp in 1:length(pap.ss)
-		pass=pap.ss[issp]
-		for i in 1:length(pass.boundary)
-			pass.boundary[i][:]=0.0
+		
+
+function initialize_boundary!(pa)
+	# zero out results stored per worker
+	@sync begin
+		for (ip, p) in enumerate(procs(pa.p))
+			@async remotecall_wait(p) do 
+				pap=localpart(pa.p)
+				for issp in 1:length(pap.ss)
+					pass=pap.ss[issp]
+					for i in 1:length(pass.boundary)
+						pass.boundary[i][:]=0.0
+					end
+				end
+			end
 		end
 	end
 end
@@ -195,6 +205,7 @@ function initialize!(pac::Paramc)
 	for i in eachindex(pac.grad_stack)
 		pac.grad_stack[i]=0.0
 	end
+	fill!(pac.gradient,0.0)
 	for i in eachindex(pac.grad_modrrvx_stack)
 		pac.grad_modrrvx_stack[i]=0.0
 	end
@@ -204,29 +215,26 @@ function initialize!(pac::Paramc)
 	for i in eachindex(pac.grad_modrr_stack)
 		pac.grad_modrr_stack[i]=0.0
 	end
-	for i in eachindex(pac.illum_stack)
-		pac.illum_stack[i]=0.0
-	end
+	fill!(pac.illum_stack,0.0)
 	for ipw=1:pac.npw
 		dat=pac.data[ipw]
 		fill!(dat, 0.0)
 	end
-	for i in eachindex(pac.datamat)
-		pac.datamat[i]=0.0
-	end
-	fill!(pac.gmodel, 0.0)
+	fill!(pac.datamat,0.0)
 end
 
 function reset_per_ss!(pap::Paramp)
-	pap.p[:]=0.0
-	pap.pp[:]=0.0
-	pap.ppp[:]=0.0
-	pap.dpdx[:]=0.0
-	pap.dpdz[:]=0.0
-	pap.memory_dp_dz[:]=0.0
-	pap.memory_dp_dx[:]=0.0
-	pap.memory_dvx_dx[:]=0.0
-	pap.memory_dvz_dz[:]=0.0
+	for ipw in 1:length(pap.p)
+		fill!(pap.p[ipw],0.0)
+		fill!(pap.pp[ipw],0.0)
+		fill!(pap.ppp[ipw],0.0)
+		fill!(pap.dpdx[ipw],0.0)
+		fill!(pap.dpdz[ipw],0.0)
+		fill!(pap.memory_dp_dz[ipw],0.0)
+		fill!(pap.memory_dp_dx[ipw],0.0)
+		fill!(pap.memory_dvx_dx[ipw],0.0)
+		fill!(pap.memory_dvz_dz[ipw],0.0)
+	end
 end
 
 
@@ -426,10 +434,10 @@ function Param(;
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
 	grad_stack=SharedVector{Float64}(2*nzd*nxd)
+	gradient=zeros(2*nzd*nxd)
 	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	grad_modrr_stack=zeros(nzd,nxd)
-	gmodel=similar(model)
 	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
 	itsnaps = [indmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
@@ -447,12 +455,13 @@ function Param(;
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modtt, modttI,modrr,modrrvx,modrrvz,
 	    δmodtt,modrr_pert,δmodrrvx,δmodrrvz,
-	    grad_stack,grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,
+	    grad_stack,
+	    gradient,
+	    grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,
 	    illum_flag,illum_stack,
 	    backprop_flag,
 	    snaps_flag,
 	    itsnaps,born_flag,
-	    gmodel,
 	    gmodel_flag,
 	    ibx0,ibz0,ibx1,ibz1,
 	    isx0,isz0,
@@ -484,15 +493,18 @@ The parameters common to all workers are stored in `pac`.
 function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 	nx=pac.nx; nz=pac.nz; npw=pac.npw
 
-	p=zeros(nz,nx,3,npw); pp=zeros(p); ppp=zeros(p)
-	dpdx=zeros(p); dpdz=zeros(p)
+	p=[zeros(nz,nx,3) for ipw in 1:npw]; 
+	dpdx=[zeros(nz,nx,3) for ipw in 1:npw]; 
+	dpdz=[zeros(nz,nx,3) for ipw in 1:npw]; 
+	pp=[zeros(nz,nx,3) for ipw in 1:npw]; 
+	ppp=[zeros(nz,nx,3) for ipw in 1:npw]; 
 
-	memory_dvx_dx=zeros(nz,nx,npw)
-	memory_dvx_dz=zeros(memory_dvx_dx)
-	memory_dvz_dx=zeros(memory_dvx_dx)
-	memory_dvz_dz=zeros(memory_dvx_dx)
-	memory_dp_dx=zeros(memory_dvx_dx)
-	memory_dp_dz=zeros(memory_dvx_dx)
+	memory_dvx_dx=[zeros(nz,nx) for ipw in 1:npw]
+	memory_dvx_dz=[zeros(nz,nx) for ipw in 1:npw]
+	memory_dvz_dx=[zeros(nz,nx) for ipw in 1:npw]
+	memory_dvz_dz=[zeros(nz,nx) for ipw in 1:npw]
+	memory_dp_dx=[zeros(nz,nx) for ipw in 1:npw]
+	memory_dp_dz=[zeros(nz,nx) for ipw in 1:npw]
 	
 	ss=[Paramss(iss, pac) for (issp,iss) in enumerate(sschunks)]
 
@@ -679,7 +691,7 @@ This method updated the input `Fdtd.Param` after the wave propagation.
 
 * `pa.c.TDout::Vector{Data.TD}` : seismic data at receivers after modeling, for each propagating wavefield
 * `pa.c.snaps::Array{Float64,4}` : snaps with size `(nz,nx,length(tsnaps),nss)` saved at `tsnaps`
-* `pa.c.gmodel::Models.Seismic` : gradient model modified only if `gmodel_flag`
+* `pa.c.gradient::Models.Seismic` : gradient model modified only if `gmodel_flag`
 * `pa.c.illum_stack::Array{Float64,2}` source energy of size `(nz,nx)` if `illum_flag`
 
 # Example
@@ -738,9 +750,9 @@ Author: Pawan Bharadwaj
 		end
 	end
 
-	@timeit to "update gmodel" begin
+	@timeit to "update gradient" begin
 		# update gradient model using grad_modtt_stack, grad_modrr_stack
-		update_gmodel!(pa.c)
+		update_gradient!(pa.c)
 	end
 
 	@timeit to "record data" begin
@@ -910,7 +922,7 @@ end
 	snaps=pass[issp].snaps
 	for ix=1:size(snaps,2)
 		@simd for iz=1:size(snaps,1)
-			snaps[iz,ix,itsnap]=p[isz0+iz,isx0+ix,1,1]
+			snaps[iz,ix,itsnap]=p[1][isz0+iz,isx0+ix,1]
 		end
 	end
 end

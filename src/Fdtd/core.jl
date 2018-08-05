@@ -39,21 +39,25 @@
 
 end
 function pppppp!(p,pp,ppp,activepw)
-	for ipw in activepw, ifi in 1:size(p,3), ix in 1:size(p,2)
-		@simd for iz in 1:size(p,1)
-			@inbounds ppp[iz,ix,ifi,ipw]=pp[iz,ix,ifi,ipw]
-			@inbounds pp[iz,ix,ifi,ipw]=p[iz,ix,ifi,ipw]
-		end
+	for ipw in activepw 
+		pw=p[ipw]
+		ppw=pp[ipw]
+		pppw=ppp[ipw]
+		copy!(pppw,ppw)
+		copy!(ppw,pw)
 	end
 end
 
 @inbounds @fastmath function dvdx!(dpdx,p,memory_dvx_dx,b_x,a_x,k_xI,nz,nx,δx24I,activepw)
 	for ipw in activepw
+		pw=p[ipw]
+		dpdxw=dpdx[ipw]
+		memory_dvx_dxw=memory_dvx_dx[ipw]
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds dpdx[iz,ix,2,ipw] = (27.e0*p[iz,ix,2,ipw]-27.e0*p[iz,ix-1,2,ipw]-p[iz,ix+1,2,ipw]+p[iz,ix-2,2,ipw]) * (δx24I)
-			@inbounds memory_dvx_dx[iz,ix,ipw] = b_x[ix] * memory_dvx_dx[iz,ix,ipw] + a_x[ix] * dpdx[iz,ix,2,ipw] # pml 
-			@inbounds dpdx[iz,ix,2,ipw] = dpdx[iz,ix,2,ipw] * k_xI[ix] + memory_dvx_dx[iz,ix,ipw] # pml
+			@inbounds dpdxw[iz,ix,2] = (27.e0*pw[iz,ix,2]-27.e0*pw[iz,ix-1,2]-pw[iz,ix+1,2]+pw[iz,ix-2,2]) * (δx24I)
+			@inbounds memory_dvx_dxw[iz,ix] = b_x[ix] * memory_dvx_dxw[iz,ix] + a_x[ix] * dpdxw[iz,ix,2] # pml 
+			@inbounds dpdxw[iz,ix,2] = dpdxw[iz,ix,2] * k_xI[ix] + memory_dvx_dxw[iz,ix] # pml
 		end
 		end
 	end
@@ -61,11 +65,14 @@ end
 
 @inbounds @fastmath function dvdz!(dpdz,p,memory_dvz_dz,b_z,a_z,k_zI,nz,nx,δz24I,activepw)
 	for ipw in activepw
+		pw=p[ipw]
+		dpdzw=dpdz[ipw]
+		memory_dvz_dzw=memory_dvz_dz[ipw]
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds dpdz[iz,ix,3,ipw] = (27.e0*p[iz,ix,3,ipw]-27.e0*p[iz-1,ix,3,ipw]-p[iz+1,ix,3,ipw]+p[iz-2,ix,3,ipw]) * (δz24I)
-			@inbounds memory_dvz_dz[iz,ix,ipw] = b_z[iz] * memory_dvz_dz[iz,ix,ipw] + a_z[iz] * dpdz[iz,ix,3,ipw] # pml
-			@inbounds dpdz[iz,ix,3,ipw] = dpdz[iz,ix,3,ipw] * k_zI[iz] + memory_dvz_dz[iz,ix,ipw] # pml
+			@inbounds dpdzw[iz,ix,3] = (27.e0*pw[iz,ix,3]-27.e0*pw[iz-1,ix,3]-pw[iz+1,ix,3]+pw[iz-2,ix,3]) * (δz24I)
+			@inbounds memory_dvz_dzw[iz,ix] = b_z[iz] * memory_dvz_dzw[iz,ix] + a_z[iz] * dpdzw[iz,ix,3] # pml
+			@inbounds dpdzw[iz,ix,3] = dpdzw[iz,ix,3] * k_zI[iz] + memory_dvz_dzw[iz,ix] # pml
 		end
 		end
 	end
@@ -73,9 +80,12 @@ end
 
 @inbounds @fastmath function pvzvx!(p,dpdx,dpdz,modttI,nz,nx,δt,activepw)
 	for ipw in activepw
+		pw=p[ipw]
+		dpdxw=dpdx[ipw]
+		dpdzw=dpdz[ipw]
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,1,ipw] += (modttI[iz,ix] * (dpdx[iz,ix,2,ipw] + dpdz[iz,ix,3,ipw])) * δt #* boundary_p(iz,ix)
+			@inbounds pw[iz,ix,1] += (modttI[iz,ix] * (dpdxw[iz,ix,2] + dpdzw[iz,ix,3])) * δt #* boundary_p(iz,ix)
 		end
 		end
 	end
@@ -83,11 +93,14 @@ end
 
 @inbounds @fastmath function update_dpdx!(p, dpdx, δx24I, memory_dp_dx, b_x_half, a_x_half, k_x_halfI, nx, nz,activepw)
 	for ipw in activepw
+		pw=p[ipw]
+		dpdxw=dpdx[ipw]
+		memory_dp_dxw=memory_dp_dx[ipw]
 		for ix = 3:nx-2
 		@simd for iz = 3:nz-2
-			@inbounds dpdx[iz,ix,1,ipw] = (27.e0*p[iz,ix+1,1,ipw]-27.e0*p[iz,ix,1,ipw]-p[iz,ix+2,1,ipw]+p[iz,ix-1,1,ipw]) * (δx24I)
-			@inbounds memory_dp_dx[iz,ix,ipw] = b_x_half[ix] * memory_dp_dx[iz,ix,ipw] + a_x_half[ix] * dpdx[iz,ix,1,ipw] # pml
-			@inbounds dpdx[iz,ix,1,ipw] = dpdx[iz,ix,1,ipw] * k_x_halfI[ix] + memory_dp_dx[iz,ix,ipw] # pml
+			@inbounds dpdxw[iz,ix,1] = (27.e0*pw[iz,ix+1,1]-27.e0*pw[iz,ix,1]-pw[iz,ix+2,1]+pw[iz,ix-1,1]) * (δx24I)
+			@inbounds memory_dp_dxw[iz,ix] = b_x_half[ix] * memory_dp_dxw[iz,ix] + a_x_half[ix] * dpdxw[iz,ix,1] # pml
+			@inbounds dpdxw[iz,ix,1] = dpdxw[iz,ix,1] * k_x_halfI[ix] + memory_dp_dxw[iz,ix] # pml
 		end
 		end
 	end
@@ -95,11 +108,14 @@ end
 
 @inbounds @fastmath function update_dpdz!(p, dpdz, δz24I, memory_dp_dz, b_z_half, a_z_half, k_z_halfI, nx, nz,activepw)
 	for ipw in activepw
+		pw=p[ipw]
+		dpdzw=dpdz[ipw]
+		memory_dp_dzw=memory_dp_dz[ipw]
 		for ix = 3:nx-2
 		@simd for iz = 3:nz-2
-			@inbounds dpdz[iz,ix,1,ipw] = (27.e0*p[iz+1,ix,1,ipw]-27.e0*p[iz,ix,1,ipw]-p[iz+2,ix,1,ipw]+p[iz-1,ix,1,ipw]) * (δz24I)
-			@inbounds memory_dp_dz[iz,ix,ipw] = b_z_half[iz] * memory_dp_dz[iz,ix,ipw] + a_z_half[iz] * dpdz[iz,ix,1,ipw] # pml
-			@inbounds dpdz[iz,ix,1,ipw] = dpdz[iz,ix,1,ipw] * k_z_halfI[iz] + memory_dp_dz[iz,ix,ipw] # pml
+			@inbounds dpdzw[iz,ix,1] = (27.e0*pw[iz+1,ix,1]-27.e0*pw[iz,ix,1]-pw[iz+2,ix,1]+pw[iz-1,ix,1]) * (δz24I)
+			@inbounds memory_dp_dzw[iz,ix] = b_z_half[iz] * memory_dp_dzw[iz,ix] + a_z_half[iz] * dpdzw[iz,ix,1] # pml
+			@inbounds dpdzw[iz,ix,1] = dpdzw[iz,ix,1] * k_z_halfI[iz] + memory_dp_dzw[iz,ix] # pml
 		end
 		end
 	end
@@ -107,9 +123,11 @@ end
 
 @inbounds @fastmath function update_vx!(p, dpdx, δt, modrrvx,  nx, nz,activepw)
 	for ipw in activepw
+		pw=p[ipw]
+		dpdxw=dpdx[ipw]
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,2,ipw] += (dpdx[iz,ix,1,ipw]) * δt * modrrvx[iz,ix] #* boundary_vx(iz,ix)
+			@inbounds pw[iz,ix,2] += (dpdxw[iz,ix,1]) * δt * modrrvx[iz,ix] #* boundary_vx(iz,ix)
 		end
 		end
 	end
@@ -117,9 +135,11 @@ end
 
 @inbounds @fastmath function update_vz!(p, dpdz, δt,  modrrvz, nx, nz,activepw)
 	for ipw in activepw
+		pw=p[ipw]
+		dpdzw=dpdz[ipw]
 		for ix=3:nx-2
 		@simd for iz=3:nz-2
-			@inbounds p[iz,ix,3,ipw] +=  (dpdz[iz,ix,1,ipw]) * δt * modrrvz[iz,ix] #* boundary_vz(iz,ix)
+			@inbounds pw[iz,ix,3] +=  (dpdzw[iz,ix,1]) * δt * modrrvz[iz,ix] #* boundary_vz(iz,ix)
 		end
 		end
 	end

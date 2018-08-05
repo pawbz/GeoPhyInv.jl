@@ -85,6 +85,8 @@ mutable struct Param{Tattrib_mod, Tdatamisfit}
 	modm0::Models.Seismic
 	"Seismic on inversion grid"
 	modi::Models.Seismic
+	"initialize on this model"
+	mod_initial::Models.Seismic
 	"prior model on the inversion grid"
 	priori::Models.Seismic
 	"prior weights on the inversion grid"
@@ -103,8 +105,6 @@ mutable struct Param{Tattrib_mod, Tdatamisfit}
 	verbose::Bool
 	"synthetic or field inversion"
 	attrib::Symbol
-	"update buffer in every iteration?"
-	buffer_update_flag::Bool
 end
 
 struct LS end # just cls inversion
@@ -121,8 +121,8 @@ struct Migr end # returns first gradient
 
 struct Migr_fd end # computes first gradient using FD
 
-include("FWI_core.jl")
-include("FWI_prior.jl")
+include("core.jl")
+include("prior.jl")
 
 """
 Convert the data `TD` to `Src` after time reversal.
@@ -232,6 +232,9 @@ function Param(
 	Models.adjust_bounds!(modi, modm)
 	Models.interp_spray!(modm, modi, :interp)
 
+	# save the initial model, as modi will be changed during the iterations
+	mod_initial=deepcopy(modi)
+
 	# allocate prior inputs
 	priori=similar(modi)
 	priorw=similar(modi)
@@ -291,6 +294,10 @@ function Param(
 	mx=Inversion.X(modi.mgrid.nz*modi.mgrid.nx*count(parameterization.≠:null),2)
 	mxm=Inversion.X(modm.mgrid.nz*modm.mgrid.nx*count(parameterization.≠:null),2)
 
+
+	# put modm as a vector, according to parameterization in mxm.x
+	Models.Seismic_get!(mxm.x,modm,parameterization)
+
 	pa = Param(
 	     mx, mxm,
 	     paf,
@@ -299,14 +306,14 @@ function Param(
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
 	     attrib_mod,  
-	     deepcopy(modm), deepcopy(modm0), modi, 
+	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,
 	     priori, priorw,
 	     gmodm,gmodi,
 	     parameterization,
 	     zeros(2,2), # dummy, update mprecon later
 	     paTD,
 	     paminterp,
-	     verbose, attrib, true)
+	     verbose, attrib)
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic))
@@ -367,24 +374,29 @@ At the same time, update the lower and upper bounds on the inversion variable.
 """
 function initialize!(pa::Param)
 
-	pa.mx.x[:]=0.0
 	randn!(pa.mx.last_x)  # reset last_x
 
-	# convert initial model to the inversion variable
-	# replace x and modi with initial model (pa.modm)
-	if(iszero(pa.modi)) # then use modm
-		if(iszero(pa.modm))
-			error("no initial model present in pa") 
-		else
-			Models.interp_spray!(pa.modm, pa.modi, :interp)
-		end
-	end
-	# use modi as starting model without disturbing modm
-	Models.Seismic_get!(pa.mx.x,pa.modi,pa.parameterization)
+	# use mod_initial as starting model according to parameterization
+	Models.Seismic_get!(pa.mx.x, pa.mod_initial, pa.parameterization)
 
 	# bounds
 	Seismic_xbound!(pa.mx.lower_x, pa.mx.upper_x, pa)
 
+end
+
+# finalize xfwi or wfwi on pa
+function finalize!(pa::Param, xminimizer)
+	# update modm
+	x_to_modm!(pa, xminimizer)
+
+	# update calculated data using the minimizer
+	F!(pa, nothing, pa.attrib_mod)
+
+	# put minimizer into modi
+	Models.Seismic_reparameterize!(pa.modi, xminimizer, pa.parameterization) 
+
+	# update initial model using minimizer, so that running xfwi! next time will start with updated model
+	copy!(pa.mod_initial, pa.modi)
 end
 
 """
@@ -446,7 +458,7 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 		"""
 		Bounded LBFGS inversion
 		"""
-		if solver == :ipopt
+		if (solver == :ipopt)
 			function eval_f(x)
 			    return ζfunc(x, pa.mx.last_x,  pa, obj)
 			end
@@ -470,7 +482,7 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 
 			addOption(prob, "hessian_approximation", "limited-memory")
 
-			if ipopt_options !== nothing
+			if !(ipopt_options === nothing)
 			    for i in 1:size(ipopt_options)[1]
 				addOption(prob, ipopt_options[i][1], ipopt_options[i][2])
 			    end
@@ -478,35 +490,32 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 
 			prob.x = pa.mx.x
 			    
-			res = solveProblem(prob)
+			@timeit to "xfwi!" begin
+				res = solveProblem(prob)
+			end
 		else
 			@timeit to "xfwi!" begin
-			res = optimize(f, g!, pa.mx.lower_x, pa.mx.upper_x, 
-			pa.mx.x, Fminbox(optim_scheme), optim_options)
+				res = optimize(f, g!, pa.mx.lower_x, pa.mx.upper_x,pa.mx.x, Fminbox(optim_scheme), optim_options)
+			end
                 end
 	end
 	show(to)
-	if solver == :ipopt
+
+	# print some stuff after optimization...
+	if (solver == :ipopt)
 		pa.verbose && println(ApplicationReturnStatus[res])
-		#println(prob.x)
-		#println(prob.obj_val)   
 	else
 		pa.verbose && println(res)
 	end
 	
 
-	# update modm and modi using minimizer of Optim
+	# finalize optimization, using the optimizer... 
 	if solver == :ipopt
-		x_to_modm!(pa, prob.x)
+		finalize!(pa, prob.x)
 	else
-		x_to_modm!(pa, Optim.minimizer(res))
+		finalize!(pa, Optim.minimizer(res))
 	end
 
-	# update calculated data at the last iteration --> pa.paTD.x
-	F!(pa, nothing, pa.attrib_mod)
-
-	# leave buffer update flag to true before leaving xfwi
-	pa.buffer_update_flag = true
 
 	return res
 end
@@ -544,17 +553,13 @@ function xfwi!(pa::Param, obj::Migr)
 	initialize!(pa)
 
 	g1=pa.mx.gm[1]
-	@timeit to "fg!" begin
+	@timeit to "xfwi!" begin
 		grad!(g1, pa.mx.x, pa.mx.last_x,  pa)
 	end
 	show(to)
-	pa.verbose && show(pa)
 
 	# convert gradient vector to model
 	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, g1, pa)
-
-	# leave buffer update flag to true before leaving xfwi
-	pa.buffer_update_flag = true
 
 	return pa.gmodi
 end
@@ -574,7 +579,7 @@ function xfwi!(pa::Param, obj::Migr_fd)
 	println("> number of functional evaluations:\t", xfwi_ninv(pa)) 
 
 	f(x) = ζfunc(x, pa.mx.last_x,  pa, LS())
-	#
+
 	gx = Calculus.gradient(f,pa.mx.x) # allocating new gradient vector here
 	
 	show(to)
@@ -681,7 +686,7 @@ function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 	@timeit to "Fadj!" Fadj!(pa)	
 
 	# adjoint of interpolation
-        gmodm_to_gx!(storage, pa.gmodm, pa, pa.attrib_mod)
+        spray_gradient!(storage,  pa, pa.attrib_mod)
 
 	return storage
 end 
@@ -721,32 +726,6 @@ function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior)
 	return storage
 end
 
-"""
-Return the inversion variable of `xfwi` with mostly zeros and 
-non-zero at only one element corresponding to a location `loc`.
-
-Note: this method will modify `modm` and `modi`.
-"""
-function xfwi_pert_x(pa,loc)
-	# allocate
-	x = zeros(xfwi_ninv(pa))
-	return xfwi_pert_x!(x,pa,loc)
-end
-"""
-"""
-function xfwi_pert_x!(x, pa, loc)
-
-	fill!(pa.modm, 0.0)
-	fill!(pa.modi, 0.0)
-
-	# add a point perturbation
-	Models.Seismic_addon!(pa.modi, point_loc=loc, point_pert=0.1, fields=[:χvp]) 
-
-	# update x
-	Models.Seismic_get!(x,pa.modi,pa.parameterization)
-
-	return x
-end
 
 """
 Update pa.w
@@ -799,7 +778,7 @@ end # wfwi
 function x_to_modm!(pa, x)
 
 	# put sparse x into modi (useless step, just for visualization)
-	Models.Seismic_reparameterize!(pa.modi,x,pa.parameterization) 
+	Models.Seismic_reparameterize!(pa.modi, x, pa.parameterization) 
 
 	# get x on dense grid
 	Interpolation.interp_spray!(x, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
@@ -808,27 +787,30 @@ function x_to_modm!(pa, x)
 	Models.Seismic_reparameterize!(pa.modm,pa.mxm.x,pa.parameterization) 
 end
 
-# Convert gradient vector to `Seismic` type and vice versa
-# This will be different from the previous one, once 
-function gmodm_to_gx!(gx, gmodm, pa, ::ModFdtd)
+"""
+convert the gradient output from Fdtd to gx
+"""
+function spray_gradient!(gx,  pa, ::ModFdtd)
 
 	# apply chain rule on gmodm to get gradient w.r.t. dense x
-	Models.Seismic_chainrule!(gmodm, pa.modm, pa.mxm.gx, pa.parameterization, -1)
+	Models.gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
 
 	# spray gradient w.r.t. dense x to the space of sparse x
 	Interpolation.interp_spray!(gx, pa.mxm.gx, pa.paminterp, :spray, count(pa.parameterization.≠:null))
 
 	# visualize gmodi here?
+	# visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)
 end
-function gmodm_to_gx!(gx, gmodm, pa, ::ModFdtdBorn)
+function spray_gradient!(gx, pa, ::ModFdtdBorn)
 
 	# apply chain rule on gmodm to get gradient w.r.t. dense x (note that background model is used for Born modeling here)
-	Models.Seismic_chainrule!(gmodm, pa.modm0, pa.mxm.gx, pa.parameterization, -1)
+	Models.gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm0, pa.parameterization)
 
 	# spray gradient w.r.t. dense x to the space of sparse x
 	Interpolation.interp_spray!(gx, pa.mxm.gx, pa.paminterp, :spray, count(pa.parameterization.≠:null))
 
 	# visualize gmodi here?
+	# visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)
 end
 
 

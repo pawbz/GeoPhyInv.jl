@@ -58,20 +58,13 @@ function stack_grads!(pac::Paramc, pap::Paramp)
 
 end
 
-function update_gmodel!(pac::Paramc)
+function update_gradient!(pac::Paramc)
 	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
 	
-	for i in 1:nznxd
-		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],pac.model.ref.KI,1)
-		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],pac.model.ref.ρI,1)
+	for i in eachindex(pac.gradient)
+		pac.gradient[i]=pac.grad_stack[i] # parameterization is  [:KI, :ρI, :null]
 	end
 
-	Models.Seismic_chainrule!(pac.gmodel, pac.model, pac.grad_stack, [:χKI, :χρI, :null], 1)
-
-	for i in 1:nznxd
-		pac.grad_stack[i]=Models.χg(pac.grad_stack[i],pac.model.ref.KI,-1)
-		pac.grad_stack[nznxd+i]=Models.χg(pac.grad_stack[nznxd+i],pac.model.ref.ρI,-1)
-	end
 end
 
 
@@ -94,27 +87,35 @@ end
 end
 
 @inbounds @fastmath function gmodtt!(grad_modtt,p,pp,ppp,nx,nz,δtI,)
+	pppw=ppp[1]
+	pw=p[1]
+	ppw=pp[1]
+	ppw2=pp[2]
 	for ix=1:nx
 		@simd for iz=1:nz
 			# p at [it], pp at [it-1]	# dpdx and dpdz at [it]	# gradients w.r.t inverse of modtt, i.e., 1/rho/c^2 
-			@inbounds grad_modtt[iz,ix] += ((-1.0 * (ppp[iz, ix, 1,1] + p[iz, ix,  1,1] - 2.0 * pp[iz, ix,  1,1]) * δtI * δtI) *  pp[iz,ix,1,2])
+			@inbounds grad_modtt[iz,ix] += ((-1.0 * (pppw[iz, ix, 1] + pw[iz, ix,  1] - 2.0 * ppw[iz, ix,  1]) * δtI * δtI) *  ppw2[iz,ix,1])
 		end
 	end
 end
 @inbounds @fastmath function gmodrrvx!(grad_modrrvx,dpdx,nx,nz)
+	dpdxw1=dpdx[1]
+	dpdxw2=dpdx[2]
 	for ix=1:nx
 		@simd for iz=1:nz
 			# gradient w.r.t. inverse of rho on vx and vz grids
-			@inbounds grad_modrrvx[iz,ix] += (- dpdx[iz,ix,1,2]*dpdx[iz,ix,1,1])
+			@inbounds grad_modrrvx[iz,ix] += (- dpdxw2[iz,ix,1]*dpdxw1[iz,ix,1])
 		end
 	end
 
 end
 @inbounds @fastmath function gmodrrvz!(grad_modrrvz,dpdz,nx,nz)
+	dpdzw1=dpdz[1]
+	dpdzw2=dpdz[2]
 	for ix=1:nx
 		@simd for iz=1:nz
 			# gradient w.r.t. inverse of rho on vx and vz grids
-			@inbounds grad_modrrvz[iz,ix] += (- dpdz[iz,ix,1,2]*dpdz[iz,ix,1,1])
+			@inbounds grad_modrrvz[iz,ix] += (- dpdzw2[iz,ix,1]*dpdzw1[iz,ix,1])
 		end
 	end
 end
