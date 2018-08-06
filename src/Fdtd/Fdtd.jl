@@ -8,7 +8,6 @@ using Signals
 import JuMIT.Models
 import JuMIT.Acquisition
 import JuMIT.Data
-import JuMIT.Gallery
 using ProgressMeter
 using TimerOutputs
 using DistributedArrays
@@ -165,6 +164,9 @@ mutable struct Param
 	c::Paramc # common parameters
 end
 
+Base.print(pa::Param)=nothing
+Base.show(pa::Param)=nothing
+
 function initialize!(pap::Paramp)
 	reset_per_ss!(pap)
 	for issp in 1:length(pap.ss)
@@ -246,12 +248,12 @@ finite-difference modeling is performed.
 # Keyword Arguments
 
 * `npw::Int64=1` : number of independently propagating wavefields in `model`
-* `model::Models.Seismic=Gallery.Seismic(:acou_homo1)` : seismic medium parameters 
+* `model::Models.Seismic` : seismic medium parameters 
 * `model_pert::Models.Seismic=model` : perturbed model, i.e., model + δmodel, used only for Born modeling 
-* `tgridmod::Grid.M1D=Gallery.M1D(:acou_homo1)` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
+* `tgridmod::Grid.M1D=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
 * `tgrid::Grid.M1D=tgridmod` : output records are resampled on this time grid
-* `acqgeom::Vector{Acquisition.Geom}=fill(Gallery.Geom(:acou_homo1),npw)` :  acquisition geometry for each independently propagating wavefield
-* `acqsrc::Vector{Acquisition.Src}=fill(Gallery.Src(:acou_homo1),npw)` : source acquisition parameters for each independently propagating wavefield
+* `acqgeom::Vector{Acquisition.Geom}` :  acquisition geometry for each independently propagating wavefield
+* `acqsrc::Vector{Acquisition.Src}` : source acquisition parameters for each independently propagating wavefield
 * `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
   * `=[0]` inactive sources
   * `=[1]` sources with injection rate
@@ -297,13 +299,13 @@ Author: Pawan Bharadwaj
 function Param(;
 	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
-	model::Models.Seismic=Gallery.Seismic(:acou_homo1),
+	model::Models.Seismic=nothing,
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
 	born_flag::Bool=false,
 	model_pert::Models.Seismic = model,
-	tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
-	acqgeom::Vector{Acquisition.Geom} = fill(Gallery.Geom(model.mgrid,:surf,nss=1),npw),
-	acqsrc::Array{Acquisition.Src} = fill(Gallery.Src(:acou_homo1),npw),
+	tgridmod::Grid.M1D=nothing,
+	acqgeom::Vector{Acquisition.Geom}=nothing,
+	acqsrc::Array{Acquisition.Src}=nothing,
 	sflags::Vector{Int64}=fill(2,npw), 
 	rflags::Vector{Int64}=fill(1,npw),
 	rfields::Vector{Symbol}=[:P], 
@@ -862,14 +864,14 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 			# force p[1] on boundaries
 			(pac.backprop_flag==-1) && boundary_force!(it,issp,pac,pap.ss,pap)
 	 
-			add_source!(it, issp, iss, pac, pap.ss, pap, Source_B0())
+			add_source!(it, issp, iss, pac, pap.ss, pap, Source_B1())
 
 			(pac.born_flag) && add_born_sources!(issp, pac, pap.ss, pap)
 
 			# record boundaries after time reversal already
 			(pac.backprop_flag==1) && boundary_save!(pac.nt-it+1,issp,pac,pap.ss,pap)
 
-			record!(it, issp, iss, pac, pap.ss, pap, Receiver_B0())
+			record!(it, issp, iss, pac, pap.ss, pap, Receiver_B1())
 
 			(pac.gmodel_flag) && compute_gradient!(issp, pac, pap.ss, pap)
 

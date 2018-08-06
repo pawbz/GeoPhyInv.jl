@@ -1,4 +1,82 @@
 
+"""
+Return functional and gradient of the LS objective 
+* `last_x::Vector{Float64}` : buffer is only updated when x!=last_x, and modified such that last_x=x
+"""
+function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
+	global to
+
+	if(!isequal(x, last_x))
+		copy!(last_x, x)
+		# do forward modelling, apply F x
+		@timeit to "F!" F!(pa, x, pa.attrib_mod)
+	end
+
+	# compute misfit 
+	f = Data.func_grad!(pa.paTD)
+	return f
+end
+
+function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
+	global to
+
+	# (inactive when applied on same model)
+	if(!isequal(x, last_x))
+		copy!(last_x, x)
+		# do forward modelling, apply F x 
+		@timeit to "F!" F!(pa, x, pa.attrib_mod)
+	end
+
+	# compute functional and get ∇_d J (adjoint sources)
+	f = Data.func_grad!(pa.paTD, :dJx);
+
+	# update adjoint sources after time reversal
+	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
+
+	# do adjoint modelling here with adjoint sources Fᵀ F P x
+	@timeit to "Fadj!" Fadj!(pa)	
+
+	# adjoint of interpolation
+        spray_gradient!(storage,  pa, pa.attrib_mod)
+
+	return storage
+end 
+
+
+
+function ζfunc(x, last_x, pa::Param, ::LS)
+	return func(x, last_x, pa)
+end
+
+
+function ζgrad!(storage, x, last_x, pa::Param, ::LS)
+	return grad!(storage, x, last_x, pa)
+end
+
+
+function ζfunc(x, last_x, pa::Param, obj::LS_prior)
+	f1=func(x, last_x, pa)
+
+	f2=Misfits.error_squared_euclidean!(nothing, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+
+	return f1*obj.α[1]+f2*obj.α[2]
+end
+
+function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior)
+	g1=pa.mx.gm[1]
+	grad!(g1, x, last_x, pa)
+
+	g2=pa.mx.gm[2]
+	Misfits.error_squared_euclidean!(g2, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+
+	scale!(g1, obj.α[1])
+	scale!(g2, obj.α[2])
+	for i in eachindex(storage)
+		@inbounds storage[i]=g1[i]+g2[i]
+	end
+	return storage
+end
+
 
 """
 Perform a forward simulation.
@@ -141,10 +219,10 @@ function Fadj_Fborn_x!(xx, x, pa)
 end
 
 
-function Fadj_Fborn(pa)
-	(pa.paf.c.born_flag==false) && error("need born flag")
-	fw=(y,x)->F_kernel!(y, x, pa)
-	bk=(y,x)->Fadj_kernel!(y, x, pa)
+function operator_Born(pa)
+	(typeof(pa.attrib_mod) ≠ ModFdtdBorn) && error("need born flag")
+	fw=(y,x)->Fborn_map!(y, x, pa)
+	bk=(y,x)->Fadj_map!(y, x, pa)
 
 	return LinearMap(fw, bk, 
 		  length(pa.paTD.dJx),  # length of output
@@ -152,12 +230,12 @@ function Fadj_Fborn(pa)
 		  ismutating=true)
 end
 
-function F_kernel!(y, x, pa)
-	F!(pa, x, pa.attrib_mod)
+function Fborn_map!(y, x, pa)
+	F!(pa, x, ModFdtdBorn())
 	copy!(y, pa.paTD.x)
 end
 
-function Fadj_kernel!(y, x, pa)
+function Fadj_map!(y, x, pa)
 	copy!(pa.paTD.dJx, x)
 
 	# adjoint sources
@@ -167,7 +245,7 @@ function Fadj_kernel!(y, x, pa)
 	Fadj!(pa)
 
 	# adjoint of interpolation
-        gmodm_to_gx!(y, pa.gmodm, pa, pa.attrib_mod)
+	spray_gradient!(y,  pa, ModFdtdBorn())
 end
 
 

@@ -7,6 +7,7 @@ using Signals
 import JuMIT.IO
 import JuMIT.Models
 import JuMIT.Acquisition
+import JuMIT.FWI
 
 global marmousi_folder=joinpath(Pkg.dir("JuMIT"), "marmousi2")
 
@@ -228,5 +229,7 @@ function Src(attrib::Symbol, nss::Int64=1)
 	end
 end
 
+
+include("fwi.jl")
 
 end # module

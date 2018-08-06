@@ -7,7 +7,6 @@ using Conv
 import JuMIT.Acquisition
 import JuMIT.Models
 import JuMIT.Data
-import JuMIT.Gallery
 
 
 """
@@ -24,12 +23,12 @@ end
 function mod(;
 	     vp0::Float64=2000.0,
 	     ρ0::Float64=2000.0,
-	     model_pert::Models.Seismic = Gallery.Seismic(:acou_homo1),
+	     model_pert::Models.Seismic=nothing,
              born_flag::Bool=false,
-	     tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
+	     tgridmod::Grid.M1D=nothing,
 	     tgrid::Grid.M1D = tgridmod,
-	     acqgeom::Acquisition.Geom=Gallery.Geom(:acou_homo1),
-	     acqsrc::Acquisition.Src=Gallery.Src(:acou_homo1),
+	     acqgeom::Acquisition.Geom=nothing,
+	     acqsrc::Acquisition.Src=nothing,
 	     src_flag::Int64=2,
 		  )
 	(getfield(acqgeom,:nss) != getfield(acqsrc,:nss))  ? error("different supersources") : nothing
