@@ -1,5 +1,3 @@
-__precompile__()
-
 module Models
 
 
@@ -7,13 +5,13 @@ using DataFrames
 using CSV
 using Grid
 using Interpolation
-using ImageFiltering
+#using ImageFiltering
 import JuMIT.Smooth
 
 """
 Store reference model parameters
 """
-type Seismic_ref{T<:Real}
+mutable struct Seismic_ref{T<:Real}
 	vp::T
 	vs::T
 	ρ::T
@@ -515,6 +513,7 @@ function Seismic_smooth(mod::Seismic, zperc::Real, xperc::Real=zperc;
 		 xmin::Real=mod.mgrid.x[1], xmax::Real=mod.mgrid.x[end],
 		 fields=[:χvp, :χρ, :χvs]
 			)
+	warn("ImageFiltering bug, not active")
 	xwidth = Float64(xperc) * 0.01 * abs(mod.mgrid.x[end]-mod.mgrid.x[1])
 	zwidth = Float64(zperc) * 0.01 * abs(mod.mgrid.z[end]-mod.mgrid.z[1])
 	xnwin=Int(div(xwidth,mod.mgrid.δx*2.))
@@ -529,7 +528,7 @@ function Seismic_smooth(mod::Seismic, zperc::Real, xperc::Real=zperc;
 	for (i,iff) in enumerate(fields)
 		m=view(getfield(mod, iff),izmin:izmax,ixmin:ixmax)
 		mg=view(getfield(modg, iff),izmin:izmax,ixmin:ixmax)
-		imfilter!(mg, m, Kernel.gaussian([znwin,xnwin]));
+#		imfilter!(mg, m, Kernel.gaussian([znwin,xnwin]));
 	end
 	return modg
 end
@@ -621,7 +620,7 @@ PML Extend a model on all four sides
 """
 function pml_pad_trun!(modex::Array{Float64,2}, mod::Array{Float64,2}, flag::Int64=1)
 	np=(size(modex,1)-size(mod,1) == size(modex,2)-size(mod,2)) ? 
-			div(size(modex,2)-size(mod,2),2): error("modex size")
+			div(size(modex,2)-size(mod,2),2) : error("modex size")
 	if(isequal(flag,1)) 
 		nz = size(mod,1); nx = size(mod,2)
 		modexc=view(modex,np+1:np+nz,np+1:np+nx)

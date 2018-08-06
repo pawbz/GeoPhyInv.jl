@@ -28,7 +28,7 @@ function xfwi_problem(attrib::Symbol)
 		       model0,
 		       modm_obs=model, 
 		       igrid_interp_scheme=:B2, 
-		       igrid=model.mgrid, 
+		       #igrid=model.mgrid, 
 		       igrid=Grid.M2D_resamp(model.mgrid, 50.,50.,),    
 		       #igrid=Grid.M2D(-500.,500.,-500.,500.,100.,100., 50), 
 		       parameterization=[:χvp, :χρ, :null],  verbose=false);

@@ -29,7 +29,7 @@ Time domain representation of Seismic Data.
 * `tgrid::Grid.M1D` : grid to represent time
 * `acqgeom::Acquisition.Geom` : acquisition geometry used to generate the data
 """
-type TD
+mutable struct TD
 	d::Matrix{Matrix{Float64}}
 	fields::Vector{Symbol}
 	tgrid::Grid.M1D

@@ -5,7 +5,7 @@ using RecipesBase
 using Interpolation
 using Grid
 using Conv
-using ImageFiltering
+#using ImageFiltering
 import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Models
@@ -35,6 +35,9 @@ Plot the velocity and density seismic models.
 		   contrast_flag=false,
 		   use_bounds=false,
 		  ) 
+	if(contrast_flag)
+		warn("ImageFiltering bug needs to be fixed")
+	end
 	model=p.args[1]
 
 	nrow = (model.mgrid.nx <= model.mgrid.nz) ? 1 : length(fields)
@@ -53,7 +56,7 @@ Plot the velocity and density seismic models.
 		if(contrast_flag)
 			mmin=minimum(m)
 			mmax=maximum(m)
-			m=imfilter(m, Kernel.Laplacian())
+			#m=imfilter(m, Kernel.Laplacian())
 			mmmin=minimum(m)
 			mmmax=maximum(m)
 			for j in eachindex(m)

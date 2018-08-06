@@ -35,7 +35,7 @@ recording waves.
 * `ns::Vector{Int64,1}` : number of sources for every supersource
 * `nr::Vector{Int64,1}` : number of receivers for every supersource 
 """
-type Geom
+mutable struct Geom
 	sx::Vector{Vector{Float64}}
 	sz::Vector{Vector{Float64}}
 	rx::Vector{Vector{Float64}}
@@ -480,7 +480,7 @@ Data type for the source related parameters during acquisiton.
 * `wav::Array{Float64}` : wavelets in time domain
 * `tgrid::Grid.M1D` : time grid 
 """
-type Src
+mutable struct Src
 	nss::Int64
 	ns::Vector{Int64}
 	fields::Vector{Symbol}

@@ -1,14 +1,1 @@
-julia 0.6
-DataFrames
-ImageFiltering
-CSV
-Calculus
-TimerOutputs
-RecipesBase
-ForwardDiff
-Optim
-Distributions
-StatsBase
-DistributedArrays
-LinearMaps
-Ipopt
+julia 0.7

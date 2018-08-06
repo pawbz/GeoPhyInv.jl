@@ -1,5 +1,3 @@
-__precompile__()
-
 """
 This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media,
 i.e. media having spatially varying (space-dependent) medium parameters.
@@ -26,7 +24,6 @@ Poisson.solve(field,mpars,solflag) solves the forward or inverse Poisson problem
 * `mpars` : medium parameters for forward or inverse mode
 * `solflag` : Solution flag determining whether to use forward (solflag=1) or inverse mode (solflag=-1) of Poisson solver.
 """
-
 function solve(field,mpars,solflag::Int64) # fields: either field or source, mpars=medium pars
 
 if(solflag==-1) 
@@ -40,8 +37,8 @@ end
 
 nz=size(mpars,1);
 nx=size(mpars,2);
-dz= 1./(nz - 1);
-dx= 1./(nx - 1);
+dz= inv(nz - 1);
+dx= inv(nx - 1);
 
 z=(0 : nz - 1)*dz;
 x=(0:nx-1)*dx;

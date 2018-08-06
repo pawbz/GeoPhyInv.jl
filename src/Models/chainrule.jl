@@ -93,9 +93,9 @@ function Seismic_chainrule!(
 				g[i]=χg(g[i],mod.ref.KI,-1)
 				g[nznx+i]=χg(g[nznx+i],mod.ref.ρI,-1)
 				# gradient w.r.t  χρ
-				gmod.χρ[i]= -1.*abs2(inv(ρ[i]))*g[nznx+i]-inv(vp[i]*vp[i]*ρ[i]*ρ[i])*g[i]
+				gmod.χρ[i]= -1.0*abs2(inv(ρ[i]))*g[nznx+i]-inv(vp[i]*vp[i]*ρ[i]*ρ[i])*g[i]
 				# gradient w.r.t χvp
-				gmod.χvp[i] = -2.*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
+				gmod.χvp[i] = -2.0*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
 				g[i]=χg(g[i],mod.ref.KI,1)
 				g[nznx+i]=χg(g[nznx+i],mod.ref.ρI,1)
 			end
@@ -105,7 +105,7 @@ function Seismic_chainrule!(
 			@inbounds for i in 1:nznx
 				g[i]=χg(g[i],mod.ref.KI,-1)
 				# gradient w.r.t χvp
-				gmod.χvp[i] = -2.*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
+				gmod.χvp[i] = -2.0*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
 				g[i]=χg(g[i],mod.ref.KI,1)
 			end
 			χg!(gmod.χvp,mod.ref.vp,1)

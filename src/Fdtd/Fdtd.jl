@@ -11,6 +11,7 @@ import JuMIT.Data
 using ProgressMeter
 using TimerOutputs
 using DistributedArrays
+using SharedArrays
 
 #As forward modeling method, the 
 #finite-difference method is employed. 
@@ -93,13 +94,13 @@ mutable struct Paramc
 	modrr_pert::Matrix{Float64}
 	δmodrrvx::Matrix{Float64}
 	δmodrrvz::Matrix{Float64}
-	grad_stack::SharedVector{Float64} # contains gmodtt and gmodrr
+	grad_stack::SharedArrays.SharedArray{Float64,1} # contains gmodtt and gmodrr
 	gradient::Vector{Float64}  # output gradient vector
-	grad_modrrvx_stack::SharedMatrix{Float64}
-	grad_modrrvz_stack::SharedMatrix{Float64}
+	grad_modrrvx_stack::SharedArrays.SharedArray{Float64,2}
+	grad_modrrvz_stack::SharedArrays.SharedArray{Float64,2}
 	grad_modrr_stack::Matrix{Float64}
 	illum_flag::Bool
-	illum_stack::SharedMatrix{Float64}
+	illum_stack::SharedArrays.SharedArray{Float64,2}
 	backprop_flag::Int64
 	snaps_flag::Bool
 	itsnaps::Vector{Int64}
@@ -111,7 +112,7 @@ mutable struct Paramc
 	ibz1::Int64
 	isx0::Int64
 	isz0::Int64
-	datamat::SharedArray{Float64,3}
+	datamat::SharedArrays.SharedArray{Float64,3}
 	data::Vector{Data.TD}
 	verbose::Bool
 end 
