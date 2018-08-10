@@ -144,7 +144,7 @@ recorded.
 """
 function Geom_find(acq::Geom; rpos::Array{Float64,1}=nothing, rpos0::Array{Float64,1}=nothing)
 	rpos==nothing ? error("need rpos") : nothing
-	sson = Array{Vector{Int64}}(acq.nss);
+	sson = Array{Vector{Int64}}(undef,acq.nss);
 	for iss = 1:acq.nss
 		rvec = [[acq.rz[iss][ir],acq.rx[iss][ir]] for ir=1:acq.nr[iss]]
 		ir=findfirst(rvec, rpos)
@@ -212,10 +212,10 @@ function Geom_check(geom::Geom, mgrid::Grid.M2D)
 	for iss=1:geom.nss
 		checkvec[iss] = any(
 		      vcat(
-		     (((geom.sx[iss]-xmin).*(xmax-geom.sx[iss])) .< 0.0),
-		     (((geom.sz[iss]-zmin).*(zmax-geom.sz[iss])) .< 0.0),
-		     (((geom.rx[iss]-xmin).*(xmax-geom.rx[iss])) .< 0.0),
-		     (((geom.rz[iss]-zmin).*(zmax-geom.rz[iss])) .< 0.0),
+		     (((geom.sx[iss] .- xmin).*(xmax .- geom.sx[iss])) .< 0.0),
+		     (((geom.sz[iss] .- zmin).*(zmax .- geom.sz[iss])) .< 0.0),
+		     (((geom.rx[iss] .- xmin).*(xmax .- geom.rx[iss])) .< 0.0),
+		     (((geom.rz[iss] .- zmin).*(zmax .- geom.rz[iss])) .< 0.0),
 		     ) )
 	end
 	return !(any(checkvec))
@@ -298,7 +298,7 @@ function Geom_fixed(
 
 
 	ssarray = isequal(nss,1) ? fill(ssmin,1) : (rand_flags[1] ? 
-					   rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : linspace(ssmin,ssmax,nss))
+					   rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : range(ssmin,stop=ssmax,length=nss))
 	if(ssattrib==:horizontal)
 		ssz = ss0+(ssarray-minimum(ssarray))*sin(ssα)/cos(ssα); ssx=ssarray
 	elseif(ssattrib==:vertical)
@@ -308,7 +308,7 @@ function Geom_fixed(
 	end
 
 	rarray = isequal(nr,1) ? fill(rmin,1) : (rand_flags[2] ? 
-				        rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : linspace(rmin,rmax,nr))
+				        rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : range(rmin,stop=rmax,length=nr))
 	if(rattrib==:horizontal)
 		rz = r0+(rarray-minimum(rarray))*sin(rα)/cos(rα); rx = rarray
 	elseif(rattrib==:vertical)
@@ -368,19 +368,19 @@ function Geom_circ(;
 
 	sxx, szz = circ_coord(loc..., nss, rad[1])
 	rxxa, rzza = circ_coord(loc..., nra, rad[2])
-	sx=Array{Array{Float64}}(nss)
-	sz=Array{Array{Float64}}(nss)
-	rx=Array{Array{Float64}}(nss)
-	rz=Array{Array{Float64}}(nss)
-	ns=Array{Int64}(nss)
-	nr=Array{Int64}(nss)
+	sx=Array{Array{Float64}}(undef,nss)
+	sz=Array{Array{Float64}}(undef,nss)
+	rx=Array{Array{Float64}}(undef,nss)
+	rz=Array{Array{Float64}}(undef,nss)
+	ns=Array{Int64}(undef,nss)
+	nr=Array{Int64}(undef,nss)
 
 	for iss=1:nss
 		rangles = [angle(complex(rxxa[ira]-loc[2], rzza[ira]-loc[1])) for ira in 1:nra]
 		sangles = angle(complex(sxx[iss]-loc[2], szz[iss]-loc[1]))
-		diff = abs.(rangles-sangles)
+		diff = abs.(rangles.-sangles)
 		diff = [min(diff[ira], (2π - diff[ira])) for ira in 1:nra]
-		angles = find(minimum(θlim) .<= diff .<= maximum(θlim))
+		angles = findall(minimum(θlim) .<= diff .<= maximum(θlim))
 		sx[iss] = [sxx[iss]]
 		sz[iss] = [szz[iss]]
 		ns[iss] = 1 
@@ -395,9 +395,9 @@ function Geom_circ(;
 end
 
 function circ_coord(z, x, n, rad)
-	θ = (n==1) ? [0.0] : collect(linspace(0, 2π, n+1))
-	xx = (rad .* cos.(θ) + x)[1:n]
-	zz = (rad .* sin.(θ) + z)[1:n]
+	θ = (n==1) ? [0.0] : collect(range(0, stop=2π, length=n+1))
+	xx = (rad .* cos.(θ) .+ x)[1:n]
+	zz = (rad .* sin.(θ) .+ z)[1:n]
 	return xx, zz
 end
 
@@ -500,7 +500,7 @@ function Base.isapprox(src1::Src, src2::Src)
 	return all(vec)
 end
 
-function Base.copy!(srco::Src, src::Src)
+function Base.copyto!(srco::Src, src::Src)
 	if(isapprox(srco, src))
 		for f in [:wav]
 			srcowav=getfield(srco, f)
@@ -508,7 +508,7 @@ function Base.copy!(srco::Src, src::Src)
 			for iss=1:src.nss, ifield=1:length(src.fields) 
 				srcowavv=srcowav[iss,ifield]
 				srcwavv=srcwav[iss,ifield]
-				copy!(srcowavv, srcwavv)
+				copyto!(srcowavv, srcwavv)
 			end
 		end
 		return srco
@@ -678,7 +678,7 @@ function Src_uspos(src::Vector{Src}, acq::Vector{Geom})
 	# fill source wavelets when necessary
 	for ip=1:np
 		for ifield=1:length(src[ip].fields), iss=1:src[ip].nss, is=1:acq[ip].ns[iss]
-			is0=find([[uspos[1][i]-acq[ip].sz[iss][is],
+			is0=findall([[uspos[1][i]-acq[ip].sz[iss][is],
 		      uspos[2][i]-acq[ip].sx[iss][is]] == [0., 0.,] for i in 1:nus])
 
 			wavout[ip][iss, ifield][:,is0] = src[ip].wav[iss, ifield][:,is] 

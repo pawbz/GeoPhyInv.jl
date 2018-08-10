@@ -93,10 +93,6 @@ struct Source_B0 end
 			division of source term with δx and δz (see Jan's fdelmodc manual)
 			"""
 			source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
-
-						if(it==1)
-							println("source term t=0*^^***** ", source_term)
-						end
 			
 			"""
 			multiplication with modttI

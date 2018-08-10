@@ -8,12 +8,13 @@ module JuMIT
 #end
 
 # include modules (note: due to dependencies, order is important!)
+include("Utils/Utils.jl")
 include("Poisson.jl")
 include("Operators.jl")
 include("Smooth.jl")
 include("IO.jl")
 include("Models/Models.jl")
-include("Acquisition.jl")
+include("Acquisition/Acquisition.jl")
 include("Coupling.jl")
 include("Data/Data.jl")
 include("Analytic.jl")

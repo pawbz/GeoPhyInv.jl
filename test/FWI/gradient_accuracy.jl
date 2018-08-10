@@ -12,11 +12,11 @@ const J=JuMIT
 const JF=JuMIT.FWI
 
 model = JuMIT.Gallery.Seismic(:acou_homo2);
-model.mgrid.npml=5;
+#model.mgrid.npml=5;
 #JuMIT.Models.Seismic_addon!(model, ellip_rad=50., ellip_loc=[500.,0.],ellip_pert=0.1,randn_perc=0.01, fields=[:χvp,:χρ])
 
 model0 = JuMIT.Gallery.Seismic(:acou_homo2);
-model0.mgrid.npml=5;
+#model0.mgrid.npml=5;
 acqgeom = JuMIT.Acquisition.Geom_circ(nss=1,nr=2,rad=[0.,200.])
 JuMIT.Models.Seismic_addon!(model0, randn_perc=0.0001, fields=[:χvp,:χρ])
 
@@ -32,14 +32,13 @@ pa=JuMIT.FWI.Param(acqsrc, acqgeom, tgrid, JF.ModFdtd(), model0,
 	             parameterization=[:χvp, :χρ, :null],   verbose=false)
 
 
-JuMIT.FWI.xfwi!(pa, JuMIT.FWI.LS(),  bounded_flag=true, solver=:ipopt,
-		ipopt_options=[["max_iter", 0],["derivative_test", "first-order"]])
+#JuMIT.FWI.xfwi!(pa, JuMIT.FWI.LS(),  bounded_flag=true, solver=:ipopt,
+#		ipopt_options=[["max_iter", 0],["derivative_test", "first-order"]])
 
 pa_fd=deepcopy(pa);
 
 migr=JuMIT.FWI.xfwi!(pa, JuMIT.FWI.Migr())
 
-llll
 Profile.clear_malloc_data()
 
 migr_fd=JuMIT.FWI.xfwi!(pa_fd, JuMIT.FWI.Migr_fd())

@@ -2,16 +2,13 @@ module Plots
 
 using StatsBase
 using RecipesBase
-using Interpolation
 using Grid
-using Conv
+using FFTW
 #using ImageFiltering
 import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Models
 
-function dummy_()
-end
 
 @userplot Seismic
 """
@@ -46,10 +43,10 @@ Plot the velocity and density seismic models.
 
 	layout --> (nrow,ncol)
 	for (i,iff) in enumerate(fields)
-		name=replace(string(iff), "ρ", "rho")
-		name=replace(name, "χ", "contrast\t")
+		name=replace(string(iff), "ρ" => "rho")
+		name=replace(name, "χ" => "contrast\t")
 
-		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
+		f0 = Symbol((replace("$(fields[i])", "χ" => "")),0)
 		m = Models.Seismic_get(model, iff)
 		mx = model.mgrid.x
 		mz = model.mgrid.z
@@ -200,7 +197,7 @@ end
 	end
 
 	fgrid= Grid.M1D_rfft(tgrid)
-	powwav = (abs.(rfft(wav, [1])).^2)
+	powwav = (abs.(FFTW.rfft(wav, [1])).^2)
 	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
 
 	@series begin        
@@ -236,7 +233,7 @@ Plot the source wavelet used for acquisition.
 	end
 
 	fgrid= Grid.M1D_rfft(tgrid)
-	powwav = (abs.(rfft(wav, [1])).^2)
+	powwav = (abs.(FFTW.rfft(wav, [1])).^2)
 	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
 	@series begin        
 		subplot := 2

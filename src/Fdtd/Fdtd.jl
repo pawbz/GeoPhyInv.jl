@@ -12,6 +12,7 @@ using Distributed
 using DistributedArrays
 using SharedArrays
 using LinearAlgebra
+using AxisArrays
 using Printf
 
 global const to = TimerOutput(); # create a timer object
@@ -176,14 +177,14 @@ function initialize!(pap::Paramp)
 	for issp in 1:length(pap.ss)
 		pass=pap.ss[issp]
 		for i in 1:length(pass.records)
-			pass.records[i][:]=0.0
+			fill!(pass.records[i],0.0)
 		end
-		pass.snaps[:]=0.0
-		pass.illum[:]=0.0
-		pass.grad_modtt[:]=0.0
-		pass.grad_modrrvx[:]=0.0
-		pass.grad_modrrvz[:]=0.0
-		pass.born_svalue_stack[:]=0.0
+		fill!(pass.snaps,0.0)
+		fill!(pass.illum,0.0)
+		fill!(pass.grad_modtt,0.0)
+		fill!(pass.grad_modrrvx,0.0)
+		fill!(pass.grad_modrrvz,0.0)
+		fill!(pass.born_svalue_stack,0.0)
 	end
 end
 
@@ -198,7 +199,7 @@ function initialize_boundary!(pa)
 				for issp in 1:length(pap.ss)
 					pass=pap.ss[issp]
 					for i in 1:length(pass.boundary)
-						pass.boundary[i][:]=0.0
+						fill!(pass.boundary[i],0.0)
 					end
 				end
 			end
@@ -208,19 +209,11 @@ end
 
 function initialize!(pac::Paramc)
 	# need explicit loops while zeroing out Shared Matrices? "fill!" takes memory!!!
-	for i in eachindex(pac.grad_stack)
-		pac.grad_stack[i]=0.0
-	end
+	fill!(pac.grad_stack,0.0)
 	fill!(pac.gradient,0.0)
-	for i in eachindex(pac.grad_modrrvx_stack)
-		pac.grad_modrrvx_stack[i]=0.0
-	end
-	for i in eachindex(pac.grad_modrrvz_stack)
-		pac.grad_modrrvz_stack[i]=0.
-	end
-	for i in eachindex(pac.grad_modrr_stack)
-		pac.grad_modrr_stack[i]=0.0
-	end
+	fill!(pac.grad_modrrvx_stack,0.0)
+	fill!(pac.grad_modrrvz_stack,0.0)
+	fill!(pac.grad_modrr_stack,0.0)
 	fill!(pac.illum_stack,0.0)
 	for dat in pac.data
 		fill!(dat, 0.0)
@@ -319,8 +312,8 @@ function Param(;
 	snaps_flag::Bool=false,
 	verbose::Bool=false)
 
-	println("********PML Removed*************")
-	abs_trbl=[:null]
+	#println("********PML Removed*************")
+	#abs_trbl=[:null]
 	
 
 	# check sizes and errors based on input
@@ -354,12 +347,12 @@ function Param(;
 	# necessary that nss and fields should be same for all nprop
 	nss = acqgeom[1].nss;
 	sfields = [acqsrc[ipw].fields for ipw in 1:npw]
-	isfields = [findin([:P, :Vx, :Vz], acqsrc[ipw].fields) for ipw in 1:npw]
+	isfields = [findall(in([:P, :Vx, :Vz]), acqsrc[ipw].fields) for ipw in 1:npw]
 	fill(nss, npw) != [getfield(acqgeom[ip],:nss) for ip=1:npw] ? error("different supersources") : nothing
 
 	# create acquisition geometry with each source shooting 
 	# at every unique receiver position
-	irfields = findin([:P, :Vx, :Vz], rfields)
+	irfields = findall(in([:P, :Vx, :Vz]), rfields)
 
 
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
@@ -440,9 +433,9 @@ function Param(;
 
 
 	# pml_variables
-	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, model.mgrid.npml, vpmax, vpmin, freqmin, freqmax, 
+	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax, 
 							       [any(abs_trbl .== :left), any(abs_trbl .== :right)])
-	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml, vpmax, vpmin, freqmin, freqmax,
+	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax,
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
 	grad_stack=SharedVector{Float64}(2*nzd*nxd)
@@ -484,7 +477,7 @@ function Param(;
 	# dividing the supersources to workers
 	nwork = min(nss, nworkers())
 	work = workers()[1:nwork]
-	ssi=[round(Int, s) for s in linspace(0,nss,nwork+1)]
+	ssi=[round(Int, s) for s in range(0,stop=nss,length=nwork+1)]
 	sschunks=Array{UnitRange{Int64}}(nwork)
 	for ib in 1:nwork       
 		sschunks[ib]=ssi[ib]+1:ssi[ib+1]
@@ -531,7 +524,7 @@ This routine is used during FWI, where medium parameters are itertively updated.
 """
 function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 
-	copy!(pac.model, model)
+	copyto!(pac.model, model)
 
 	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model)
 
@@ -542,7 +535,7 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 	get_rhovzI!(pac.modrrvz, pac.modrr)
 
 	if(pac.born_flag && !(model_pert === nothing))
-		copy!(pac.model_pert, model_pert)
+		copyto!(pac.model_pert, model_pert)
 		Models.Seismic_pml_pad_trun!(pac.exmodel_pert, pac.model_pert);
 		Models.Seismic_get!(pac.modrr_pert, pac.exmodel_pert, [:ρI])
 		get_rhovxI!(pac.δmodrrvx, pac.modrr_pert)
@@ -563,10 +556,10 @@ function update_acqsrc!(pa::Param, acqsrc::Vector{Acquisition.Src}, sflags=nothi
 	# update acqsrc in pa.c
 	(length(acqsrc) ≠ pa.c.npw) && error("cannot update")
 	for i in 1:length(acqsrc)
-		copy!(pa.c.acqsrc[i], acqsrc[i])
+		copyto!(pa.c.acqsrc[i], acqsrc[i])
 	end
 	if(!(sflags===nothing))
-		copy!(pa.c.sflags, sflags)
+		copyto!(pa.c.sflags, sflags)
 	end
 
 	# fill_wavelets for each supersource
@@ -888,7 +881,7 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 			(pac.illum_flag) && compute_illum!(issp, pap.ss, pap)
 
 			if(pac.snaps_flag)
-				itsnap = findin(pac.itsnaps,it)
+				itsnap = findall(in(pac.itsnaps),it)
 				(itsnap ≠ []) && (snaps_save!(itsnap[1],issp,pac,pap.ss,pap))
 			end
 
@@ -946,7 +939,7 @@ end
 Project density on to a staggerred grid using simple interpolation
 """
 function get_rhovxI(rhoI::Array{Float64})
-	rhovxI = zeros(rhoI);
+	rhovxI = zero(rhoI);
 	get_rhovxI!(rhovxI, rhoI)
 	return rhovxI
 end
@@ -963,7 +956,7 @@ end # get_rhovxI
 Project density on to a staggerred grid using simple interpolation
 """
 function get_rhovzI(rhoI::Array{Float64})
-	rhovzI = zeros(rhoI);
+	rhovzI = zero(rhoI);
 	get_rhovzI!(rhovzI, rhoI)
 	return rhovzI
 end
@@ -990,9 +983,9 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 	str2=@sprintf("%0.2e",δs_temp)
 	if(str1 ≠ str2)
 		if(all(δs_max .> δs_temp)) 
-			warn("decrease spatial sampling ($str1) below $str2", once=false)
+			@warn "decrease spatial sampling ($str1) below $str2"
 		else
-			info("spatial sampling ($str1) can be as high as $str2")
+			@info "spatial sampling ($str1) can be as high as $str2"
 		end
 	end
 
@@ -1003,9 +996,9 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 	str2=@sprintf("%0.2e", δt_temp)
 	if(str1 ≠ str2)
 		if(all(δt .> δt_temp))
-			warn("decrease time sampling ($str1) below $str2", once=false)
+			@warn "decrease time sampling ($str1) below $str2"
 		else
-			info("time sampling ($str1) can be as high as $str2")
+			@info "time sampling ($str1) can be as high as $str2"
 		end
 	end
 

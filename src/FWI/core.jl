@@ -69,8 +69,8 @@ function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior)
 	g2=pa.mx.gm[2]
 	Misfits.error_squared_euclidean!(g2, x, pa.mx.prior, pa.mx.w, norm_flag=false)
 
-	scale!(g1, obj.α[1])
-	scale!(g2, obj.α[2])
+	rmul!(g1, obj.α[1])
+	rmul!(g2, obj.α[2])
 	for i in eachindex(storage)
 		@inbounds storage[i]=g1[i]+g2[i]
 	end
@@ -116,7 +116,7 @@ function F!(pa::Param, x, ::ModFdtd)
 
 	# copy data to evaluate misfit
 	dcal=pa.paf.c.data[1]
-	copy!(pa.paTD.x,dcal)
+	copyto!(pa.paTD.x,dcal)
 end
 
 
@@ -149,7 +149,7 @@ function F!(pa::Param, x, ::ModFdtdBorn)
 
 	Fdtd.mod!(pa.paf);
 	dcal=pa.paf.c.data[2]
-	copy!(pa.paTD.x,dcal)
+	copyto!(pa.paTD.x,dcal)
 
 	pa.paf.c.born_flag=false
 end
@@ -232,11 +232,11 @@ end
 
 function Fborn_map!(y, x, pa)
 	F!(pa, x, ModFdtdBorn())
-	copy!(y, pa.paTD.x)
+	copyto!(y, pa.paTD.x)
 end
 
 function Fadj_map!(y, x, pa)
-	copy!(pa.paTD.dJx, x)
+	copyto!(pa.paTD.dJx, x)
 
 	# adjoint sources
 	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)

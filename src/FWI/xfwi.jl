@@ -28,7 +28,7 @@ function finalize!(pa::Param, xminimizer)
 	Models.Seismic_reparameterize!(pa.modi, xminimizer, pa.parameterization) 
 
 	# update initial model using minimizer, so that running xfwi! next time will start with updated model
-	copy!(pa.mod_initial, pa.modi)
+	copyto!(pa.mod_initial, pa.modi)
 end
 
 """

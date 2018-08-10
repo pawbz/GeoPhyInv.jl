@@ -5,6 +5,8 @@ using DataFrames
 using CSV
 using Grid
 using Interpolation
+using Statistics
+using LinearAlgebra
 #using ImageFiltering
 import JuMIT.Smooth
 
@@ -84,12 +86,12 @@ end
 function update_derived!(mod::Seismic)
 	"note that: mean(K0) ≠ 1/mean(KI0)"
 	mod.K0 = mod.vp0 .* mod.vp0 .* mod.ρ0; 
-	mod.KI0 = flipdim(inv.(mod.K0),1);
+	mod.KI0 = reverse(inv.(mod.K0),dims=1);
 	ρ0 = mod.ρ0; 
-	mod.ρI0 = flipdim(inv.(ρ0),1);
+	mod.ρI0 = reverse(inv.(ρ0),dims=1);
 	mod.μ0 = mod.vs0 .* mod.vs0 .* mod.ρ0;
-	mod.μI0 = flipdim(inv.(mod.μ0),1);
-	mod.ref = Seismic_ref(mean.([mod.vp0,mod.vs0,mod.ρ0,mod.K0,mod.μ0,mod.KI0,mod.μI0,mod.ρI0])...)
+	mod.μI0 = reverse(inv.(mod.μ0),dims=1);
+	mod.ref = Seismic_ref(Statistics.mean.([mod.vp0,mod.vs0,mod.ρ0,mod.K0,mod.μ0,mod.KI0,mod.μI0,mod.ρI0])...)
 end
 
 """
@@ -112,7 +114,7 @@ The bounds cannot be less than zero
 function bounds(mod::Array{Float64}, frac::Float64=0.1)
 	any(mod .< 0.0) && error("model values less than zero")
 	bounds=zeros(2)
-	bound=frac*mean(mod)
+	bound=frac*Statistics.mean(mod)
 	bounds[1] = ((minimum(mod) - bound)<0.0) ? 0.0 : (minimum(mod) - bound)
 	bounds[2] = maximum(mod)+bound
 	return bounds
@@ -124,9 +126,9 @@ function adjust_bounds!(mod::Seismic,mod0::Seismic)
 end
 
 function adjust_bounds!(mod::Seismic,vp0::Vector{T},vs0::Vector{T},ρ0::Vector{T}) where {T<:Real}
-	copy!(mod.vp0, Float64.(vp0))
-	copy!(mod.vs0, Float64.(vs0))
-	copy!(mod.ρ0, Float64.(ρ0))
+	copyto!(mod.vp0, Float64.(vp0))
+	copyto!(mod.vs0, Float64.(vs0))
+	copyto!(mod.ρ0, Float64.(ρ0))
 	update_derived!(mod)
 end
 
@@ -208,12 +210,12 @@ end
 Copy for `Seismic` models. The models should have same bounds and sizes.
 Doesn't allocate any memory.
 """
-function Base.copy!(modo::Seismic, mod::Seismic)
+function Base.copyto!(modo::Seismic, mod::Seismic)
 	if(isapprox(modo, mod))
 		for f in [:χvp, :χρ, :χvs]
 			modof=getfield(modo,f)
 			modf=getfield(mod,f)
-			copy!(modof,modf)
+			copyto!(modof,modf)
 		end
 		return modo
 	else
@@ -386,10 +388,10 @@ function χg(mod::AbstractArray{T}, mod0::T, flag::Int64=1) where {T<:Real}
 end
 function χg!(mod::AbstractArray{T}, mod0::T, flag::Int64=1) where {T<:Real}
 	if(flag == 1)
-		scale!(mod, mod0)
+		rmul!(mod, mod0)
 	elseif(flag == -1)
 		m0 = inv(mod0)
-		scale!(mod, m0)
+		rmul!(mod, m0)
 	end
 	return mod
 end
@@ -479,7 +481,7 @@ function Seismic_addon!(mod::Seismic;
 
 	# random noise
 	for field in fields
-		f0 = Symbol((replace("$(field)", "χ", "")),0)
+		f0 = Symbol((replace("$(field)", "χ" => "")),0)
 		m=getfield(mod, field)
 		m0=getfield(mod, f0)
 		for i in eachindex(m)

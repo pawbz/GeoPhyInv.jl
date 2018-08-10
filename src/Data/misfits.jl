@@ -152,7 +152,7 @@ function func_grad!(pa::P_misfit_ssf, grad=nothing)
 		interp_spray!(pa.x, pa.xr, :interp, pa=pa.painterp)
 		println("ffffff, HELEL")
 	else
-		copy!(pa.xr,pa.x)
+		copyto!(pa.xr,pa.x)
 	end
 
 	xr=pa.xr
@@ -202,7 +202,7 @@ function func_grad!(pa::P_misfit_ssf, grad=nothing)
 		interp_spray!(pa.dJx, pa.dJxr, :spray, pa=pa.painterp)
 		println("ffffff, HELEL")
 	else
-		copy!(pa.dJx,pa.dJxr)
+		copyto!(pa.dJx,pa.dJxr)
 	end
 
 	(J == 0.0) && warn("misfit computed is zero")

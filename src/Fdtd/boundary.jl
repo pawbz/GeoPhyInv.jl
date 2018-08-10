@@ -77,13 +77,13 @@ end
 	#vx
 	bs=view(boundary,:,:,2)
 	ps=view(pw,:,:,2)
-	copy!(bs, ps)
-	scale!(bs,-1.)
+	copyto!(bs, ps)
+	rmul!(bs,-1.)
 	# vz
 	bs=view(boundary,:,:,3)
 	ps=view(pw,:,:,3)
-	copy!(bs, ps)
-	scale!(bs,-1.)
+	copyto!(bs, ps)
+	rmul!(bs,-1.)
 end
 @fastmath @inbounds function boundary_save!(it::Int64,issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
 	boundary=pass[issp].boundary

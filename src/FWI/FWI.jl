@@ -20,6 +20,7 @@ using Misfits
 using Inversion
 using TimerOutputs
 using LinearMaps
+using LinearAlgebra
 using Ipopt
 
 import JuMIT.Models
@@ -30,6 +31,7 @@ import JuMIT.Fdtd
 using Optim, LineSearches
 using DistributedArrays
 using Calculus
+using Random
 
 
 global const to = TimerOutput(); # create a timer object
@@ -275,10 +277,10 @@ function Param(
 	gmodm=similar(modm)
 	gmodi=similar(modi)
 
-	println("added fake precon")
-	dprecon=deepcopy(dobs)
-	fill!(dprecon, 1.0)
-	Data.taper!(dprecon, 20.)
+	#println("added fake precon")
+	#dprecon=deepcopy(dobs)
+	#fill!(dprecon, 1.0)
+	#Data.taper!(dprecon, 20.)
 
 	# check dprecon
 	if(!(dprecon===nothing))
@@ -293,7 +295,7 @@ function Param(
 	# paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
 	if(iszero(dobs))
-		randn!(dobs) # dummy dobs, update later
+		Random.randn!(dobs) # dummy dobs, update later
 	end
 
 	paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon);
@@ -331,14 +333,14 @@ function Param(
 		modm_copy=deepcopy(pa.modm)
 
 		# change model to actual model
-		copy!(pa.modm, modm_obs)
+		copyto!(pa.modm, modm_obs)
 
 		F!(pa, nothing, pa.attrib_mod)
 
-		copy!(pa.paTD.y, pa.paTD.x)
+		copyto!(pa.paTD.y, pa.paTD.x)
 
 		# put back model and sources
-		copy!(pa.modm, modm_copy)
+		copyto!(pa.modm, modm_copy)
 
 	        Fdtd.initialize!(paf.c)  # clear everything
 	end

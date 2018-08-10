@@ -8,7 +8,7 @@ import JuMIT.Models
 import JuMIT.Acquisition
 import JuMIT.FWI
 
-global marmousi_folder=joinpath(Pkg.dir("JuMIT"), "marmousi2")
+global marmousi_folder=joinpath(@__DIR__, "marmousi2")
 
 """
 Gallery of `M2D` grids.
@@ -227,14 +227,12 @@ function Src(attrib::Symbol, nss::Int64=1)
 	end
 end
 
-include("fwi.jl")
-include("fdtd.jl")
-function fdtd_problems()
-	println("Hellllo")
 
-	return Seismic(:acou_homo1)
-
-
+for file in ["fwi.jl", "fdtd.jl"]   
+	fn=joinpath(@__DIR__, file)
+	include(fn)
+	#Revise.track(@__MODULE__,fn)
 end
 
+		 	
 end # module

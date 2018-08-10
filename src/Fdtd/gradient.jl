@@ -127,9 +127,9 @@ end
 	"gradient is formed by intergration over time, hence multiply with δt, but why not?"
 	"I don't completely understand where the factors δx and δz are coming from..."
 	"probably the source term should not be multiplied by δxI and δzI during adjoint propagation"
-	scale!(grad_modtt,δ)
-	scale!(grad_modrrvx,δ)
-	scale!(grad_modrrvz,δ)
+	rmul!(grad_modtt,δ)
+	rmul!(grad_modrrvx,δ)
+	rmul!(grad_modrrvz,δ)
 end
 
 

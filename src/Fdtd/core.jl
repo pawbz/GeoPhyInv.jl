@@ -128,7 +128,7 @@ end
 		pppppp!(pw,ppw,pppw)
 
 		advance_kernel!(pw, dpdxw, dpdzw, δx24I, δz24I,
-			 memory_dp_dxw,memory_dp_dzw,
+			 memory_dp_dxw, memory_dp_dzw,
 			 b_x_half,b_z_half,a_x_half,a_z_half,k_x_halfI,k_z_halfI,
 			 nx,nz,δt,modrrvx,modrrvz,memory_dvx_dxw,memory_dvz_dzw,
 			 b_x,b_z,a_x,a_z,k_xI,k_zI,modttI)
