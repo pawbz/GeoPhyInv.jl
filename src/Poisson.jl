@@ -13,7 +13,6 @@ In collaboration with: Aimé Fournier & Laurent Demanet, Massachusetts Institute
 Date: October, 2017 \\\n
 Contact: ngrobbe@gmail.com
 """
-
 module Poisson
 
 

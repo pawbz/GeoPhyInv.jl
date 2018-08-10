@@ -1,5 +1,3 @@
-__precompile__()
-
 """
 This module defines a type called `Param` that is to be constructed 
 before performing 
@@ -277,6 +275,11 @@ function Param(
 	gmodm=similar(modm)
 	gmodi=similar(modi)
 
+	println("added fake precon")
+	dprecon=deepcopy(dobs)
+	fill!(dprecon, 1.0)
+	Data.taper!(dprecon, 20.)
+
 	# check dprecon
 	if(!(dprecon===nothing))
 		(!(isapprox(dprecon,dobs))) && error("invalid dprecon used")
@@ -348,7 +351,7 @@ function Param(
 	pa.paf.c.illum_flag=false # switch off illum flag for speed
 
 	# default weights are 1.0
-	pa.mx.w[:]=1.0
+	fill!(pa.mx.w, 1.0)
 
 	# update priori and priorw in pa to defaults
 	update_prior!(pa)

@@ -1,5 +1,3 @@
-__precompile__()
-
 """
 The data recorded at the receivers during a seismic experiment 
 is a convolution of the Green's function,

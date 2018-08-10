@@ -1,5 +1,3 @@
-__precompile__()
-
 module Fdtd
 
 using Grid
@@ -10,8 +8,13 @@ import JuMIT.Acquisition
 import JuMIT.Data
 using ProgressMeter
 using TimerOutputs
+using Distributed
 using DistributedArrays
 using SharedArrays
+using LinearAlgebra
+using Printf
+
+global const to = TimerOutput(); # create a timer object
 
 #As forward modeling method, the 
 #finite-difference method is employed. 
@@ -219,8 +222,7 @@ function initialize!(pac::Paramc)
 		pac.grad_modrr_stack[i]=0.0
 	end
 	fill!(pac.illum_stack,0.0)
-	for ipw=1:pac.npw
-		dat=pac.data[ipw]
+	for dat in pac.data
 		fill!(dat, 0.0)
 	end
 	fill!(pac.datamat,0.0)
@@ -317,6 +319,10 @@ function Param(;
 	snaps_flag::Bool=false,
 	verbose::Bool=false)
 
+	println("********PML Removed*************")
+	abs_trbl=[:null]
+	
+
 	# check sizes and errors based on input
 	#(length(TDout) ≠ length(findn(rflags))) && error("TDout dimension")
 	(length(acqgeom) ≠ npw) && error("acqgeom dimension")
@@ -371,9 +377,12 @@ function Param(;
 	check_fd_stability(vpmin, vpmax, model.mgrid.δx, model.mgrid.δz, freqmin, freqmax, tgridmod.δx, verbose)
 
 
-	# some constants for boundary
+	# where to store the boundary values
 	ibx0=model.mgrid.npml-2; ibx1=model.mgrid.nx+model.mgrid.npml+3
 	ibz0=model.mgrid.npml-2; ibz1=model.mgrid.nz+model.mgrid.npml+3
+#	ibx0=model.mgrid.npml+1; ibx1=model.mgrid.nx+model.mgrid.npml
+#	ibz0=model.mgrid.npml+1; ibz1=model.mgrid.nz+model.mgrid.npml
+#	println("**** Boundary Storage Changed **** ")
 
 	# for snaps
 	isx0, isz0=model.mgrid.npml, model.mgrid.npml
@@ -431,9 +440,9 @@ function Param(;
 
 
 	# pml_variables
-	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax, 
+	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, model.mgrid.npml, vpmax, vpmin, freqmin, freqmax, 
 							       [any(abs_trbl .== :left), any(abs_trbl .== :right)])
-	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax,
+	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml, vpmax, vpmin, freqmin, freqmax,
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
 	grad_stack=SharedVector{Float64}(2*nzd*nxd)
@@ -443,7 +452,7 @@ function Param(;
 	grad_modrr_stack=zeros(nzd,nxd)
 	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
-	itsnaps = [indmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
+	itsnaps = [argmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
 
 	nrmat=[acqgeom[ipw].nr[iss] for ipw in 1:npw, iss in 1:acqgeom[1].nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),acqgeom[1].nss)
@@ -568,7 +577,7 @@ function update_acqsrc!(pa::Param, acqsrc::Vector{Acquisition.Src}, sflags=nothi
 				for is in 1:length(pap.ss)
 					iss=pap.ss[is].iss
 					wavelets=pap.ss[is].wavelets
-					initialize_wavelets!(iss, wavelets)
+					fill!.(wavelets, 0.0)
 					fill_wavelets!(iss, wavelets, pa.c.acqsrc, pa.c.sflags)
 				end
 			end
@@ -710,7 +719,7 @@ Author: Pawan Bharadwaj
 """
 @fastmath function mod!(pa::Param=Param())
 
-	const to = TimerOutput(); # create a timer object
+	global to
 
 	reset_timer!(to)
 
@@ -763,7 +772,7 @@ Author: Pawan Bharadwaj
 		if(pa.c.rflags[ipw] ≠ 0) # record only if rflags is non-zero
 			for ifield in 1:length(pa.c.irfields)
 
-				pa.c.datamat[:]=0.0
+				fill!(pa.c.datamat, 0.0)
 				@sync begin
 					for (ip, p) in enumerate(procs(pa.p))
 						@sync remotecall_wait(p) do 
@@ -913,8 +922,10 @@ end # mod_per_shot
 	# saving illumination to be used as preconditioner 
 	p=pap.p
 	illum=pass[issp].illum
-	pp=view(p,:,:,1,1)
-	@. illum += pp * pp
+	pp=view(p[1],:,:,1)
+	for i in eachindex(illum)
+		illum[i] += abs2(pp[i])
+	end
 end
 
 
@@ -934,7 +945,6 @@ end
 """
 Project density on to a staggerred grid using simple interpolation
 """
-
 function get_rhovxI(rhoI::Array{Float64})
 	rhovxI = zeros(rhoI);
 	get_rhovxI!(rhovxI, rhoI)
@@ -967,18 +977,6 @@ function get_rhovzI!(rhovzI, rhoI::Array{Float64})
 end # get_rhovzI
 
 
-
-function initialize_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2})
-
-	npw = size(wavelets,1)
-	nt = size(wavelets,2)
-	ns, snfield = size(wavelets[1,1])
-	for ipw=1:npw, it=1:nt
-		for ifield=1:snfield, is=1:ns
-			wavelets[ipw,it][is,ifield] = 0.0
-		end
-	end
-end
 
 
 
@@ -1110,7 +1108,7 @@ function pml_variables(
 #
 		# just in case, for -5 at the end
 		(alpha_x[ix] < 0.0) ? alpha_x[ix] = 0.0 : nothing
-		(alpha_x_half[ix] < 0.0)? alpha_x_half[ix] = 0.0 : nothing
+		(alpha_x_half[ix] < 0.0) ? alpha_x_half[ix] = 0.0 : nothing
 
 		b_x[ix] = exp(- (d_x[ix] / k_x[ix] + alpha_x[ix]) * δt)
 		b_x_half[ix] = exp(- (d_x_half[ix] / k_x_half[ix] + alpha_x_half[ix]) * δt)

@@ -7,7 +7,7 @@ function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 	global to
 
 	if(!isequal(x, last_x))
-		copy!(last_x, x)
+		copyto!(last_x, x)
 		# do forward modelling, apply F x
 		@timeit to "F!" F!(pa, x, pa.attrib_mod)
 	end
@@ -22,7 +22,7 @@ function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 
 	# (inactive when applied on same model)
 	if(!isequal(x, last_x))
-		copy!(last_x, x)
+		copyto!(last_x, x)
 		# do forward modelling, apply F x 
 		@timeit to "F!" F!(pa, x, pa.attrib_mod)
 	end

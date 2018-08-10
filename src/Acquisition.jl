@@ -1,5 +1,3 @@
-__precompile__()
-
 """
 This module defines the following data types:
 * `Geom` : acquisition geometry, i.e., positions of supersources, sources and receivers
@@ -613,7 +611,7 @@ function Src_fixed_mod(
 	d = sqrt((x[1]-x[end]).^2+(z[1]-z[end]).^2)
 	
 	# use two-way maximum distance to get tmax
-	tmax=2.*d/vavg .* tmaxfrac
+	tmax=2.0*d*inv(vavg)*tmaxfrac
 
 	# choose sampling interval to obey max freq of source wavelet
 	δmin = minimum([mod.mgrid.δx, mod.mgrid.δz])

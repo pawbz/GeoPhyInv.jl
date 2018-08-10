@@ -19,6 +19,12 @@ function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc:
 					source_term = acqsrc[ipw].wav[iss,ifield][it,is]
 					wavelets[ipw,it][is,ifield] = source_term
 				end
+			elseif(sflags[ipw] == -1)
+				"ϕ[t] = s[t]"
+				for it=1:snt
+					source_term = acqsrc[ipw].wav[iss,ifield][it,is]
+					wavelets[ipw,nt-it+1][is,ifield] = -1.0*source_term
+				end
 			elseif(sflags[ipw] == 2)
 				"ϕ[t] = ∑₁ᵗ⁻¹ s[t]"
 				source_term_stack = 0.0;
@@ -87,6 +93,10 @@ struct Source_B0 end
 			division of source term with δx and δz (see Jan's fdelmodc manual)
 			"""
 			source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
+
+						if(it==1)
+							println("source term t=0*^^***** ", source_term)
+						end
 			
 			"""
 			multiplication with modttI

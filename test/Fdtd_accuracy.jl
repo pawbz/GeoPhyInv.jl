@@ -18,8 +18,8 @@ vp0=mean(JuMIT.Models.χ(model.χvp,model.ref.vp,-1))
 ρ0=mean(JuMIT.Models.χ(model.χρ,model.ref.ρ,-1))
 rec1 = JuMIT.Analytic.mod(vp0=vp0,
             model_pert=model,
-		             ρ0=ρ0,
-			         acqgeom=acqgeom, acqsrc=acqsrc, tgridmod=tgrid, src_flag=2)
+		     ρ0=ρ0,
+			 acqgeom=acqgeom, acqsrc=acqsrc, tgridmod=tgrid, src_flag=2)
 
 
 

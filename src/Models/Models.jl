@@ -161,9 +161,9 @@ function Seismic_zeros(mgrid::Grid.M2D)
 end
 
 function Base.fill!(mod::Seismic, k::Float64=0.0)
-	mod.χvp[:]=k
-	mod.χρ[:]=k
-	mod.χvs[:]=k
+	fill!(mod.χvp,k)
+	fill!(mod.χρ,k)
+	fill!(mod.χvs,k)
 	return mod
 end
 

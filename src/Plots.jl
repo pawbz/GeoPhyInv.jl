@@ -179,7 +179,7 @@ and model grid `M2D`.
 			legend --> false
 			markersize --> 7
 			markercolor := :red
-			markershape := :star7
+			markershape := :xcross
 			seriestype := :scatter
 			sx, sz
 		end
@@ -221,7 +221,6 @@ Plot the source wavelet used for acquisition.
 
 * `acqsrc::Acquisition.Src` : source acquisition parameters
 """
-
 @recipe function psrc(p::Src)
 	acqsrc=p.args[1]
 	tgrid=acqsrc.tgrid

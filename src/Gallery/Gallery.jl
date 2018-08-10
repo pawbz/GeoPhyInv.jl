@@ -1,9 +1,8 @@
-__precompile__()
-
 module Gallery
 
 using Grid
 using Signals
+using Pkg
 import JuMIT.IO
 import JuMIT.Models
 import JuMIT.Acquisition
@@ -23,7 +22,6 @@ Gallery of `M2D` grids.
 * `attrib=:acou_homo2` : a square grid for with 51 samples in each dimension, with 50 PML 
 		points; both X and Z vary from -1000 to 1000. 
 """
-
 function M2D(attrib::Symbol)
 	if(attrib == :acou_homo1)
 		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,201,201,50)
@@ -229,7 +227,14 @@ function Src(attrib::Symbol, nss::Int64=1)
 	end
 end
 
-
 include("fwi.jl")
+include("fdtd.jl")
+function fdtd_problems()
+	println("Hellllo")
+
+	return Seismic(:acou_homo1)
+
+
+end
 
 end # module

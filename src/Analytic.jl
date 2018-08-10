@@ -1,5 +1,3 @@
-__precompile__()
-
 module Analytic
 
 using Grid
@@ -12,7 +10,7 @@ import JuMIT.Data
 """
 k = wavenumber = 2pif/v0
 """
-function G0_homo_acou{T<:AbstractFloat}(x::T, z::T, k::T, ρ0::T)
+function G0_homo_acou(x::T, z::T, k::T, ρ0::T) where {T<:AbstractFloat}
 	sqrt(x*x + z*z) == 0.0 ? error("distance cannot be zero") : nothing
 	k == 0.0 ? error("wavenumber cannot be zero") : nothing
 	G0 = -0.25 * ρ0 * im * complex.(besselj0(k*sqrt(x*x + z*z)), -bessely0(k*sqrt(x*x + z*z)))

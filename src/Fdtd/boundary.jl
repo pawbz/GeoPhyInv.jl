@@ -5,7 +5,7 @@
 	boundary=pass[issp].boundary[5]
 	ps=view(p[1],:,:,1)
 	bs=view(boundary,:,:,1)
-	copy!(ps,bs)
+	copyto!(ps,bs)
 end
 @inbounds @fastmath function boundary_force_snap_vxvz!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
 	# initial conditions from boundary for first propagating field only
@@ -14,10 +14,10 @@ end
 	boundary=pass[issp].boundary[5]
 	ps=view(pw,:,:,2)
 	bs=view(boundary,:,:,2)
-	copy!(ps,bs)
+	copyto!(ps,bs)
 	ps=view(pw,:,:,3)
 	bs=view(boundary,:,:,3)
-	copy!(ps,bs)
+	copyto!(ps,bs)
 end
 @fastmath @inbounds function boundary_force!(it::Int64,issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
 	boundary=pass[issp].boundary
@@ -68,7 +68,7 @@ end
 	boundary=pass[issp].boundary[5]
 	ps=view(pw,:,:,1)
 	bs=view(boundary,:,:,1)
-	copy!(bs, ps)
+	copyto!(bs, ps)
 end
 @inbounds @fastmath function boundary_save_snap_vxvz!(issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
 	p=pap.p

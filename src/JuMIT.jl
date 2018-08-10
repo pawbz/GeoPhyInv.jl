@@ -1,5 +1,3 @@
-__precompile__()
-
 module JuMIT
 
 #const depsfile = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")

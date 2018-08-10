@@ -1,5 +1,3 @@
-__precompile__()
-
 """
 This module defines the data types related to seismic data:
 * `TD` : time domain representation
@@ -15,9 +13,12 @@ using Interpolation
 #using DeConv
 using Misfits
 using Signals
+using LinearAlgebra
+using Statistics
 import JuMIT.Acquisition
 import JuMIT.Coupling
 using DSP
+using Random
 
 """
 Time domain representation of Seismic Data.
@@ -132,11 +133,11 @@ end
 """
 Fill with randn values
 """
-function Base.randn!(data::TD)
+function Random.randn!(data::TD)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
-		randn!(dd)
+		Random.randn!(dd)
 	end
 	return data
 end
@@ -188,6 +189,15 @@ function interp(data::TD,
 	      data.fields,tgrid,data.acqgeom)
 	interp_spray!(data, dataout)
 	return dataout
+end
+
+function taper!(data::TD, perc=0.0; bperc=perc,eperc=perc)
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	for ifield = 1:length(data.fields), iss = 1:nss
+		dd=data.d[iss, ifield]
+		Signals.DSP.taper!(dd,bperc=bperc,eperc=eperc)
+	end
+	return data
 end
 
 
@@ -280,9 +290,9 @@ end
 Returns the variance of data
 
 """
-function Base.var(data1::TD)
+function Statistics.var(data1::TD)
 	σ=0.0
-	μ=mean(data1)
+	μ=Statistics.mean(data1)
 	n=0
 	for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
 		for ir = 1:data1.acqgeom.nr[iss], it = 1:data1.tgrid.nx
@@ -293,7 +303,7 @@ function Base.var(data1::TD)
 	return σ*inv(n)
 end
 
-function Base.mean(data1::TD)
+function Statistics.mean(data1::TD)
 	n=0
 	μ=0.0
 	for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
@@ -307,7 +317,7 @@ end
 
 function addnoise!(dataN::TD, data::TD, SNR)
 
-	σx=var(data)
+	σx=Statistics.var(data)
 
 	σxN=sqrt(σx^2*inv(10^(SNR/10.)))
 	
@@ -316,7 +326,7 @@ function addnoise!(dataN::TD, data::TD, SNR)
 	for ifield = 1:length(data.fields), iss = 1:data.acqgeom.nss 
 		for ir = 1:data.acqgeom.nr[iss], it = 1:data.tgrid.nx
 
-			dataN.d[iss, ifield][it, ir] = dataN.d[iss, ifield][it, ir] + α*randn()
+			dataN.d[iss, ifield][it, ir] = dataN.d[iss, ifield][it, ir] + α*Random.randn()
 		end
 	end
 end
@@ -335,7 +345,7 @@ Returns dot product of data.
 
 * dot product as `Float64`
 """
-function Base.dot(data1::TD, data2::TD)
+function LinearAlgebra.dot(data1::TD, data2::TD)
 	if(isapprox(data1, data2))
 		dotd = 0.0;
 		for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
@@ -491,6 +501,7 @@ end # TDcoup
 
 
 include("misfits.jl")
+include("weights.jl")
 
 #=
 function DDeConv(d::TD, wav::AbstractVector{Float64}, ϵ=1e-2)
