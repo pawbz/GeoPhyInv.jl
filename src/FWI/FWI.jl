@@ -63,12 +63,12 @@ FWI Parameters
 
 TODO: add an extra attribute for coupling functions inversion and modelling
 """
-mutable struct Param{Tattrib_mod, Tdatamisfit}
+mutable struct Param{Tmod, Tattrib_mod, Tdatamisfit}
 	"model inversion variable"
 	mx::Inversion.X{Float64,1}
 	mxm::Inversion.X{Float64,1}
 	"forward modelling parameters for"
-	paf::Fdtd.Param
+	paf::Tmod
 	"base source wavelet"
 	acqsrc::Acquisition.Src
 	"adjoint source functions"

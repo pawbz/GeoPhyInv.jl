@@ -1,11 +1,12 @@
-module Analytic
+module Born
 
 using Grid
-using Conv
 import JuMIT.Acquisition
 import JuMIT.Models
 import JuMIT.Data
 
+mutable struct Param
+end
 
 """
 k = wavenumber = 2pif/v0

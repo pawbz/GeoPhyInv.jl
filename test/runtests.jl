@@ -6,7 +6,9 @@ using Misfits
 using BenchmarkTools
 using Grid
 using Profile
+using Distributed
 
+addprocs(5)
 
 folder="FWI"
 for t in ["gradient_accuracy"]
