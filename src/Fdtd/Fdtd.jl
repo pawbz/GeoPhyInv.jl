@@ -189,6 +189,23 @@ function initialize!(pap::Paramp)
 	end
 end
 
+function iszero_boundary(pa)
+	result=false
+	@sync begin
+		for (ip, p) in enumerate(procs(pa.p))
+			@async remotecall_wait(p) do 
+				pap=localpart(pa.p)
+				for issp in 1:length(pap.ss)
+					pass=pap.ss[issp]
+					for i in 1:length(pass.boundary)
+						result = result | iszero(pass.boundary[i])
+					end
+				end
+			end
+		end
+	end
+	return result
+end
 		
 
 function initialize_boundary!(pa)
