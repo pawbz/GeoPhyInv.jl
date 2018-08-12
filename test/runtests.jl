@@ -1,9 +1,24 @@
-using Revise
-using JuMIT
-using Base.Test
 using LinearAlgebra
+using JuMIT
+using Test
+using Signals
+using Misfits
 using BenchmarkTools
 using Grid
+using Profile
+
+
+folder="FWI"
+for t in ["gradient_accuracy"]
+	fp = joinpath(folder, string(t, ".jl"))
+	println(" *********** $(fp) ***************")
+	include(fp)
+end
+
+
+
+
+
 
 #tests = ["Fdtd_accuracy", "Fdtd_backprop", 
 #	 # "Poisson_testscript_RandomEigenfns", 
@@ -11,8 +26,4 @@ using Grid
 #
 #println("Running tests:")
 #
-#for t in tests
-#	fp = string(t, ".jl")
-#	println(" *********** $(fp) ***************")
-#	include(fp)
 #end

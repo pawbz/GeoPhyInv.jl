@@ -16,6 +16,7 @@ using AxisArrays
 using Printf
 
 global const to = TimerOutput(); # create a timer object
+global const npml = 50
 
 #As forward modeling method, the 
 #finite-difference method is employed. 
@@ -370,15 +371,15 @@ function Param(;
 	check_fd_stability(vpmin, vpmax, model.mgrid.δx, model.mgrid.δz, freqmin, freqmax, tgridmod.δx, verbose)
 
 
-	# where to store the boundary values
-	ibx0=model.mgrid.npml-2; ibx1=model.mgrid.nx+model.mgrid.npml+3
-	ibz0=model.mgrid.npml-2; ibz1=model.mgrid.nz+model.mgrid.npml+3
-#	ibx0=model.mgrid.npml+1; ibx1=model.mgrid.nx+model.mgrid.npml
-#	ibz0=model.mgrid.npml+1; ibz1=model.mgrid.nz+model.mgrid.npml
+	# where to store the boundary values (careful, born scaterrers cannot be inside these!?)
+	ibx0=npml-2; ibx1=model.mgrid.nx+npml+3
+	ibz0=npml-2; ibz1=model.mgrid.nz+npml+3
+#	ibx0=npml+1; ibx1=model.mgrid.nx+npml
+#	ibz0=npml+1; ibz1=model.mgrid.nz+npml
 #	println("**** Boundary Storage Changed **** ")
 
 	# for snaps
-	isx0, isz0=model.mgrid.npml, model.mgrid.npml
+	isx0, isz0=npml, npml
 
 	# extend models in the PML layers
 	exmodel = Models.Seismic_pml_pad_trun(model);
@@ -433,9 +434,9 @@ function Param(;
 
 
 	# pml_variables
-	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax, 
+	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, npml-5, vpmax, vpmin, freqmin, freqmax, 
 							       [any(abs_trbl .== :left), any(abs_trbl .== :right)])
-	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax,
+	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, npml-5, vpmax, vpmin, freqmin, freqmax,
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
 	grad_stack=SharedVector{Float64}(2*nzd*nxd)
@@ -449,7 +450,7 @@ function Param(;
 
 	nrmat=[acqgeom[ipw].nr[iss] for ipw in 1:npw, iss in 1:acqgeom[1].nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),acqgeom[1].nss)
-	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]
+	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findall(!iszero, rflags))]
 
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
@@ -478,7 +479,7 @@ function Param(;
 	nwork = min(nss, nworkers())
 	work = workers()[1:nwork]
 	ssi=[round(Int, s) for s in range(0,stop=nss,length=nwork+1)]
-	sschunks=Array{UnitRange{Int64}}(nwork)
+	sschunks=Array{UnitRange{Int64}}(undef, nwork)
 	for ib in 1:nwork       
 		sschunks[ib]=ssi[ib]+1:ssi[ib+1]
 	end
@@ -621,7 +622,6 @@ function Paramss(iss::Int64, pac::Paramc)
 
 	# storing boundary values for back propagation
 	nx1, nz1=pac.model.mgrid.nx, pac.model.mgrid.nz
-	npml=pac.model.mgrid.npml
 	if(pac.backprop_flag ≠ 0)
 		boundary=[zeros(3,nx1+6,nt),
 		  zeros(nz1+6,3,nt),
@@ -759,6 +759,7 @@ Author: Pawan Bharadwaj
 		# update gradient model using grad_modtt_stack, grad_modrr_stack
 		update_gradient!(pa.c)
 	end
+
 
 	@timeit to "record data" begin
 	for ipw in pa.c.activepw
@@ -977,7 +978,7 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 
 
 	# check spatial sampling
-	δs_temp=round(vpmin/5.0/freqmax,2);
+	δs_temp=round(vpmin/5.0/freqmax,digits=2);
 	δs_max = maximum([δx, δz])
 	str1=@sprintf("%0.2e",δs_max)
 	str2=@sprintf("%0.2e",δs_temp)
@@ -1117,5 +1118,6 @@ function pml_variables(
 
 	return a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI
 end
+
 
 end # module

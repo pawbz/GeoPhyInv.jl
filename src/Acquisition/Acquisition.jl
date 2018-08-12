@@ -10,9 +10,9 @@ module Acquisition
 using Grid
 import JuMIT.Models
 using Signals
-import JuMIT.Models
 using Distributions
 using DataFrames
+using Random
 using CSV
 
 """
@@ -298,7 +298,7 @@ function Geom_fixed(
 
 
 	ssarray = isequal(nss,1) ? fill(ssmin,1) : (rand_flags[1] ? 
-					   rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : range(ssmin,stop=ssmax,length=nss))
+					   Random.rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : range(ssmin,stop=ssmax,length=nss))
 	if(ssattrib==:horizontal)
 		ssz = ss0+(ssarray-minimum(ssarray))*sin(ssα)/cos(ssα); ssx=ssarray
 	elseif(ssattrib==:vertical)
@@ -308,7 +308,7 @@ function Geom_fixed(
 	end
 
 	rarray = isequal(nr,1) ? fill(rmin,1) : (rand_flags[2] ? 
-				        rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : range(rmin,stop=rmax,length=nr))
+				        Random.rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : range(rmin,stop=rmax,length=nr))
 	if(rattrib==:horizontal)
 		rz = r0+(rarray-minimum(rarray))*sin(rα)/cos(rα); rx = rarray
 	elseif(rattrib==:vertical)
@@ -322,8 +322,8 @@ function Geom_fixed(
 	sszall=[zeros(ns[iss]) for iss=1:nss];
 	for iss in 1:nss
 		for is in 1:ns[iss]
-			θ=rand(Uniform(-Float64(pi),Float64(pi)))
-			r = iszero(srad) ? 0.0 : rand(Uniform(0,srad))
+			θ=Random.rand(Uniform(-Float64(pi),Float64(pi)))
+			r = iszero(srad) ? 0.0 : Random.rand(Uniform(0,srad))
 			x=r*cos(θ)
 			z=r*sin(θ)
 			ssxall[iss][is]=ssx[iss]+x
@@ -332,6 +332,28 @@ function Geom_fixed(
 	end
 	return Geom(ssxall, sszall, rxall, rzall, nss, ns, fill(nr,nss))
 end
+
+"""
+Randomly place source and receivers in a given model
+"""
+function Geom_fixed(mod::Models.Seismic,
+	      nss::Int64=5,
+	      nr::Int64=5,
+	      ns::Vector{Int64}=ones(Int,nss))
+
+	xmin=mod.mgrid.x[1]
+	xmax=mod.mgrid.x[end]
+	zmin=mod.mgrid.z[1]
+	zmax=mod.mgrid.z[end]
+
+	rxall = [Random.rand(Uniform(xmin,xmax),nr) for iss=1:nss];
+	rzall = [Random.rand(Uniform(xmin,xmax),nr) for iss=1:nss];
+	ssxall = [Random.rand(Uniform(xmin,xmax),ns[iss]) for iss=1:nss];
+	sszall = [Random.rand(Uniform(xmin,xmax),ns[iss]) for iss=1:nss];
+
+	return Geom(ssxall, sszall, rxall, rzall, nss, ns, fill(nr,nss))
+end
+
 
 """
 Circular acquisition. The sources and receivers can also be placed on a circle of radius

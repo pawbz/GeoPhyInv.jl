@@ -108,6 +108,7 @@ function F!(pa::Param, x, ::ModFdtd)
 	pa.paf.c.activepw=[1,]
 	pa.paf.c.illum_flag=false
 	pa.paf.c.sflags=[2, 0]
+	pa.paf.c.rflags=[1, 0] # record only after first scattering
 	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
 	pa.paf.c.backprop_flag=1
 	pa.paf.c.gmodel_flag=false
@@ -179,7 +180,6 @@ function Fadj!(pa::Param)
 	# update source wavelets in paf using adjoint sources
 	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
 
-
 	# no need to record data
 	pa.paf.c.rflags=[0,0]
 
@@ -190,32 +190,6 @@ function Fadj!(pa::Param)
 	pa.paf.c.rflags=[1,1]
 
 	return pa.paf.c.gradient
-end
-
-"""
-xx = Fadj * Fborn * x
-"""
-function Fadj_Fborn_x!(xx, x, pa)
-
-	# put  x into pa
-	x_to_modm!(pa, x)
-
-	# generate Born Data
-	(pa.paf.c.born_flag==false) && error("need born flag")
-	Fborn!(pa)
-
-	#f = Data.func_grad!(pa.paTD, :dJx)
-
-	# adjoint sources
-	update_adjsrc!(pa.adjsrc, pa.paTD.x, pa.adjacqgeom)
-
-	# adjoint simulation
-	Fadj!(pa)
-
-	# adjoint of interpolation
-	Seismic_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, xx, pa, 1) 
-
-	return pa
 end
 
 

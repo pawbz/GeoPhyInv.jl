@@ -210,7 +210,7 @@ function Param(
 	       tlagrf_fracs=0.0,
 	       acqsrc_obs::Acquisition.Src=deepcopy(acqsrc),
 	       modm_obs::Models.Seismic=modm,
-	       modm0::Models.Seismic=fill!(deepcopy(modm),0.0),
+	       modm0=nothing,
 	       parameterization::Vector{Symbol}=[:χvp, :χρ, :null],
 	       verbose::Bool=false,
 	       attrib::Symbol=:synthetic,
@@ -229,7 +229,7 @@ function Param(
 		min(igrid.x[end],mg.x[end-2]),
 		max(igrid.z[1],mg.z[3]),
 		min(igrid.z[end],mg.z[end-2]),
-		 		igrid.δx,igrid.δz,igrid.npml)
+		 		igrid.nx,igrid.nz,igrid.npml)
 
 
 	# create modi according to igrid and interpolation of modm
@@ -245,10 +245,15 @@ function Param(
 	priori=similar(modi)
 	priorw=similar(modi)
 
-	# need a separate model for synthetic
-	if(attrib == :synthetic) 
-		((attrib_mod == :fdtd_hborn) | (attrib_mod == :fdtd_born)) && 
+	# check initial models
+	if(typeof(attrib_mod) == ModFdtdBorn)
+		(modm0===nothing) && error("need modm0 for Born mod")
 		isequal(modm0, modm_obs) && error("change background model used for Born modelling")
+	else
+		modm0=similar(modm) # some dummy
+		fill!(modm, 0.0)
+	end
+	if(attrib == :synthetic) 
 		isequal(modm, modm_obs) && error("initial model same as actual model")
 	end
 
@@ -439,7 +444,7 @@ end
 function spray_gradient!(gx, pa, ::ModFdtdBorn)
 
 	# apply chain rule on gmodm to get gradient w.r.t. dense x (note that background model is used for Born modeling here)
-	Models.gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm0, pa.parameterization)
+	Models.gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
 
 	# spray gradient w.r.t. dense x to the space of sparse x
 	Interpolation.interp_spray!(gx, pa.mxm.gx, pa.paminterp, :spray, count(pa.parameterization.≠:null))

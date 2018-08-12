@@ -19,10 +19,8 @@ Simple test to see staggerred grid spatial derivatives that are used satisfy adj
 function Δxsample(p)	
 	nx=length(p)
 	# boundary conditions
-	p[1:2,:].=0.0
-	p[:,1:2].=0.0
-	p[nz-1:nz,:].=0.0
-	p[:,nx-1:nx].=0.0
+	p[1:2].=0.0
+	p[nx-1:nx].=0.0
 	dpdx=zero(p)
 	pout=zero(p)
 	for i in 1:100 # applying operators a 100 times, say
@@ -42,20 +40,21 @@ end
 """
 advance by one time step for adjoint test
 """
-function advance_sample(ntimes, p, modrrvx, modrrvz, a_x=nothing)
+function advance_sample(ntimes, p, modrrvx, modrrvz, modttI)
 	nz=size(p,1)
 	nx=size(p,2)
 	# boundary conditions
-	p[1:2,:].=0.0
-	p[:,1:2].=0.0
-	p[nz-1:nz,:].=0.0
-	p[:,nx-1:nx].=0.0
+	for i in 1:3
+		p[1:2,:,i] .= 0.0
+		p[:,1:2,i] .= 0.0
+		p[nz-1:nz,:,i] .= 0.0
+		p[:,nx-1:nx,i] .= 0.0
+	end
 
 
 	δx24I=1.; δz24I=1.; δt=1.
 
-	(a_x===nothing) && (a_x=zeros(nx))
-
+	a_x=zeros(nx)
 	a_x_half=zeros(nx)
 	b_x=zeros(nx);	b_x_half=zeros(nx)
 	k_x=ones(nx);	k_xI=ones(nx)
@@ -66,18 +65,20 @@ function advance_sample(ntimes, p, modrrvx, modrrvz, a_x=nothing)
 	a_z=zeros(nz);	a_z_half=zeros(nz)
 	b_z=zeros(nz);	b_z_half=zeros(nz)
 
-	#modrrvx=ones(nz,nx)
-	#modrrvz=ones(nz,nx)
+	modrrvx=ones(nz,nx)
+	modrrvz=ones(nz,nx)
 	modttI=ones(nz,nx)
 
 	pw=zeros(nz,nx,3)
 	#input
+	copyto!(pw, p)
+#=	
 	for iz in 1:nz
 		for ix in 1:nx
-			pw[iz,ix,1]=p[iz,ix]
+			pw[iz,ix,3]=p[iz,ix,3]
 		end
 	end
-
+=#
 	dpdxw=zeros(nz,nx,3); 	dpdzw=zeros(nz,nx,3) 
 	ppw=zeros(nz,nx,3); 	pppw=zeros(nz,nx,3) 
 
@@ -98,7 +99,7 @@ function advance_sample(ntimes, p, modrrvx, modrrvz, a_x=nothing)
 	end
 
 
-	return pw[:,:,1]
+	return pw
 end
 
 @inbounds @fastmath function advance!(pac, pap)

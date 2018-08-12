@@ -40,24 +40,29 @@ end
 
 
 function testing2(nx,nz)
-	ntimes=3
+	ntimes=1
 
-	p=zeros(nz,nx)
-	p=Random.randn(nz,nx)
+#	p=zeros(nz,nx,3)
+#	p[div(nz,2),div(nx,2),1]=1.0
+	p=Random.randn(nz,nx,3)
 	modrrvz=Random.randn(nz,nx)
 	modrrvx=Random.randn(nz,nx)
+	modttI=Random.randn(nz,nx)
 	a_x=Random.randn(nz,nx)
 
 
-	pout=advance_sample(ntimes, p, modrrvx, modrrvz)
+	pout=advance_sample(ntimes, p, modrrvx, modrrvz, modttI)
+#	println(pout[:,:,1])
 
 
-	pout2=randn(nz,nx)
+	pout2=randn(nz,nx,3)
 
 
-	p2=advance_sample(ntimes, pout2, modrrvx, modrrvz)
+	p2=advance_sample(ntimes, pout2, modrrvx, modrrvz, modttI)
 
-	@test dot(pout2,pout) ≈ dot(p,p2)
+	i=3
+	@test dot(pout2[:,:,i],pout[:,:,i]) ≈ dot(p[:,:,i],p2[:,:,i])
+	#@test dot(pout2,pout-p) ≈ dot(p,p2-pout2)
 end
 	
 

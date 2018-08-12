@@ -1,3 +1,88 @@
+# This routine ABSOLUTELY should not allocate any memory, called inside time loop.
+@inbounds @fastmath function compute_gradient!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
+	# aliases
+	p=pap.p
+	pp=pap.pp
+	ppp=pap.ppp
+	dpdx=pap.dpdx
+	dpdz=pap.dpdz
+	δtI=pac.δtI
+	grad_modtt=pass[issp].grad_modtt
+	grad_modrrvx=pass[issp].grad_modrrvx
+	grad_modrrvz=pass[issp].grad_modrrvz
+
+	gmodtt!(grad_modtt,p,pp,ppp,pac.nx,pac.nz,δtI)
+	#gmodtt!(grad_modtt,p,pp,ppp,dpdx,dpdz,pac.nx,pac.nz)
+	gmodrrvx!(grad_modrrvx,dpdx,pac.nx,pac.nz)
+	gmodrrvz!(grad_modrrvz,dpdz,pac.nx,pac.nz)
+end
+
+@inbounds @fastmath function gmodtt!(grad_modtt,p,pp,ppp,nx,nz,δtI,)
+	pppw=ppp[1]
+	pw=p[1]
+	ppw=pp[1]
+	ppw2=pp[2]
+	for ix=1:nx
+		@simd for iz=1:nz
+			# p at [it], pp at [it-1]	# dpdx and dpdz at [it]	# gradients w.r.t inverse of modtt, i.e., 1/rho/c^2 
+			@inbounds grad_modtt[iz,ix] += ((-1.0 * (pppw[iz, ix, 1] + pw[iz, ix,  1] - 2.0 * ppw[iz, ix,  1]) * δtI * δtI) *  ppw2[iz,ix,1])
+		end
+	end
+end
+
+
+#=
+@inbounds @fastmath function gmodtt!(grad_modtt,p,pp,ppp,dpdx,dpdz,nx,nz)
+	pw=p[1]
+	pw2=p[2]
+	ppw=pp[1]
+	ppw2=pp[2]
+	pppw2=ppp[2]
+	pppw=ppp[1]
+	dpdxw2=dpdx[2]
+	dpdzw2=dpdz[2]
+	for ix=1:nx
+		@simd for iz=1:nz
+			# p at [it], pp at [it-1]	# dpdx and dpdz at [it]	# gradients w.r.t inverse of modtt, i.e., 1/rho/c^2 
+			@inbounds grad_modtt[iz,ix] += -1.0*(pw2[iz,ix,1]-ppw2[iz,ix,1])*pw[iz,ix,1]
+		end
+	end
+end
+=#
+@inbounds @fastmath function gmodrrvx!(grad_modrrvx,dpdx,nx,nz)
+	dpdxw1=dpdx[1]
+	dpdxw2=dpdx[2]
+	for ix=1:nx
+		@simd for iz=1:nz
+			# gradient w.r.t. inverse of rho on vx and vz grids
+			@inbounds grad_modrrvx[iz,ix] += (- dpdxw2[iz,ix,1]*dpdxw1[iz,ix,1])
+		end
+	end
+
+end
+@inbounds @fastmath function gmodrrvz!(grad_modrrvz,dpdz,nx,nz)
+	dpdzw1=dpdz[1]
+	dpdzw2=dpdz[2]
+	for ix=1:nx
+		@simd for iz=1:nz
+			# gradient w.r.t. inverse of rho on vx and vz grids
+			@inbounds grad_modrrvz[iz,ix] += (- dpdzw2[iz,ix,1]*dpdzw1[iz,ix,1])
+		end
+	end
+end
+
+@inbounds @fastmath function scale_gradient!(issp::Int64,pass::Vector{Paramss},δ)
+	grad_modtt=pass[issp].grad_modtt
+	grad_modrrvx=pass[issp].grad_modrrvx
+	grad_modrrvz=pass[issp].grad_modrrvz
+	"gradient is formed by intergration over time, hence multiply with δt, but why not?"
+	"I don't completely understand where the factors δx and δz are coming from..."
+	"probably the source term should not be multiplied by δxI and δzI during adjoint propagation"
+	rmul!(grad_modtt,δ)
+	rmul!(grad_modrrvx,δ)
+	rmul!(grad_modrrvz,δ)
+end
+
 
 
 
@@ -66,70 +151,4 @@ function update_gradient!(pac::Paramc)
 	end
 
 end
-
-
-# This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function compute_gradient!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
-	# aliases
-	p=pap.p
-	pp=pap.pp
-	ppp=pap.ppp
-	dpdx=pap.dpdx
-	dpdz=pap.dpdz
-	δtI=pac.δtI
-	grad_modtt=pass[issp].grad_modtt
-	grad_modrrvx=pass[issp].grad_modrrvx
-	grad_modrrvz=pass[issp].grad_modrrvz
-
-	gmodtt!(grad_modtt,p,pp,ppp,pac.nx,pac.nz,δtI)
-	gmodrrvx!(grad_modrrvx,dpdx,pac.nx,pac.nz)
-	gmodrrvz!(grad_modrrvz,dpdz,pac.nx,pac.nz)
-end
-
-@inbounds @fastmath function gmodtt!(grad_modtt,p,pp,ppp,nx,nz,δtI,)
-	pppw=ppp[1]
-	pw=p[1]
-	ppw=pp[1]
-	ppw2=pp[2]
-	for ix=1:nx
-		@simd for iz=1:nz
-			# p at [it], pp at [it-1]	# dpdx and dpdz at [it]	# gradients w.r.t inverse of modtt, i.e., 1/rho/c^2 
-			@inbounds grad_modtt[iz,ix] += ((-1.0 * (pppw[iz, ix, 1] + pw[iz, ix,  1] - 2.0 * ppw[iz, ix,  1]) * δtI * δtI) *  ppw2[iz,ix,1])
-		end
-	end
-end
-@inbounds @fastmath function gmodrrvx!(grad_modrrvx,dpdx,nx,nz)
-	dpdxw1=dpdx[1]
-	dpdxw2=dpdx[2]
-	for ix=1:nx
-		@simd for iz=1:nz
-			# gradient w.r.t. inverse of rho on vx and vz grids
-			@inbounds grad_modrrvx[iz,ix] += (- dpdxw2[iz,ix,1]*dpdxw1[iz,ix,1])
-		end
-	end
-
-end
-@inbounds @fastmath function gmodrrvz!(grad_modrrvz,dpdz,nx,nz)
-	dpdzw1=dpdz[1]
-	dpdzw2=dpdz[2]
-	for ix=1:nx
-		@simd for iz=1:nz
-			# gradient w.r.t. inverse of rho on vx and vz grids
-			@inbounds grad_modrrvz[iz,ix] += (- dpdzw2[iz,ix,1]*dpdzw1[iz,ix,1])
-		end
-	end
-end
-
-@inbounds @fastmath function scale_gradient!(issp::Int64,pass::Vector{Paramss},δ)
-	grad_modtt=pass[issp].grad_modtt
-	grad_modrrvx=pass[issp].grad_modrrvx
-	grad_modrrvz=pass[issp].grad_modrrvz
-	"gradient is formed by intergration over time, hence multiply with δt, but why not?"
-	"I don't completely understand where the factors δx and δz are coming from..."
-	"probably the source term should not be multiplied by δxI and δzI during adjoint propagation"
-	rmul!(grad_modtt,δ)
-	rmul!(grad_modrrvx,δ)
-	rmul!(grad_modrrvz,δ)
-end
-
 

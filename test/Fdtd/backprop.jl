@@ -8,7 +8,7 @@ acqsrc=JuMIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmax
 @time pa=JuMIT.Fdtd.Param(born_flag=false,npw=1, tgridmod=acqsrc.tgrid,
 #	abs_trbl=[:null],
         gmodel_flag=false,
-		sflags=[2],
+		sflags=[1],
         snaps_flag=true,
 	verbose=true,
         backprop_flag=1,
@@ -19,7 +19,7 @@ JuMIT.Fdtd.mod!(pa);
 rec1=deepcopy(pa.c.data[1])
 
 # change source flag and update wavelets in pa
-pa.c.sflags=[3];
+pa.c.sflags=[-1];
 JuMIT.Fdtd.update_acqsrc!(pa,[acqsrc])
 pa.c.backprop_flag=-1 # do backpropagation
 

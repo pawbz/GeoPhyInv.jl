@@ -174,7 +174,7 @@ function xfwi!(pa::Param, obj::Migr)
 	# convert gradient vector to model
 	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, g1, pa)
 
-	return pa.gmodi
+	return pa.gmodi, g1
 end
 
 
@@ -200,7 +200,7 @@ function xfwi!(pa::Param, obj::Migr_fd)
 	# convert gradient vector to model
 	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)
 
-	return pa.gmodi
+	return pa.gmodi, gx
 end
 
 
