@@ -142,7 +142,6 @@ mutable struct Paramss
         boundary::Vector{Array{Float64,3}}
 	snaps::Array{Float64,3}
 	illum::Matrix{Float64}
-	born_svalue_stack::Matrix{Float64} 
 	grad_modtt::Matrix{Float64} 
 	grad_modrrvx::Matrix{Float64}
 	grad_modrrvz::Matrix{Float64}
@@ -163,6 +162,7 @@ mutable struct Paramp
 	memory_dp_dz::Vector{Array{Float64,2}}
 	memory_dvx_dx::Vector{Array{Float64,2}}
 	memory_dvz_dz::Vector{Array{Float64,2}}
+	born_svalue_stack::Matrix{Float64} 
 end
 
 mutable struct Param
@@ -185,7 +185,6 @@ function initialize!(pap::Paramp)
 		fill!(pass.grad_modtt,0.0)
 		fill!(pass.grad_modrrvx,0.0)
 		fill!(pass.grad_modrrvz,0.0)
-		fill!(pass.born_svalue_stack,0.0)
 	end
 end
 
@@ -226,7 +225,6 @@ function initialize_boundary!(pa)
 end
 
 function initialize!(pac::Paramc)
-	# need explicit loops while zeroing out Shared Matrices? "fill!" takes memory!!!
 	fill!(pac.gradient,0.0)
 	fill!(pac.grad_modtt_stack,0.0)
 	fill!(pac.grad_modrrvx_stack,0.0)
@@ -241,6 +239,7 @@ end
 
 function reset_per_ss!(pap::Paramp)
 	for ipw in 1:length(pap.p)
+		fill!(pap.born_svalue_stack,0.0)
 		fill!(pap.p[ipw],0.0)
 		fill!(pap.pp[ipw],0.0)
 		fill!(pap.ppp[ipw],0.0)
@@ -520,6 +519,8 @@ The parameters common to all workers are stored in `pac`.
 function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 	nx=pac.nx; nz=pac.nz; npw=pac.npw
 
+	born_svalue_stack = zeros(nz, nx)
+
 	p=[zeros(nz,nx,3) for ipw in 1:npw]; 
 	dpdx=[zeros(nz,nx,3) for ipw in 1:npw]; 
 	dpdz=[zeros(nz,nx,3) for ipw in 1:npw]; 
@@ -535,7 +536,8 @@ function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 	
 	ss=[Paramss(iss, pac) for (issp,iss) in enumerate(sschunks)]
 
-	pap=Paramp(ss,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz)
+	pap=Paramp(ss,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz,
+	    born_svalue_stack)
 
 	return pap
 end
@@ -635,11 +637,7 @@ function Paramss(iss::Int64, pac::Paramc)
 	wavelets = [zeros(pac.acqgeom[ipw].ns[iss],length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
 	fill_wavelets!(iss, wavelets, acqsrc, sflags)
 
-	if(pac.born_flag)
-		born_svalue_stack = zeros(nz, nx)
-	else
-		born_svalue_stack = zeros(1,1)
-	end
+	
 
 	# storing boundary values for back propagation
 	nx1, nz1=pac.model.mgrid.nx, pac.model.mgrid.nz
@@ -691,7 +689,6 @@ function Paramss(iss::Int64, pac::Paramc)
 
 	pass=Paramss(iss,wavelets,ssprayw,records,rinterpolatew,
 	      isx1,isx2,isz1,isz2,irx1,irx2,irz1,irz2,boundary,snaps,illum, 
-	      born_svalue_stack,
 	      grad_modtt,grad_modrrvx,grad_modrrvz)
 
 

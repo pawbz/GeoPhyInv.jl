@@ -2,7 +2,6 @@
 
 function add_born_sources!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
 
-	born_svalue_stack=pass[issp].born_svalue_stack
 	δx24I=pac.δx24I; δz24I=pac.δz24I; 
 	δxI=pac.δxI; δzI=pac.δzI; 
 	δt=pac.δt
@@ -13,6 +12,7 @@ function add_born_sources!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap:
 	nx=pac.model.mgrid.nx; nz=pac.model.mgrid.nz
 	np=pac.model.mgrid.npml # born sources are not added in the PML region
 
+	born_svalue_stack=pap.born_svalue_stack
 	p=pap.p; pp=pap.pp; ppp=pap.ppp;
 	dpdx=pap.dpdx; dpdz=pap.dpdz;
 
