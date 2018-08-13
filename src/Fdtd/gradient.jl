@@ -146,8 +146,8 @@ function update_gradient!(pac::Paramc)
 	gradient=pac.gradient
 	for i in 1:nznxd
 		# parameterization is  [:KI, :ρI, :null]
-		gradient[i]+=pac.grad_modtt_stack[i]  # update gmodtt
-		gradient[nznxd+i]+=pac.grad_modrr_stack[i]  # update gmodrr
+		gradient[i]=pac.grad_modtt_stack[i]  # update gmodtt
+		gradient[nznxd+i]=pac.grad_modrr_stack[i]  # update gmodrr
 	end
 
 end

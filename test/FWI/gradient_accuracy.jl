@@ -5,33 +5,36 @@ J.Models.Seismic_addon!(model,randn_perc=1, fields=[:χvp,:χρ])
 model0 = J.Gallery.Seismic(:acou_homo2);
 J.Models.Seismic_addon!(model0, randn_perc=1, fields=[:χvp,:χρ])
 
-acqgeom=J.Acquisition.Geom_fixed(model,2,10)
+acqgeom=J.Acquisition.Geom_fixed(model,5,10)
 acqsrc=J.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=1.0)
 tgrid=acqsrc.tgrid
 
 
 @testset "test parallel implementation during gradient" begin
-	pa=JF.Param(acqsrc, acqgeom, tgrid, JF.ModFdtd(), model0, 
-			     modm_obs=model,  
-			     igrid_interp_scheme=:B2,    
-			     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
-			     parameterization=[:χvp, :χρ, :null],   verbose=false,
-			     nworker=1)
+	for attrib_mod in [JF.ModFdtd(), JF.ModFdtdBorn()]
+		pa=JF.Param(acqsrc, acqgeom, tgrid, attrib_mod, model0, 
+				     modm_obs=model,  
+				     igrid_interp_scheme=:B2,    
+				     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
+				     parameterization=[:χvp, :χρ, :null],   verbose=false,
+				     nworker=1)
 
 
-	pa_parallel=JF.Param(acqsrc, acqgeom, tgrid, JF.ModFdtd(), model0, 
-			     modm_obs=model,  
-			     igrid_interp_scheme=:B2,    
-			     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
-			     parameterization=[:χvp, :χρ, :null],   verbose=false,
-			     nworker=nothing)
+		pa_parallel=JF.Param(acqsrc, acqgeom, tgrid, attrib_mod, model0, 
+				     modm_obs=model,  
+				     igrid_interp_scheme=:B2,    
+				     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
+				     parameterization=[:χvp, :χρ, :null],   verbose=false,
+				     nworker=nothing)
 
-	result=JF.xfwi!(pa, JF.Migr())
+		result=JF.xfwi!(pa, JF.Migr())
 
-	result_parallel=JF.xfwi!(pa_parallel, JF.Migr())
+		result_parallel=JF.xfwi!(pa_parallel, JF.Migr())
 
-	@test result[2] ≈ result_parallel[2]
+		@test result[2] ≈ result_parallel[2]
+	end
 end
+
 
 @testset "Testing gradient LS FWI" begin
 	pa=JF.Param(acqsrc, acqgeom, tgrid, JF.ModFdtd(), model0, 

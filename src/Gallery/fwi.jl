@@ -17,7 +17,7 @@ function xfwi_problem(attrib::Symbol; born_flag=false)
 		# starting model
 		model0 = Gallery.Seismic(:acou_homo2);
 		# add some noise to starting model
-		#Models.Seismic_addon!(model0, randn_perc=0.1, fields=[:χvp,:χρ])
+		# Models.Seismic_addon!(model0, randn_perc=0.1, fields=[:χvp,:χρ])
 
 		# sources, receivers
 		acqgeom=Acquisition.Geom_circ(nss=5,nr=20,rad=[900.,900.])

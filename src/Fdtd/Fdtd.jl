@@ -778,7 +778,7 @@ Author: Pawan Bharadwaj
 
 	@timeit to "update gradient" begin
 		# update gradient model using grad_modtt_stack, grad_modrr_stack
-		update_gradient!(pa.c)
+		(pa.c.gmodel_flag) && update_gradient!(pa.c)
 	end
 
 
