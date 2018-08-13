@@ -14,6 +14,7 @@ tgrid=acqsrc.tgrid
 	for attrib_mod in [JF.ModFdtd(), JF.ModFdtdBorn()]
 		pa=JF.Param(acqsrc, acqgeom, tgrid, attrib_mod, model0, 
 				     modm_obs=model,  
+				     modm0=model0,
 				     igrid_interp_scheme=:B2,    
 				     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
 				     parameterization=[:χvp, :χρ, :null],   verbose=false,
@@ -22,6 +23,7 @@ tgrid=acqsrc.tgrid
 
 		pa_parallel=JF.Param(acqsrc, acqgeom, tgrid, attrib_mod, model0, 
 				     modm_obs=model,  
+				     modm0=model0,
 				     igrid_interp_scheme=:B2,    
 				     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
 				     parameterization=[:χvp, :χρ, :null],   verbose=false,
@@ -56,6 +58,7 @@ end
 
 	@test f<1e-15
 end
+
 
 @testset "Testing Born Modeling and its gradient" begin
 
