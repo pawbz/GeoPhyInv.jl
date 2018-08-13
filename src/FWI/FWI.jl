@@ -191,6 +191,7 @@ Constructor for `Param`
 * `attrib::Symbol=:synthetic` : an attribute to control class
   * `=:synthetic` synthetic data inversion
   * `=:field` field data inversion
+* nworker : number of workers (input nothing to use all available)
 """
 function Param(
 	       acqsrc::Acquisition.Src,
@@ -214,6 +215,7 @@ function Param(
 	       parameterization::Vector{Symbol}=[:χvp, :χρ, :null],
 	       verbose::Bool=false,
 	       attrib::Symbol=:synthetic,
+	       nworker=nothing,
 	       )
 
 	# make a copy of initial model
@@ -276,7 +278,7 @@ function Param(
 		acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], 
 		sflags=[3, 2], rflags=[1, 1],
 		backprop_flag=1, 
-		tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false)
+		tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
 
 
 	gmodm=similar(modm)

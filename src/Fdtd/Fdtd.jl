@@ -99,11 +99,11 @@ mutable struct Paramc
 	modrr_pert::Matrix{Float64}
 	δmodrrvx::Matrix{Float64}
 	δmodrrvz::Matrix{Float64}
-	grad_stack::SharedArrays.SharedArray{Float64,1} # contains gmodtt and gmodrr
 	gradient::Vector{Float64}  # output gradient vector
+	grad_modtt_stack::SharedArrays.SharedArray{Float64,2} # contains gmodtt
 	grad_modrrvx_stack::SharedArrays.SharedArray{Float64,2}
 	grad_modrrvz_stack::SharedArrays.SharedArray{Float64,2}
-	grad_modrr_stack::Matrix{Float64}
+	grad_modrr_stack::SharedArrays.SharedArray{Float64,2}
 	illum_flag::Bool
 	illum_stack::SharedArrays.SharedArray{Float64,2}
 	backprop_flag::Int64
@@ -227,8 +227,8 @@ end
 
 function initialize!(pac::Paramc)
 	# need explicit loops while zeroing out Shared Matrices? "fill!" takes memory!!!
-	fill!(pac.grad_stack,0.0)
 	fill!(pac.gradient,0.0)
+	fill!(pac.grad_modtt_stack,0.0)
 	fill!(pac.grad_modrrvx_stack,0.0)
 	fill!(pac.grad_modrrvz_stack,0.0)
 	fill!(pac.grad_modrr_stack,0.0)
@@ -328,7 +328,8 @@ function Param(;
 	illum_flag::Bool=false,
 	tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1),
 	snaps_flag::Bool=false,
-	verbose::Bool=false)
+	verbose::Bool=false,
+	nworker=nothing)
 
 	#println("********PML Removed*************")
 	#abs_trbl=[:null]
@@ -456,11 +457,11 @@ function Param(;
 	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, npml-5, vpmax, vpmin, freqmin, freqmax,
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
-	grad_stack=SharedVector{Float64}(2*nzd*nxd)
 	gradient=zeros(2*nzd*nxd)
+	grad_modtt_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
-	grad_modrr_stack=zeros(nzd,nxd)
+	grad_modrr_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
 	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
 	itsnaps = [argmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
@@ -478,9 +479,10 @@ function Param(;
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modtt, modttI,modrr,modrrvx,modrrvz,
 	    δmodtt,modrr_pert,δmodrrvx,δmodrrvz,
-	    grad_stack,
 	    gradient,
-	    grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,
+	    grad_modtt_stack,
+	    grad_modrrvx_stack,
+	    grad_modrrvz_stack,grad_modrr_stack,
 	    illum_flag,illum_stack,
 	    backprop_flag,
 	    snaps_flag,
@@ -493,11 +495,13 @@ function Param(;
 	    verbose)	
 
 	# dividing the supersources to workers
-	nwork = min(nss, nworkers())
-	work = workers()[1:nwork]
-	ssi=[round(Int, s) for s in range(0,stop=nss,length=nwork+1)]
-	sschunks=Array{UnitRange{Int64}}(undef, nwork)
-	for ib in 1:nwork       
+	if(nworker===nothing)
+		nworker = min(nss, Distributed.nworkers())
+	end
+	work = Distributed.workers()[1:nworker]
+	ssi=[round(Int, s) for s in range(0,stop=nss,length=nworker+1)]
+	sschunks=Array{UnitRange{Int64}}(undef, nworker)
+	for ib in 1:nworker       
 		sschunks[ib]=ssi[ib]+1:ssi[ib+1]
 	end
 

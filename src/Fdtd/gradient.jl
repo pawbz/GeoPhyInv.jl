@@ -114,7 +114,7 @@ function stack_grads!(pac::Paramc, pap::Paramp)
 	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
 
 	# theses are SharedArrays
-	grad_stack=pac.grad_stack
+	gmodtt=pac.grad_modtt_stack
 	gmodrrvx=pac.grad_modrrvx_stack
 	gmodrrvz=pac.grad_modrrvz_stack
 	pass=pap.ss
@@ -122,7 +122,7 @@ function stack_grads!(pac::Paramc, pap::Paramp)
 		gs=pass[issp].grad_modtt
 		gss=view(gs,np+1:nz-np,np+1:nx-np)
 		for i in 1:nznxd
-			grad_stack[i]+=gss[i]  # only update gmodtt
+			gmodtt[i]+=gss[i]  # only update gmodtt
 		end
 		gs=pass[issp].grad_modrrvx
 		gss=view(gs,np+1:nz-np,np+1:nx-np)
@@ -135,19 +135,19 @@ function stack_grads!(pac::Paramc, pap::Paramp)
 			gmodrrvz[i] += gss[i]
 		end
 	end
-	# combine rrvx and rrvz
-	grad_modrr!(pac::Paramc)
-	for i in 1:nznxd
-		grad_stack[nznxd+i]+=pac.grad_modrr_stack[i]  # update gmodrr
-	end
-
 end
 
 function update_gradient!(pac::Paramc)
 	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
-	
-	for i in eachindex(pac.gradient)
-		pac.gradient[i]=pac.grad_stack[i] # parameterization is  [:KI, :ρI, :null]
+
+	# combine rrvx and rrvz
+	grad_modrr!(pac)
+
+	gradient=pac.gradient
+	for i in 1:nznxd
+		# parameterization is  [:KI, :ρI, :null]
+		gradient[i]+=pac.grad_modtt_stack[i]  # update gmodtt
+		gradient[nznxd+i]+=pac.grad_modrr_stack[i]  # update gmodrr
 	end
 
 end
