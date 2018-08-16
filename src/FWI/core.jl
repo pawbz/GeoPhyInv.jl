@@ -144,15 +144,10 @@ function F!(pa::Param, x, ::ModFdtdBorn)
 	# source wavelets (for second wavefield, they are dummy)
 	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
 
-	if(Fdtd.iszero_boundary(pa.paf))
-		# if boundary is not recorded before, record it.. 
-		pa.paf.c.backprop_flag=1 # store boundary values for gradient later
-	else
-		# otherwise, to do faster
-		pa.paf.c.backprop_flag=0 
-	end
+	# actually, should record only when background field is changed
+	pa.paf.c.backprop_flag=1 # store boundary values for gradient later
+
 	pa.paf.c.gmodel_flag=false # no gradient
-	
 
 	Fdtd.mod!(pa.paf);
 	dcal=pa.paf.c.data[2]

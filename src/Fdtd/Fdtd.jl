@@ -413,25 +413,25 @@ function Param(;
 
 	if(born_flag)
 		(npw≠2) && error("born_flag needs npw=2")
-		isapprox(exmodel, exmodel_pert) || error("pertrubed model should be similar to background model")
-		"inverse density contrasts for Born Modelling"
-		modrr_pert = Models.Seismic_get(exmodel_pert, :ρI)
-		δmodrrvx = get_rhovxI(modrr_pert)
-		δmodrrvz = get_rhovzI(modrr_pert)
-		for i in eachindex(δmodrrvx)
-			δmodrrvx[i] -= modrrvx[i]
-			δmodrrvz[i] -= modrrvz[i]
-		end
-
-		"inverse Bulk Modulus contrasts for Born Modelling"
-		δmodtt = Models.Seismic_get(exmodel_pert, :KI)
-		for i in eachindex(δmodtt)
-			δmodtt[i] -= modtt[i]
-		end
-	else
-		δmodtt, δmodrrvx, δmodrrvz = zeros(1,1), zeros(1,1), zeros(1,1)
-		modrr_pert = zeros(1,1)
 	end
+
+	#>>>>>>>>>>>>>### Dont need this, if born inversion is not performed ####
+	isapprox(exmodel, exmodel_pert) || error("pertrubed model should be similar to background model")
+	"inverse density contrasts for Born Modelling"
+	modrr_pert = Models.Seismic_get(exmodel_pert, :ρI)
+	δmodrrvx = get_rhovxI(modrr_pert)
+	δmodrrvz = get_rhovzI(modrr_pert)
+	for i in eachindex(δmodrrvx)
+		δmodrrvx[i] -= modrrvx[i]
+		δmodrrvz[i] -= modrrvz[i]
+	end
+
+	"inverse Bulk Modulus contrasts for Born Modelling"
+	δmodtt = Models.Seismic_get(exmodel_pert, :KI)
+	for i in eachindex(δmodtt)
+		δmodtt[i] -= modtt[i]
+	end
+	#<<<<<<<<<<<<<<<<##############################################################
 
 
 
@@ -557,9 +557,8 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 	Models.Seismic_get!(pac.modrr, pac.exmodel, [:ρI])
 	get_rhovxI!(pac.modrrvx, pac.modrr)
 	get_rhovzI!(pac.modrrvz, pac.modrr)
-	println("Hello")
 
-	if(pac.born_flag && !(model_pert === nothing))
+	if(!(model_pert === nothing))
 		copyto!(pac.model_pert, model_pert)
 		Models.Seismic_pml_pad_trun!(pac.exmodel_pert, pac.model_pert);
 		Models.Seismic_get!(pac.modrr_pert, pac.exmodel_pert, [:ρI])
