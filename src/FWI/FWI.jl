@@ -63,7 +63,7 @@ FWI Parameters
 
 TODO: add an extra attribute for coupling functions inversion and modelling
 """
-mutable struct Param{Tmod, Tattrib_mod, Tdatamisfit}
+mutable struct Param{Tmod, Tdatamisfit}
 	"model inversion variable"
 	mx::Inversion.X{Float64,1}
 	mxm::Inversion.X{Float64,1}
@@ -77,8 +77,6 @@ mutable struct Param{Tmod, Tattrib_mod, Tdatamisfit}
 	acqgeom::Acquisition.Geom
 	"acquisition geometry for adjoint propagation"
 	adjacqgeom::Acquisition.Geom
-	"modeling attribute"
-	attrib_mod::Tattrib_mod
 	"Seismic model on modeling grid"
 	modm::Models.Seismic
 	"background Seismic model"
@@ -247,16 +245,15 @@ function Param(
 	priori=similar(modi)
 	priorw=similar(modi)
 
-	# check initial models
-	if(typeof(attrib_mod) == ModFdtdBorn)
-		(modm0===nothing) && error("need modm0 for Born mod")
-		isequal(modm0, modm_obs) && error("change background model used for Born modelling")
-	else
-		modm0=similar(modm) # some dummy
-		fill!(modm, 0.0)
+	# use default background model modm0
+	if(modm0 === nothing)
+		modm0=deepcopy!(modm) # some dummy
+		fill!(modm0, 0.0)
 	end
+	isequal(modm0, modm_obs) && (@warn "modm0 == modm_obs")
+
 	if(attrib == :synthetic) 
-		isequal(modm, modm_obs) && error("initial model same as actual model")
+		isequal(modm, modm_obs) && error("initial model same as actual model, zero misfit?")
 	end
 
 	# acqgeom geometry for adjoint propagation
@@ -265,16 +262,10 @@ function Param(
 	# generate adjoint sources
 	adjsrc=generate_adjsrc(recv_fields, tgrid, adjacqgeom)
 
-	if(typeof(attrib_mod) == ModFdtd)
-		born_flag=false
-	else
-		born_flag=true
-	end
-
 	# generating forward and adjoint modelling engines
 	# to generate modelled data, border values, etc.
-	# most of the parameters given to this are dummy, except for born_flag
-	paf=Fdtd.Param(npw=2, model=modm, born_flag=born_flag,
+	# most of the parameters given to this are dummy
+	paf=Fdtd.Param(npw=2, model=modm, born_flag=true,
 		acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], 
 		sflags=[3, 2], rflags=[1, 1],
 		backprop_flag=1, 
@@ -323,7 +314,6 @@ function Param(
 	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
-	     attrib_mod,  
 	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,
 	     priori, priorw,
 	     gmodm,gmodi,
@@ -335,26 +325,13 @@ function Param(
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic))
-		# update model in the same forward engine
-		# save modm
-		modm_copy=deepcopy(pa.modm)
-
-		# change model to actual model
-		copyto!(pa.modm, modm_obs)
-
-		F!(pa, nothing, pa.attrib_mod)
-
-		copyto!(pa.paTD.y, pa.paTD.x)
-
-		# put back model and sources
-		copyto!(pa.modm, modm_copy)
-
-	        Fdtd.initialize!(paf.c)  # clear everything
+		update_observed_data!(pa, modm_obs, attrib_mod)
 	end
+
 	iszero(dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
 
 	# generate modelled data
-	F!(pa, nothing, pa.attrib_mod)
+	F!(pa, nothing, attrib_mod)
 
 #	build_mprecon!(pa, Array(pa.paf.c.illum_stack), mprecon_factor)
 	pa.paf.c.illum_flag=false # switch off illum flag for speed
@@ -367,6 +344,32 @@ function Param(
 	
 	return pa
 end
+
+"""
+update the *synthetic* observed data in `Param`
+* allocated memory, don't use in inner loops
+"""
+function update_observed_data!(pa::Param, modm_obs, attrib_mod=ModFdtd())
+	# save modm of pa to put it back later
+	modm_copy=deepcopy(pa.modm)
+
+	# change modm in pa to actual model
+	copyto!(pa.modm, modm_obs)
+
+	# update models in the forward engine and do modelling
+	# ModFdtdBorn: modm0 will be used as a background model for Born modelling and modm will be perturbed model
+	# ModFdtd: modm will be *the* model
+	F!(pa, nothing, attrib_mod)
+
+	# get observed data
+	copyto!(pa.paTD.y, pa.paTD.x)
+
+	# put back model and sources
+	copyto!(pa.modm, modm_copy)
+
+	Fdtd.initialize!(paf.c)  # clear everything
+end
+
 
 
 """

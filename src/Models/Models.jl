@@ -73,6 +73,13 @@ mutable struct Seismic
 		       error("error in Seismic construction") : new(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid,K0,μ0,KI0,μI0,ρI0,ref)
 end
 
+# check whether a seismic model is bounded
+function isbounded(mod::Seismic)
+	@warn "need to be implemented"
+	result=true
+end
+
+# method to create Seismic object without using derived fields
 function Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, mgrid::Grid.M2D)
 	mod=Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, mgrid,
 	    zeros(2), zeros(2), zeros(2), zeros(2), zeros(2),
@@ -80,7 +87,6 @@ function Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, mgrid::Grid.M2D)
 	update_derived!(mod)
 	return mod
 end
-
 
 # update the derived fields of the Seisimc model
 function update_derived!(mod::Seismic)

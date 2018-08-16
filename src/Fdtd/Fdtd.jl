@@ -553,10 +553,12 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model)
 
 	Models.Seismic_get!(pac.modttI, pac.exmodel, [:K]) 
+	Models.Seismic_get!(pac.modtt, pac.exmodel, [:KI]) 
 
 	Models.Seismic_get!(pac.modrr, pac.exmodel, [:ρI])
 	get_rhovxI!(pac.modrrvx, pac.modrr)
 	get_rhovzI!(pac.modrrvz, pac.modrr)
+
 
 	if(!(model_pert === nothing))
 		copyto!(pac.model_pert, model_pert)
@@ -564,12 +566,15 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 		Models.Seismic_get!(pac.modrr_pert, pac.exmodel_pert, [:ρI])
 		get_rhovxI!(pac.δmodrrvx, pac.modrr_pert)
 		get_rhovzI!(pac.δmodrrvz, pac.modrr_pert)
+		# subtract background model to get the constrasts
 		for i in eachindex(pac.δmodrrvx)
 			pac.δmodrrvx[i] -= pac.modrrvx[i]
 			pac.δmodrrvz[i] -= pac.modrrvz[i]
 		end
 
 		Models.Seismic_get!(pac.δmodtt, pac.exmodel_pert, [:KI])
+
+		# subtract background model to get the constrasts
 		for i in eachindex(pac.δmodtt)
 			pac.δmodtt[i] -= pac.modtt[i]
 		end
