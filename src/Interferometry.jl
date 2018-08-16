@@ -1,5 +1,3 @@
-__precompile__()
-
 module Interferometry
 
 using Grid
@@ -51,7 +49,7 @@ function TD_virtual_diff(
 			
 				# the distance between receivers must be greater than 2λdom
 				# here λdom is the central wavelength (Shapiro 2005)
-				if(δrpos > 2.*λdom)
+				if(δrpos > 2.0*λdom)
 
 					# find sources that shoot at these two receivers
 					sson = Acquisition.Geom_find(data.acqgeom; rpos=rpos, rpos0=rpos0)

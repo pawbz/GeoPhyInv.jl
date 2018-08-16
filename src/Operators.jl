@@ -1,6 +1,3 @@
-# blind deconvolution
-__precompile__()
-
 module Operators
 
 

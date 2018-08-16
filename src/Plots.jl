@@ -2,16 +2,13 @@ module Plots
 
 using StatsBase
 using RecipesBase
-using Interpolation
 using Grid
-using Conv
-using ImageFiltering
+using FFTW
+#using ImageFiltering
 import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Models
 
-function dummy_()
-end
 
 @userplot Seismic
 """
@@ -35,6 +32,9 @@ Plot the velocity and density seismic models.
 		   contrast_flag=false,
 		   use_bounds=false,
 		  ) 
+	if(contrast_flag)
+		warn("ImageFiltering bug needs to be fixed")
+	end
 	model=p.args[1]
 
 	nrow = (model.mgrid.nx <= model.mgrid.nz) ? 1 : length(fields)
@@ -43,17 +43,17 @@ Plot the velocity and density seismic models.
 
 	layout --> (nrow,ncol)
 	for (i,iff) in enumerate(fields)
-		name=replace(string(iff), "ρ", "rho")
-		name=replace(name, "χ", "contrast\t")
+		name=replace(string(iff), "ρ" => "rho")
+		name=replace(name, "χ" => "contrast\t")
 
-		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
+		f0 = Symbol((replace("$(fields[i])", "χ" => "")),0)
 		m = Models.Seismic_get(model, iff)
 		mx = model.mgrid.x
 		mz = model.mgrid.z
 		if(contrast_flag)
 			mmin=minimum(m)
 			mmax=maximum(m)
-			m=imfilter(m, Kernel.Laplacian())
+			#m=imfilter(m, Kernel.Laplacian())
 			mmmin=minimum(m)
 			mmmax=maximum(m)
 			for j in eachindex(m)
@@ -176,7 +176,7 @@ and model grid `M2D`.
 			legend --> false
 			markersize --> 7
 			markercolor := :red
-			markershape := :star7
+			markershape := :xcross
 			seriestype := :scatter
 			sx, sz
 		end
@@ -197,7 +197,7 @@ end
 	end
 
 	fgrid= Grid.M1D_rfft(tgrid)
-	powwav = (abs.(rfft(wav, [1])).^2)
+	powwav = (abs.(FFTW.rfft(wav, [1])).^2)
 	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
 
 	@series begin        
@@ -218,7 +218,6 @@ Plot the source wavelet used for acquisition.
 
 * `acqsrc::Acquisition.Src` : source acquisition parameters
 """
-
 @recipe function psrc(p::Src)
 	acqsrc=p.args[1]
 	tgrid=acqsrc.tgrid
@@ -234,7 +233,7 @@ Plot the source wavelet used for acquisition.
 	end
 
 	fgrid= Grid.M1D_rfft(tgrid)
-	powwav = (abs.(rfft(wav, [1])).^2)
+	powwav = (abs.(FFTW.rfft(wav, [1])).^2)
 	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
 	@series begin        
 		subplot := 2

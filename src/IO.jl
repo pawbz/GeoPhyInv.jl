@@ -1,10 +1,8 @@
-__precompile__()
-
 module IO
 
 #import JuMIT.Data
 
-type SegyHeader
+mutable struct SegyHeader
 	tracl::Int32
 	tracr::Int32
 	fldr::Int32
