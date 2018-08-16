@@ -54,17 +54,17 @@ function ζgrad!(storage, x, last_x, pa::Param, ::LS, attrib_mod)
 end
 
 
-function ζfunc(x, last_x, pa::Param, obj::LS_prior)
-	f1=func(x, last_x, pa)
+function ζfunc(x, last_x, pa::Param, obj::LS_prior, attrib_mod)
+	f1=func(x, last_x, pa, attrib_mod)
 
 	f2=Misfits.error_squared_euclidean!(nothing, x, pa.mx.prior, pa.mx.w, norm_flag=false)
 
 	return f1*obj.α[1]+f2*obj.α[2]
 end
 
-function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior)
+function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior, attrib_mod)
 	g1=pa.mx.gm[1]
-	grad!(g1, x, last_x, pa)
+	grad!(g1, x, last_x, pa, attrib_mod)
 
 	g2=pa.mx.gm[2]
 	Misfits.error_squared_euclidean!(g2, x, pa.mx.prior, pa.mx.w, norm_flag=false)
