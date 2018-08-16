@@ -46,7 +46,7 @@ function xfwi_problem(attrib::Symbol; born_flag=false)
 		       igrid=igrid, parameterization=parameterization, verbose=false);
 	end
 
-	return pa
+	return pa, model
 end
 
 

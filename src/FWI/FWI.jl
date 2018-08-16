@@ -247,7 +247,7 @@ function Param(
 
 	# use default background model modm0
 	if(modm0 === nothing)
-		modm0=deepcopy!(modm) # some dummy
+		modm0=deepcopy(modm) # some dummy
 		fill!(modm0, 0.0)
 	end
 	isequal(modm0, modm_obs) && (@warn "modm0 == modm_obs")
@@ -367,7 +367,7 @@ function update_observed_data!(pa::Param, modm_obs, attrib_mod=ModFdtd())
 	# put back model and sources
 	copyto!(pa.modm, modm_copy)
 
-	Fdtd.initialize!(paf.c)  # clear everything
+	Fdtd.initialize!(pa.paf.c)  # clear everything
 end
 
 
