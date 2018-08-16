@@ -557,6 +557,7 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 	Models.Seismic_get!(pac.modrr, pac.exmodel, [:ρI])
 	get_rhovxI!(pac.modrrvx, pac.modrr)
 	get_rhovzI!(pac.modrrvz, pac.modrr)
+	println("Hello")
 
 	if(pac.born_flag && !(model_pert === nothing))
 		copyto!(pac.model_pert, model_pert)

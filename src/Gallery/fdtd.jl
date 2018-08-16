@@ -2,7 +2,7 @@
 
 function fdtd_problem()
 
-	println("DEADDDD YOU AREEyyxxyyQ")
+	println("DEADDDD YOU AREEuO")
 	return Seismic(:acou_homo1)
 
 

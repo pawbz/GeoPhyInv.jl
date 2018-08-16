@@ -111,7 +111,7 @@ version = "1.0.1"
 
 [[Conv]]
 deps = ["BenchmarkTools", "Calculus", "DSP", "FFTW", "LinearAlgebra", "Misfits", "Test"]
-git-tree-sha1 = "034fc28cec13c3025c1817574eb36528fc8e2b20"
+git-tree-sha1 = "9c9c58e8906fb031b7759f0e60ef273f62c4b36e"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Conv.jl.git"
 uuid = "eca63721-1f9a-5e79-b7ed-eda27904149e"
@@ -236,7 +236,7 @@ uuid = "a2bd30eb-e257-5431-a919-1863eab51364"
 version = "0.3.0"
 
 [[Grid]]
-git-tree-sha1 = "0eba45720d17594ed8a9b5910f54fd89d3ddb508"
+git-tree-sha1 = "3bf610eabc038400f8227883bea2589cc6908234"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Grid.jl.git"
 uuid = "03512f2c-8e8a-5728-b518-32bdd82c6646"
@@ -268,7 +268,7 @@ version = "0.7.0"
 
 [[Interpolation]]
 deps = ["BenchmarkTools", "LinearAlgebra", "LinearMaps", "SparseArrays", "Test"]
-git-tree-sha1 = "358a838aea1946dfec7eaec94d65d5906684e4d8"
+git-tree-sha1 = "566e85958a4b2d25c8812911384ba49550c5eb50"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Interpolation.jl.git"
 uuid = "475ca4d2-b0ae-5dbf-b83e-9b10c0db9a39"
@@ -282,7 +282,7 @@ version = "0.2.0"
 
 [[Inversion]]
 deps = ["BenchmarkTools", "Calculus", "DataFrames", "Misfits", "Optim", "Printf", "ProgressMeter", "RecipesBase", "Test", "TimerOutputs"]
-git-tree-sha1 = "00914adc7cbfc497df1acca834b57da69d09135b"
+git-tree-sha1 = "9775963040380941f2edbf01d08c67df5b755c94"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Inversion.jl.git"
 uuid = "0a622ac7-8c5c-5314-a750-ace189c80c19"
@@ -355,7 +355,7 @@ version = "0.7.2"
 
 [[Misfits]]
 deps = ["BenchmarkTools", "Calculus", "Distances", "ForwardDiff", "LinearAlgebra", "StatsBase", "Test"]
-git-tree-sha1 = "cf0c26d8d4140d8d8a4e8842bfeab2d34cb042b8"
+git-tree-sha1 = "e1a4e1cee109e2bfa185b44642c2673d53873ae2"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Misfits.jl.git"
 uuid = "b5bed6b1-4eab-585a-ab29-0604291a8c0e"
@@ -498,11 +498,11 @@ uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 
 [[Signals]]
 deps = ["Conv", "DSP", "DistributedArrays", "Distributions", "FFTW", "Grid", "Interpolation", "Misfits", "Test"]
-git-tree-sha1 = "e6b1f01b921839511feb1b2b018645f0a66246f7"
+git-tree-sha1 = "c6a05f67d3b882b52d376756aaaec0fcf20a8d34"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Signals.jl.git"
 uuid = "6303bc30-01ab-52eb-8b10-60e47555a8d1"
-version = "0.2.2+"
+version = "0.0.0"
 
 [[Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
