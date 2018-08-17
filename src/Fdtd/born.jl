@@ -37,16 +37,16 @@ end
 	for ix=np+1:np+nx
 		@simd for iz=np+1:np+nz
 			born_svalue_stack[iz,ix] += 
-			δt * ((-1.0 * (pppw[iz, ix, 1] + pw[iz, ix,  1] - 2.0 * ppw[iz, ix,  1]) * δmodtt[iz, ix] * δtI * δtI)) 
+			δt * ((-1.0 * (pppw[iz, ix, 1] + pw[iz, ix,  1] - 2.0 * ppw[iz, ix,  1]) * δmodtt[iz-np, ix-np] * δtI * δtI)) 
 		end
 	end
 end
 @inbounds @fastmath function born_stackrrvx!(born_svalue_stack,dpdx,δmodrrvx,nx,nz,np,δx24I,δt)
 	dpdxw=dpdx[1]
-	for ix=np+1:np+nx
+	for ix=np+3:np+nx-1
 		@simd for iz=np+1:np+nz
 			born_svalue_stack[iz,ix] += 
-				δt * ((27.e0*dpdxw[iz,ix,1] * δmodrrvx[iz,ix] -27.e0*dpdxw[iz,ix-1,1] * δmodrrvx[iz,ix-1] -dpdxw[iz,ix+1,1] * δmodrrvx[iz,ix+1] +dpdxw[iz,ix-2,1] * δmodrrvx[iz,ix-2] ) * (δx24I)) 
+				δt * ((27.e0*dpdxw[iz,ix,1] * δmodrrvx[iz-np,ix-np] -27.e0*dpdxw[iz,ix-1,1] * δmodrrvx[iz-np,ix-1-np] -dpdxw[iz,ix+1,1] * δmodrrvx[iz-np,ix+1-np] +dpdxw[iz,ix-2,1] * δmodrrvx[iz-np,ix-2-np] ) * (δx24I)) 
 		end
 	end
 
@@ -54,9 +54,9 @@ end
 @inbounds @fastmath function born_stackrrvz!(born_svalue_stack,dpdz,δmodrrvz,nx,nz,np,δz24I,δt)
 	dpdzw=dpdz[1]
 	for ix=np+1:np+nx
-		@simd for iz=np+1:np+nz
+		@simd for iz=np+3:np+nz-1
 			born_svalue_stack[iz,ix] += 
-				δt * ((27.e0*dpdzw[iz,ix,1] * δmodrrvz[iz,ix] -27.e0*dpdzw[iz-1,ix,1] * δmodrrvz[iz-1,ix] -dpdzw[iz+1,ix,1] * δmodrrvz[iz+1,ix] +dpdzw[iz-2,ix,1] * δmodrrvz[iz-2,ix] ) * (δz24I))  
+				δt * ((27.e0*dpdzw[iz,ix,1] * δmodrrvz[iz-np,ix-np] -27.e0*dpdzw[iz-1,ix,1] * δmodrrvz[iz-1-np,ix-np] -dpdzw[iz+1,ix,1] * δmodrrvz[iz+1-np,ix-np] +dpdzw[iz-2,ix,1] * δmodrrvz[iz-2-np,ix-np] ) * (δz24I))  
 
 		end
 	end

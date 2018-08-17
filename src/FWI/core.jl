@@ -128,16 +128,23 @@ end
 Born modeling with `modm` as the perturbed model and `modm0` as the background model.
 """
 function F!(pa::Param, x, ::ModFdtdBorn)
-	# switch on born scattering
-	pa.paf.c.born_flag=true
 
+	# update background model in the forward engine 
+	Fdtd.update_model!(pa.paf.c, pa.modm0)
 	if(!(x===nothing))
 		# project x, which lives in modi, on to model space (modm)
 		x_to_modm!(pa, x)
 	end
+	# update perturbed models in the forward engine
+	Fdtd.update_δmods!(pa.paf.c, pa.modm)
 
-	# update background and perturbed models in the forward engine
-	Fdtd.update_model!(pa.paf.c, pa.modm0, pa.modm)
+	Fbornmod!(pa::Param)
+end
+
+function Fbornmod!(pa::Param) 
+
+	# switch on born scattering
+	pa.paf.c.born_flag=true
 
 	pa.paf.c.activepw=[1,2] # two wavefields are active
 	pa.paf.c.illum_flag=false 
@@ -208,13 +215,14 @@ function operator_Born(pa)
 		  ismutating=true)
 end
 
-function Fborn_map!(y, x, pa)
-	F!(pa, x, ModFdtdBorn())
-	copyto!(y, pa.paTD.x)
+function Fborn_map!(δy, δx, pa)
+	δx_to_δmods!(pa, δx)
+	Fbornmod!(pa)
+	copyto!(δy, pa.paTD.x)
 end
 
-function Fadj_map!(y, x, pa)
-	copyto!(pa.paTD.dJx, x)
+function Fadj_map!(δy, δx, pa)
+	copyto!(pa.paTD.dJx, δx)
 
 	# adjoint sources
 	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
@@ -223,7 +231,9 @@ function Fadj_map!(y, x, pa)
 	Fadj!(pa)
 
 	# adjoint of interpolation
-	spray_gradient!(y,  pa, ModFdtdBorn())
+	Interpolation.interp_spray!(δy, 
+			     pa.paf.c.gradient, pa.paminterp, :spray, 
+			     count(pa.parameterization.≠:null))
 end
 
 

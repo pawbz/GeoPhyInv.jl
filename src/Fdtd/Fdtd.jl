@@ -59,9 +59,7 @@ mutable struct Paramc
 	npw::Int64 
 	activepw::Vector{Int64}
 	exmodel::Models.Seismic
-	exmodel_pert::Models.Seismic
 	model::Models.Seismic
-	model_pert::Models.Seismic
 	acqgeom::Vector{Acquisition.Geom}
 	acqsrc::Vector{Acquisition.Src}
 	abs_trbl::Vector{Symbol}
@@ -91,15 +89,16 @@ mutable struct Paramc
 	b_z_half::Vector{Float64}
 	k_z_halfI::Vector{Float64}
 	modtt::Matrix{Float64}
-	modttI::Matrix{Float64}
+	modttI::Matrix{Float64} # just storing inv(modtt) for speed
 	modrr::Matrix{Float64}
 	modrrvx::Matrix{Float64}
 	modrrvz::Matrix{Float64}
 	δmodtt::Matrix{Float64}
-	modrr_pert::Matrix{Float64}
+	δmodrr::Matrix{Float64} 
 	δmodrrvx::Matrix{Float64}
 	δmodrrvz::Matrix{Float64}
-	gradient::Vector{Float64}  # output gradient vector
+	δmod::Vector{Float64} # perturbation vector (KI, ρI)
+	gradient::Vector{Float64}  # output gradient vector w.r.t (KI, ρI)
 	grad_modtt_stack::SharedArrays.SharedArray{Float64,2} # contains gmodtt
 	grad_modrrvx_stack::SharedArrays.SharedArray{Float64,2}
 	grad_modrrvz_stack::SharedArrays.SharedArray{Float64,2}
@@ -262,7 +261,6 @@ finite-difference modeling is performed.
 
 * `npw::Int64=1` : number of independently propagating wavefields in `model`
 * `model::Models.Seismic` : seismic medium parameters 
-* `model_pert::Models.Seismic=model` : perturbed model, i.e., model + δmodel, used only for Born modeling 
 * `tgridmod::Grid.M1D=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
 * `tgrid::Grid.M1D=tgridmod` : output records are resampled on this time grid
 * `acqgeom::Vector{Acquisition.Geom}` :  acquisition geometry for each independently propagating wavefield
@@ -315,7 +313,6 @@ function Param(;
 	model::Models.Seismic=nothing,
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
 	born_flag::Bool=false,
-	model_pert::Models.Seismic = model,
 	tgridmod::Grid.M1D=nothing,
 	acqgeom::Vector{Acquisition.Geom}=nothing,
 	acqsrc::Array{Acquisition.Src}=nothing,
@@ -351,7 +348,7 @@ function Param(;
 
 	# all the propagating wavefields should have same supersources? check that?
 
-	# check dimension of model and model_pert
+	# check dimension of model
 
 	# check if all sources are receivers are inside model
 	any(.![Acquisition.Geom_check(acqgeom[ip], model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
@@ -380,8 +377,8 @@ function Param(;
 	freqmax = Signals.DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
 
 	# minimum and maximum velocities
-	vpmin = minimum(broadcast(minimum,[model.vp0, model_pert.vp0]))
-	vpmax = maximum(broadcast(maximum,[model.vp0, model_pert.vp0]))
+	vpmin = minimum(broadcast(minimum,[model.vp0]))
+	vpmax = maximum(broadcast(maximum,[model.vp0]))
 	#verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
 
 
@@ -400,8 +397,6 @@ function Param(;
 
 	# extend models in the PML layers
 	exmodel = Models.Seismic_pml_pad_trun(model);
-	exmodel_pert = Models.Seismic_pml_pad_trun(model_pert);
-
 
 	"density values on vx and vz stagerred grids"
 	modrr=Models.Seismic_get(exmodel, :ρI)
@@ -414,26 +409,6 @@ function Param(;
 	if(born_flag)
 		(npw≠2) && error("born_flag needs npw=2")
 	end
-
-	#>>>>>>>>>>>>>### Dont need this, if born inversion is not performed ####
-	isapprox(exmodel, exmodel_pert) || error("pertrubed model should be similar to background model")
-	"inverse density contrasts for Born Modelling"
-	modrr_pert = Models.Seismic_get(exmodel_pert, :ρI)
-	δmodrrvx = get_rhovxI(modrr_pert)
-	δmodrrvz = get_rhovzI(modrr_pert)
-	for i in eachindex(δmodrrvx)
-		δmodrrvx[i] -= modrrvx[i]
-		δmodrrvz[i] -= modrrvz[i]
-	end
-
-	"inverse Bulk Modulus contrasts for Born Modelling"
-	δmodtt = Models.Seismic_get(exmodel_pert, :KI)
-	for i in eachindex(δmodtt)
-		δmodtt[i] -= modtt[i]
-	end
-	#<<<<<<<<<<<<<<<<##############################################################
-
-
 
 	#create some aliases
 	nx, nz = exmodel.mgrid.nx, exmodel.mgrid.nz
@@ -448,6 +423,14 @@ function Param(;
 	δtI = (δt)^(-1.0)
 	nt=tgridmod.nx
 	mesh_x, mesh_z = exmodel.mgrid.x, exmodel.mgrid.z
+
+
+	# perturbation vectors
+	δmodtt = zeros(nzd, nxd)
+	δmod = zeros(2*nzd*nxd)
+	δmodrr = zeros(nzd, nxd)
+	δmodrrvx = zeros(nzd, nxd)
+	δmodrrvz = zeros(nzd, nxd)
 
 
 	# pml_variables
@@ -472,12 +455,13 @@ function Param(;
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
 	pac=Paramc(jobname,npw,activepw,
-	    exmodel,exmodel_pert,model,model_pert,
+	    exmodel,model,
 	    acqgeom,acqsrc,abs_trbl,isfields,sflags,
 	    irfields,rflags,δt,δxI,δzI,
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modtt, modttI,modrr,modrrvx,modrrvz,
-	    δmodtt,modrr_pert,δmodrrvx,δmodrrvz,
+	    δmodtt,δmodrr,δmodrrvx,δmodrrvz,
+	    δmod,
 	    gradient,
 	    grad_modtt_stack,
 	    grad_modrrvx_stack,
@@ -510,7 +494,6 @@ function Param(;
 	return Param(papa, pac)
 end
 
-
 """
 Create modeling parameters for each worker.
 Each worker performs the modeling of supersources in `sschunks`.
@@ -542,11 +525,53 @@ function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 	return pap
 end
 
+
 """
-Update the `Seismic` models in `Paramc` without additional memory allocation.
+update the perturbation vector using the perturbed model
+in this case, model will be treated as the background model 
+* `δmod` is [δKI, δρI]
+"""
+function update_δmods!(pac::Paramc, δmod::Vector{Float64})
+	nznxd=pac.model.mgrid.nz*pac.model.mgrid.nx
+	copyto!(pac.δmod, δmod)
+	for i in 1:nznxd
+		# put perturbation due to KI as it is
+		pac.δmodtt[i] =  δmod[i] 
+	end
+	for i in 1:nznxd
+		# put perturbation due to ρI here
+		pac.δmodrr[i] =  δmod[nznxd+i]
+	end
+
+	# project δmodrr onto the vz and vx grids
+	get_rhovxI!(pac.δmodrrvx, pac.δmodrr)
+	get_rhovzI!(pac.δmodrrvz, pac.δmodrr)
+	return nothing
+end
+
+"""
+This method should be executed only after the updating the main model.
+Update the `δmods` when a perturbed `model_pert` is input.
+The model through which the waves are propagating 
+is assumed to be the background model.
+"""
+function update_δmods!(pac::Paramc, model_pert::Models.Seismic)
+	nznxd=pac.model.mgrid.nz*pac.model.mgrid.nx
+	Models.Seismic_get!(pac.δmod, model_pert, [:KI, :ρI])
+
+	for i in 1:nznxd
+		pac.δmod[i] -= pac.modtt[i] # subtracting the background model
+		pac.δmod[nznxd+i] -= pac.modrr[i] # subtracting the background model
+	end
+	update_δmods!(pac, pac.δmod)
+	return nothing
+end
+
+"""
+Update the `Seismic` model in `Paramc` without additional memory allocation.
 This routine is used during FWI, where medium parameters are itertively updated. 
 """
-function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
+function update_model!(pac::Paramc, model::Models.Seismic)
 
 	copyto!(pac.model, model)
 
@@ -554,31 +579,10 @@ function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
 
 	Models.Seismic_get!(pac.modttI, pac.exmodel, [:K]) 
 	Models.Seismic_get!(pac.modtt, pac.exmodel, [:KI]) 
-
 	Models.Seismic_get!(pac.modrr, pac.exmodel, [:ρI])
 	get_rhovxI!(pac.modrrvx, pac.modrr)
 	get_rhovzI!(pac.modrrvz, pac.modrr)
-
-
-	if(!(model_pert === nothing))
-		copyto!(pac.model_pert, model_pert)
-		Models.Seismic_pml_pad_trun!(pac.exmodel_pert, pac.model_pert);
-		Models.Seismic_get!(pac.modrr_pert, pac.exmodel_pert, [:ρI])
-		get_rhovxI!(pac.δmodrrvx, pac.modrr_pert)
-		get_rhovzI!(pac.δmodrrvz, pac.modrr_pert)
-		# subtract background model to get the constrasts
-		for i in eachindex(pac.δmodrrvx)
-			pac.δmodrrvx[i] -= pac.modrrvx[i]
-			pac.δmodrrvz[i] -= pac.modrrvz[i]
-		end
-
-		Models.Seismic_get!(pac.δmodtt, pac.exmodel_pert, [:KI])
-
-		# subtract background model to get the constrasts
-		for i in eachindex(pac.δmodtt)
-			pac.δmodtt[i] -= pac.modtt[i]
-		end
-	end
+	return nothing
 end 
 
 function update_acqsrc!(pa::Param, acqsrc::Vector{Acquisition.Src}, sflags=nothing)

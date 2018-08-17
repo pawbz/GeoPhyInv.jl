@@ -432,6 +432,16 @@ function x_to_modm!(pa, x)
 	Models.Seismic_reparameterize!(pa.modm,pa.mxm.x,pa.parameterization) 
 end
 
+
+function δx_to_δmods!(pa, δx)
+
+	# get x on dense grid
+	Interpolation.interp_spray!(δx, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
+
+	# only implemented for [:KI, :ρI] at the moment
+	Fdtd.update_δmods!(pa.paf.c, pa.mxm.x)
+end
+
 """
 convert the gradient output from Fdtd to gx
 """
