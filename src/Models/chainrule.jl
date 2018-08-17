@@ -33,7 +33,7 @@ function gradient_chainrule!(gout, g, mod, parameterization)
 		@inbounds for i in 1:nznx
 			gout[i]= χg(grad_of_vp(g[i], vp[i], ρ[i]), mod.ref.vp,1)
 		end
-	elseif(parameterization == [:χnull, :χρ, :null]) 
+	elseif(parameterization == [:null, :χρ, :null]) 
 		@inbounds for i in 1:nznx
 			gout[i]=χg(grad_of_ρ(g[i],g[nznx+i],vp[i],ρ[i]), mod.ref.ρ,1)
 		end

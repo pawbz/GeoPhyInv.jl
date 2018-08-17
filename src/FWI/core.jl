@@ -216,6 +216,7 @@ function operator_Born(pa)
 end
 
 function Fborn_map!(δy, δx, pa)
+	#Models.linear_reparameterize!(pa.paf.c.δmod, δx, pa.parameterization)
 	δx_to_δmods!(pa, δx)
 	Fbornmod!(pa)
 	copyto!(δy, pa.paTD.x)

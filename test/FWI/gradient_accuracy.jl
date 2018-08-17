@@ -29,9 +29,9 @@ tgrid=acqsrc.tgrid
 				     parameterization=[:χvp, :χρ, :null],   verbose=false,
 				     nworker=nothing)
 
-		result=JF.xfwi!(pa, JF.Migr())
+		result=JF.xfwi!(pa, JF.Migr(), attrib_mod)
 
-		result_parallel=JF.xfwi!(pa_parallel, JF.Migr())
+		result_parallel=JF.xfwi!(pa_parallel, JF.Migr(), attrib_mod)
 
 		@test result[2] ≈ result_parallel[2]
 	end
@@ -42,17 +42,17 @@ end
 	pa=JF.Param(acqsrc, acqgeom, tgrid, JF.ModFdtd(), model0, 
 			     modm_obs=model,  
 			     igrid_interp_scheme=:B2,    
-			     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
+			     igrid=Grid.M2D_resamp(model.mgrid, 350.,350.,),     
 			     parameterization=[:χvp, :χρ, :null],   verbose=false)
 
-	JF.xfwi!(pa, JF.LS(),  bounded_flag=true, solver=:ipopt,
+	JF.xfwi!(pa, JF.LS(), JF.ModFdtd(),  bounded_flag=true, solver=:ipopt,
 			ipopt_options=[["max_iter", 0],["derivative_test", "first-order"]])
 
 
-	result=JF.xfwi!(pa, JF.Migr())
+	result=JF.xfwi!(pa, JF.Migr(), JF.ModFdtd())
 
 	pa_fd=deepcopy(pa);
-	result_fd=JF.xfwi!(pa_fd, JF.Migr_fd())
+	result_fd=JF.xfwi!(pa_fd, JF.Migr_fd(), JF.ModFdtd())
 
 	f=Misfits.error_squared_euclidean!(nothing, result[2], result_fd[2], nothing, norm_flag=true)
 
@@ -66,17 +66,17 @@ end
 	     		     modm0=model0,
 			     modm_obs=model,  
 			     igrid_interp_scheme=:B2,    
-			     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
+			     igrid=Grid.M2D_resamp(model.mgrid, 350.,350.,),     
 			     parameterization=[:χvp, :χρ, :null],   verbose=false)
 
 
-	JF.xfwi!(pa, JF.LS(),  bounded_flag=true, solver=:ipopt,
+	JF.xfwi!(pa, JF.LS(), JF.ModFdtdBorn(),  bounded_flag=true, solver=:ipopt,
 			ipopt_options=[["max_iter", 0],["derivative_test", "first-order"]])
 
-	result=JF.xfwi!(pa, JF.Migr())
+	result=JF.xfwi!(pa, JF.Migr(), JF.ModFdtdBorn())
 
 	pa_fd=deepcopy(pa);
-	result_fd=JF.xfwi!(pa_fd, JF.Migr_fd())
+	result_fd=JF.xfwi!(pa_fd, JF.Migr_fd(), JF.ModFdtdBorn())
 
 	f=Misfits.error_squared_euclidean!(nothing, result[2], result_fd[2], nothing, norm_flag=true)
 
