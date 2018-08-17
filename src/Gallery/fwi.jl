@@ -25,7 +25,7 @@ function xfwi_problem(attrib::Symbol; born_flag=false)
 		tgrid=acqsrc.tgrid 
 		println("FFFwececwwe")
 		igrid=Grid.M2D_resamp(model.mgrid, 50.,50.,)
-		parameterization=[:χvp, :χρ, :null]
+		parameterization=[:χKI, :χρI, :null]
 		igrid_interp_scheme=:B2
 	else
 		error("invalid attrib")
