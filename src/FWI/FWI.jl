@@ -434,12 +434,14 @@ end
 
 
 function δx_to_δmods!(pa, δx)
-
 	# get x on dense grid
 	Interpolation.interp_spray!(δx, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
 
-	# only implemented for [:KI, :ρI] at the moment
-	Fdtd.update_δmods!(pa.paf.c, pa.mxm.x)
+	# reparameterize accordingly to get [δKI, δρI]
+	Models.pert_reparameterize!(pa.paf.c.δmod, pa.mxm.x, pa.modm0, pa.parameterization)
+
+	# input [δKI, δρI] to the modeling engine
+	Fdtd.update_δmods!(pa.paf.c, pa.paf.c.δmod)
 end
 
 """

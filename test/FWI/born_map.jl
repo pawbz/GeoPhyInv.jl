@@ -1,16 +1,11 @@
 
-pa, mod=JG.xfwi_problem(:pizza, born_flag=true)
+pa, model=JG.xfwi_problem(:pizza, born_flag=true)
 
 
 F=JF.operator_Born(pa);
 
-fac=1e-1
-x1=randn(size(F,2)) .* fac
-#fill!(x1,0.0)
-#x1[10]=fac
-x2=randn(size(F,2)) .* fac
-#fill!(x2,0.0)
-#x2[220]=-1.*fac
+x1=randn(size(F,2)) 
+x2=randn(size(F,2)) 
 x12=x1.+x2
 
 
@@ -23,13 +18,27 @@ d2=F*x2
 
 d12new=d1.+d2
 
-
 f=Misfits.error_squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)
-println(d12-d1-d2)
 
-println(f)
+@test f<1e-30
 
 
+function adjtest()
+	x=randn(size(F,2))
+	y=randn(size(F,1))
+	a=LinearAlgebra.dot(y,F*x)
+	b=LinearAlgebra.dot(x,adjoint(F)*y)
+	c=LinearAlgebra.dot(x, transpose(F)*F*x)
+	println("adjoint test: ", a, "\t", b)       
+	@test isapprox(a,b,rtol=1e-6)
+	println("must be positive: ", c)
+	@test c>0.0
+end
+
+
+for i in 1:5
+	adjtest()
+end
 
 
 

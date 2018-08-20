@@ -35,7 +35,7 @@ function gradient_chainrule!(gout, g, mod, parameterization)
 		end
 	elseif(parameterization == [:null, :χρ, :null]) 
 		@inbounds for i in 1:nznx
-			gout[i]=χg(grad_of_ρ(g[i],g[nznx+i],vp[i],ρ[i]), mod.ref.ρ,1)
+			gout[i]=χg(grad_of_ρ(g[i],vp[i],ρ[i]), mod.ref.ρ,1)
 		end
 	end
 
@@ -47,8 +47,44 @@ end
 
 
 
-grad_of_vp(gKI, vp, ρ) = -2. * gKI * inv(vp*vp*vp*ρ)
-grad_of_ρ(gKI, gρI, vp, ρ) = -1. * inv(abs2(ρ)) * (inv(vp*vp)*gKI + gρI) 
+grad_of_vp(gKI, vp, ρ) = -2.0 * gKI * inv(vp*vp*vp*ρ)
+grad_of_ρ(gKI, gρI, vp, ρ) = -1.0 * inv(abs2(ρ)) * (inv(vp*vp)*gKI + gρI) 
+grad_of_ρ(gρI, vp, ρ) = -1.0 * inv(abs2(ρ)) * (gρI) 
+
+"""
+No different from the previous case, but...
+"""
+function pert_gradient_chainrule!(gout, g, mod, parameterization)
+	nznx=mod.mgrid.nz*mod.mgrid.nx
+	(length(gout)≠(count(parameterization.≠ :null)*nznx)) &&  error("size x")
+	fill!(gout, 0.0)
+	if(parameterization == [:χKI, :χρI, :null]) 
+		@inbounds for i in 1:nznx
+			gout[i]=g[i]*mod.ref.KI
+			gout[nznx+i]=g[nznx+i]*mod.ref.ρI
+		end
+	elseif(parameterization == [:χKI, :null, :null]) 
+		@inbounds for i in 1:nznx
+			gout[i]=χg(g[i],mod.ref.KI,1)
+		end
+	elseif(parameterization == [:χvp, :χρ, :null]) 
+		@inbounds for i in 1:nznx
+			# derivative w.r.t vp
+			gout[i]= -2.0*mod.ref.KI*g[i]
+			# derivative w.r.t. ρ
+			gout[nznx+i]=-1.0*mod.ref.KI*g[i]-1.0*mod.ref.ρI*g[nznx+i]
+		end
+	elseif(parameterization == [:χvp, :null, :null]) 
+		@inbounds for i in 1:nznx
+			gout[i]=-2.0*mod.ref.KI*g[i]
+		end
+	elseif(parameterization == [:null, :χρ, :null]) 
+		@inbounds for i in 1:nznx
+			gout[i]=-1.0*mod.ref.ρI*g[i]
+		end
+	end
+end
+
 
 
 

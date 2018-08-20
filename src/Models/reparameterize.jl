@@ -51,35 +51,38 @@ end
 
 
 """
-Input perturbations corresponding to parameterization.
-Output perturbations of KI and rhoI.
+Input perturbations corresponding to `parameterization`.
+Output perturbations of KI and rhoI, i.e., without the contrast.
+`mod` is just used for reference values.
 """
-function linear_reparameterize!(xout, x, parameterization)
-	nznx = div(length(xout), 2)
-
-	fill!(xout, 0.0)
+function pert_reparameterize!(δxout, δx, mod, parameterization)
+	nznx=mod.mgrid.nz*mod.mgrid.nx
+	fill!(δxout, 0.0)
 	if(parameterization == [:χKI, :χρI, :null]) 
 		@inbounds for i in 1:nznx
-			xout[i]=x[i]
-			xout[nznx+i]=x[nznx+i]
+			δxout[i]=δx[i]*mod.ref.KI
+			δxout[nznx+i]=δx[nznx+i]*mod.ref.ρI
 		end
 	elseif(parameterization == [:χKI, :null, :null]) 
 		@inbounds for i in 1:nznx
-			xout[i]=x[i]
+			δxout[i]=δx[i]*mod.ref.KI
 		end
 	elseif(parameterization == [:χvp, :χρ, :null]) 
 		@inbounds for i in 1:nznx
-			xout[i]=-1.0*x[nznx+i]-2.0*x[i]
-			xout[nznx+i]=-1.0*x[nznx+i]
+			δxout[i]=(-1.0*δx[nznx+i]-2.0*δx[i])*mod.ref.KI
+			δxout[nznx+i]=(-1.0*δx[nznx+i])*mod.ref.ρI
 		end
 	elseif(parameterization == [:χvp, :null, :null]) 
 		@inbounds for i in 1:nznx
-			xout[i]=-2.0*x[i]
+			δxout[i]=-2.0*δx[i]*mod.ref.KI
 		end
 	elseif(parameterization == [:null, :χρ, :null]) 
 		@inbounds for i in 1:nznx
-			xout[i]=-1.0*x[i]
+			δxout[i]=-1.0*δx[i]*mod.ref.ρI
 		end
 	end
 end
 
+
+#pert_of_KI(dvp, dρ, vp0, ρ0) = - 2. / (ρ0 * vp0^3) * dvp - 1 / (ρ0^2 * vp0^2) * dρ
+#pert_of_ρI(dρ, vp0, ρ0) = -1. / (ρ0^2) * dρ

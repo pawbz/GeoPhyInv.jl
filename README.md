@@ -3,7 +3,8 @@
 ## Installation
 Install this package using:
 ```julia
-Pkg.clone("https://github.com/pawbz/JuMIT.jl.git")
+using Pkg
+Pkg.add("https://github.com/pawbz/JuMIT.jl.git")
 ```
 
 ## Tutorials
@@ -16,7 +17,8 @@ Online documentation of various modules of this package can be found
 [here](https://pawbz.github.io/JuMIT.jl/).
 
 
-##  Constrained inversion
+## Credits
+* Thanks to Charles Clerget [@chclerget](https://github.com/chclerget) for testing a few methods of this package.
 
 
 

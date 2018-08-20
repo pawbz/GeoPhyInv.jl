@@ -216,7 +216,6 @@ function operator_Born(pa)
 end
 
 function Fborn_map!(δy, δx, pa)
-	#Models.linear_reparameterize!(pa.paf.c.δmod, δx, pa.parameterization)
 	δx_to_δmods!(pa, δx)
 	Fbornmod!(pa)
 	copyto!(δy, pa.paTD.x)
@@ -231,9 +230,12 @@ function Fadj_map!(δy, δx, pa)
 	# adjoint simulation
 	Fadj!(pa)
 
-	# adjoint of interpolation
+	# chain rule corresponding to reparameterization
+	Models.pert_gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm0, pa.parameterization)
+
+	# finally, adjoint of interpolation
 	Interpolation.interp_spray!(δy, 
-			     pa.paf.c.gradient, pa.paminterp, :spray, 
+			     pa.mxm.gx, pa.paminterp, :spray, 
 			     count(pa.parameterization.≠:null))
 end
 

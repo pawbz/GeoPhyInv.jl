@@ -23,9 +23,8 @@ function xfwi_problem(attrib::Symbol; born_flag=false)
 
 		acqsrc=Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=3)
 		tgrid=acqsrc.tgrid 
-		println("FFFwececwwe")
 		igrid=Grid.M2D_resamp(model.mgrid, 50.,50.,)
-		parameterization=[:χKI, :χρI, :null]
+		parameterization=[:χvp, :null, :null]
 		igrid_interp_scheme=:B2
 	else
 		error("invalid attrib")
