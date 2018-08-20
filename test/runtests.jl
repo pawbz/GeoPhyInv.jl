@@ -34,7 +34,7 @@ end
 
 
 folder="FWI"
-for t in ["gradient_accuracy, born_map"]
+for t in ["gradient_accuracy", "born_map"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end
