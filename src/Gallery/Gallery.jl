@@ -17,16 +17,16 @@ Gallery of `M2D` grids.
 * `attrib::Symbol` : 
 
 # Outputs
-* `attrib=:acou_homo1` : a square grid for with 201 samples in each dimension, with 50 PML 
+* `attrib=:acou_homo1` : a square grid for with 201 samples in each dimension 
 		points; both X and Z vary from -1000 to 1000.
-* `attrib=:acou_homo2` : a square grid for with 51 samples in each dimension, with 50 PML 
+* `attrib=:acou_homo2` : a square grid for with 51 samples in each dimension 
 		points; both X and Z vary from -1000 to 1000. 
 """
 function M2D(attrib::Symbol)
 	if(attrib == :acou_homo1)
-		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,201,201,50)
+		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,201,201)
 	elseif(attrib == :acou_homo2)
-		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,51,51,50)
+		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,51,51)
 	else
 		error("invalid attrib")
 	end

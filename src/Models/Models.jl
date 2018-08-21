@@ -7,6 +7,8 @@ using Grid
 using Interpolation
 using Statistics
 using LinearAlgebra
+using Distributions
+using Random
 #using ImageFiltering
 import JuMIT.Smooth
 
@@ -511,7 +513,8 @@ the input bounds cannot be strictly imposed.
 """
 function Seismic_trun(mod::Seismic;
 			 zmin::Float64=mod.mgrid.z[1], zmax::Float64=mod.mgrid.z[end],
-			 xmin::Float64=mod.mgrid.x[1], xmax::Float64=mod.mgrid.x[end] 
+			 xmin::Float64=mod.mgrid.x[1], xmax::Float64=mod.mgrid.x[end],
+			 npml
 			 )
 
 	izmin = Interpolation.indminn(mod.mgrid.z, zmin, 1)[1]
@@ -521,7 +524,6 @@ function Seismic_trun(mod::Seismic;
 
 	x = mod.mgrid.x[ixmin:ixmax]
 	z = mod.mgrid.z[izmin:izmax]
-	npml =  mod.mgrid.npml
 	δx, δz = mod.mgrid.δx, mod.mgrid.δz
 
 	mgrid_trun = Grid.M2D(x, z, length(x), length(z), npml, δx, δz)
@@ -542,24 +544,26 @@ end
 """
 Extend a seismic model into PML layers
 """
-function Seismic_pml_pad_trun(mod::Seismic)
-	modex=Seismic_zeros(Grid.M2D_pml_pad_trun(mod.mgrid))
+function Seismic_pml_pad_trun(mod::Seismic, nlayer_rand, npml)
+	modex=Seismic_zeros(Grid.M2D_pml_pad_trun(mod.mgrid,npml=npml))
 	adjust_bounds!(modex,mod)
-	Seismic_pml_pad_trun!(modex, mod)
+	Seismic_pml_pad_trun!(modex, mod, nlayer_rand)
 
 	return modex
 end
 
 "only padding implemented"
-function Seismic_pml_pad_trun!(modex::Seismic, mod::Seismic)
+function Seismic_pml_pad_trun!(modex::Seismic, mod::Seismic, nlayer_rand)
 	vp=mod.χvp; χ!(vp,mod.ref.vp,-1)
 	vs=mod.χvs; χ!(vs,mod.ref.vs,-1)
 	ρ=mod.χρ; χ!(ρ,mod.ref.ρ,-1)
 
 	vpex=modex.χvp; vsex=modex.χvs; ρex=modex.χρ;
-	pml_pad_trun!(vpex,vp,1);	pml_pad_trun!(vsex,vs,1);	pml_pad_trun!(ρex,ρ,1)
-	χ!(vpex,modex.ref.vp,1);	χ!(vsex,modex.ref.vs,1);	χ!(ρex,modex.ref.ρ,1)
-	χ!(vp,mod.ref.vp,1);	χ!(vs,mod.ref.vs,1);	χ!(ρ,mod.ref.ρ,1)
+	pml_pad_trun!(vpex,vp,mod.vp0,nlayer_rand,50.0);	
+	pml_pad_trun!(vsex,vs,[1,2],nlayer_rand,0.0);	
+	pml_pad_trun!(ρex,ρ,mod.ρ0,nlayer_rand,0.0)
+	χ!(vpex,modex.ref.vp,1); χ!(vsex,modex.ref.vs,1); χ!(ρex,modex.ref.ρ,1)
+	χ!(vp,mod.ref.vp,1); χ!(vs,mod.ref.vs,1); χ!(ρ,mod.ref.ρ,1)
 end
 
 function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
@@ -579,37 +583,85 @@ end
 """
 PML Extend a model on all four sides
 """
-function pml_pad_trun!(modex::Array{Float64,2}, mod::Array{Float64,2}, flag::Int64=1)
+function pml_pad_trun!(modex::Array{Float64,2}, mod::Array{Float64,2}, bounds, nlayer_rand, var_fact=1.)
 	np=(size(modex,1)-size(mod,1) == size(modex,2)-size(mod,2)) ? 
 			div(size(modex,2)-size(mod,2),2) : error("modex size")
-	if(isequal(flag,1)) 
-		nz = size(mod,1); nx = size(mod,2)
-		modexc=view(modex,np+1:np+nz,np+1:np+nx)
-		@. modexc = mod
-		for ix in 1:size(modex,2)
-			for iz in 1:np
-				modex[iz,ix] = modex[np+1,ix]
-			end
-			for iz in nz+1+np:size(modex,1)
-				modex[iz,ix] = modex[nz+np,ix];
-			end
+	nz = size(mod,1); nx = size(mod,2)
+	#=
+	# first fill with random numbers
+	Random.seed!(1)
+	#for i in eachindex(modex)
+	#	modex[i]=rand(Distributions.Uniform(bounds...))
+	#end
+	# experiments with random boundary conditions
+	sample = v->rand(Distributions.Truncated(Distributions.Normal(mean(bounds),v),bounds[1],bounds[2]))
+	for ix in 1+np:np+nx
+		for iz in 1:np
+			v=var_fact*(np-iz)/np+1e-5
+			modex[iz,ix] = sample(v)
 		end
-		for iz in 1:size(modex,1)
-			for ix in 1:np
-				modex[iz,ix] = modex[iz,np+1]
-			end
-			for ix in nx+1+np:size(modex,2)
-				modex[iz,ix] = modex[iz,nx+np]
-			end
+		for iz in nz+1+np:size(modex,1)
+			v=var_fact*(iz-np-nz-1)/np+1e-5
+			modex[iz,ix] = sample(v)
 		end
-		return modex
-	elseif(isequal(flag,-1)) 
-		nz = size(modex,1); nx = size(modex,2)
-		modexc=view(modex,np+1:nz-np,np+1:nx-np)
-		@. mod=modexc
-	else
-		error("invalid flag")
 	end
+	for iz in 1+np:np+nz
+		for ix in 1:np
+			v=var_fact*(np-ix)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+		for ix in nx+1+np:size(modex,2)
+			v=var_fact*(ix-np-nz-1)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+	end
+
+	for ix in 1:np
+		for iz in 1:np
+			v=var_fact*sqrt((np-iz)^2+(np-ix)^2)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+		for iz in nz+1+np:size(modex,1)
+			v=var_fact*sqrt((iz-np-nz-1)^2+(np-ix)^2)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+	end
+	for ix in np+nx+1:size(modex,1)
+		for iz in 1:np
+			v=var_fact*sqrt((np-iz)^2+(ix-np-nx-1)^2)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+		for iz in nz+1+np:size(modex,1)
+			v=var_fact*sqrt((iz-np-nz-1)^2+(ix-np-nx-1)^2)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+	end
+
+	=#
+	for ix in 1:nx
+		for iz in 1:nz
+			modex[np+iz,np+ix]=mod[iz,ix]
+		end
+	end
+
+	# flood borders
+	for ix in 1:size(modex,2)
+		for iz in 1:np-nlayer_rand
+			modex[iz,ix] = modex[np+1-nlayer_rand,ix]
+		end
+		for iz in nz+1+np+nlayer_rand:size(modex,1)
+			modex[iz,ix] = modex[nz+np+nlayer_rand,ix];
+		end
+	end
+	for iz in 1:size(modex,1)
+		for ix in 1:np-nlayer_rand
+			modex[iz,ix] = modex[iz,np+1-nlayer_rand]
+		end
+		for ix in nx+1+np+nlayer_rand:size(modex,2)
+			modex[iz,ix] = modex[iz,nx+np+nlayer_rand]
+		end
+	end
+	return modex
 end
 
 

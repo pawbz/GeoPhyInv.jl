@@ -17,6 +17,7 @@ using Printf
 
 global const to = TimerOutput(); # create a timer object
 global const npml = 50
+global const nlayer_rand = 0
 
 #As forward modeling method, the 
 #finite-difference method is employed. 
@@ -102,7 +103,7 @@ mutable struct Paramc
 	grad_modtt_stack::SharedArrays.SharedArray{Float64,2} # contains gmodtt
 	grad_modrrvx_stack::SharedArrays.SharedArray{Float64,2}
 	grad_modrrvz_stack::SharedArrays.SharedArray{Float64,2}
-	grad_modrr_stack::SharedArrays.SharedArray{Float64,2}
+	grad_modrr_stack::Array{Float64,2}
 	illum_flag::Bool
 	illum_stack::SharedArrays.SharedArray{Float64,2}
 	backprop_flag::Int64
@@ -329,7 +330,6 @@ function Param(;
 
 	#println("********PML Removed*************")
 	#abs_trbl=[:null]
-	
 
 	# check sizes and errors based on input
 	#(length(TDout) ≠ length(findn(rflags))) && error("TDout dimension")
@@ -396,7 +396,7 @@ function Param(;
 	isx0, isz0=npml, npml
 
 	# extend models in the PML layers
-	exmodel = Models.Seismic_pml_pad_trun(model);
+	exmodel = Models.Seismic_pml_pad_trun(model, nlayer_rand, npml);
 
 	"density values on vx and vz stagerred grids"
 	modrr=Models.Seismic_get(exmodel, :ρI)
@@ -425,25 +425,26 @@ function Param(;
 	mesh_x, mesh_z = exmodel.mgrid.x, exmodel.mgrid.z
 
 
-	# perturbation vectors
-	δmodtt = zeros(nzd, nxd)
+	# perturbation vectors are required on full space
+	δmodtt = zeros(nz, nx)
 	δmod = zeros(2*nzd*nxd)
-	δmodrr = zeros(nzd, nxd)
-	δmodrrvx = zeros(nzd, nxd)
-	δmodrrvz = zeros(nzd, nxd)
+	δmodrr = zeros(nz, nx)
+	δmodrrvx = zeros(nz, nx)
+	δmodrrvz = zeros(nz, nx)
 
 
 	# pml_variables
-	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, npml-5, vpmax, vpmin, freqmin, freqmax, 
+	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, npml-3, vpmax, vpmin, freqmin, freqmax, 
 							       [any(abs_trbl .== :left), any(abs_trbl .== :right)])
-	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, npml-5, vpmax, vpmin, freqmin, freqmax,
+	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, npml-3, vpmax, vpmin, freqmin, freqmax,
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
 	gradient=zeros(2*nzd*nxd)
-	grad_modtt_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
-	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
-	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
-	grad_modrr_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
+	grad_modtt_stack=SharedMatrix{Float64}(zeros(nz,nx))
+	# these are full size, as rhoI -> rhovx and rhovz is also full size
+	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nz,nx))
+	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nz,nx))
+	grad_modrr_stack=zeros(nz,nx)
 	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
 	itsnaps = [argmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
@@ -532,17 +533,21 @@ in this case, model will be treated as the background model
 * `δmod` is [δKI, δρI]
 """
 function update_δmods!(pac::Paramc, δmod::Vector{Float64})
+	nx=pac.nx; nz=pac.nz
 	nznxd=pac.model.mgrid.nz*pac.model.mgrid.nx
 	copyto!(pac.δmod, δmod)
+	fill!(pac.δmodtt,0.0)
+	δmodtt=view(pac.δmodtt,npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
 		# put perturbation due to KI as it is
-		pac.δmodtt[i] =  δmod[i] 
+		δmodtt[i] = δmod[i] 
 	end
+	fill!(pac.δmodrr,0.0)
+	δmodrr=view(pac.δmodrr,npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
 		# put perturbation due to ρI here
-		pac.δmodrr[i] =  δmod[nznxd+i]
+		δmodrr[i] = δmod[nznxd+i]
 	end
-
 	# project δmodrr onto the vz and vx grids
 	get_rhovxI!(pac.δmodrrvx, pac.δmodrr)
 	get_rhovzI!(pac.δmodrrvz, pac.δmodrr)
@@ -557,6 +562,7 @@ is assumed to be the background model.
 """
 function update_δmods!(pac::Paramc, model_pert::Models.Seismic)
 	nznxd=pac.model.mgrid.nz*pac.model.mgrid.nx
+	fill!(pac.δmod,0.0)
 	Models.Seismic_get!(pac.δmod, model_pert, [:KI, :ρI])
 
 	for i in 1:nznxd
@@ -575,7 +581,7 @@ function update_model!(pac::Paramc, model::Models.Seismic)
 
 	copyto!(pac.model, model)
 
-	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model)
+	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model, nlayer_rand)
 
 	Models.Seismic_get!(pac.modttI, pac.exmodel, [:K]) 
 	Models.Seismic_get!(pac.modtt, pac.exmodel, [:KI]) 
@@ -854,13 +860,12 @@ end
 	#		       tgridmod, acqgeom[1]) for iprop in 1:npw]
 
 function stack_illums!(pac::Paramc, pap::Paramp)
-	np=pac.model.mgrid.npml
 	nx, nz=pac.nx, pac.nz
 	illums=pac.illum_stack
 	pass=pap.ss
 	for issp in 1:length(pass)
 		gs=pass[issp].illum
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
+		gss=view(gs,npml+1:nz-npml,npml+1:nx-npml)
 		@. illums += gss
 	end
 end

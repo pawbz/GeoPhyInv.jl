@@ -229,7 +229,7 @@ function Param(
 		min(igrid.x[end],mg.x[end-2]),
 		max(igrid.z[1],mg.z[3]),
 		min(igrid.z[end],mg.z[end-2]),
-		 		igrid.nx,igrid.nz,igrid.npml)
+		 		igrid.nx,igrid.nz)
 
 
 	# create modi according to igrid and interpolation of modm

@@ -74,10 +74,6 @@ function grad_modrr!(pac::Paramc)
 end
 
 function stack_grads!(pac::Paramc, pap::Paramp)
-	np=pac.model.mgrid.npml # to truncate the gradients in PML region
-	nx, nz=pac.nx, pac.nz
-	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
-
 	# theses are SharedArrays
 	gmodtt=pac.grad_modtt_stack
 	gmodrrvx=pac.grad_modrrvx_stack
@@ -85,34 +81,35 @@ function stack_grads!(pac::Paramc, pap::Paramp)
 	pass=pap.ss
 	for issp in 1:length(pass)
 		gs=pass[issp].grad_modtt
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		for i in 1:nznxd
-			gmodtt[i]+=gss[i]  # only update gmodtt
+		for i in eachindex(gmodtt)
+			gmodtt[i]+=gs[i]  # only update gmodtt
 		end
 		gs=pass[issp].grad_modrrvx
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		for i in 1:nznxd
-			gmodrrvx[i] += gss[i]
+		for i in eachindex(gmodrrvx)
+			gmodrrvx[i]+=gs[i]
 		end
 		gs=pass[issp].grad_modrrvz
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		for i in 1:nznxd
-			gmodrrvz[i] += gss[i]
+		for i in eachindex(gmodrrvz)
+			gmodrrvz[i]+=gs[i]
 		end
 	end
 end
 
 function update_gradient!(pac::Paramc)
+	nx, nz=pac.nx, pac.nz
 	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
 
 	# combine rrvx and rrvz
 	grad_modrr!(pac)
 
 	gradient=pac.gradient
+	# truncate
+	gmodtt=view(pac.grad_modtt_stack,npml+1:nz-npml,npml+1:nx-npml)
+	gmodrr=view(pac.grad_modrr_stack,npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
 		# parameterization is  [:KI, :ρI, :null]
-		gradient[i]=pac.grad_modtt_stack[i]  # update gmodtt
-		gradient[nznxd+i]=pac.grad_modrr_stack[i]  # update gmodrr
+		gradient[i]=gmodtt[i]  # update gmodtt
+		gradient[nznxd+i]=gmodrr[i]  # update gmodrr
 	end
 end
 
