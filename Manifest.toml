@@ -11,10 +11,10 @@ uuid = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
 version = "0.2.2"
 
 [[AxisArrays]]
-deps = ["Compat", "IntervalSets", "IterTools", "RangeArrays"]
-git-tree-sha1 = "7718ef9c2de099ace56256abf1b3b14012203590"
+deps = ["Compat", "Dates", "IntervalSets", "IterTools", "Pkg", "Random", "RangeArrays", "Test"]
+git-tree-sha1 = "2e2536e9e6f27c4f8d09d8442b61a7ae0b910c28"
 uuid = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
-version = "0.2.1"
+version = "0.3.0"
 
 [[Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -27,9 +27,9 @@ version = "0.4.0"
 
 [[BinDeps]]
 deps = ["Compat", "Libdl", "SHA", "URIParser"]
-git-tree-sha1 = "a6e1f6b5818ef909cda3a7011dd97c3dac6dc369"
+git-tree-sha1 = "12093ca6cdd0ee547c39b1870e0c9c3f154d9ca9"
 uuid = "9e28174c-4ba2-5203-b857-d8d62c4213ee"
-version = "0.8.9"
+version = "0.8.10"
 
 [[BinaryProvider]]
 deps = ["Libdl", "Pkg", "SHA", "Test"]
@@ -39,9 +39,9 @@ version = "0.4.1"
 
 [[CSV]]
 deps = ["CategoricalArrays", "DataFrames", "DataStreams", "Dates", "InternedStrings", "Missings", "Mmap", "Test", "WeakRefStrings"]
-git-tree-sha1 = "38fb8a40079560da5804a280d7d3cf0180b833b1"
+git-tree-sha1 = "67134caa06fd033202d89385517e4d8b542f420c"
 uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-version = "0.3.0"
+version = "0.3.1"
 
 [[Calculus]]
 deps = ["Compat"]
@@ -69,21 +69,21 @@ version = "0.5.0"
 
 [[ColorTypes]]
 deps = ["FixedPointNumbers", "Random", "Test"]
-git-tree-sha1 = "b45e62af8eabea138c381c04972c4b25d47e6c69"
+git-tree-sha1 = "0e3209ba7418aed732e5c3818076b4400ee36c08"
 uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
-version = "0.7.3"
+version = "0.7.4"
 
 [[ColorVectorSpace]]
 deps = ["ColorTypes", "Colors", "FixedPointNumbers", "LinearAlgebra", "SpecialFunctions", "Statistics", "StatsBase", "Test"]
-git-tree-sha1 = "5a66211549bd293fa479e23c15f8f3eb734e5000"
+git-tree-sha1 = "9ccd32d161d30ca1dacc4c21e63aa63513b39a44"
 uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
-version = "0.6.0"
+version = "0.6.1"
 
 [[Colors]]
 deps = ["ColorTypes", "FixedPointNumbers", "InteractiveUtils", "Pkg", "Printf", "Reexport", "Test"]
-git-tree-sha1 = "22dbaed87c2b5a2df5caeca48c5f25fe7b6b009a"
+git-tree-sha1 = "26f24e97782dd19d52cf97073c316897ac4d0e30"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
-version = "0.9.2"
+version = "0.9.3"
 
 [[CommonSubexpressions]]
 deps = ["Test"]
@@ -137,9 +137,9 @@ version = "0.5.1"
 
 [[DataFrames]]
 deps = ["CategoricalArrays", "CodecZlib", "Compat", "DataStreams", "Dates", "InteractiveUtils", "LinearAlgebra", "Missings", "Pkg", "Printf", "Random", "Reexport", "SortingAlgorithms", "Statistics", "StatsBase", "Test", "TranscodingStreams", "Unicode", "WeakRefStrings"]
-git-tree-sha1 = "fff8b03ab91c5c0d6a26e8f9c666bdd439a092c9"
+git-tree-sha1 = "31cca86a48add8d5cdd9457c4f75ee5577ef3488"
 uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-version = "0.13.0"
+version = "0.13.1"
 
 [[DataStreams]]
 deps = ["Dates", "Missings", "Test", "WeakRefStrings"]
@@ -236,7 +236,7 @@ uuid = "a2bd30eb-e257-5431-a919-1863eab51364"
 version = "0.3.0"
 
 [[Grid]]
-git-tree-sha1 = "3bf610eabc038400f8227883bea2589cc6908234"
+git-tree-sha1 = "7f6dad224a67c80fbe6dc50058cd38e10ff2d679"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Grid.jl.git"
 uuid = "03512f2c-8e8a-5728-b518-32bdd82c6646"
@@ -250,11 +250,11 @@ version = "0.7.1"
 
 [[ImageFiltering]]
 deps = ["CatIndices", "ColorVectorSpace", "Colors", "ComputationalResources", "DataStructures", "FFTViews", "FFTW", "FixedPointNumbers", "ImageCore", "LinearAlgebra", "Logging", "MappedArrays", "OffsetArrays", "Random", "StaticArrays", "Statistics", "Test", "TiledIteration"]
-git-tree-sha1 = "b2602234b201d10274fad08f30a999d49eb4a792"
-repo-rev = "teh/update0.7"
+git-tree-sha1 = "e36fac956a5d8f284254f1fc9e7624f77265d3c8"
+repo-rev = "master"
 repo-url = "https://github.com/JuliaImages/ImageFiltering.jl.git"
 uuid = "6a3955dd-da59-5b1f-98d4-e7296123deb5"
-version = "0.3.0+"
+version = "0.4.1+"
 
 [[InteractiveUtils]]
 deps = ["LinearAlgebra", "Markdown"]
@@ -450,9 +450,9 @@ version = "0.6.0"
 
 [[QuadGK]]
 deps = ["DataStructures", "LinearAlgebra", "Test"]
-git-tree-sha1 = "d136ea5b320aad2b1a8c3196e642c2282e601660"
+git-tree-sha1 = "7d61ca207f021be6574b365a1a077bea04935f19"
 uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
-version = "2.0.0"
+version = "2.0.1"
 
 [[REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets"]
@@ -592,6 +592,6 @@ version = "1.1.2"
 
 [[WeakRefStrings]]
 deps = ["Missings", "Random", "Test"]
-git-tree-sha1 = "1c28233e41ef8351c86ef42ddd50604b48238ed3"
+git-tree-sha1 = "d4631352d65840254d33ab703e2de3d9768cdb77"
 uuid = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
-version = "0.5.1"
+version = "0.5.2"
