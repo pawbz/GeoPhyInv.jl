@@ -1,6 +1,6 @@
 
 # some model
-mgrid = Grid.M2D(0.0, 10., 0., 10., .05,.05,2);
+mgrid = Grid.M2D(0.0, 10., 0., 10., .05,.05);
 model = JuMIT.Models.Seismic_zeros(mgrid);
 vp0=[2100.,2200.];vs0=[-1., -1.]; ρ0=[2100., 2300.]
 JuMIT.Models.adjust_bounds!(model, vp0,vs0,ρ0);

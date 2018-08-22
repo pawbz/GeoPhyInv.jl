@@ -4,6 +4,8 @@ using Grid
 import JuMIT.Acquisition
 import JuMIT.Models
 import JuMIT.Data
+using SpecialFunctions
+using FFTW
 
 mutable struct Param
 end
@@ -80,7 +82,7 @@ function mod(;
 			for it in 1:nt
 				wpow2[it]=complex(acqsrc.wav[iss,ifield][it,is])
 			end
-			fft!(wpow2) # source wavelet in the frequency domain
+			FFTW.fft!(wpow2) # source wavelet in the frequency domain
 
 			x = sx[is] - rx[ir]
 			z = sz[is] - rz[ir]
@@ -124,7 +126,7 @@ function mod(;
 		end
 
 		# back to time domain
-		ifft!(dpow2all)
+		FFTW.ifft!(dpow2all)
 
 		# truncate
 		for it in 1:nt

@@ -107,7 +107,7 @@ function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 		vp0=Models.bounds(vp,bfrac); 
 		vs0=Models.bounds(vs,bfrac); 
 		ρ0=Models.bounds(ρ, bfrac);
-		mgrid = Grid.M2D(0., 17000., 0., 3500.,size(vp,2),size(vp,1),40)
+		mgrid = Grid.M2D(0., 17000., 0., 3500.,size(vp,2),size(vp,1))
 		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
 	elseif(attrib == :seismic_marmousi2_high_res)
 		vp, h= IO.readsu(joinpath(marmousi_folder,"vp_marmousi-ii.su"))
@@ -117,7 +117,7 @@ function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 		vp0=Models.bounds(vp,bfrac); 
 		vs0=Models.bounds(vs,bfrac); 
 		ρ0=Models.bounds(ρ, bfrac);
-		mgrid = Grid.M2D(0., 17000., 0., 3500.,size(vp,2),size(vp,1),40)
+		mgrid = Grid.M2D(0., 17000., 0., 3500.,size(vp,2),size(vp,1))
 		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
 
 	elseif(attrib == :seismic_marmousi2_xwell)

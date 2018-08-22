@@ -1,5 +1,5 @@
 using Distributed
-#addprocs(5)
+addprocs(5)
 
 using LinearAlgebra
 using JuMIT
@@ -18,7 +18,7 @@ function initialize(fp)
 end
 
 folder="Models"
-for t in ["param_adj"]
+for t in ["Models", "param_adj"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end
@@ -26,7 +26,7 @@ end
 
 
 folder="Fdtd"
-for t in ["rho_projection"]
+for t in ["accuracy", "backprop", "rho_projection"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end
