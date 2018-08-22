@@ -43,6 +43,11 @@ struct ModFdtdBorn end
 
 struct ModFdtdHBorn end
 
+# fields
+struct P end
+struct Vx end
+struct Vz end
+
 
 """
 FWI Parameters
@@ -132,20 +137,26 @@ include("xwfwi.jl")
 Convert the data `TD` to `Src` after time reversal.
 """
 function update_adjsrc!(adjsrc, δdat::Data.TD, adjacqgeom)
+	(adjsrc.fields != δdat.fields) && error("dissimilar fields")
 	nt=δdat.tgrid.nx
 	for i in 1:adjacqgeom.nss
-		for j in 1:length(δdat.fields)
+		for (j,field) in enumerate(δdat.fields)
 			wav=adjsrc.wav[i,j] 
 			dat=δdat.d[i,j]
 			for ir in 1:δdat.acqgeom.nr[i]
 				for it in 1:nt
-					@inbounds wav[it,ir]=dat[nt-it+1,ir]
+					@inbounds wav[it,ir]=value_adjsrc(dat[nt-it+1,ir],eval(field)())
 				end
 			end
 		end
 	end
 	return nothing
 end
+
+value_adjsrc(s, ::P) = s
+value_adjsrc(s, ::Vx) = -1.0*s # see adj tests
+value_adjsrc(s, ::Vz) = -1.0*s
+
 
 function generate_adjsrc(fields, tgrid, adjacqgeom)
 	adjsrc=Acquisition.Src_zeros(adjacqgeom, fields, tgrid)
@@ -199,11 +210,11 @@ function Param(
 	       modm::Models.Seismic;
 	       # other optional 
 	       tgrid_obs::Grid.M1D=deepcopy(tgrid),
-	       recv_fields=[:P],
+	       rfields=[:P],
 	       igrid::Grid.M2D=nothing,
 	       igrid_interp_scheme::Symbol=:B2,
 	       mprecon_factor::Float64=1.0,
-	       dobs::Data.TD=Data.TD_zeros(recv_fields,tgrid_obs,acqgeom),
+	       dobs::Data.TD=Data.TD_zeros(rfields,tgrid_obs,acqgeom),
 	       dprecon=nothing,
 	       tlagssf_fracs=0.0,
 	       tlagrf_fracs=0.0,
@@ -260,13 +271,14 @@ function Param(
 	adjacqgeom = AdjGeom(acqgeom)
 
 	# generate adjoint sources
-	adjsrc=generate_adjsrc(recv_fields, tgrid, adjacqgeom)
+	adjsrc=generate_adjsrc(rfields, tgrid, adjacqgeom)
 
 	# generating forward and adjoint modelling engines
 	# to generate modelled data, border values, etc.
 	# most of the parameters given to this are dummy
 	paf=Fdtd.Param(npw=2, model=modm, born_flag=true,
 		acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], 
+		rfields=rfields,
 		sflags=[3, 2], rflags=[1, 1],
 		backprop_flag=1, 
 		tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
@@ -286,17 +298,17 @@ function Param(
 	end
 	
 	# create Parameters for data misfit
-	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, recv_fields, acqgeom)
+	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, rfields, acqgeom)
 	# choose the data misfit
 	#	(iszero(tlagssf_fracs)) 
  	# tlagssf_fracs==[0.0] | tlagssf_fracs=[0.0])
-	# paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
+	# paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
 	if(iszero(dobs))
 		Random.randn!(dobs) # dummy dobs, update later
 	end
 
-	paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon);
+	paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,acqgeom),dobs,w=dprecon);
 
 	paminterp=Interpolation.Kernel([modi.mgrid.x, modi.mgrid.z], [modm.mgrid.x, modm.mgrid.z], igrid_interp_scheme)
 
@@ -311,7 +323,7 @@ function Param(
 	     mx, mxm,
 	     paf,
 	     deepcopy(acqsrc), 
-	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
+	     Acquisition.Src_zeros(adjacqgeom, rfields, tgrid),
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
 	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,

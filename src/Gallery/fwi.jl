@@ -1,7 +1,7 @@
 
 # create pizza problem
 
-function xfwi_problem(attrib::Symbol; born_flag=false)
+function xfwi_problem(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P])
 
 	if(attrib==:pizza)
 		# starting model
@@ -33,6 +33,7 @@ function xfwi_problem(attrib::Symbol; born_flag=false)
 
 	if(born_flag)
 		pa = FWI.Param(acqsrc, acqgeom, tgrid, FWI.ModFdtdBorn(),
+		       rfields=rfields,
 		       model0, modm0=model0, modm_obs=model, 
 		       igrid_interp_scheme=igrid_interp_scheme, 
 		       igrid=igrid, parameterization=parameterization, verbose=false);
@@ -41,6 +42,7 @@ function xfwi_problem(attrib::Symbol; born_flag=false)
 	else
 		pa = FWI.Param(acqsrc, acqgeom, tgrid, FWI.ModFdtd(),
 		       model0, modm_obs=model, modm0=model0, 
+		       rfields=rfields,
 		       igrid_interp_scheme=igrid_interp_scheme, 
 		       igrid=igrid, parameterization=parameterization, verbose=false);
 	end

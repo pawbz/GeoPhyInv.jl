@@ -186,7 +186,7 @@ function Fadj!(pa::Param)
 	pa.paf.c.illum_flag=false
 
 	# force boundaries in first pw and back propagation for second pw
-	pa.paf.c.sflags=[3,2] 
+	pa.paf.c.sflags=[-2,2] 
 	pa.paf.c.backprop_flag=-1
 
 	# update source wavelets in paf using adjoint sources

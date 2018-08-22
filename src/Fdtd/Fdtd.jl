@@ -19,6 +19,12 @@ global const to = TimerOutput(); # create a timer object
 global const npml = 50
 global const nlayer_rand = 0
 
+# struct related to fields
+struct P end
+struct Vx end
+struct Vz end
+
+# 
 #As forward modeling method, the 
 #finite-difference method is employed. 
 #It uses a discrete version of the two-dimensional isotropic acoustic wave equation.
@@ -64,6 +70,7 @@ mutable struct Paramc
 	acqgeom::Vector{Acquisition.Geom}
 	acqsrc::Vector{Acquisition.Src}
 	abs_trbl::Vector{Symbol}
+	sfields::Vector{Vector{Symbol}}
 	isfields::Vector{Vector{Int64}}
 	sflags::Vector{Int64} 
 	irfields::Vector{Int64}
@@ -361,13 +368,21 @@ function Param(;
 
 	# necessary that nss and fields should be same for all nprop
 	nss = acqgeom[1].nss;
-	sfields = [acqsrc[ipw].fields for ipw in 1:npw]
-	isfields = [findall(in([:P, :Vx, :Vz]), acqsrc[ipw].fields) for ipw in 1:npw]
+	sfields=[acqsrc[ipw].fields for ipw in 1:npw]
+	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
+	for ipw in 1:npw
+		for (i,field) in enumerate(sfields[ipw])
+			isfields[ipw][i]=findfirst(isequal(field), [:P,:Vx,:Vz])
+		end
+	end
 	fill(nss, npw) != [getfield(acqgeom[ip],:nss) for ip=1:npw] ? error("different supersources") : nothing
 
 	# create acquisition geometry with each source shooting 
 	# at every unique receiver position
-	irfields = findall(in([:P, :Vx, :Vz]), rfields)
+	irfields = Array{Int}(undef,length(rfields))
+	for (i,field) in enumerate(rfields)
+		irfields[i]=findfirst(isequal(field), [:P,:Vx,:Vz])
+	end
 
 
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
@@ -457,7 +472,7 @@ function Param(;
 	activepw=[ipw for ipw in 1:npw]
 	pac=Paramc(jobname,npw,activepw,
 	    exmodel,model,
-	    acqgeom,acqsrc,abs_trbl,isfields,sflags,
+	    acqgeom,acqsrc,abs_trbl,sfields,isfields,sflags,
 	    irfields,rflags,δt,δxI,δzI,
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modtt, modttI,modrr,modrrvx,modrrvz,
