@@ -1,7 +1,7 @@
 
 # create pizza problem
 
-function xfwi_problem(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P])
+function xfwi_problem(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=0.0)
 
 	if(attrib==:pizza)
 		# starting model
@@ -25,6 +25,22 @@ function xfwi_problem(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P])
 		acqsrc=Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=3)
 		tgrid=acqsrc.tgrid 
 		igrid=Grid.M2D_resamp(model.mgrid, 50.,50.,)
+		parameterization=[:χvp, :χρ, :null]
+		igrid_interp_scheme=:B2
+	elseif(attrib==:downhole)
+		gri = Grid.M2D(-30.,30.,-120.,30.,1.0,1.0)
+		model = Models.Seismic_zeros(gri)
+		Models.adjust_bounds!(model, [2500., 3500.], [2500., 3500.], [2500.,3500.])
+		model0=deepcopy(model)
+		print(model)
+		Models.Seismic_addon!(model, randn_perc=0.1, fields=[:χvp,:χρ])
+		Models.Seismic_addon!(model0, randn_perc=0.1, fields=[:χvp,:χρ])
+		Models.Seismic_addon!(model, ellip_rad=[2000., 5.], ellip_loc=[0.,0.],ellip_pert=0.1, ellip_α=α, fields=[:χvp],)
+
+		acqgeom=Acquisition.Geom_fixed(-75., -50., 0.0, -100., -50., 0.0, 2, 20, :vertical, :vertical)
+		acqsrc=Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=4, tmaxfrac=0.8)
+		tgrid=acqsrc.tgrid 
+		igrid=Grid.M2D(-30.,30.,-40.,30.,40,100)
 		parameterization=[:χvp, :χρ, :null]
 		igrid_interp_scheme=:B2
 	else

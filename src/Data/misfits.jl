@@ -54,7 +54,6 @@ function func_grad!(pa::P_misfit, grad=nothing)
 		else
 			error("invalid grad")
 		end
-
 		J += JJ 
 	end
 	return J

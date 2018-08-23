@@ -6,7 +6,7 @@ acqgeom =JuMIT.Acquisition.Geom_circ(nss=4,nr=100,rad=[990.,990.]);
 acqgeom =JuMIT.Acquisition.Geom_circ(nss=4,nr=100,rad=[0.,200.]);
 acqsrc=JuMIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=0.4)
 
-for sflags in [[1,-1],[2,3]]
+for sflags in [[1,-1],[2,-2]]
 	pa=JuMIT.Fdtd.Param(born_flag=false,npw=1, tgridmod=acqsrc.tgrid,
 	#	abs_trbl=[:null],
 		gmodel_flag=false,
