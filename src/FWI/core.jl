@@ -68,7 +68,6 @@ function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior, attrib_mod)
 	g1=pa.mx.gm[1]
 	grad!(g1, x, last_x, pa, attrib_mod)
 
-	# add a linear map here and replace w
 	Misfits.func_grad!(g2, x, pa.mx.prior, obj.pmgls)
 
 	for i in eachindex(storage)

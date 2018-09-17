@@ -120,6 +120,7 @@ struct LS_prior # cls inversion including prior
 	# pdgls
 	pmgls::Misfits.P_gls{Float64}
 end
+LS_prior(Q)=LS_prior(Misfits.P_gls(Q))
 
 """
 this method constructs prior term with Q=α*I
@@ -133,6 +134,7 @@ function LS_prior(ninv, α=0.5)
 		      ninv, ninv, ismutating=true, issymmetric=true)
 	return LS_prior(Misfits.P_gls(Q))
 end
+
 
 struct Migr end # returns first gradient
 
