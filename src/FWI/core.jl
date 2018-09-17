@@ -61,14 +61,17 @@ function ζfunc(x, last_x, pa::Param, obj::LS_prior, attrib_mod)
 	# note: change the inverse model covariance matrix `pmgls.Q` accordingly
 	f2=Misfits.func_grad!(nothing, x, pa.mx.prior, obj.pmgls)
 
-	return f1+f2
+	return f1*obj.pdgls+f2
 end
 
 function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior, attrib_mod)
 	g1=pa.mx.gm[1]
 	grad!(g1, x, last_x, pa, attrib_mod)
 
+	g2=pa.mx.gm[2]
 	Misfits.func_grad!(g2, x, pa.mx.prior, obj.pmgls)
+
+	rmul!(g1, obj.pdgls)
 
 	for i in eachindex(storage)
 		@inbounds storage[i]=g1[i]+g2[i]

@@ -116,23 +116,24 @@ Base.display(pa::Param)=nothing
 struct LS end # just cls inversion
 
 struct LS_prior # cls inversion including prior 
-	# add data inverse covariance matrix here later
+	# add data inverse covariance matrix here later, instead of just Float64
+	pdgls::Float64
 	# pdgls
 	pmgls::Misfits.P_gls{Float64}
 end
-LS_prior(Q)=LS_prior(Misfits.P_gls(Q))
+LS_prior(α1, Q)=LS_prior(α1, Misfits.P_gls(Q))
 
 """
 this method constructs prior term with Q=α*I
 * `ninv` : number of inversion variables, use `xfwi_ninv` 
 * `α` : scalar
 """
-function LS_prior(ninv, α=0.5)
+function LS_prior(α=[1.0, 0.5],ninv)
 	Q=LinearMap(
-	     (y,x)->LinearAlgebra.mul!(y,x,α), 
-	     (y,x)->LinearAlgebra.mul!(y,x,α), 
+	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
+	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
 		      ninv, ninv, ismutating=true, issymmetric=true)
-	return LS_prior(Misfits.P_gls(Q))
+	return LS_prior(α[1],Misfits.P_gls(Q))
 end
 
 
