@@ -128,7 +128,7 @@ this method constructs prior term with Q=α*I
 * `ninv` : number of inversion variables, use `xfwi_ninv` 
 * `α` : scalar
 """
-function LS_prior(α=[1.0, 0.5],ninv)
+function LS_prior(ninv, α=[1.0, 0.5])
 	Q=LinearMap(
 	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
 	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
