@@ -121,14 +121,14 @@ struct LS_prior # cls inversion including prior
 	# pdgls
 	pmgls::Misfits.P_gls{Float64}
 end
-LS_prior(α1, Q)=LS_prior(α1, Misfits.P_gls(Q))
+LS_prior(α1::Float64, Q::LinearMap)=LS_prior(α1, Misfits.P_gls(Q))
 
 """
 this method constructs prior term with Q=α*I
 * `ninv` : number of inversion variables, use `xfwi_ninv` 
 * `α` : scalar
 """
-function LS_prior(ninv, α=[1.0, 0.5])
+function LS_prior(ninv::Int, α=[1.0, 0.5])
 	Q=LinearMap(
 	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
 	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
