@@ -92,8 +92,6 @@ mutable struct Param{Tmod, Tdatamisfit}
 	mod_initial::Models.Seismic
 	"prior model on the inversion grid"
 	priori::Models.Seismic
-	"prior weights on the inversion grid"
-	priorw::Models.Seismic
 	"gradient Seismic model on modeling grid"
 	gmodm::Models.Seismic
 	"gradient Seismic on inversion grid"
@@ -114,14 +112,26 @@ Base.print(pa::Param)=nothing
 Base.show(pa::Param)=nothing
 Base.display(pa::Param)=nothing
 
+# add data inverse covariance matrix here later
 struct LS end # just cls inversion
 
 struct LS_prior # cls inversion including prior 
-	α::Vector{Float64} # weights
+	# add data inverse covariance matrix here later
+	# pdgls
+	pmgls::Misfits.P_gls{Float64}
 end
 
-function LS_prior()
-	return LS_prior([1.0, 0.5])
+"""
+this method constructs prior term with Q=α*I
+* `ninv` : number of inversion variables, use `xfwi_ninv` 
+* `α` : scalar
+"""
+function LS_prior(ninv, α=0.5)
+	Q=LinearMap(
+	     (y,x)->LinearAlgebra.mul!(y,x,α), 
+	     (y,x)->LinearAlgebra.mul!(y,x,α), 
+		      ninv, ninv, ismutating=true, issymmetric=true)
+	return LS_prior(Misfits.P_gls(Q))
 end
 
 struct Migr end # returns first gradient
@@ -254,7 +264,6 @@ function Param(
 
 	# allocate prior inputs
 	priori=similar(modi)
-	priorw=similar(modi)
 
 	# use default background model modm0
 	if(modm0 === nothing)
@@ -327,7 +336,7 @@ function Param(
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
 	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,
-	     priori, priorw,
+	     priori,
 	     gmodm,gmodi,
 	     parameterization,
 	     zeros(2,2), # dummy, update mprecon later
@@ -351,7 +360,7 @@ function Param(
 	# default weights are 1.0
 	fill!(pa.mx.w, 1.0)
 
-	# update priori and priorw in pa to defaults
+	# update priori in pa to defaults
 	update_prior!(pa)
 	
 	return pa

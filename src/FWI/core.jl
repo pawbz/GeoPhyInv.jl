@@ -57,20 +57,20 @@ end
 function ζfunc(x, last_x, pa::Param, obj::LS_prior, attrib_mod)
 	f1=func(x, last_x, pa, attrib_mod)
 
-	f2=Misfits.error_squared_euclidean!(nothing, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+	# calculate the generalized least-squares error
+	# note: change the inverse model covariance matrix `pmgls.Q` accordingly
+	f2=Misfits.func_grad!(nothing, x, pa.mx.prior, obj.pmgls)
 
-	return f1*obj.α[1]+f2*obj.α[2]
+	return f1+f2
 end
 
 function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior, attrib_mod)
 	g1=pa.mx.gm[1]
 	grad!(g1, x, last_x, pa, attrib_mod)
 
-	g2=pa.mx.gm[2]
-	Misfits.error_squared_euclidean!(g2, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+	# add a linear map here and replace w
+	Misfits.func_grad!(g2, x, pa.mx.prior, obj.pmgls)
 
-	rmul!(g1, obj.α[1])
-	rmul!(g2, obj.α[2])
 	for i in eachindex(storage)
 		@inbounds storage[i]=g1[i]+g2[i]
 	end
