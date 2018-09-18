@@ -504,7 +504,7 @@ uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 
 [[Signals]]
 deps = ["Conv", "DSP", "DistributedArrays", "Distributions", "FFTW", "Grid", "Interpolation", "LinearAlgebra", "Misfits", "ProgressMeter", "Test"]
-git-tree-sha1 = "1680105422d10cf0d5db4c1e68503d02e08be015"
+git-tree-sha1 = "dce77959663c2f1423a0a1fb7f9fc3b58fa2dd4f"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Signals.jl.git"
 uuid = "6303bc30-01ab-52eb-8b10-60e47555a8d1"

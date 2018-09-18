@@ -298,7 +298,7 @@ function Geom_fixed(
 
 
 	ssarray = isequal(nss,1) ? fill(ssmin,1) : (rand_flags[1] ? 
-					   Random.rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : range(ssmin,stop=ssmax,length=nss))
+					     Random.rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : Array(range(ssmin,stop=ssmax,length=nss)))
 	if(ssattrib==:horizontal)
 		ssz = ss0+(ssarray-minimum(ssarray))*sin(ssα)/cos(ssα); ssx=ssarray
 	elseif(ssattrib==:vertical)
