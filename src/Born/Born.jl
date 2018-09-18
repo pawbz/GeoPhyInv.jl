@@ -37,7 +37,7 @@ function mod(;
 
 
 	nt = (length(tgridmod.x) == length(acqsrc.tgrid.x)) ? tgrid.nx : error("acqsrc tgrid")
-	np2 = nextpow2(2*nt);	
+	np2 = nextpow(2, 2*nt);	
 		
 
 	if(born_flag)

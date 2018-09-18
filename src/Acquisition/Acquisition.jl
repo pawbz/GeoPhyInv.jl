@@ -298,21 +298,21 @@ function Geom_fixed(
 
 
 	ssarray = isequal(nss,1) ? fill(ssmin,1) : (rand_flags[1] ? 
-					     Random.rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : Array(range(ssmin,stop=ssmax,length=nss)))
+					     Random.rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : range(ssmin,stop=ssmax,length=nss))
 	if(ssattrib==:horizontal)
-		ssz = ss0+(ssarray-minimum(ssarray))*sin(ssα)/cos(ssα); ssx=ssarray
+		ssz = ss0.+(ssarray.-minimum(ssarray)).*sin(ssα)/cos(ssα); ssx=ssarray
 	elseif(ssattrib==:vertical)
-		ssx = ss0+(ssarray-minimum(ssarray))*sin(ssα)/cos(ssα); ssz=ssarray
+		ssx = ss0.+(ssarray.-minimum(ssarray)).*sin(ssα)/cos(ssα); ssz=ssarray
 	else
 		error("invalid ssattrib")
 	end
 
 	rarray = isequal(nr,1) ? fill(rmin,1) : (rand_flags[2] ? 
-				        Random.rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : range(rmin,stop=rmax,length=nr))
+					  Random.rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : range(rmin,stop=rmax,length=nr))
 	if(rattrib==:horizontal)
-		rz = r0+(rarray-minimum(rarray))*sin(rα)/cos(rα); rx = rarray
+		rz = r0.+(rarray.-minimum(rarray)).*sin(rα)/cos(rα); rx = rarray
 	elseif(rattrib==:vertical)
-		rx = r0+(rarray-minimum(rarray))*sin(rα)/cos(rα); rz = rarray
+		rx = r0.+(rarray.-minimum(rarray)).*sin(rα)/cos(rα); rz = rarray
 	else
 		error("invalid rattrib")
 	end
@@ -680,7 +680,7 @@ Function that returns Src after time reversal
 """
 function Src_tr(src::Src)
 	return Src(src.nss,src.ns,src.fields,
-	    [flipdim(src.wav[i,j],1) for i in 1:src.nss, j in 1:length(src.fields)],deepcopy(src.tgrid))
+	    [reverse(src.wav[i,j],dims=1) for i in 1:src.nss, j in 1:length(src.fields)],deepcopy(src.tgrid))
 end
 
 

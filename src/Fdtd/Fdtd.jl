@@ -462,7 +462,7 @@ function Param(;
 	grad_modrr_stack=zeros(nz,nx)
 	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
-	itsnaps = [argmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
+	itsnaps = [argmin(abs.(tgridmod.x .- tsnaps[i])) for i in 1:length(tsnaps)]
 
 	nrmat=[acqgeom[ipw].nr[iss] for ipw in 1:npw, iss in 1:acqgeom[1].nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),acqgeom[1].nss)

@@ -156,7 +156,7 @@ Time reverse the records of each receiver in `TD`
 * `data::TD` : input data that is modified
 """
 function TD_tr!(data::TD)
-	data.d = copy([flipdim(data.d[i,j],1) for i in 1:data.acqgeom.nss, j in 1:length(data.fields)]);
+	data.d = copy([reverse(data.d[i,j],dims=1) for i in 1:data.acqgeom.nss, j in 1:length(data.fields)]);
 end
 
 

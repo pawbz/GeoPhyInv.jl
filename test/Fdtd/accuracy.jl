@@ -1,4 +1,6 @@
 
+using Statistics
+
 model = JuMIT.Gallery.Seismic(:acou_homo1);
 acqgeom = JuMIT.Gallery.Geom(model.mgrid,:xwell);
 tgrid = JuMIT.Gallery.M1D(:acou_homo1);
