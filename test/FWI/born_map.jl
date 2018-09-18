@@ -31,7 +31,7 @@ for rfields in [[:P], [:Vx], [:Vz]]
 		b=LinearAlgebra.dot(x,adjoint(F)*y)
 		c=LinearAlgebra.dot(x, transpose(F)*F*x)
 		println("adjoint test: ", a, "\t", b)       
-		@test isapprox(a,b,rtol=1e-6)
+		@test isapprox(a,b,rtol=1e-5)
 		println("must be positive: ", c)
 		@test c>0.0
 	end

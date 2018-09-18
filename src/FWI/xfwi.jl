@@ -111,7 +111,8 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior}, attrib_mod;
 			    
 			end
 
-			prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, Array{Float64}(0), Array{Float64}(0), 0, 0,
+			prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, 
+				Array{Float64}(undef,0), Array{Float64}(undef,0), 0, 0,
 					eval_f, void_g, eval_grad_f, void_g_jac, nothing)
 
 			addOption(prob, "hessian_approximation", "limited-memory")
