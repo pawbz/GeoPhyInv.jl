@@ -1,6 +1,5 @@
 module Interferometry
 
-using Grid
 using Conv
 import JuMIT.Acquisition
 import JuMIT.Data
@@ -12,16 +11,16 @@ enhance diffractions in the `TD`
 # Keyword Arguments
 
 `λdom::Float64=0.0` : distance between receivers must be greater than twice central wavelength, 2*λdom (Shapiro 2005)
-`tlag::Float64=data.tgrid.x[end]-data.tgrid.x[1]` : maximum lag time in the output traces 
+`tlag::Float64=data.tgrid[end]-data.tgrid[1]` : maximum lag time in the output traces 
 
 """
 function TD_virtual_diff(
 			 data::Data.TD;
 			 λdom::Float64=0.0,
-			 tlag::Float64=data.tgrid.x[end]-data.tgrid.x[1]
+			 tlag::Float64=data.tgrid[end]-data.tgrid[1]
 			)
 
-	nr = maximum(data.acqgeom.nr);	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	nr = maximum(data.acqgeom.nr);	nss = data.acqgeom.nss;	nt = length(data.tgrid)
 	fields = data.fields;
 	# normalize the records in data
 	datan = Data.TD_normalize(data,:recrms)
@@ -95,10 +94,10 @@ function TD_virtual_diff(
 			     [length(rx[ir]) for ir=1:length(rx)])
 
 	# tgrid after correlation
-	dt = data.tgrid.x[end]-data.tgrid.x[1]
-	tgridxcorr=Grid.M1D(-dt, +dt, data.tgrid.δx)
+	dt = data.tgrid[end]-data.tgrid[1]
+	tgridxcorr=range(-dt, stop=+dt, step=step(data.tgrid))
 	
-	tlag > 0.0 ? tgridcut=Grid.M1D(-tlag, +tlag, data.tgrid.δx) : error("tlag < 0")
+	tlag > 0.0 ? tgridcut=range(-tlag,stop=+tlag,step=step(data.tgrid)) : error("tlag < 0")
 
 	return Data.TD_resamp(
 		       Data.TD_urpos(datmat,data.fields,tgridxcorr,vacqgeom,nur,urpos), 
@@ -114,9 +113,10 @@ Correlating noise records with reference records
 """
 function TD_noise_corr(data::Data.TD; tlagfrac=0.5, irref=[1],)
 
+	error("fix this")
 	# tgrid after correlation
-	tt = data.tgrid.x[end]-data.tgrid.x[1]
-	tgridc = Grid.M1D_lag(tlagfrac*tt, data.tgrid.δx)
+	tt = data.tgrid[end]-data.tgrid[1]
+	#tgridc = lag(tlagfrac*tt, step(data.tgrid))
 
 	# allocate TD
 	dataout=Data.TD_zeros(data.fields, tgridc[1], data.acqgeom)
@@ -127,13 +127,13 @@ end
 function TD_noise_corr!(dataout, data, irref)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	
 	fields=data.fields
-	ntlag=Int((dataout.tgrid.nx-1)/2)
+	ntlag=Int((length(dataout.tgrid)-1)/2)
 
-	nto = dataout.tgrid.nx;
+	nto = length(dataout.tgrid);
 	isodd(nto) || error("odd samples in output data required")
 	for ifield = 1:length(fields), iss = 1:nss
 		# need param for each supersource, because of different receivers
-		paxcorr=Conv.P_xcorr(data.tgrid.nx, nr[iss], 
+		paxcorr=Conv.P_xcorr(length(data.tgrid), nr[iss], 
 		   cglags=[ntlag, ntlag], norm_flag=false,cg_indices=irref)
 		dd=data.d[iss, ifield]
 		ddo=[dataout.d[iss, ifield]]

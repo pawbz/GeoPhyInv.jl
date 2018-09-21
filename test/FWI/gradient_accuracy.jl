@@ -11,13 +11,15 @@ tgrid=acqsrc.tgrid
 
 parameterization=[:χvp, :χρ, :null]
 
+mgrid=model.mgrid
+
 @testset "test parallel implementation during gradient" begin
 	for attrib_mod in [JF.ModFdtd(), JF.ModFdtdBorn()]
 		pa=JF.Param(acqsrc, acqgeom, tgrid, attrib_mod, model0, 
 				     modm_obs=model,  
 				     modm0=model0,
 				     igrid_interp_scheme=:B2,    
-				     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
+				     igrid=broadcast(x->range(x[1],stop=x[end],step=300.),mgrid),
 				     parameterization=parameterization,   verbose=false,
 				     nworker=1)
 
@@ -26,7 +28,7 @@ parameterization=[:χvp, :χρ, :null]
 				     modm_obs=model,  
 				     modm0=model0,
 				     igrid_interp_scheme=:B2,    
-				     igrid=Grid.M2D_resamp(model.mgrid, 300.,300.,),     
+				     igrid=broadcast(x->range(x[1],stop=x[end],step=300.),mgrid),
 				     parameterization=parameterization,   verbose=false,
 				     nworker=nothing)
 
@@ -44,7 +46,7 @@ end
 	     		     modm0=model0,
 			     modm_obs=model,  
 			     igrid_interp_scheme=:B2,    
-			     igrid=Grid.M2D_resamp(model.mgrid, 350.,350.,),     
+			     igrid=broadcast(x->range(x[1],stop=x[end],step=350.),mgrid),
 			     parameterization=parameterization,   verbose=false)
 
 
@@ -65,7 +67,7 @@ end
 	pa=JF.Param(acqsrc, acqgeom, tgrid, JF.ModFdtd(), model0, 
 			     modm_obs=model,  
 			     igrid_interp_scheme=:B2,    
-			     igrid=Grid.M2D_resamp(model.mgrid, 350.,350.,),     
+			     igrid=broadcast(x->range(x[1],stop=x[end],step=350.),mgrid),
 			     parameterization=parameterization,   verbose=false)
 
 	JF.xfwi!(pa, JF.LS(), JF.ModFdtd(),  bounded_flag=true, solver=:ipopt,

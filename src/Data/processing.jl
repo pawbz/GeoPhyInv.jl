@@ -20,7 +20,7 @@ function TD_normalize(data::TD, attrib::Symbol=:recrms)
 	return datan
 end
 function TD_normalize!(data::TD, attrib::Symbol=:recrms)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		scs=vecnorm(dd,2)
@@ -50,11 +50,11 @@ function TD_filter!(data::TD; fmin=nothing, fmax=nothing)
 	if((fmin===nothing) && (fmax===nothing))
 		return nothing
 	end
-	fs = 1/ data.tgrid.δx;
+	fs = inv(step(data.tgrid));
 	designmethod = Butterworth(4);
 	filtsource = Bandpass(fmin, fmax; fs=fs);
 
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		scs=vecnorm(dd,2)
@@ -77,13 +77,13 @@ for all supersources.
 """
 function TD_urpos(d::Array{Float64}, 
 		   fields::Vector{Symbol}, 
-		   tgrid::Grid.M1D, 
+		   tgrid::StepRangeLen, 
 		   acq::Acquisition.Geom,
 		   nur::Int64,
 		   urpos::Tuple{Array{Float64,1},Array{Float64,1}
 		  }
 		   )
-	dout = [zeros(tgrid.nx,acq.nr[iss]) for iss=1:acq.nss, ifield=1:length(fields)] 
+	dout = [zeros(length(tgrid),acq.nr[iss]) for iss=1:acq.nss, ifield=1:length(fields)] 
 
 	for ifield=1:length(fields), iss=1:acq.nss, ir=1:acq.nr[iss]
 		# find index in urpos
@@ -119,11 +119,11 @@ function TDcoup!(
 	       w::Coupling.TD,
 	       attrib::Symbol
 	       )
-	nr = r.acqgeom.nr;	nss = r.acqgeom.nss;	nt = r.tgrid.nx;
+	nr = r.acqgeom.nr;	nss = r.acqgeom.nss;	nt = length(r.tgrid);
 	fields = (w.fields == r.fields == s.fields) ? w.fields : error("different fields")
-	sv=zeros(s.tgrid.nx)
-	rv=zeros(r.tgrid.nx)
-	wv=zeros(w.tgridssf.nx)
+	sv=zeros(length(s.tgrid))
+	rv=zeros(length(r.tgrid))
+	wv=zeros(length(w.tgridssf))
 	for ifield = 1:length(fields), iss = 1:nss, ir = 1:nr[iss]
 		# receiver coupling
 	#	Signals.DSP.fast_filt!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],

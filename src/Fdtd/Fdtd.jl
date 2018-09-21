@@ -1,6 +1,5 @@
 module Fdtd
 
-using Grid
 using Interpolation
 using Signals
 import JuMIT.Models
@@ -47,9 +46,9 @@ Modelling parameters common for all supersources
 
 * `gradient::Vector{Float64}=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
 * `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]`
-* `illum::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx)` : source energy if `illum_flag`
+* `illum::Array{Float64,2}=zeros(length(model.mgrid[1]), length(model.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
-* `snaps::Array{Float64,4}=zeros(model.mgrid.nz,model.mgrid.nx,length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
+* `snaps::Array{Float64,4}=zeros(length(model.mgrid[1]),length(model.mgrid[2]),length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
 
 # Return (in order)
 
@@ -269,8 +268,8 @@ finite-difference modeling is performed.
 
 * `npw::Int64=1` : number of independently propagating wavefields in `model`
 * `model::Models.Seismic` : seismic medium parameters 
-* `tgridmod::Grid.M1D=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
-* `tgrid::Grid.M1D=tgridmod` : output records are resampled on this time grid
+* `tgridmod::StepRangeLen=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
+* `tgrid::StepRangeLen=tgridmod` : output records are resampled on this time grid
 * `acqgeom::Vector{Acquisition.Geom}` :  acquisition geometry for each independently propagating wavefield
 * `acqsrc::Vector{Acquisition.Src}` : source acquisition parameters for each independently propagating wavefield
 * `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
@@ -291,7 +290,7 @@ finite-difference modeling is performed.
 * `born_flag::Bool=false` : do only Born modeling instead of full wavefield modelling (to be updated soon)
 * `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
 * `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
-* `tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1)` : store snaps at these modelling times
+* `tsnaps::Vector{Float64}=fill(0.5*(tgridmod[end]+tgridmod[1]),1)` : store snaps at these modelling times
 * `snaps_flag::Bool=false` : return snaps or not
 * `verbose::Bool=false` : verbose flag
 
@@ -321,7 +320,7 @@ function Param(;
 	model::Models.Seismic=nothing,
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
 	born_flag::Bool=false,
-	tgridmod::Grid.M1D=nothing,
+	tgridmod::StepRangeLen=nothing,
 	acqgeom::Vector{Acquisition.Geom}=nothing,
 	acqsrc::Array{Acquisition.Src}=nothing,
 	sflags::Vector{Int64}=fill(2,npw), 
@@ -330,7 +329,7 @@ function Param(;
 	backprop_flag::Int64=0,  
 	gmodel_flag::Bool=false,
 	illum_flag::Bool=false,
-	tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1),
+	tsnaps::Vector{Float64}=fill(0.5*(tgridmod[end]+tgridmod[1]),1),
 	snaps_flag::Bool=false,
 	verbose::Bool=false,
 	nworker=nothing)
@@ -344,9 +343,9 @@ function Param(;
 	(length(acqsrc) ≠ npw) && error("acqsrc dimension")
 	(length(sflags) ≠ npw) && error("sflags dimension")
 	(length(rflags) ≠ npw) && error("rflags dimension")
-	(maximum(tgridmod.x) < maximum(acqsrc[1].tgrid.x)) && error("modeling time is less than source time")
+	(maximum(tgridmod) < maximum(acqsrc[1].tgrid)) && error("modeling time is less than source time")
 	#(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
-	#any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod.x) for ip=1:length(TDout)]) && error("output time > modeling time")
+	#any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod) for ip=1:length(TDout)]) && error("output time > modeling time")
 
 	#! no modeling if source wavelet is zero
 	#if(maxval(abs(src_wavelets)) .lt. tiny(rzero_de)) 
@@ -397,14 +396,14 @@ function Param(;
 	#verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
 
 
-	check_fd_stability(vpmin, vpmax, model.mgrid.δx, model.mgrid.δz, freqmin, freqmax, tgridmod.δx, verbose)
+	check_fd_stability(vpmin, vpmax, step(model.mgrid[2]), step(model.mgrid[1]), freqmin, freqmax, step(tgridmod), verbose)
 
 
 	# where to store the boundary values (careful, born scaterrers cannot be inside these!?)
-	ibx0=npml-2; ibx1=model.mgrid.nx+npml+3
-	ibz0=npml-2; ibz1=model.mgrid.nz+npml+3
-#	ibx0=npml+1; ibx1=model.mgrid.nx+npml
-#	ibz0=npml+1; ibz1=model.mgrid.nz+npml
+	ibx0=npml-2; ibx1=length(model.mgrid[2])+npml+3
+	ibz0=npml-2; ibz1=length(model.mgrid[1])+npml+3
+#	ibx0=npml+1; ibx1=length(model.mgrid[2])+npml
+#	ibz0=npml+1; ibz1=length(model.mgrid[1])+npml
 #	println("**** Boundary Storage Changed **** ")
 
 	# for snaps
@@ -426,18 +425,18 @@ function Param(;
 	end
 
 	#create some aliases
-	nx, nz = exmodel.mgrid.nx, exmodel.mgrid.nz
-	nxd, nzd = model.mgrid.nx, model.mgrid.nz
-	δx, δz = exmodel.mgrid.δx, exmodel.mgrid.δz
-	δt = tgridmod.δx 
-	nt=tgridmod.nx
+	nz, nx = length.(exmodel.mgrid)
+	nzd, nxd = length.(model.mgrid)
+	δx, δz = step(exmodel.mgrid[2]), step(exmodel.mgrid[1])
+	δt = step(tgridmod)
+	nt=length(tgridmod)
 
-	δx24I, δz24I = (δx * 24.0)^(-1.0), (δz * 24.0)^(-1.0)
-	δxI, δzI = (δx)^(-1.0), (δz)^(-1.0)
-	δt = tgridmod.δx 
-	δtI = (δt)^(-1.0)
-	nt=tgridmod.nx
-	mesh_x, mesh_z = exmodel.mgrid.x, exmodel.mgrid.z
+	δx24I, δz24I = inv(δx * 24.0), inv(δz * 24.0)
+	δxI, δzI = inv(δx), inv(δz)
+	δt = step(tgridmod)
+	δtI = inv(δt)
+	nt=length(tgridmod)
+	mesh_x, mesh_z = exmodel.mgrid[2], exmodel.mgrid[1]
 
 
 	# perturbation vectors are required on full space
@@ -462,7 +461,7 @@ function Param(;
 	grad_modrr_stack=zeros(nz,nx)
 	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
-	itsnaps = [argmin(abs.(tgridmod.x .- tsnaps[i])) for i in 1:length(tsnaps)]
+	itsnaps = [argmin(abs.(tgridmod .- tsnaps[i])) for i in 1:length(tsnaps)]
 
 	nrmat=[acqgeom[ipw].nr[iss] for ipw in 1:npw, iss in 1:acqgeom[1].nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),acqgeom[1].nss)
@@ -549,7 +548,7 @@ in this case, model will be treated as the background model
 """
 function update_δmods!(pac::Paramc, δmod::Vector{Float64})
 	nx=pac.nx; nz=pac.nz
-	nznxd=pac.model.mgrid.nz*pac.model.mgrid.nx
+	nznxd=prod(length.(pac.model.mgrid))
 	copyto!(pac.δmod, δmod)
 	fill!(pac.δmodtt,0.0)
 	δmodtt=view(pac.δmodtt,npml+1:nz-npml,npml+1:nx-npml)
@@ -576,7 +575,7 @@ The model through which the waves are propagating
 is assumed to be the background model.
 """
 function update_δmods!(pac::Paramc, model_pert::Models.Seismic)
-	nznxd=pac.model.mgrid.nz*pac.model.mgrid.nx
+	nznxd=prod(length.(pac.model.mgrid))
 	fill!(pac.δmod,0.0)
 	Models.Seismic_get!(pac.δmod, model_pert, [:KI, :ρI])
 
@@ -643,12 +642,11 @@ function Paramss(iss::Int64, pac::Paramc)
 	npw=pac.npw
 	nt=pac.nt
 	nx=pac.nx; nz=pac.nz
-	nxd=pac.model.mgrid.nx
-	nzd=pac.model.mgrid.nz
+	nzd,nxd=length.(pac.model.mgrid)
 	acqgeom=pac.acqgeom
 	acqsrc=pac.acqsrc
 	sflags=pac.sflags
-	mesh_x, mesh_z = pac.exmodel.mgrid.x, pac.exmodel.mgrid.z
+	mesh_x, mesh_z = pac.exmodel.mgrid[2], pac.exmodel.mgrid[1]
 
 	# records_output, distributed array among different procs
 	records = [zeros(nt,pac.acqgeom[ipw].nr[iss],length(irfields)) for ipw in 1:npw]
@@ -670,7 +668,7 @@ function Paramss(iss::Int64, pac::Paramc)
 	
 
 	# storing boundary values for back propagation
-	nx1, nz1=pac.model.mgrid.nx, pac.model.mgrid.nz
+	nz1, nx1=length.(pac.model.mgrid)
 	if(pac.backprop_flag ≠ 0)
 		boundary=[zeros(3,nx1+6,nt),
 		  zeros(nz1+6,3,nt),
@@ -950,7 +948,7 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 		(pac.backprop_flag==1) && boundary_save_snap_vxvz!(issp,pac,pap.ss,pap)
 
 		"scale gradients for each issp"
-		(pac.gmodel_flag) && scale_gradient!(issp, pap.ss, pac.model.mgrid.δx*pac.model.mgrid.δz)
+		(pac.gmodel_flag) && scale_gradient!(issp, pap.ss, step(pac.model.mgrid[2])*step(pac.model.mgrid[1]))
 		
 
 	end # source_loop

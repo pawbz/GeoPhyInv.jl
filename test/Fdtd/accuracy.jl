@@ -3,8 +3,8 @@ using Statistics
 
 model = JuMIT.Gallery.Seismic(:acou_homo1);
 acqgeom = JuMIT.Gallery.Geom(model.mgrid,:xwell);
-tgrid = JuMIT.Gallery.M1D(:acou_homo1);
-wav = Signals.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
+tgrid = range(0.0,stop=2.0,length=1000)
+wav = JuMIT.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
 # source wavelet for modelling
 acqsrc = JuMIT.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
 

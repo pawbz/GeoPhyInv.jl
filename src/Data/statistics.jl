@@ -9,7 +9,7 @@ function Statistics.var(data1::TD)
 	μ=Statistics.mean(data1)
 	n=0
 	for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
-		for ir = 1:data1.acqgeom.nr[iss], it = 1:data1.tgrid.nx
+		for ir = 1:data1.acqgeom.nr[iss], it = 1:length(data1.tgrid)
 			n += 1
 			σ += (data1.d[iss, ifield][it, ir]-μ)^2 
 		end
@@ -21,7 +21,7 @@ function Statistics.mean(data1::TD)
 	n=0
 	μ=0.0
 	for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
-		for ir = 1:data1.acqgeom.nr[iss], it = 1:data1.tgrid.nx
+		for ir = 1:data1.acqgeom.nr[iss], it = 1:length(data1.tgrid)
 			n += 1
 			μ += data1.d[iss, ifield][it, ir]
 		end

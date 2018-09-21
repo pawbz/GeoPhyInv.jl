@@ -7,13 +7,13 @@ mod=randn(1000); mod0=2.0
 @btime JuMIT.Models.χg!(mod,mod0,-1)
 
 # some model
-mgrid = Grid.M2D(0.0, 10., 0., 10., .05,.05);
+mgrid = [range(0.0, stop=10.,step=0.05), range(0.0, stop=10.,step=0.05)];
 model = JuMIT.Models.Seismic_zeros(mgrid);
 vp0=[2100.,2200.];vs0=[-1., -1.]; ρ0=[2100., 2300.]
 JuMIT.Models.adjust_bounds!(model, vp0,vs0,ρ0);
 
 JuMIT.Models.Seismic_addon!(model, randn_perc=1e-3)
-nznx = model.mgrid.nz * model.mgrid.nx;
+nznx=prod(length.(model.mgrid))
 
 # test copyto!
 model_new=deepcopy(model)
@@ -36,7 +36,7 @@ for attribvec in [[:χKI,:χρI,:null], [:χKI,:null,:null], [:null,:χρ,:null]
 	@test model.χρ ≈ model0.χρ
 end
 
-nznx = model.mgrid.nz * model.mgrid.nx;
+nznx=prod(length.(model.mgrid))
 G1 = randn(nznx); G2 = randn(nznx);
 g1 = similar(G1); g2 = similar(G2);
 

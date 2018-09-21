@@ -3,11 +3,11 @@ function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc:
 
 	npw = size(wavelets,1)
 	nt = size(wavelets,2)
-	δt = acqsrc[1].tgrid.δx
+	δt = step(acqsrc[1].tgrid)
 	for ipw=1:npw
 		ns, snfield = size(wavelets[ipw,1]) # ns may vary with ipw
 		for ifield=1:snfield, is=1:ns
-			snt = acqsrc[ipw].tgrid.nx;
+			snt = length(acqsrc[ipw].tgrid)
 			if(sflags[ipw] == 0)
 				# nothing # just put zeros, no sources added
 				for it=1:nt

@@ -6,7 +6,7 @@
 * `gout` : output gradients according to parameterization
 """
 function gradient_chainrule!(gout, g, mod, parameterization)
-	nznx=mod.mgrid.nz*mod.mgrid.nx
+	nznx=prod(length.(mod.mgrid))
 	(length(gout)≠(count(parameterization.≠ :null)*nznx)) &&  error("size x")
 
 	ρ=mod.χρ; χ!(ρ, mod.ref.ρ,-1) # undo it later
@@ -55,7 +55,7 @@ grad_of_ρ(gρI, vp, ρ) = -1.0 * inv(abs2(ρ)) * (gρI)
 No different from the previous case, but...
 """
 function pert_gradient_chainrule!(gout, g, mod, parameterization)
-	nznx=mod.mgrid.nz*mod.mgrid.nx
+	nznx=prod(length.(mod.mgrid))
 	(length(gout)≠(count(parameterization.≠ :null)*nznx)) &&  error("size x")
 	fill!(gout, 0.0)
 	if(parameterization == [:χKI, :χρI, :null]) 
@@ -117,7 +117,7 @@ function Seismic_chainrule!(
 		      flag::Int64=1
 		      )
 
-	nznx=mod.mgrid.nz*mod.mgrid.nx
+	nznx=prod(length.(mod.mgrid))
 	(length(g)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
 
 	ρ=mod.χρ; χ!(ρ, mod.ref.ρ,-1) # undo it later

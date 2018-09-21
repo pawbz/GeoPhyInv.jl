@@ -18,7 +18,7 @@ function Seismic_reparameterize!(
 		      attribvec::Vector{Symbol}=[:χKI, :χρI, :null]
 		      )
 	iszero(mod) ? error("mod cannot be zero") : nothing
-	nznx=mod.mgrid.nz*mod.mgrid.nx
+	nznx=prod(length.(mod.mgrid))
 	(length(x)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
 	if(attribvec == [:χKI, :χρI, :null]) 
 		@inbounds for i in 1:nznx 
@@ -56,7 +56,7 @@ Output perturbations of KI and rhoI, i.e., without the contrast.
 `mod` is just used for reference values.
 """
 function pert_reparameterize!(δxout, δx, mod, parameterization)
-	nznx=mod.mgrid.nz*mod.mgrid.nx
+	nznx=prod(length.(mod.mgrid))
 	fill!(δxout, 0.0)
 	if(parameterization == [:χKI, :χρI, :null]) 
 		@inbounds for i in 1:nznx

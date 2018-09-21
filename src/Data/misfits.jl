@@ -100,11 +100,11 @@ function P_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 
 
 	paconvssf=[Conv.P_conv(ssize=[coup.tgridssf.nx], 
-			dsize=[y.tgrid.nx,y.acqgeom.nr[iss]], 
-			gsize=[y.tgrid.nx,y.acqgeom.nr[iss]], 
+			dsize=[length(y.tgrid),y.acqgeom.nr[iss]], 
+			gsize=[length(y.tgrid),y.acqgeom.nr[iss]], 
 		      slags=coup.ssflags, 
-		      dlags=[y.tgrid.nx-1, 0], 
-		      glags=[y.tgrid.nx-1, 0]) for iss in 1:y.acqgeom.nss]
+		      dlags=[length(y.tgrid)-1, 0], 
+		      glags=[length(y.tgrid)-1, 0]) for iss in 1:y.acqgeom.nss]
 
 	dJssf=deepcopy(coup.ssf)
 
@@ -122,13 +122,13 @@ function P_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 	ynorm = dot(y, y)
 	(ynorm == 0.0) && error("y cannot be zero")
 
-	dJxc=zeros(y.tgrid.nx)
+	dJxc=zeros(length(y.tgrid))
 
 	if(func_attrib==:cls)
 		pacse=[Conv.P_misfit_xcorr(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
 		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	elseif(func_attrib==:xcorrcls)
-		pacse=[Conv.P_misfit_xcorr(y.tgrid.nx, y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		pacse=[Conv.P_misfit_xcorr(length(y.tgrid), y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 		func=[(dJx,x)->Conv.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	end
 

@@ -24,10 +24,10 @@ function xfwi_problem(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=
 
 		acqsrc=Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=3)
 		tgrid=acqsrc.tgrid 
-		igrid=Grid.M2D_resamp(model.mgrid, 50.,50.,)
+		igrid=broadcast(x->range(x[1],stop=x[end],step=50.),model.mgrid)
 		igrid_interp_scheme=:B2
 	elseif(attrib==:downhole)
-		gri = Grid.M2D(-30.,30.,-120.,30.,1.0,1.0)
+		gri = [range(-120.,stop=30.,step=1.0), range(-30.,stop=30.,step=1.0)]
 		model = Models.Seismic_zeros(gri)
 		Models.adjust_bounds!(model, [2500., 3500.], [2500., 3500.], [2500.,3500.])
 		model0=deepcopy(model)
@@ -39,7 +39,7 @@ function xfwi_problem(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=
 		acqgeom=Acquisition.Geom_fixed(-75., -50., 0.0, -100., -50., 0.0, 2, 20, :vertical, :vertical)
 		acqsrc=Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=8, tmaxfrac=0.8)
 		tgrid=acqsrc.tgrid 
-		igrid=Grid.M2D(-30.,30.,-40.,30.,40,100)
+		igrid=[range(-40.,stop=30.,length=100), range(-30.,stop=30.,length=40)]
 		igrid_interp_scheme=:B2
 	else
 		error("invalid attrib")

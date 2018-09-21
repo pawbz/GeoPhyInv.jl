@@ -97,7 +97,7 @@ end
 
 function update_gradient!(pac::Paramc)
 	nx, nz=pac.nx, pac.nz
-	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
+	nznxd = prod(length.(pac.model.mgrid))
 
 	# combine rrvx and rrvz
 	grad_modrr!(pac)

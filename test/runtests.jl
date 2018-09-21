@@ -7,7 +7,6 @@ using Test
 using Signals
 using Misfits
 using BenchmarkTools
-using Grid
 using Profile
 
 function initialize(fp)
@@ -30,8 +29,6 @@ for t in ["accuracy", "backprop", "rho_projection"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end
-
-
 
 folder="FWI"
 for t in ["gradient_accuracy", "born_map"]

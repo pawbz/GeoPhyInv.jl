@@ -15,7 +15,6 @@ module FWI
 
 using Interpolation
 using Conv
-using Grid
 using Misfits
 using Inversion
 using TimerOutputs
@@ -54,11 +53,11 @@ FWI Parameters
 
 # Fields
 
-* `mgrid::Grid.M2D` : modelling grid
-* `igrid::Grid.M2D` : inversion grid
+* `mgrid::Vector{StepRangeLen}` : modelling grid
+* `igrid::Vector{StepRangeLen}` : inversion grid
 * `acqsrc::Acquisition.Src` : base source wavelet for modelling data
 * `acqgeom::Acquisition.Geom` : acquisition geometry
-* `tgrid::Grid.M1D` : 
+* `tgrid::StepRangeLen` : 
 * `attrib_mod`
 * `model_obs` : model used for generating observed data
 * `model0` : background velocity model (only used during Born modeling and inversion)
@@ -151,7 +150,7 @@ Convert the data `TD` to `Src` after time reversal.
 """
 function update_adjsrc!(adjsrc, δdat::Data.TD, adjacqgeom)
 	(adjsrc.fields != δdat.fields) && error("dissimilar fields")
-	nt=δdat.tgrid.nx
+	nt=length(δdat.tgrid)
 	for i in 1:adjacqgeom.nss
 		for (j,field) in enumerate(δdat.fields)
 			wav=adjsrc.wav[i,j] 
@@ -184,14 +183,14 @@ Constructor for `Param`
 
 * `acqsrc::Acquisition.Src` : source time functions
 * `acqgeom::Acquisition.Geom` : acquisition geometry
-* `tgrid::Grid.M1D` : modelling time grid
+* `tgrid::StepRangeLen` : modelling time grid
 * `attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}` : modelling attribute
 * `modm::Models.Seismic` : seismic model on modelling mesh 
 
 # Optional Arguments
-* `tgrid_obs::Grid.M1D` : time grid for observed data
+* `tgrid_obs::StepRangeLen` : time grid for observed data
 
-* `igrid::Grid.M2D=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
+* `igrid::Vector{StepRangeLen}=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
 * `igrid_interp_scheme` : interpolation scheme
   * `=:B1` linear 
   * `=:B2` second order 
@@ -218,13 +217,13 @@ Constructor for `Param`
 function Param(
 	       acqsrc::Acquisition.Src,
 	       acqgeom::Acquisition.Geom,
-	       tgrid::Grid.M1D,
+	       tgrid::StepRangeLen,
 	       attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}, 
 	       modm::Models.Seismic;
 	       # other optional 
-	       tgrid_obs::Grid.M1D=deepcopy(tgrid),
+	       tgrid_obs::StepRangeLen=deepcopy(tgrid),
 	       rfields=[:P],
-	       igrid::Grid.M2D=nothing,
+	       igrid=nothing,
 	       igrid_interp_scheme::Symbol=:B2,
 	       mprecon_factor::Float64=1.0,
 	       dobs::Data.TD=Data.TD_zeros(rfields,tgrid_obs,acqgeom),
@@ -249,11 +248,14 @@ function Param(
 	# igrid has to truncated because the gradient evaluation 
 	# is inaccurate on boundaries
 	mg=modm.mgrid
-	igrid=Grid.M2D(max(mg.x[3],igrid.x[1]),
-		min(igrid.x[end],mg.x[end-2]),
-		max(igrid.z[1],mg.z[3]),
-		min(igrid.z[end],mg.z[end-2]),
-		 		igrid.nx,igrid.nz)
+	igrid=[
+	range(max(igrid[1][1],mg[1][3]),
+		stop=min(igrid[1][end],mg[1][end-2]),
+		length=length(igrid[1])),
+		range(max(mg[2][3],igrid[2][1]),
+		stop=min(igrid[2][end],mg[2][end-2]),
+		length=length(igrid[2])),
+		]
 
 
 	# create modi according to igrid and interpolation of modm
@@ -322,10 +324,10 @@ function Param(
 
 	paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,acqgeom),dobs,w=dprecon);
 
-	paminterp=Interpolation.Kernel([modi.mgrid.x, modi.mgrid.z], [modm.mgrid.x, modm.mgrid.z], igrid_interp_scheme)
+	paminterp=Interpolation.Kernel([modi.mgrid[2], modi.mgrid[1]], [modm.mgrid[2], modm.mgrid[1]], igrid_interp_scheme)
 
-	mx=Inversion.X(modi.mgrid.nz*modi.mgrid.nx*count(parameterization.≠:null),2)
-	mxm=Inversion.X(modm.mgrid.nz*modm.mgrid.nx*count(parameterization.≠:null),2)
+	mx=Inversion.X(prod(length.(modi.mgrid))*count(parameterization.≠:null),2)
+	mxm=Inversion.X(prod(length.(modm.mgrid))*count(parameterization.≠:null),2)
 
 
 	# put modm as a vector, according to parameterization in mxm.x
@@ -420,7 +422,7 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 	(any(illum .<= 0.0)) && error("illum cannot be negative or zero")
 	(mprecon_factor < 1.0)  && error("invalid mprecon_factor")
 
-	illumi = zeros(pa.modi.mgrid.nz, pa.modi.mgrid.nx)
+	illumi = zeros(length(pa.modi.mgrid[1]), length(pa.modi.mgrid[2]))
 	Interpolation.interp_spray!(illumi, illum, pa.paminterp, :spray)
 	(any(illumi .<= 0.0)) && error("illumi cannot be negative or zero")
 
@@ -501,7 +503,7 @@ Return bound vectors for the `Seismic` model,
 depeding on paramaterization
 """
 function Seismic_xbound!(lower_x, upper_x, pa)
-	nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
+	nznx = prod(length.(pa.modi.mgrid))
 
 	bound1 = similar(lower_x)
 	# create a Seismic model with minimum possible values

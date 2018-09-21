@@ -1,7 +1,6 @@
 
 model=JuMIT.Gallery.Seismic(:acou_homo1)
 JuMIT.Models.Seismic_addon!(model, randn_perc=0.1, fields=[:χvp,:χρ])
-#model.mgrid.npml=5;
 acqgeom =JuMIT.Acquisition.Geom_circ(nss=4,nr=100,rad=[990.,990.]);
 acqgeom =JuMIT.Acquisition.Geom_circ(nss=4,nr=100,rad=[0.,200.]);
 acqsrc=JuMIT.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=0.4)

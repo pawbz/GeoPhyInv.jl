@@ -69,9 +69,9 @@ version = "0.5.0"
 
 [[ColorTypes]]
 deps = ["FixedPointNumbers", "Random", "Test"]
-git-tree-sha1 = "0e3209ba7418aed732e5c3818076b4400ee36c08"
+git-tree-sha1 = "f73b0e10f2a5756de7019818a41654686da06b09"
 uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
-version = "0.7.4"
+version = "0.7.5"
 
 [[ColorVectorSpace]]
 deps = ["ColorTypes", "Colors", "FixedPointNumbers", "LinearAlgebra", "SpecialFunctions", "Statistics", "StatsBase", "Test"]
@@ -111,7 +111,7 @@ version = "1.0.1"
 
 [[Conv]]
 deps = ["BenchmarkTools", "Calculus", "DSP", "FFTW", "LinearAlgebra", "Misfits", "Test"]
-git-tree-sha1 = "9c9c58e8906fb031b7759f0e60ef273f62c4b36e"
+git-tree-sha1 = "c0288db1147b67cae67d4e4af6849a8f22b748ad"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Conv.jl.git"
 uuid = "eca63721-1f9a-5e79-b7ed-eda27904149e"
@@ -148,10 +148,10 @@ uuid = "9a8bc11e-79be-5b39-94d7-1ccc349a1a85"
 version = "0.4.1"
 
 [[DataStructures]]
-deps = ["InteractiveUtils", "REPL", "Random", "Serialization", "Test"]
-git-tree-sha1 = "5162c360c52e9265e0bfafb71415c31f746f7e04"
+deps = ["InteractiveUtils", "OrderedCollections", "REPL", "Random", "Serialization", "Test"]
+git-tree-sha1 = "70c9a5215aa61d216f2f6ef209a8e190c3c17b40"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.12.0"
+version = "0.13.0"
 
 [[Dates]]
 deps = ["Printf"]
@@ -235,18 +235,11 @@ git-tree-sha1 = "e3ead4211073d4117a0d2ef7d1efc5c8092c8412"
 uuid = "a2bd30eb-e257-5431-a919-1863eab51364"
 version = "0.4.0"
 
-[[Grid]]
-git-tree-sha1 = "2da65cc87f9ee3db680252e82faa1888a912a0bc"
-repo-rev = "master"
-repo-url = "https://github.com/pawbz/Grid.jl.git"
-uuid = "03512f2c-8e8a-5728-b518-32bdd82c6646"
-version = "0.0.0"
-
 [[ImageCore]]
 deps = ["ColorTypes", "Colors", "FFTW", "FixedPointNumbers", "Graphics", "MappedArrays", "OffsetArrays", "PaddedViews", "Pkg", "Random", "Statistics", "Test"]
-git-tree-sha1 = "b274f3abdcc10a0885187af3b7c7b2d67b73d0fe"
+git-tree-sha1 = "2b4e3847ef8c1f9a8904c89a66b4b9331d93fbce"
 uuid = "a09fc81d-aa75-5fe9-8630-4744c3626534"
-version = "0.7.1"
+version = "0.7.2"
 
 [[ImageFiltering]]
 deps = ["CatIndices", "ColorVectorSpace", "Colors", "ComputationalResources", "DataStructures", "FFTViews", "FFTW", "FixedPointNumbers", "ImageCore", "LinearAlgebra", "Logging", "MappedArrays", "OffsetArrays", "Random", "StaticArrays", "Statistics", "Test", "TiledIteration"]
@@ -268,7 +261,7 @@ version = "0.7.0"
 
 [[Interpolation]]
 deps = ["BenchmarkTools", "LinearAlgebra", "LinearMaps", "SparseArrays", "Test"]
-git-tree-sha1 = "9e268a2ae2b9b049c154a96b6f3a0d64f5d94d67"
+git-tree-sha1 = "42d01525fa5b52d003d738a41674b3ac8495484c"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Interpolation.jl.git"
 uuid = "475ca4d2-b0ae-5dbf-b83e-9b10c0db9a39"
@@ -282,7 +275,7 @@ version = "0.3.0"
 
 [[Inversion]]
 deps = ["BenchmarkTools", "Calculus", "DataFrames", "Misfits", "Optim", "Printf", "ProgressMeter", "RecipesBase", "Test", "TimerOutputs"]
-git-tree-sha1 = "1c1b91fc13baec9d04d1e48fa00b61cb2769e57d"
+git-tree-sha1 = "a143e491499fb79a7b61793464823b9c38891bba"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Inversion.jl.git"
 uuid = "0a622ac7-8c5c-5314-a750-ace189c80c19"
@@ -349,9 +342,9 @@ version = "0.6.0"
 
 [[MathProgBase]]
 deps = ["Compat"]
-git-tree-sha1 = "83b11194ca1c6353f39307f3221c804fff96350d"
+git-tree-sha1 = "eb8bcdf4cc7869651013df29ad6ee16dc8e53794"
 uuid = "fdba3010-5040-5b88-9595-932c9decdf73"
-version = "0.7.5"
+version = "0.7.6"
 
 [[Misfits]]
 deps = ["BenchmarkTools", "Calculus", "Distances", "ForwardDiff", "LinearAlgebra", "LinearMaps", "StatsBase", "Test"]
@@ -363,9 +356,9 @@ version = "0.0.0"
 
 [[Missings]]
 deps = ["Dates", "InteractiveUtils", "SparseArrays", "Test"]
-git-tree-sha1 = "196528fa1df03df435025f52f9c1ff8356f94738"
+git-tree-sha1 = "adc26d2ee85a49c413464110d922cf21efc9d233"
 uuid = "e1d29d7a-bbdc-5cf2-9ac0-f12de2c33e28"
-version = "0.3.0"
+version = "0.3.1"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -395,10 +388,10 @@ uuid = "429524aa-4258-5aef-a3af-852621145aeb"
 version = "0.17.1"
 
 [[OrderedCollections]]
-deps = ["InteractiveUtils", "Pkg", "Random", "Serialization", "Test"]
-git-tree-sha1 = "27af6dc22697bf20ace8e3a45f404a34eaf0b819"
+deps = ["Pkg", "Random", "Serialization", "Test"]
+git-tree-sha1 = "41da1edba028376b58520ca01d9a41e29f855d55"
 uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
-version = "1.0.0"
+version = "1.0.1"
 
 [[PDMats]]
 deps = ["Arpack", "LinearAlgebra", "SparseArrays", "SuiteSparse", "Test"]
@@ -408,9 +401,9 @@ version = "0.9.5"
 
 [[PaddedViews]]
 deps = ["OffsetArrays", "Test"]
-git-tree-sha1 = "a6ecf172a704baa599ee1cc2c2953d129ce6aa31"
+git-tree-sha1 = "7da3e7e1a58cffbf10177553ae95f17b92516912"
 uuid = "5432bcbf-9aad-5242-b902-cca2824c8663"
-version = "0.4.1"
+version = "0.4.2"
 
 [[Parameters]]
 deps = ["Markdown", "OrderedCollections", "Pkg", "REPL", "Test"]
@@ -503,8 +496,8 @@ deps = ["Distributed", "Mmap", "Random", "Serialization"]
 uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 
 [[Signals]]
-deps = ["Conv", "DSP", "DistributedArrays", "Distributions", "FFTW", "Grid", "Interpolation", "LinearAlgebra", "Misfits", "ProgressMeter", "Test"]
-git-tree-sha1 = "cd1e9b0ca82b63750153451b6b5e710018c062b7"
+deps = ["Conv", "DSP", "DistributedArrays", "Distributions", "FFTW", "Interpolation", "LinearAlgebra", "Misfits", "ProgressMeter", "Test"]
+git-tree-sha1 = "20ee955d75d9baa1b76f1a19085672a7528390f5"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Signals.jl.git"
 uuid = "6303bc30-01ab-52eb-8b10-60e47555a8d1"
