@@ -271,7 +271,7 @@ version = "0.3.0"
 deps = ["BenchmarkTools", "Calculus", "DataFrames", "Misfits", "Optim", "Printf", "ProgressMeter", "RecipesBase", "Test", "TimerOutputs"]
 git-tree-sha1 = "c8b098a4aeb0f802b8b2c6a308082e0b185143d2"
 repo-rev = "master"
-repo-url = "https://github.com/pawbz/Inversion.jl.git"
+repo-url = "git@github.com:pawbz/Inversion.jl.git"
 uuid = "0a622ac7-8c5c-5314-a750-ace189c80c19"
 version = "1.0.0"
 
