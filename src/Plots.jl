@@ -274,8 +274,8 @@ Plot time-domain data of type `Data.TD`
 	any(ssvec .> dat.acqgeom.nss) && error("invalid ssvec")
 	ns = length(ssvec);
 	nr = maximum(dat.acqgeom.nr);
-	dd=getfield(dat,fieldnames(dat)[1])
-	fieldvec = findin(dat.fields, fields)
+	dd=getfield(dat,fieldnames(typeof(dat))[1])
+	fieldvec = findall(in(fields),dat.fields)
 	if(tr_flag)
 		dp = hcat(dd[ssvec,fieldvec][end:-1:1,:]...);
 		dz = dat.tgrid

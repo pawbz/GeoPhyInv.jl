@@ -7,6 +7,7 @@ import JuMIT.Models
 import JuMIT.Acquisition
 import JuMIT.FWI
 import JuMIT.Utils
+using Statistics
 
 global marmousi_folder=joinpath(@__DIR__, "marmousi2")
 
@@ -62,7 +63,7 @@ function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 		vs0=Models.bounds(vs,bfrac); 
 		ρ0=Models.bounds(ρ, bfrac);
 		mgrid=[range(0.,stop=3500.,length=size(vp,1)),range(0., stop=17000., length=size(vp,2))]
-		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
+		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,mean(vp0),1), Models.χ(vs,mean(vs0),1), Models.χ(ρ,mean(ρ0),1), mgrid)
 	elseif(attrib == :seismic_marmousi2_high_res)
 		vp, h= IO.readsu(joinpath(marmousi_folder,"vp_marmousi-ii.su"))
 		vs, h= IO.readsu(joinpath(marmousi_folder,"vs_marmousi-ii.su"))
@@ -72,7 +73,7 @@ function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 		vs0=Models.bounds(vs,bfrac); 
 		ρ0=Models.bounds(ρ, bfrac);
 		mgrid=[range(0.,stop=3500.,length=size(vp,1)),range(0., stop=17000., length=size(vp,2))]
-		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
+		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,mean(vp0),1), Models.χ(vs,mean(vs0),1), Models.χ(ρ,mean(ρ0),1), mgrid)
 
 	elseif(attrib == :seismic_marmousi2_xwell)
 		model=Models.Seismic_trun(Seismic(:seismic_marmousi2_high_res), 
