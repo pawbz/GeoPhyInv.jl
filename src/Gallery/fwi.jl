@@ -39,7 +39,7 @@ function xfwi_problem(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=
 		acqgeom=Acquisition.Geom_fixed(-75., -50., 0.0, -100., -50., 0.0, 2, 20, :vertical, :vertical)
 		acqsrc=Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=8, tmaxfrac=0.8)
 		tgrid=acqsrc.tgrid 
-		igrid=[range(-40.,stop=30.,length=100), range(-30.,stop=30.,length=40)]
+		igrid=[range(-40.,stop=30.,length=100), range(-30.,length=1,step=60.)]
 		igrid_interp_scheme=:B2
 	else
 		error("invalid attrib")
