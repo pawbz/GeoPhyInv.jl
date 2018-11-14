@@ -248,14 +248,21 @@ function Param(
 	# igrid has to truncated because the gradient evaluation 
 	# is inaccurate on boundaries
 	mg=modm.mgrid
-	igrid=[
-	range(max(igrid[1][1],mg[1][3]),
-		stop=min(igrid[1][end],mg[1][end-2]),
-		length=length(igrid[1])),
-		range(max(mg[2][3],igrid[2][1]),
-		stop=min(igrid[2][end],mg[2][end-2]),
-		length=length(igrid[2])),
-		]
+	amin=max(igrid[1][1],mg[1][3])
+	amax=min(igrid[1][end],mg[1][end-2])
+	if(length(igrid[1])==1)
+		grid1=range(amin,step=min(step(igrid[1]), amax-amin),length=1)  
+	else
+		grid1=range(amin,stop=amax,length=length(igrid[1]))
+	end
+	amin=max(mg[2][3],igrid[2][1])
+	amax=min(igrid[2][end],mg[2][end-2])
+	if(length(igrid[2])==1)
+		grid2=range(amin,step=min(step(igrid[2]), amax-amin),length=1)  
+	else
+		grid2=range(amin,stop=amax,length=length(igrid[2]))
+	end
+	igrid=[grid1, grid2]
 
 
 	# create modi according to igrid and interpolation of modm
