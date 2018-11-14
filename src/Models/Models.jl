@@ -146,8 +146,8 @@ Since the reference values are adjust the χ fields should also be changed
 """
 function adjust_bounds!(mod::Seismic, frac::Float64=0.1)
 	for f in [:χvp, :χρ, :χvs]
-		f0 = Symbol((replace("$(f)", "χ", "")),0)
-		fm = Symbol((replace("$(f)", "χ", "")))
+		f0 = Symbol((replace("$(f)", "χ" => "")),0)
+		fm = Symbol((replace("$(f)", "χ" => "")))
 		m = Seismic_get(mod, fm)
 		m0 = bounds(m, frac)
 		setfield!(mod, f0, m0)
@@ -427,7 +427,7 @@ function Seismic_addon!(mod::Seismic;
 			iz in 1:length(mod.mgrid[1]), ix in 1:length(mod.mgrid[2]) ]
 	end
 	if(!(constant_pert == 0.0))
-		temp += constant_pert
+		temp .+= constant_pert
 	end
 
 
@@ -514,7 +514,6 @@ the input bounds cannot be strictly imposed.
 function Seismic_trun(mod::Seismic;
 			 zmin::Float64=mod.mgrid[1][1], zmax::Float64=mod.mgrid[1][end],
 			 xmin::Float64=mod.mgrid[2][1], xmax::Float64=mod.mgrid[2][end],
-			 npml
 			 )
 
 	izmin = Interpolation.indminn(mod.mgrid[1], zmin, 1)[1]
@@ -530,7 +529,7 @@ function Seismic_trun(mod::Seismic;
 	adjust_bounds!(mod_trun, mod)
 
 	for f in [:χvp, :χvs, :χρ]
-		f0 = Symbol((replace("$(f)", "χ", "")),0)
+		f0 = Symbol((replace("$(f)", "χ" => "")),0)
 		setfield!(mod_trun, f, getfield(mod, f)[izmin:izmax, ixmin:ixmax])
 		setfield!(mod_trun, f0, getfield(mod, f0)) # adjust bounds later after truncation if necessary
 	end

@@ -474,10 +474,10 @@ Advance either source or receiver array in an acquisition geometry in horizontal
 function Geom_advance(geom::Geom, advances::Vector{Vector{Float64}}=[[0.,0.], [0.,0.]]) 
 	geom_out=deepcopy(geom)
 	for iss=1:geom.nss
-		geom_out.sx[iss][:] += advances[1][2]
-		geom_out.sz[iss][:] += advances[1][1]
-		geom_out.rx[iss][:] += advances[2][2]
-		geom_out.rz[iss][:] += advances[2][1]
+		geom_out.sx[iss][:] .+= advances[1][2]
+		geom_out.sz[iss][:] .+= advances[1][1]
+		geom_out.rx[iss][:] .+= advances[2][2]
+		geom_out.rz[iss][:] .+= advances[2][1]
 	end
 	return geom_out
 end
