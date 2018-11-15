@@ -255,7 +255,7 @@ uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[Interpolation]]
 deps = ["BenchmarkTools", "LinearAlgebra", "LinearMaps", "SparseArrays", "Test"]
-git-tree-sha1 = "65e2ccb0fc1dcf9786a56f28c8889f0223083363"
+git-tree-sha1 = "1323f938ed8cbfe129aa1b83ecb63ae7d6030c9e"
 repo-rev = "master"
 repo-url = "https://github.com/pawbz/Interpolation.jl.git"
 uuid = "475ca4d2-b0ae-5dbf-b83e-9b10c0db9a39"
