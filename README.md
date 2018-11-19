@@ -1,12 +1,23 @@
 # Julia Modeling and Inversion Toolbox
 
 ## Installation
-Install this package using:
+Install these packages after pressing `]` in Julia:
 ```julia
-Pkg.clone("https://github.com/pawbz/JuMIT.jl.git")
+add https://github.com/pawbz/Misfits.jl.git
+add https://github.com/pawbz/Inversion.jl.git
+add https://github.com/pawbz/Interpolation.jl.git
+add https://github.com/pawbz/Conv.jl.git
+add https://github.com/pawbz/JuMIT.jl.git
 ```
 
 ## Tutorials
+
+### Forward Modeling
+* generate seismic data using 2D finite-difference simulation
+solvers
+[notebook] (https://github.com/pawbz/JuMIT/notebooks/modeling)
+
+
 Various tutorials that demonstrate the use of this software are available 
 [here](https://github.com/pawbz/JuMITtutorials). Installation if `IJulia` is necessary.
 
