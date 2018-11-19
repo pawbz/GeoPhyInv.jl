@@ -15,7 +15,6 @@ module FWI
 
 using Interpolation
 using Conv
-using Grid
 using Misfits
 using Inversion
 using TimerOutputs
@@ -43,17 +42,22 @@ struct ModFdtdBorn end
 
 struct ModFdtdHBorn end
 
+# fields
+struct P end
+struct Vx end
+struct Vz end
+
 
 """
 FWI Parameters
 
 # Fields
 
-* `mgrid::Grid.M2D` : modelling grid
-* `igrid::Grid.M2D` : inversion grid
+* `mgrid::Vector{StepRangeLen}` : modelling grid
+* `igrid::Vector{StepRangeLen}` : inversion grid
 * `acqsrc::Acquisition.Src` : base source wavelet for modelling data
 * `acqgeom::Acquisition.Geom` : acquisition geometry
-* `tgrid::Grid.M1D` : 
+* `tgrid::StepRangeLen` : 
 * `attrib_mod`
 * `model_obs` : model used for generating observed data
 * `model0` : background velocity model (only used during Born modeling and inversion)
@@ -63,7 +67,7 @@ FWI Parameters
 
 TODO: add an extra attribute for coupling functions inversion and modelling
 """
-mutable struct Param{Tmod, Tattrib_mod, Tdatamisfit}
+mutable struct Param{Tmod, Tdatamisfit}
 	"model inversion variable"
 	mx::Inversion.X{Float64,1}
 	mxm::Inversion.X{Float64,1}
@@ -77,8 +81,6 @@ mutable struct Param{Tmod, Tattrib_mod, Tdatamisfit}
 	acqgeom::Acquisition.Geom
 	"acquisition geometry for adjoint propagation"
 	adjacqgeom::Acquisition.Geom
-	"modeling attribute"
-	attrib_mod::Tattrib_mod
 	"Seismic model on modeling grid"
 	modm::Models.Seismic
 	"background Seismic model"
@@ -89,8 +91,6 @@ mutable struct Param{Tmod, Tattrib_mod, Tdatamisfit}
 	mod_initial::Models.Seismic
 	"prior model on the inversion grid"
 	priori::Models.Seismic
-	"prior weights on the inversion grid"
-	priorw::Models.Seismic
 	"gradient Seismic model on modeling grid"
 	gmodm::Models.Seismic
 	"gradient Seismic on inversion grid"
@@ -111,15 +111,30 @@ Base.print(pa::Param)=nothing
 Base.show(pa::Param)=nothing
 Base.display(pa::Param)=nothing
 
+# add data inverse covariance matrix here later
 struct LS end # just cls inversion
 
 struct LS_prior # cls inversion including prior 
-	α::Vector{Float64} # weights
+	# add data inverse covariance matrix here later, instead of just Float64
+	pdgls::Float64
+	# pdgls
+	pmgls::Misfits.P_gls{Float64}
+end
+LS_prior(α1::Float64, Q::LinearMap)=LS_prior(α1, Misfits.P_gls(Q))
+
+"""
+this method constructs prior term with Q=α*I
+* `ninv` : number of inversion variables, use `xfwi_ninv` 
+* `α` : scalar
+"""
+function LS_prior(ninv::Int, α=[1.0, 0.5])
+	Q=LinearMap(
+	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
+	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
+		      ninv, ninv, ismutating=true, issymmetric=true)
+	return LS_prior(α[1],Misfits.P_gls(Q))
 end
 
-function LS_prior()
-	return LS_prior([1.0, 0.5])
-end
 
 struct Migr end # returns first gradient
 
@@ -134,20 +149,26 @@ include("xwfwi.jl")
 Convert the data `TD` to `Src` after time reversal.
 """
 function update_adjsrc!(adjsrc, δdat::Data.TD, adjacqgeom)
-	nt=δdat.tgrid.nx
+	(adjsrc.fields != δdat.fields) && error("dissimilar fields")
+	nt=length(δdat.tgrid)
 	for i in 1:adjacqgeom.nss
-		for j in 1:length(δdat.fields)
+		for (j,field) in enumerate(δdat.fields)
 			wav=adjsrc.wav[i,j] 
 			dat=δdat.d[i,j]
 			for ir in 1:δdat.acqgeom.nr[i]
 				for it in 1:nt
-					@inbounds wav[it,ir]=dat[nt-it+1,ir]
+					@inbounds wav[it,ir]=value_adjsrc(dat[nt-it+1,ir],eval(field)())
 				end
 			end
 		end
 	end
 	return nothing
 end
+
+value_adjsrc(s, ::P) = s
+value_adjsrc(s, ::Vx) = -1.0*s # see adj tests
+value_adjsrc(s, ::Vz) = -1.0*s
+
 
 function generate_adjsrc(fields, tgrid, adjacqgeom)
 	adjsrc=Acquisition.Src_zeros(adjacqgeom, fields, tgrid)
@@ -162,14 +183,14 @@ Constructor for `Param`
 
 * `acqsrc::Acquisition.Src` : source time functions
 * `acqgeom::Acquisition.Geom` : acquisition geometry
-* `tgrid::Grid.M1D` : modelling time grid
+* `tgrid::StepRangeLen` : modelling time grid
 * `attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}` : modelling attribute
 * `modm::Models.Seismic` : seismic model on modelling mesh 
 
 # Optional Arguments
-* `tgrid_obs::Grid.M1D` : time grid for observed data
+* `tgrid_obs::StepRangeLen` : time grid for observed data
 
-* `igrid::Grid.M2D=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
+* `igrid::Vector{StepRangeLen}=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
 * `igrid_interp_scheme` : interpolation scheme
   * `=:B1` linear 
   * `=:B2` second order 
@@ -196,16 +217,16 @@ Constructor for `Param`
 function Param(
 	       acqsrc::Acquisition.Src,
 	       acqgeom::Acquisition.Geom,
-	       tgrid::Grid.M1D,
+	       tgrid::StepRangeLen,
 	       attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}, 
 	       modm::Models.Seismic;
 	       # other optional 
-	       tgrid_obs::Grid.M1D=deepcopy(tgrid),
-	       recv_fields=[:P],
-	       igrid::Grid.M2D=nothing,
+	       tgrid_obs::StepRangeLen=deepcopy(tgrid),
+	       rfields=[:P],
+	       igrid=nothing,
 	       igrid_interp_scheme::Symbol=:B2,
 	       mprecon_factor::Float64=1.0,
-	       dobs::Data.TD=Data.TD_zeros(recv_fields,tgrid_obs,acqgeom),
+	       dobs::Data.TD=Data.TD_zeros(rfields,tgrid_obs,acqgeom),
 	       dprecon=nothing,
 	       tlagssf_fracs=0.0,
 	       tlagrf_fracs=0.0,
@@ -227,11 +248,21 @@ function Param(
 	# igrid has to truncated because the gradient evaluation 
 	# is inaccurate on boundaries
 	mg=modm.mgrid
-	igrid=Grid.M2D(max(mg.x[3],igrid.x[1]),
-		min(igrid.x[end],mg.x[end-2]),
-		max(igrid.z[1],mg.z[3]),
-		min(igrid.z[end],mg.z[end-2]),
-		 		igrid.nx,igrid.nz,igrid.npml)
+	amin=max(igrid[1][1],mg[1][3])
+	amax=min(igrid[1][end],mg[1][end-2])
+	if(length(igrid[1])==1)
+		grid1=range(amin,step=min(step(igrid[1]), mg[1][end-2]-amin),length=1)  
+	else
+		grid1=range(amin,stop=amax,length=length(igrid[1]))
+	end
+	amin=max(mg[2][3],igrid[2][1])
+	amax=min(igrid[2][end],mg[2][end-2])
+	if(length(igrid[2])==1)
+		grid2=range(amin,step=min(step(igrid[2]), mg[2][end-2]-amin),length=1)  
+	else
+		grid2=range(amin,stop=amax,length=length(igrid[2]))
+	end
+	igrid=[grid1, grid2]
 
 
 	# create modi according to igrid and interpolation of modm
@@ -245,37 +276,30 @@ function Param(
 
 	# allocate prior inputs
 	priori=similar(modi)
-	priorw=similar(modi)
 
-	# check initial models
-	if(typeof(attrib_mod) == ModFdtdBorn)
-		(modm0===nothing) && error("need modm0 for Born mod")
-		isequal(modm0, modm_obs) && error("change background model used for Born modelling")
-	else
-		modm0=similar(modm) # some dummy
-		fill!(modm, 0.0)
+	# use default background model modm0
+	if(modm0 === nothing)
+		modm0=deepcopy(modm) # some dummy
+		fill!(modm0, 0.0)
 	end
+	isequal(modm0, modm_obs) && (@warn "modm0 == modm_obs")
+
 	if(attrib == :synthetic) 
-		isequal(modm, modm_obs) && error("initial model same as actual model")
+		isequal(modm, modm_obs) && error("initial model same as actual model, zero misfit?")
 	end
 
 	# acqgeom geometry for adjoint propagation
 	adjacqgeom = AdjGeom(acqgeom)
 
 	# generate adjoint sources
-	adjsrc=generate_adjsrc(recv_fields, tgrid, adjacqgeom)
-
-	if(typeof(attrib_mod) == ModFdtd)
-		born_flag=false
-	else
-		born_flag=true
-	end
+	adjsrc=generate_adjsrc(rfields, tgrid, adjacqgeom)
 
 	# generating forward and adjoint modelling engines
 	# to generate modelled data, border values, etc.
-	# most of the parameters given to this are dummy, except for born_flag
-	paf=Fdtd.Param(npw=2, model=modm, born_flag=born_flag,
+	# most of the parameters given to this are dummy
+	paf=Fdtd.Param(npw=2, model=modm, born_flag=true,
 		acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], 
+		rfields=rfields,
 		sflags=[3, 2], rflags=[1, 1],
 		backprop_flag=1, 
 		tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
@@ -295,22 +319,22 @@ function Param(
 	end
 	
 	# create Parameters for data misfit
-	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, recv_fields, acqgeom)
+	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, rfields, acqgeom)
 	# choose the data misfit
 	#	(iszero(tlagssf_fracs)) 
  	# tlagssf_fracs==[0.0] | tlagssf_fracs=[0.0])
-	# paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
+	# paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
 	if(iszero(dobs))
 		Random.randn!(dobs) # dummy dobs, update later
 	end
 
-	paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon);
+	paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,acqgeom),dobs,w=dprecon);
 
-	paminterp=Interpolation.Kernel([modi.mgrid.x, modi.mgrid.z], [modm.mgrid.x, modm.mgrid.z], igrid_interp_scheme)
+	paminterp=Interpolation.Kernel([modi.mgrid[2], modi.mgrid[1]], [modm.mgrid[2], modm.mgrid[1]], igrid_interp_scheme)
 
-	mx=Inversion.X(modi.mgrid.nz*modi.mgrid.nx*count(parameterization.≠:null),2)
-	mxm=Inversion.X(modm.mgrid.nz*modm.mgrid.nx*count(parameterization.≠:null),2)
+	mx=Inversion.X(prod(length.(modi.mgrid))*count(parameterization.≠:null),2)
+	mxm=Inversion.X(prod(length.(modm.mgrid))*count(parameterization.≠:null),2)
 
 
 	# put modm as a vector, according to parameterization in mxm.x
@@ -320,12 +344,11 @@ function Param(
 	     mx, mxm,
 	     paf,
 	     deepcopy(acqsrc), 
-	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
+	     Acquisition.Src_zeros(adjacqgeom, rfields, tgrid),
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
-	     attrib_mod,  
 	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,
-	     priori, priorw,
+	     priori,
 	     gmodm,gmodi,
 	     parameterization,
 	     zeros(2,2), # dummy, update mprecon later
@@ -335,26 +358,13 @@ function Param(
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic))
-		# update model in the same forward engine
-		# save modm
-		modm_copy=deepcopy(pa.modm)
-
-		# change model to actual model
-		copyto!(pa.modm, modm_obs)
-
-		F!(pa, nothing, pa.attrib_mod)
-
-		copyto!(pa.paTD.y, pa.paTD.x)
-
-		# put back model and sources
-		copyto!(pa.modm, modm_copy)
-
-	        Fdtd.initialize!(paf.c)  # clear everything
+		update_observed_data!(pa, modm_obs, attrib_mod)
 	end
+
 	iszero(dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
 
 	# generate modelled data
-	F!(pa, nothing, pa.attrib_mod)
+	F!(pa, nothing, attrib_mod)
 
 #	build_mprecon!(pa, Array(pa.paf.c.illum_stack), mprecon_factor)
 	pa.paf.c.illum_flag=false # switch off illum flag for speed
@@ -362,11 +372,37 @@ function Param(
 	# default weights are 1.0
 	fill!(pa.mx.w, 1.0)
 
-	# update priori and priorw in pa to defaults
+	# update priori in pa to defaults
 	update_prior!(pa)
 	
 	return pa
 end
+
+"""
+update the *synthetic* observed data in `Param`
+* allocated memory, don't use in inner loops
+"""
+function update_observed_data!(pa::Param, modm_obs, attrib_mod=ModFdtd())
+	# save modm of pa to put it back later
+	modm_copy=deepcopy(pa.modm)
+
+	# change modm in pa to actual model
+	copyto!(pa.modm, modm_obs)
+
+	# update models in the forward engine and do modelling
+	# ModFdtdBorn: modm0 will be used as a background model for Born modelling and modm will be perturbed model
+	# ModFdtd: modm will be *the* model
+	F!(pa, nothing, attrib_mod)
+
+	# get observed data
+	copyto!(pa.paTD.y, pa.paTD.x)
+
+	# put back model and sources
+	copyto!(pa.modm, modm_copy)
+
+	Fdtd.initialize!(pa.paf.c)  # clear everything
+end
+
 
 
 """
@@ -393,7 +429,7 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 	(any(illum .<= 0.0)) && error("illum cannot be negative or zero")
 	(mprecon_factor < 1.0)  && error("invalid mprecon_factor")
 
-	illumi = zeros(pa.modi.mgrid.nz, pa.modi.mgrid.nx)
+	illumi = zeros(length(pa.modi.mgrid[1]), length(pa.modi.mgrid[2]))
 	Interpolation.interp_spray!(illumi, illum, pa.paminterp, :spray)
 	(any(illumi .<= 0.0)) && error("illumi cannot be negative or zero")
 
@@ -429,6 +465,18 @@ function x_to_modm!(pa, x)
 	Models.Seismic_reparameterize!(pa.modm,pa.mxm.x,pa.parameterization) 
 end
 
+
+function δx_to_δmods!(pa, δx)
+	# get x on dense grid
+	Interpolation.interp_spray!(δx, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
+
+	# reparameterize accordingly to get [δKI, δρI]
+	Models.pert_reparameterize!(pa.paf.c.δmod, pa.mxm.x, pa.modm0, pa.parameterization)
+
+	# input [δKI, δρI] to the modeling engine
+	Fdtd.update_δmods!(pa.paf.c, pa.paf.c.δmod)
+end
+
 """
 convert the gradient output from Fdtd to gx
 """
@@ -462,7 +510,7 @@ Return bound vectors for the `Seismic` model,
 depeding on paramaterization
 """
 function Seismic_xbound!(lower_x, upper_x, pa)
-	nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
+	nznx = prod(length.(pa.modi.mgrid))
 
 	bound1 = similar(lower_x)
 	# create a Seismic model with minimum possible values

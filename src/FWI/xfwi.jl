@@ -17,12 +17,12 @@ function initialize!(pa::Param)
 end
 
 # finalize xfwi or wfwi on pa
-function finalize!(pa::Param, xminimizer)
+function finalize!(pa::Param, xminimizer, attrib_mod)
 	# update modm
 	x_to_modm!(pa, xminimizer)
 
 	# update calculated data using the minimizer
-	F!(pa, nothing, pa.attrib_mod)
+	F!(pa, nothing, attrib_mod)
 
 	# put minimizer into modi
 	Models.Seismic_reparameterize!(pa.modi, xminimizer, pa.parameterization) 
@@ -58,7 +58,7 @@ The gradiet is computed using the adjoint state method.
 * returns the result of optimization as an Optim.jl object
   * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
 """
-function xfwi!(pa::Param, obj::Union{LS,LS_prior}; 
+function xfwi!(pa::Param, obj::Union{LS,LS_prior}, attrib_mod; 
 	   optim_scheme=LBFGS(),
 	   optim_options=Optim.Options(show_trace=true,
 	   store_trace=true, 
@@ -79,8 +79,8 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 
 	initialize!(pa)
 
-	f(x) = ζfunc(x, pa.mx.last_x,  pa, obj)
-	g!(storage, x) = ζgrad!(storage, x, pa.mx.last_x, pa, obj)
+	f(x) = ζfunc(x, pa.mx.last_x,  pa, obj, attrib_mod)
+	g!(storage, x) = ζgrad!(storage, x, pa.mx.last_x, pa, obj, attrib_mod)
 	if(!bounded_flag)
 		"""
 		Unbounded LBFGS inversion, only for testing
@@ -94,12 +94,12 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 		"""
 		if (solver == :ipopt)
 			function eval_f(x)
-			    return ζfunc(x, pa.mx.last_x,  pa, obj)
+			    return ζfunc(x, pa.mx.last_x,  pa, obj, attrib_mod)
 			end
 
 
 			function eval_grad_f(x, grad_f)
-			    ζgrad!(grad_f, x, pa.mx.last_x, pa, obj)
+			    ζgrad!(grad_f, x, pa.mx.last_x, pa, obj, attrib_mod)
 			end
 
 
@@ -111,7 +111,8 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 			    
 			end
 
-			prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, Array{Float64}(0), Array{Float64}(0), 0, 0,
+			prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, 
+				Array{Float64}(undef,0), Array{Float64}(undef,0), 0, 0,
 					eval_f, void_g, eval_grad_f, void_g_jac, nothing)
 
 			addOption(prob, "hessian_approximation", "limited-memory")
@@ -133,7 +134,7 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 			end
                 end
 	end
-	show(to)
+	println(to)
 
 	# print some stuff after optimization...
 	if (solver == :ipopt)
@@ -145,9 +146,9 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior};
 
 	# finalize optimization, using the optimizer... 
 	if solver == :ipopt
-		finalize!(pa, prob.x)
+		finalize!(pa, prob.x, attrib_mod)
 	else
-		finalize!(pa, Optim.minimizer(res))
+		finalize!(pa, Optim.minimizer(res), attrib_mod)
 	end
 
 
@@ -158,7 +159,7 @@ end
 """
 Return gradient at the first iteration, i.e., a migration image
 """
-function xfwi!(pa::Param, obj::Migr)
+function xfwi!(pa::Param, obj::Migr, attrib_mod)
 
 	global to
 	reset_timer!(to)
@@ -167,9 +168,9 @@ function xfwi!(pa::Param, obj::Migr)
 
 	g1=pa.mx.gm[1]
 	@timeit to "xfwi!" begin
-		grad!(g1, pa.mx.x, pa.mx.last_x,  pa)
+		grad!(g1, pa.mx.x, pa.mx.last_x,  pa, attrib_mod)
 	end
-	show(to)
+	println(to)
 
 	# convert gradient vector to model
 	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, g1, pa)
@@ -182,7 +183,7 @@ end
 Return gradient at the first iteration, i.e., a migration image, without using
 adjoint state method.
 """
-function xfwi!(pa::Param, obj::Migr_fd)
+function xfwi!(pa::Param, obj::Migr_fd, attrib_mod)
 	global to
 	reset_timer!(to)
 
@@ -191,11 +192,11 @@ function xfwi!(pa::Param, obj::Migr_fd)
 
 	println("> number of functional evaluations:\t", xfwi_ninv(pa)) 
 
-	f(x) = ζfunc(x, pa.mx.last_x,  pa, LS())
+	f(x) = ζfunc(x, pa.mx.last_x,  pa, LS(), attrib_mod)
 
 	gx = Calculus.gradient(f,pa.mx.x) # allocating new gradient vector here
 	
-	show(to)
+	println(to)
 
 	# convert gradient vector to model
 	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)

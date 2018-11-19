@@ -1,22 +1,17 @@
-#addprocs(2)
-using JuMIT
-using Base.Test
-using Signals
-using Misfits
-using BenchmarkTools
 
+using Statistics
 
 model = JuMIT.Gallery.Seismic(:acou_homo1);
 acqgeom = JuMIT.Gallery.Geom(model.mgrid,:xwell);
-tgrid = JuMIT.Gallery.M1D(:acou_homo1);
-wav = Signals.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
+tgrid = range(0.0,stop=2.0,length=1000)
+wav = JuMIT.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
 # source wavelet for modelling
 acqsrc = JuMIT.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
 
 
 vp0=mean(JuMIT.Models.χ(model.χvp,model.ref.vp,-1))
 ρ0=mean(JuMIT.Models.χ(model.χρ,model.ref.ρ,-1))
-rec1 = JuMIT.Analytic.mod(vp0=vp0,
+rec1 = JuMIT.Born.mod(vp0=vp0,
             model_pert=model,
 		     ρ0=ρ0,
 			 acqgeom=acqgeom, acqsrc=acqsrc, tgridmod=tgrid, src_flag=2)

@@ -1,62 +1,15 @@
 module Gallery
 
-using Grid
 using Signals
 using Pkg
 import JuMIT.IO
 import JuMIT.Models
 import JuMIT.Acquisition
 import JuMIT.FWI
+import JuMIT.Utils
+using Statistics
 
 global marmousi_folder=joinpath(@__DIR__, "marmousi2")
-
-"""
-Gallery of `M2D` grids.
-
-# Arguments 
-* `attrib::Symbol` : 
-
-# Outputs
-* `attrib=:acou_homo1` : a square grid for with 201 samples in each dimension, with 50 PML 
-		points; both X and Z vary from -1000 to 1000.
-* `attrib=:acou_homo2` : a square grid for with 51 samples in each dimension, with 50 PML 
-		points; both X and Z vary from -1000 to 1000. 
-"""
-function M2D(attrib::Symbol)
-	if(attrib == :acou_homo1)
-		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,201,201,50)
-	elseif(attrib == :acou_homo2)
-		return Grid.M2D(-1000.0,1000.0,-1000.0,1000.0,51,51,50)
-	else
-		error("invalid attrib")
-	end
-end
-
-
-"""
-Gallery of `M1D` grids.
-
-# Arguments 
-* `attrib::Symbol` : 
-
-# Outputs
-* `attrib=:acou_homo1` : a time grid for with 1000 samples; maximum time is 2 s
-* `attrib=:acou_homo1_long` : a time grid for with 1000 samples; maximum time is 4 s
-* `attrib=:npow2samp1` : a sample npow2 grid with 16 samples
-"""
-function M1D(attrib::Symbol)
-	if(attrib == :acou_homo1)
-		return Grid.M1D(0.0,2.0,1000)
-	elseif(attrib == :acou_homo1_long)
-		return Grid.M1D(0.0,4.0,2000)
-	elseif(attrib == :acou_homo2)
-		return Grid.M1D(0.0,2.0,250)
-	elseif(attrib == :npow2samp)
-		return Grid.M1D(npow2=16,δ=0.0001)
-	else
-		error("invalid attrib")
-	end
-end
 
 
 """
@@ -81,22 +34,24 @@ function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 		vp0 = [1500., 3500.] # bounds for vp
 		vs0 = [1.0, 1.0] # dummy
 		ρ0 = [1500., 3500.] # density bounds
-		mgrid = M2D(attrib)
+		mgrid = repeat([range(-1000.0,stop=1000.0,length=201)],2)
+		nz,nx=length.(mgrid)
 		model= Models.Seismic(vp0, vs0, ρ0,
-		      fill(0.0, (mgrid.nz, mgrid.nx)),
-		      fill(0.0, (mgrid.nz, mgrid.nx)),
-		      fill(0.0, (mgrid.nz, mgrid.nx)),
+		      fill(0.0, (nz, nx)),
+		      fill(0.0, (nz, nx)),
+		      fill(0.0, (nz, nx)),
 		      mgrid)
 
 	elseif((attrib == :acou_homo2))
 		vp0 = [1700., 2300.] # bounds for vp
 		vs0 = [1.0, 1.0] # dummy
 		ρ0 = [1700., 2300.] # density bounds
-		mgrid = M2D(attrib)
+		mgrid = repeat([range(-1000.0,stop=1000.0,length=51)],2)
+		nz,nx=length.(mgrid)
 		model= Models.Seismic(vp0, vs0, ρ0,
-		      fill(0.0, (mgrid.nz, mgrid.nx)),
-		      fill(0.0, (mgrid.nz, mgrid.nx)),
-		      fill(0.0, (mgrid.nz, mgrid.nx)),
+		      fill(0.0, (nz, nx)),
+		      fill(0.0, (nz, nx)),
+		      fill(0.0, (nz, nx)),
 		      mgrid)
 
 	elseif(attrib == :seismic_marmousi2)
@@ -107,8 +62,8 @@ function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 		vp0=Models.bounds(vp,bfrac); 
 		vs0=Models.bounds(vs,bfrac); 
 		ρ0=Models.bounds(ρ, bfrac);
-		mgrid = Grid.M2D(0., 17000., 0., 3500.,size(vp,2),size(vp,1),40)
-		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
+		mgrid=[range(0.,stop=3500.,length=size(vp,1)),range(0., stop=17000., length=size(vp,2))]
+		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,mean(vp0),1), Models.χ(vs,mean(vs0),1), Models.χ(ρ,mean(ρ0),1), mgrid)
 	elseif(attrib == :seismic_marmousi2_high_res)
 		vp, h= IO.readsu(joinpath(marmousi_folder,"vp_marmousi-ii.su"))
 		vs, h= IO.readsu(joinpath(marmousi_folder,"vs_marmousi-ii.su"))
@@ -117,8 +72,8 @@ function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 		vp0=Models.bounds(vp,bfrac); 
 		vs0=Models.bounds(vs,bfrac); 
 		ρ0=Models.bounds(ρ, bfrac);
-		mgrid = Grid.M2D(0., 17000., 0., 3500.,size(vp,2),size(vp,1),40)
-		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,vp0,1), Models.χ(vs,vs0,1), Models.χ(ρ,ρ0,1), mgrid)
+		mgrid=[range(0.,stop=3500.,length=size(vp,1)),range(0., stop=17000., length=size(vp,2))]
+		model= Models.Seismic(vp0, vs0, ρ0, Models.χ(vp,mean(vp0),1), Models.χ(vs,mean(vs0),1), Models.χ(ρ,mean(ρ0),1), mgrid)
 
 	elseif(attrib == :seismic_marmousi2_xwell)
 		model=Models.Seismic_trun(Seismic(:seismic_marmousi2_high_res), 
@@ -144,7 +99,7 @@ function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 		verbose && Models.print(model,string(attrib))
 		return model
 	elseif(δ > 0.0)
-		mgrid_out=Grid.M2D_resamp(model.mgrid,δ,δ,)
+		mgrid_out=broadcast(x->range(x[1],stop=x[end],step=δ),model.mgrid)
 		model_out=Models.Seismic_zeros(mgrid_out)
 		Models.adjust_bounds!(model_out,model)
 		Models.interp_spray!(model, model_out, :interp, :B1)
@@ -158,11 +113,11 @@ function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
 end
 
 """
-Gallery of acquisition geometries `Geom` using an input mesh `M2D`.
+Gallery of acquisition geometries `Geom` using an input mesh.
 The sources and receivers are not placed anywhere on the edges of the mesh.
 
 # Arguments 
-* `mgrid::Grid.M2D` : a 2-D mesh
+* `mgrid` : a 2-D mesh
 * `attrib::Symbol` : attribute decides output
   * `=:xwell` cross-well acquisition
   * `=:surf` surface acquisition
@@ -176,14 +131,14 @@ The sources and receivers are not placed anywhere on the edges of the mesh.
 * `nr=2` : number of receivers per supersource
 * `rand_flags::Vector{Bool}=[false, false]` : randomly or equally spaced supersources and receivers.
 """
-function Geom(mgrid::Grid.M2D, attrib::Symbol; nss=2, nr=2, rand_flags=[false, false])
-	otx=(0.9*mgrid.x[1]+0.1*mgrid.x[end]); ntx=(0.1*mgrid.x[1]+0.9*mgrid.x[end]);
-	otwx=(0.95*mgrid.x[1]+0.05*mgrid.x[end]); ntwx=(0.05*mgrid.x[1]+0.95*mgrid.x[end]);
-	otz=(0.9*mgrid.z[1]+0.1*mgrid.z[end]); ntz=(0.1*mgrid.z[1]+0.9*mgrid.z[end]);
-	otwz=(0.95*mgrid.z[1]+0.05*mgrid.z[end]); ntwz=(0.05*mgrid.z[1]+0.95*mgrid.z[end]);
-	quatx = (0.75*mgrid.x[1]+0.25*mgrid.x[end]); quatz = (0.75*mgrid.z[1]+0.25*mgrid.z[end]) 
-	tquatx = (0.25*mgrid.x[1]+0.75*mgrid.x[end]); tquatz = (0.25*mgrid.z[1]+0.75*mgrid.z[end]) 
-	halfx = 0.5*(mgrid.x[1]+mgrid.x[end]);	halfz = 0.5*(mgrid.z[1]+mgrid.z[end]);
+function Geom(mgrid, attrib::Symbol; nss=2, nr=2, rand_flags=[false, false])
+	otx=(0.9*mgrid[2][1]+0.1*mgrid[2][end]); ntx=(0.1*mgrid[2][1]+0.9*mgrid[2][end]);
+	otwx=(0.95*mgrid[2][1]+0.05*mgrid[2][end]); ntwx=(0.05*mgrid[2][1]+0.95*mgrid[2][end]);
+	otz=(0.9*mgrid[1][1]+0.1*mgrid[1][end]); ntz=(0.1*mgrid[1][1]+0.9*mgrid[1][end]);
+	otwz=(0.95*mgrid[1][1]+0.05*mgrid[1][end]); ntwz=(0.05*mgrid[1][1]+0.95*mgrid[1][end]);
+	quatx = (0.75*mgrid[2][1]+0.25*mgrid[2][end]); quatz = (0.75*mgrid[1][1]+0.25*mgrid[1][end]) 
+	tquatx = (0.25*mgrid[2][1]+0.75*mgrid[2][end]); tquatz = (0.25*mgrid[1][1]+0.75*mgrid[1][end]) 
+	halfx = 0.5*(mgrid[2][1]+mgrid[2][end]);	halfz = 0.5*(mgrid[1][1]+mgrid[1][end]);
 	if(attrib == :xwell)
 		geom=Acquisition.Geom_fixed(otz, ntz, otx, otz, ntz, ntx, nss, nr, :vertical, :vertical, rand_flags)
 	elseif(attrib == :surf)
@@ -213,16 +168,16 @@ Gallery of source signals `Src`.
 """
 function Src(attrib::Symbol, nss::Int64=1)
 	if(attrib == :acou_homo1)
-		tgrid = M1D(attrib)
-		wav = Signals.Wavelets.ricker(10.0, tgrid, tpeak=0.25, )
+		tgrid=range(0.0,stop=2.0,length=1000)
+		wav = Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25, )
 		return Acquisition.Src_fixed(nss, 1, [:P], wav, tgrid)
 	elseif(attrib == :acou_homo2)
-		tgrid = M1D(attrib)
-		wav = Signals.Wavelets.ricker(3.0, tgrid, tpeak=0.3, )
+		tgrid=range(0.0,stop=2.0,length=250)
+		wav = Utils.Wavelets.ricker(3.0, tgrid, tpeak=0.3, )
 		return Acquisition.Src_fixed(nss, 1, [:P], wav, tgrid)
 	elseif(attrib == :vecacou_homo1)
-		tgrid = M1D(:acou_homo1)
-		wav = Signals.Wavelets.ricker(10.0, tgrid, tpeak=0.25, )
+		tgrid=range(0.0,stop=2.0,length=1000)
+		wav = Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25, )
 		return Acquisition.Src_fixed(nss, 1, [:P, :Vx, :Vz], wav, tgrid)
 	end
 end

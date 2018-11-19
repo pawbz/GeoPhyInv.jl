@@ -3,13 +3,13 @@
 Return functional and gradient of the LS objective 
 * `last_x::Vector{Float64}` : buffer is only updated when x!=last_x, and modified such that last_x=x
 """
-function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
+function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::Param, attrib_mod)
 	global to
 
 	if(!isequal(x, last_x))
 		copyto!(last_x, x)
 		# do forward modelling, apply F x
-		@timeit to "F!" F!(pa, x, pa.attrib_mod)
+		@timeit to "F!" F!(pa, x, attrib_mod)
 	end
 
 	# compute misfit 
@@ -17,14 +17,14 @@ function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 	return f
 end
 
-function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
+function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param, attrib_mod)
 	global to
 
 	# (inactive when applied on same model)
 	if(!isequal(x, last_x))
 		copyto!(last_x, x)
 		# do forward modelling, apply F x 
-		@timeit to "F!" F!(pa, x, pa.attrib_mod)
+		@timeit to "F!" F!(pa, x, attrib_mod)
 	end
 
 	# compute functional and get ∇_d J (adjoint sources)
@@ -37,40 +37,42 @@ function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
 	@timeit to "Fadj!" Fadj!(pa)	
 
 	# adjoint of interpolation
-        spray_gradient!(storage,  pa, pa.attrib_mod)
+        spray_gradient!(storage,  pa, attrib_mod)
 
 	return storage
 end 
 
 
 
-function ζfunc(x, last_x, pa::Param, ::LS)
-	return func(x, last_x, pa)
+function ζfunc(x, last_x, pa::Param, ::LS, attrib_mod)
+	return func(x, last_x, pa, attrib_mod)
 end
 
 
-function ζgrad!(storage, x, last_x, pa::Param, ::LS)
-	return grad!(storage, x, last_x, pa)
+function ζgrad!(storage, x, last_x, pa::Param, ::LS, attrib_mod)
+	return grad!(storage, x, last_x, pa, attrib_mod)
 end
 
 
-function ζfunc(x, last_x, pa::Param, obj::LS_prior)
-	f1=func(x, last_x, pa)
+function ζfunc(x, last_x, pa::Param, obj::LS_prior, attrib_mod)
+	f1=func(x, last_x, pa, attrib_mod)
 
-	f2=Misfits.error_squared_euclidean!(nothing, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+	# calculate the generalized least-squares error
+	# note: change the inverse model covariance matrix `pmgls.Q` accordingly
+	f2=Misfits.func_grad!(nothing, x, pa.mx.prior, obj.pmgls)
 
-	return f1*obj.α[1]+f2*obj.α[2]
+	return f1*obj.pdgls+f2
 end
 
-function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior)
+function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior, attrib_mod)
 	g1=pa.mx.gm[1]
-	grad!(g1, x, last_x, pa)
+	grad!(g1, x, last_x, pa, attrib_mod)
 
 	g2=pa.mx.gm[2]
-	Misfits.error_squared_euclidean!(g2, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+	Misfits.func_grad!(g2, x, pa.mx.prior, obj.pmgls)
 
-	rmul!(g1, obj.α[1])
-	rmul!(g2, obj.α[2])
+	rmul!(g1, obj.pdgls)
+
 	for i in eachindex(storage)
 		@inbounds storage[i]=g1[i]+g2[i]
 	end
@@ -93,6 +95,9 @@ and boundary values for adjoint calculation.
 * if x is absent, using `pa.modm` for modeling
 """
 function F!(pa::Param, x, ::ModFdtd)
+
+	# switch off born scattering
+	pa.paf.c.born_flag=false
 
 	# initialize boundary, as we will record them now
 	Fdtd.initialize_boundary!(pa.paf)
@@ -125,16 +130,23 @@ end
 Born modeling with `modm` as the perturbed model and `modm0` as the background model.
 """
 function F!(pa::Param, x, ::ModFdtdBorn)
-	# switch on born scattering
-	pa.paf.c.born_flag=true
 
+	# update background model in the forward engine 
+	Fdtd.update_model!(pa.paf.c, pa.modm0)
 	if(!(x===nothing))
 		# project x, which lives in modi, on to model space (modm)
 		x_to_modm!(pa, x)
 	end
+	# update perturbed models in the forward engine
+	Fdtd.update_δmods!(pa.paf.c, pa.modm)
 
-	# update background and perturbed models in the forward engine
-	Fdtd.update_model!(pa.paf.c, pa.modm0, pa.modm)
+	Fbornmod!(pa::Param)
+end
+
+function Fbornmod!(pa::Param) 
+
+	# switch on born scattering
+	pa.paf.c.born_flag=true
 
 	pa.paf.c.activepw=[1,2] # two wavefields are active
 	pa.paf.c.illum_flag=false 
@@ -144,20 +156,16 @@ function F!(pa::Param, x, ::ModFdtdBorn)
 	# source wavelets (for second wavefield, they are dummy)
 	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
 
-	if(Fdtd.iszero_boundary(pa.paf))
-		# if boundary is not recorded before, record it.. 
-		pa.paf.c.backprop_flag=1 # store boundary values for gradient later
-	else
-		# otherwise, to do faster
-		pa.paf.c.backprop_flag=0 
-	end
+	# actually, should record only when background field is changed
+	pa.paf.c.backprop_flag=1 # store boundary values for gradient later
+
 	pa.paf.c.gmodel_flag=false # no gradient
-	
 
 	Fdtd.mod!(pa.paf);
 	dcal=pa.paf.c.data[2]
 	copyto!(pa.paTD.x,dcal)
 
+	# switch off born scattering once done
 	pa.paf.c.born_flag=false
 end
 
@@ -167,7 +175,10 @@ Perform adjoint modelling in `paf` using adjoint sources `adjsrc`.
 """
 function Fadj!(pa::Param)
 
-	# require gradient
+	# need to explicitly turn off the born flag for adjoint modelling
+	pa.paf.c.born_flag=false
+
+	# require gradient, switch on the flag
 	pa.paf.c.gmodel_flag=true
 
 	# both wavefields are active
@@ -176,17 +187,14 @@ function Fadj!(pa::Param)
 	# no need of illum during adjoint modeling
 	pa.paf.c.illum_flag=false
 
-	# need to explicitly turn off the born flag for adjoint modelling
-	pa.paf.c.born_flag=false
-
 	# force boundaries in first pw and back propagation for second pw
-	pa.paf.c.sflags=[3,2] 
+	pa.paf.c.sflags=[-2,2] 
 	pa.paf.c.backprop_flag=-1
 
 	# update source wavelets in paf using adjoint sources
 	Fdtd.update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
 
-	# no need to record data
+	# no need to record data during adjoint propagation
 	pa.paf.c.rflags=[0,0]
 
 	# adjoint modelling
@@ -200,7 +208,6 @@ end
 
 
 function operator_Born(pa)
-	(typeof(pa.attrib_mod) ≠ ModFdtdBorn) && error("need born flag")
 	fw=(y,x)->Fborn_map!(y, x, pa)
 	bk=(y,x)->Fadj_map!(y, x, pa)
 
@@ -210,13 +217,14 @@ function operator_Born(pa)
 		  ismutating=true)
 end
 
-function Fborn_map!(y, x, pa)
-	F!(pa, x, ModFdtdBorn())
-	copyto!(y, pa.paTD.x)
+function Fborn_map!(δy, δx, pa)
+	δx_to_δmods!(pa, δx)
+	Fbornmod!(pa)
+	copyto!(δy, pa.paTD.x)
 end
 
-function Fadj_map!(y, x, pa)
-	copyto!(pa.paTD.dJx, x)
+function Fadj_map!(δy, δx, pa)
+	copyto!(pa.paTD.dJx, δx)
 
 	# adjoint sources
 	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
@@ -224,8 +232,13 @@ function Fadj_map!(y, x, pa)
 	# adjoint simulation
 	Fadj!(pa)
 
-	# adjoint of interpolation
-	spray_gradient!(y,  pa, ModFdtdBorn())
+	# chain rule corresponding to reparameterization
+	Models.pert_gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm0, pa.parameterization)
+
+	# finally, adjoint of interpolation
+	Interpolation.interp_spray!(δy, 
+			     pa.mxm.gx, pa.paminterp, :spray, 
+			     count(pa.parameterization.≠:null))
 end
 
 

@@ -8,9 +8,8 @@ const JD=JuMIT.Data
 
 fields=[:P]
 # testing misfit and gradient calculation for TD objects
-tgrid1=Grid.M1D(0.,1.,5);
-
-tgrid2=Grid.M1D(0.,1.,10);
+tgrid1=range(0., stop=1., length=5);
+tgrid2=range(0., stop=1., length=10);
 
 acqgeom=JuMIT.Acquisition.Geom_fixed(10,10,10,10,10,10,10,10)
 

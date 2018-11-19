@@ -11,7 +11,7 @@ data preconditioning matrix
 # Keyword Arguments
 
 * `offsetlim::Vector{Float64}=[-Inf,Inf]` : [xoffsetlim, zoffsetlim], where the records with offsets > `offsetlim` are given zero weight 
-* `tlim::Vector{Float64}=[dw.tgrid.x[1], dw.tgrid.x[end]]` : [tminimum, tmaximum], time mute window 
+* `tlim::Vector{Float64}=[dw.tgrid[1], dw.tgrid[end]]` : [tminimum, tmaximum], time mute window 
 * `offsetpow::Vector{Float64}=[0.0,0.0]` : 
 * `tpow::Float64=0.0` :
 * `ttaperperc::Float64=0.` : taper window percentage for time window
@@ -21,22 +21,22 @@ data preconditioning matrix
 function TD_weight!(
 		    dw::TD;
 		    offsetlim::Vector{Float64}=[-Inf,Inf],
-		    tlim::Vector{Float64}=[dw.tgrid.x[1], dw.tgrid.x[end]],
+		    tlim::Vector{Float64}=[dw.tgrid[1], dw.tgrid[end]],
 		    offsetpow::Vector{Float64}=[0.0,0.0],
 		    tpow::Float64=0.0,
 		    ttaperperc::Float64=0.,
 		  )
 
-	tvecexp = dw.tgrid.x - dw.tgrid.x[1]
+	tvecexp = dw.tgrid - dw.tgrid[1]
 	tmaxI = maximum(inv.(abs.(tvecexp)))
-	nt = dw.tgrid.nx
+	nt = length(dw.tgrid)
 	fields=dw.fields
 	nss=dw.acqgeom.nss
 	rx=dw.acqgeom.rx; rz=dw.acqgeom.rz
 	sx=dw.acqgeom.sx; sz=dw.acqgeom.sz
 	nr=dw.acqgeom.nr; ns=dw.acqgeom.ns
 
-	itlim = sort(broadcast(indmin,[abs.(dw.tgrid.x-tlim[i]) for i in 1:2]))
+	itlim = sort(broadcast(indmin,[abs.(dw.tgrid-tlim[i]) for i in 1:2]))
 	twin=zeros(nt)
 	twin[itlim[1] : itlim[2]] = Signals.DSP.taper(ones(itlim[2]-itlim[1]+1),ttaperperc) 
 

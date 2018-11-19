@@ -24,12 +24,11 @@ end
 
 function findfreq(
 		  x::Array{Float64, ND},
-		  tgrid::Grid.M1D;
+		  tgrid;
 		  attrib::Symbol=:peak,
 		  threshold::Float64=-50.
 		  ) where {ND}
-
-	fgrid=Grid.M1D_rfft(tgrid);
+	fgrid=DSP.rfftfreq(length(tgrid), inv(step(tgrid)))
 
 	ax = (abs.(cx).^2); # power spectrum in dB
 
@@ -48,7 +47,7 @@ function findfreq(
 		iii=argmax(ax)
 	end
 	ii=ind2sub(size(ax),iii)[1]
-	return fgrid.x[ii]
+	return fgrid[ii]
 
 end
 

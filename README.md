@@ -3,11 +3,16 @@
 ## Installation
 Install these packages after pressing `]` in Julia:
 ```julia
+<<<<<<< HEAD
 add https://github.com/pawbz/Misfits.jl.git
 add https://github.com/pawbz/Inversion.jl.git
 add https://github.com/pawbz/Interpolation.jl.git
 add https://github.com/pawbz/Conv.jl.git
 add https://github.com/pawbz/JuMIT.jl.git
+=======
+using Pkg
+Pkg.add("https://github.com/pawbz/JuMIT.jl.git")
+>>>>>>> d4892e6afe7e0968dd37cef4629b25563dfb2775
 ```
 
 ## Tutorials
@@ -27,7 +32,8 @@ Online documentation of various modules of this package can be found
 [here](https://pawbz.github.io/JuMIT.jl/).
 
 
-##  Constrained inversion
+## Credits
+* Thanks to Charles Clerget [@chclerget](https://github.com/chclerget) for testing a few methods of this package.
 
 
 

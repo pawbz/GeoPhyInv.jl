@@ -7,7 +7,6 @@ seismic data.
 """
 module Data
 
-using Grid
 using Conv
 using Interpolation
 #using DeConv
@@ -27,20 +26,20 @@ Time domain representation of Seismic Data.
 
 * `d::Array{Array{Float64,2},2}` : data 
 * `fields::Vector{Symbol}` : components recorded at each receiver
-* `tgrid::Grid.M1D` : grid to represent time
+* `tgrid` : grid to represent time
 * `acqgeom::Acquisition.Geom` : acquisition geometry used to generate the data
 """
 mutable struct TD
 	d::Matrix{Matrix{Float64}}
 	fields::Vector{Symbol}
-	tgrid::Grid.M1D
+	tgrid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
 	acqgeom::Acquisition.Geom
 	"adding conditions that are to be false while construction"
 	TD(d, fields, tgrid, acqgeom) = 
 		any([
 		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
 		  length(fields) == 0,
-		  broadcast(size,d) != [(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)]
+		  broadcast(size,d) != [(length(tgrid),acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)]
 		  ]) ? 
 		error("error in TD construction") : new(d, fields, tgrid, acqgeom)
 
@@ -53,26 +52,26 @@ Method to resample data in time.
 # Arguments
 
 * `data::TD` : input data of type `TD`
-* `tgrid::Grid.M1D` : resampling in time according to this time grid
+* `tgrid` : resampling in time according to this time grid
 
 # Return
 
 * data after resampling as `TD`
 """
 function interp(data::TD,
-		tgrid::Grid.M1D
+		tgrid::StepRangeLen
 		)
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
 	dataout = TD(
-	      [zeros(tgrid.nx,data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:length(data.fields)],
+	      [zeros(length(tgrid),data.acqgeom.nr[iss]) for iss=1:nss, ifield=1:length(data.fields)],
 	      data.fields,tgrid,data.acqgeom)
 	interp_spray!(data, dataout)
 	return dataout
 end
 
 function taper!(data::TD, perc=0.0; bperc=perc,eperc=perc)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		Signals.DSP.taper!(dd,bperc=bperc,eperc=eperc)
@@ -94,8 +93,8 @@ function interp_spray!(data::TD, dataout::TD, attrib=:interp, Battrib=:B1; pa=no
 	# check if datasets are similar
 	nss = data.acqgeom.nss
 	nr = data.acqgeom.nr
-	xin=data.tgrid.x
-	xout=dataout.tgrid.x
+	xin=data.tgrid
+	xout=dataout.tgrid
 	if(pa===nothing)
 		pa=Interpolation.Kernel([xin], [xout], :B1)
 	end
@@ -118,15 +117,15 @@ Method used to preallocate `TD` with zeros.
 # Arguments
 
 * `fields::Vector{Symbol}` : number of components
-* `tgrid::Grid.M1D` : time domain grid
+* `tgrid` : time domain grid
 * `acqgeom::Acquisition.Geom` : acquisition geometry
 
 # Return
 
 * data with zeros as `TD`
 """
-function TD_zeros(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.Geom)
-	return TD([zeros(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],fields,
+function TD_zeros(fields::Vector{Symbol}, tgrid::StepRangeLen, acqgeom::Acquisition.Geom)
+	return TD([zeros(length(tgrid),acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],fields,
 	   deepcopy(tgrid),deepcopy(acqgeom)) 
 end
 function Base.fill!(data::TD, k::Float64)
@@ -135,14 +134,14 @@ function Base.fill!(data::TD, k::Float64)
 	end
 end
 function TD_zeros(d::TD)
-	return TD([zeros(d.tgrid.nx,d.acqgeom.nr[iss]) for iss=1:d.acqgeom.nss, ifield=1:length(d.fields)],d.fields,
+	return TD([zeros(length(d.tgrid),d.acqgeom.nr[iss]) for iss=1:d.acqgeom.nss, ifield=1:length(d.fields)],d.fields,
 	   deepcopy(d.tgrid),deepcopy(d.acqgeom)) 
 end
 
 
 "Same as `TD_zeros`, except for returning ones"
-function TD_ones(fields::Vector{Symbol}, tgrid::Grid.M1D, acqgeom::Acquisition.Geom) 
-	return TD([ones(tgrid.nx,acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],
+function TD_ones(fields::Vector{Symbol}, tgrid::StepRangeLen, acqgeom::Acquisition.Geom) 
+	return TD([ones(length(tgrid),acqgeom.nr[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)],
 	   fields,deepcopy(tgrid),deepcopy(acqgeom)) 
 end
 
@@ -156,7 +155,7 @@ Time reverse the records of each receiver in `TD`
 * `data::TD` : input data that is modified
 """
 function TD_tr!(data::TD)
-	data.d = copy([flipdim(data.d[i,j],1) for i in 1:data.acqgeom.nss, j in 1:length(data.fields)]);
+	data.d = copy([reverse(data.d[i,j],dims=1) for i in 1:data.acqgeom.nss, j in 1:length(data.fields)]);
 end
 
 
@@ -169,7 +168,7 @@ function addnoise!(dataN::TD, data::TD, SNR)
 	# factor to be multiplied to each scalar
 	α=sqrt(σxN)
 	for ifield = 1:length(data.fields), iss = 1:data.acqgeom.nss 
-		for ir = 1:data.acqgeom.nr[iss], it = 1:data.tgrid.nx
+		for ir = 1:data.acqgeom.nr[iss], it = 1:length(data.tgrid)
 
 			dataN.d[iss, ifield][it, ir] = dataN.d[iss, ifield][it, ir] + α*Random.randn()
 		end
@@ -190,7 +189,7 @@ end
 function DDeConv(d::TD, wav::AbstractVector{Float64}, ϵ=1e-2)
 
 	dout=TD_zeros(d)
-	ntd=dout.tgrid.nx
+	ntd=length(dout.tgrid)
 	wavv=deepcopy(wav);
 
 	paD=DeConv.ParamD(ntd=ntd,nts=length(wav), s=wavv)
@@ -203,7 +202,7 @@ end
 
 
 function DDeConv!(dataout::TD, data::TD, paD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		ddo=dataout.d[iss, ifield]
