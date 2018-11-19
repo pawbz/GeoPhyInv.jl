@@ -14,7 +14,7 @@ add https://github.com/pawbz/JuMIT.jl.git
 
 ### Forward Modeling
 * generate seismic data using a 2D finite-difference solver
-  ** [notebook] (https://github.com/pawbz/JuMIT.jl/tree/master/notebooks/modeling)
+  * [notebook] (https://github.com/pawbz/JuMIT.jl/tree/master/notebooks/modeling)
 
 
 ## Credits
