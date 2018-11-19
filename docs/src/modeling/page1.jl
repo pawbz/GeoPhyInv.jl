@@ -72,5 +72,5 @@ J.Fdtd.update_model!(pa.c, model_new)
 
 # plot a record after modelling
 plot!(pdata, pa.c.data[1].d[1,1])
-plot(pdata);
+plot(pdata)
 
