@@ -15,6 +15,8 @@ Contact: ngrobbe@gmail.com
 """
 module Poisson
 
+using SparseArrays
+using StatsBase
 
 """
 Poisson.solve(field,mpars,solflag) solves the forward or inverse Poisson problem in a heterogeneous medium.
@@ -151,7 +153,7 @@ elseif(solflag==1) # forward problem: source+medium --> fields
 
 	psi_vec=A\src[:]; # direct inverse solve using backslash operator
 	psi = reshape(psi_vec, nz, nx); # reshape electrical potential vector psi into 2D electrical potential map (z,x)
-	psi = psi - mean(mean(psi)); # alternative to 'fix' nullspace: make zero-mean...
+	psi = psi .- StatsBase.mean(StatsBase.mean(psi)); # alternative to 'fix' nullspace: make zero-mean...
 #	src=reshape(src,nz,nx); # reshape source vector into 2D source map for plotting purposes only.
     
     	return psi  # function command --> return these variables, in this case electrical potential ψ
