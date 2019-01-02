@@ -55,7 +55,7 @@ end
 Method to Devectorize data!
 No memory allocations
 """
-function Base.copyto!(dataout::TD, v::Vector{Float64})
+function Base.copyto!(dataout::TD, v::AbstractVector{Float64})
 	nr = dataout.acqgeom.nr;	nss = dataout.acqgeom.nss;	nt = length(dataout.tgrid);
 	dout=getfield(dataout, :d)
 	i0=0
@@ -76,7 +76,7 @@ end
 Method to vectorize data!
 No memory allocations
 """
-function Base.copyto!(v::Vector{Float64}, data::TD)
+function Base.copyto!(v::AbstractVector{Float64}, data::TD)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	d=getfield(data, :d)
 	i0=0

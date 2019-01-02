@@ -7,3 +7,6 @@ output_folder=joinpath(@__DIR__, "..","..","..","notebooks","modeling")
 
 Literate.notebook(freadme, output_folder)
 
+freadme=joinpath(@__DIR__, "page2.jl")
+Literate.notebook(freadme, output_folder)
+

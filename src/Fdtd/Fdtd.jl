@@ -928,8 +928,10 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 			(pac.illum_flag) && compute_illum!(issp, pap.ss, pap)
 
 			if(pac.snaps_flag)
-				itsnap = findall(in(pac.itsnaps),it)
-				(itsnap ≠ []) && (snaps_save!(itsnap[1],issp,pac,pap.ss,pap))
+				iitsnaps=findall(x->==(x,it),pac.itsnaps)
+				for itsnap in iitsnaps
+					snaps_save!(itsnap,issp,pac,pap.ss,pap)
+				end
 			end
 
 		end # time_loop
