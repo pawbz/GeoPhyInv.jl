@@ -64,9 +64,12 @@ for i = 1 : ntst
     end
 
     psi_ref = psi_ref./sigma;
-println("Solving Poisson equation, testrun number:",i)
+    println("Solving Poisson equation, testrun number:",i)
 
-    psi = JuMIT.Poisson.solve(src,sigma,1) # call forward solver
+#    psi = JuMIT.Poisson.solve(src,sigma,1) # call forward solver
+    pa=J.Poisson.Param(size(sigma)...)
+    J.Poisson.updateA!(pa, sigma)
+    @time psi = J.Poisson.solve!(src,pa,1) # call forward solver
 
 # subtract mean for DC
     psi_ref=psi_ref.-StatsBase.mean(psi_ref);
@@ -87,13 +90,14 @@ println("Solving Poisson equation, testrun number:",i)
     sum(sum([fields[2][1,1 : end - 1]' fields[2][1 : end - 1,end]' fields[2][end,end : -1 : 2]' fields[2][end : -1: 2,1]'].^2)));
 
 # test to study error decay for interior only, and interior+boundary points
- if i > 1
+ if i > 2
         x = minimum(err[:,1 : 2], dims=2); # error over smallest dimension
       for k = 3:4
            global p,chk
            p = polyfit(log.(x[1:i]), log.(err[1:i,k]),1);  # fit polynomial of first degree using least squares fit
-#           println(p)
-           chk=round(p[1],4)
+           println(p)
+           #chk=round(p[1],4)
+	   chk=p[1]
        end
    end
 
