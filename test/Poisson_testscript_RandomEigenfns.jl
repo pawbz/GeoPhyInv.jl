@@ -69,7 +69,7 @@ for i = 1 : ntst
 #    psi = JuMIT.Poisson.solve(src,sigma,1) # call forward solver
     pa=J.Poisson.Param(size(sigma)...)
     J.Poisson.updateA!(pa, sigma)
-    @time psi = J.Poisson.solve!(src,pa,1) # call forward solver
+    @time psi = J.Poisson.solve(src,pa,1) # call forward solver
 
 # subtract mean for DC
     psi_ref=psi_ref.-StatsBase.mean(psi_ref);
