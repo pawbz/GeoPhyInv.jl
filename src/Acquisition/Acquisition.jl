@@ -715,6 +715,22 @@ end
 
 
 """
+Return a sparse ACQ matrix, for a given acqgeom
+data=ACQ*snapshot
+"""
+function ACQmat(acqgeom::Geom,mgrid,iss=1)
+	nz,nx=length.(mgrid)
+	ACQ=spzeros(acqgeom.nr[iss],prod(length.(mgrid)))
+	for ir = 1:nr[iss]
+		irx=argmin(abs.(mgrid[2].-acqgeom.rx[iss][ir]))
+		irz=argmin(abs.(mgrid[1].-acqgeom.rz[iss][ir]))
+		ACQ[ir,irz+(irx-1)*nz]=1.0
+	end
+end
+
+
+
+"""
 return a vector of the order 
 
 """
