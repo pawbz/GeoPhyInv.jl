@@ -8,7 +8,7 @@ using LinearAlgebra
 using Test
 using ForwardDiff
 using Calculus
-include("core.jl")
+#include("core.jl")
 
 
 nx=5
@@ -31,7 +31,7 @@ psi0=randn(nznx)
 function func_test(x,p)
 	global psi0
 	x=reshape(x,nz,nx)
-	paA=Param(nx,nz,x)	
+	paA=J.Poisson.Param(nx,nz,x)	
 
 	psi=vec(applyinvA(p,paA))
 	f= sum(abs2,psi.-psi0)
@@ -41,7 +41,7 @@ end
 
 function grad_test(x,p)
 	global psi0
-	paA=Param(nx,nz,x)	
+	paA=J.Poisson.Param(nx,nz,x)	
 
 	psi=vec(applyinvA(p,paA))
 
