@@ -16,8 +16,8 @@ include("expt.jl")
 
 
 
-nx=5
-nz=5
+nx=20
+nz=20
 nt=4
 nznx=nz*nx
 mgrid=[range(0.0,step=0.5, length=nz), range(0.0,step=0.5, length=nz)]
@@ -39,16 +39,16 @@ paE=ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs)
 
 updateLP!(paE, paE.Q)
 
-f=func(σ,paE)
+@time f=func(σ,paE)
 
 
 f = x->func(x, paE);
 gcalc = Calculus.gradient(f);
 g3=reshape(gcalc(vec(σ)),nz,nx);
 
-mod!(paE,σ,FGσ())
-g=paE.g
 
+@time mod!(paE,σ,FGσ())
+g=paE.g;
 
 @test ≈(g,g3, rtol=1e-5)
 

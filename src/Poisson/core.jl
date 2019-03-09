@@ -8,7 +8,7 @@ using ForwardDiff
 mutable struct Param{T}
 	A::SparseMatrixCSC{T,Int64}
 	At::SparseMatrixCSC{T,Int64}  # for adjoint solver
-	dAdx::SparseMatrixCSC{T,Int64}  # necessary for the gradient
+	dAdx::Vector{SparseMatrixCSC{T,Int64}}  # necessary for the gradient
 	x1::Vector{T}
 	x2::Vector{T}
 	nx::Int64
@@ -41,7 +41,8 @@ function Param(mgrid, mpars=nothing)
 	end
 	A=spzeros(T, nznx+1,nznx)
 	At=spzeros(T, nznx,nznx+1)
-	dAdx=spzeros(T,nz*nx*(nz*nx+1),nz*nx)  # note the size, it has appended zeros
+
+	dAdx=dAdmpars(dx,dz,nx,nz,T)
 
 	pa=Param(A,At,dAdx,zeros(T, nznx),zeros(T, nznx+1),nx,nz,dx,dz)
 
@@ -49,7 +50,6 @@ function Param(mgrid, mpars=nothing)
 		updateA!(pa, mpars)
 	end
 
-	dAdmpars!(pa)
 	return pa
 end
 
@@ -110,14 +110,14 @@ function updateAcore!(A::AbstractArray,mpars::AbstractArray,ddx,ddz,nx,nz)
 
 end
 
-function dAdmpars!(pa::Param)
-	nz=pa.nz; nx=pa.nx; dz=pa.dz; dx=pa.dx
-	ddz = inv(pa.dz*pa.dz); # for simplicity below
-	ddx = inv(pa.dx*pa.dx);
-	return dAdmpars!(pa.dAdx,ddx,ddz,nx,nz)
-end
+"""
+transpose of dAdx
+"""
+function dAdmpars(dx,dz,nx,nz,T)
 
-function dAdmpars!(X,ddx,ddz,nx,nz)
+	ddz = inv(dz*dz); # for simplicity below
+	ddx = inv(dx*dx);
+	X=[spzeros(T,(nz*nx)+1,nz*nx) for i in 1:nz*nx]  # note the size, it has appended zeros
 
 	nznx1=(nz*nx)+1 
 
@@ -133,15 +133,15 @@ function dAdmpars!(X,ddx,ddz,nx,nz)
 		k3=k+(k-1)*nznx1; k4=k+(k)*nznx1;
 		k5=k+(k+nz-1)*nznx1;
 
-		X[k1,imp] += .5*ddx; ; X[k1,imp_0_m1] += .5*ddx; ;
-		X[k2,imp] += .5*ddz; ; X[k2,imp_m1_0] += .5*ddz; ;
+		X[imp][k1] += .5*ddx; ; X[imp_0_m1][k1] += .5*ddx; ;
+		X[imp][k2] += .5*ddz; ; X[imp_m1_0][k2] += .5*ddz; ;
 
-		X[k3,imp] -= ddx  ; X[k3,imp] -= ddz; ;
-		X[k3,imp_0_m1] -= .5*ddx;; X[k3,imp_0_p1] -= .5*ddx;;
-		X[k3,imp_m1_0] -= .5*ddz;; X[k3,imp_p1_0] -= .5*ddz;;
+		X[imp][k3] -= ddx  ; X[imp][k3] -= ddz; ;
+		X[imp_0_m1][k3] -= .5*ddx;; X[imp_0_p1][k3] -= .5*ddx;;
+		X[imp_m1_0][k3] -= .5*ddz;; X[imp_p1_0][k3] -= .5*ddz;;
 
-		X[k4,imp] += .5*ddz; ; X[k4,imp_p1_0] += .5*ddz; ;
-		X[k5,imp] += .5*ddx; ; X[k5,imp_0_p1] += .5*ddx; ;
+		X[imp][k4] += .5*ddz; ; X[imp_p1_0][k4] += .5*ddz; ;
+		X[imp][k5] += .5*ddx; ; X[imp_0_p1][k5] += .5*ddx; ;
 		k = k + 1; 
 	    end 
 	end
@@ -154,8 +154,10 @@ function dAdmpars!(X,ddx,ddz,nx,nz)
 		k1=k+(k-1)*nznx1
 		k2=k+(o-1)*nznx1
 		k3=o+(k-1)*nznx1
-		X[k1,:] .= -X[k3,:]; 
-		X[k2,:] .= -X[k1,:]; 
+		for chu in 1:nz*nx
+			X[chu][k1] = -X[chu][k3]; 
+			X[chu][k2] = -X[chu][k1]; 
+		end
 		k = k + nz - 1; 
 	    end
 	end
@@ -167,8 +169,10 @@ function dAdmpars!(X,ddx,ddz,nx,nz)
 		k1=k+(k-1)*nznx1
 		k2=k+(o-1)*nznx1
 		k3=o+(k-1)*nznx1
-		X[k1,:] .= -X[k3,:]; 
-		X[k2,:] .= -X[k1,:]; 
+		for chu in 1:nz*nx
+			X[chu][k1] = -X[chu][k3]; 
+			X[chu][k2] = -X[chu][k1]; 
+		end
 		k = k + 1; 
 	    end
 	 end
@@ -181,13 +185,15 @@ function dAdmpars!(X,ddx,ddz,nx,nz)
 		k1=k+(k-1)*nznx1
 		k2=k+(o-1)*nznx1
 		k3=o+(o-1)*nznx1
-		X[k1,:] .= X[k3,:]; 
-		X[k2,:] .= -X[k1,:]; 
+		for chu in 1:nz*nx
+			X[chu][k1] = X[chu][k3]; 
+			X[chu][k2] = -X[chu][k1]; 
+		end
 		k = k + nz - 1; #
 	    end
 	 end
 
-	return X
+	 return X
 end
 
 function boundary!(A, nx, nz)

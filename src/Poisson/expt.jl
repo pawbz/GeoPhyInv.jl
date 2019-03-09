@@ -17,13 +17,14 @@ mutable struct ParamExpt{T}
 	ψ::Vector{T} # state variable, we are going to record this state data=ACQ*ψ  
 	adjsrc::Vector{T}
 	adjψ::Vector{T} # adjoint state variable
+	adjψ2::Vector{T} # some storage of size adjψ
 	paQ::Param{T} # Param for each snapshot
 	paσ::Param{T} # Param for each snapshot
 	tgrid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}} # tgrid of snapshots
 	mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}} # model grid of snapshots
 	ACQ::SparseMatrixCSC{T,Int64}
 	g::Matrix{T}
-	gtemp::Matrix{T}
+	gtemp::Vector{T}
 end
 
 # allocate 
@@ -39,8 +40,10 @@ function ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ; σobs=nothing, Qobs=nothi
 
 	LP=zero(snaps);
 	ψ=zeros(nz*nx);	
+
 	adjsrc=zeros(nz*nx);	
 	adjψ=zeros(nz*nx+1);	
+	adjψ2=zeros(nz*nx+1);	
 
 	Q= k .* Qv ./ η # combine all these
 
@@ -74,6 +77,7 @@ nr=nz*nx
 	      ψ,
 	      adjsrc,
 	      adjψ,
+	      adjψ2,
 	     # ssnaps,
 	     # data,
 	     #datP, datLP, 
@@ -81,7 +85,7 @@ nr=nz*nx
 	     paQ, paσ, 
 	     tgrid, mgrid,
 	     ACQ,
-	     zero(σ),zero(σ))
+	    zero(σ),zeros(length(σ)))
 
 	# record P and LP
 #	record!(pa.datP, pa.P, pa.mgrid)
@@ -118,7 +122,7 @@ end
 # generate LP from P, need to optimize this routine, has a loop over snapshots
 function updateLP!(pa::ParamExpt, Q)
 	updateA!(pa.paQ, Q)
-	@showprogress "updating LP\t" for it in 1:length(pa.tgrid)
+	@showprogress "time loop LP\t" for it in 1:length(pa.tgrid)
 		snap_in=view(pa.P,:,:,it)
 		snap_out=view(pa.LP,:,:,it)
 		applyA!(snap_out, snap_in, pa.paQ; A=pa.paQ.A)
@@ -131,10 +135,12 @@ end
 # most expensive routine
 function mod!(pa::ParamExpt, σ, mode)
 	updateA!(pa.paσ, σ)
+	qrA=factorize(pa.paσ.A)
+	qrAt=factorize(pa.paσ.At)
 	fill!(pa.g, 0.0)
-	@showprogress "updating ψ\t" for it in 1:length(pa.tgrid)
+	@showprogress "time loop ψ\t" for it in 1:length(pa.tgrid)
 		snap_in=view(pa.LP,:,:,it)
-		forwψ!(pa.ψ,snap_in,pa.paσ)
+		forwψ!(pa.ψ,snap_in,pa.paσ,qrA)
 
 		# record
 		dat_slice=view(pa.data,it,:)
@@ -142,17 +148,19 @@ function mod!(pa::ParamExpt, σ, mode)
 
 		# wanna do adjoint modeling? depends on mode
 		dat_slice_obs=view(pa.data_obs,it,:)
-		adjψ!(pa.adjψ, pa.ψ, pa.adjsrc, pa.g, pa.ACQ, pa.data_misfit, dat_slice_obs, pa.paσ, mode)
+		adjψ!(pa.adjψ, pa.adjψ2, pa.ψ, 
+		      pa.adjsrc, pa.g, pa.gtemp,
+		      pa.ACQ, pa.data_misfit, dat_slice_obs, pa.paσ, qrAt, mode)
 	end
 	return pa
 end
 
-function forwψ!(ψ, src, pa::Param)
-	applyinvA!(ψ, src, pa; A=pa.A)
+function forwψ!(ψ, src, pa::Param,qrA)
+	applyinvA!(ψ, src, pa; A=qrA)
 end
-function adjψ!(adjψ, ψ, adjsrc, g, ACQ, data_misfit, data_obs, pa::Param, ::Fσ)
+function adjψ!(adjψ, adjψ2, ψ, adjsrc, g, gtemp, ACQ, data_misfit, data_obs, pa, qrAt,   ::Fσ)
 end
-function adjψ!(adjψ, ψ, adjsrc, g, ACQ, data_misfit, data_obs, pa::Param, ::FGσ)
+function adjψ!(adjψ, adjψ2, ψ, adjsrc, g, gtemp, ACQ, data_misfit, data_obs, pa, qrAt,  ::FGσ)
 
 	mul!(data_misfit,ACQ,ψ)
 	for i in eachindex(data_misfit)
@@ -161,13 +169,35 @@ function adjψ!(adjψ, ψ, adjsrc, g, ACQ, data_misfit, data_obs, pa::Param, ::F
 	mul!(adjsrc, transpose(ACQ), data_misfit)
 	rmul!(adjsrc,-2.0)
 
-	applyinvAt!(adjψ, adjsrc, pa)
+	applyinvAt!(adjψ, adjsrc, pa, At=qrAt)
 
-	gtemp=vec((adjψ*ψ'))'*(pa.dAdx)
+	abT_T_dX!(gtemp, ψ, adjψ, adjψ2, pa.dAdx)
+	#= requires a lot of memory (use only for testing)
+	mul!(ψψ, adjψ, transpose(ψ))
+	copyto!(ψψvec,ψψ)
+	mul!(gtemp, pa.dAdx', ψψvec)
+	=#
 
 	for i in eachindex(gtemp)
-                       g[i]+=gtemp[i]
-                 end
+		g[i]+=gtemp[i]
+	end
+
+end
+
+function abT_T_dX!(g, ψ, adjψ, adjψ2, A)
+	n=length(ψ)
+	fill!(g, 0.0)
+	for i in 1:n
+		AA=A[i]
+		mul!(adjψ2,AA,ψ)
+		g[i] = dot(adjψ,adjψ2)
+		# do everything by hand, was slow...
+		#for k in 1:n
+		#	for j in 1:n+1
+		#		g[i] += ψ[k]*adjψ[j]*A[j+(k-1)*(n+1),i] 
+		#	end
+		#end
+	end
 end
 
 function func(x,pa::ParamExpt)
