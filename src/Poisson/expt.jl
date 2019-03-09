@@ -68,7 +68,7 @@ function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=no
 #	datP=Data.TD_zeros([:P],tgrid,acqgeom)
 #	datLP=Data.TD_zeros([:P],tgrid,acqgeom)
 
-	if(ACQ===nothing)
+	if(ACQmat===nothing)
 		ACQ=testACQ(nz,nx,5)
 	else
 		ACQ=ACQmat
