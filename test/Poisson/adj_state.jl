@@ -33,7 +33,7 @@ function func_test(x,p)
 	x=reshape(x,nz,nx)
 	paA=J.Poisson.Param(nx,nz,x)	
 
-	psi=vec(applyinvA(p,paA))
+	psi=vec(J.Poisson.applyinvA(p,paA))
 	f= sum(abs2,psi.-psi0)
 	return f
 end
@@ -43,11 +43,11 @@ function grad_test(x,p)
 	global psi0
 	paA=J.Poisson.Param(nx,nz,x)	
 
-	psi=vec(applyinvA(p,paA))
+	psi=vec(J.Poisson.applyinvA(p,paA))
 
 	adjsrc=-2.0*(psi.-psi0)
 
-	lambda=vec(applyinvAt(adjsrc,paA))
+	lambda=vec(J.Poisson.applyinvAt(adjsrc,paA))
 	#println(size(lambda))
 	
 	return vec((lambda*psi'))'*hcat(vec.(paA.dAdx)...)
