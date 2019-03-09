@@ -7,13 +7,13 @@
 #Contact: ngrobbe@gmail.com
 
 
-#using JuMIT
+using JuMIT
 using Polynomials
 using Test
 using StatsBase
 
-include("core.jl")
-include("code_original.jl")
+#include("core.jl")
+#include("code_original.jl")
 
 
 ############################################    
@@ -70,8 +70,8 @@ for i = 1 : ntst
     println("Solving Poisson equation, testrun number:",i,"\t", size(sigma))
 
     global pa
-    pa=Param(nx,nz, sigma)
-    psi=applyinvA(src,pa)
+    pa=J.Poisson.Param(nx,nz, sigma)
+    psi=reshape(J.Poisson.applyinvA(src,pa),nz,nx)
 
    #psi,Ac = Poisson.solve(src,sigma,1)
 

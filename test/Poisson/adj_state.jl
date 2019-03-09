@@ -50,7 +50,7 @@ function grad_test(x,p)
 	lambda=vec(applyinvAt(adjsrc,paA))
 	#println(size(lambda))
 	
-	return vec((lambda*psi'))'*(paA.dAdx)
+	return vec((lambda*psi'))'*hcat(vec.(paA.dAdx)...)
 end
 
 f = x->func_test(x, p);

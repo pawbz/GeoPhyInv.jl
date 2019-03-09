@@ -1,7 +1,8 @@
+using JuMIT
 using Revise
 using Calculus
 using Test
-include("core.jl")
+#include("core.jl")
 
 nx=5
 nz=7
@@ -13,7 +14,7 @@ Q=randn(nz,nx)
 
 function func_test(x)
 	x=reshape(x,nz,nx)
-	paA=Param(nx,nz,x)	
+	paA=J.Poisson.Param(nx,nz,x)	
 
 	global p
 	psi=(paA.A*p)
@@ -27,12 +28,12 @@ end
 function grad_test(x)
 	global nznx, nz, nx,p
 	x=reshape(x,nz,nx)
-	paA=Param(nx,nz,x)	
+	paA=J.Poisson.Param(nx,nz,x)	
 
 	psi=paA.A*p
 
 	# gradient, that involves dAdx for testing
-	g1= vec(2.0*(paA.A)*p*transpose(p))'*paA.dAdx
+	g1= vec(2.0*(paA.A)*p*transpose(p))'*hcat(vec.(paA.dAdx)...)
 	return reshape(g1,nz,nx)
 end
 

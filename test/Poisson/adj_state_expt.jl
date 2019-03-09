@@ -10,8 +10,8 @@ using LinearAlgebra
 using Test
 using ForwardDiff
 using Calculus
-include("core.jl")
-include("expt.jl")
+#include("core.jl")
+#include("expt.jl")
 
 
 
@@ -35,19 +35,19 @@ psi0=randn(nznx)
 
 snaps=randn(nz,nx,nt)
 
-paE=ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs)
+paE=J.Poisson.ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs)
 
-updateLP!(paE, paE.Q)
+J.Poisson.updateLP!(paE, paE.Q)
 
-@time f=func(σ,paE)
+@time f=J.Poisson.func(σ,paE)
 
 
-f = x->func(x, paE);
+f = x->J.Poisson.func(x, paE);
 gcalc = Calculus.gradient(f);
 g3=reshape(gcalc(vec(σ)),nz,nx);
 
 
-@time mod!(paE,σ,FGσ())
+@time J.Poisson.mod!(paE,σ,J.Poisson.FGσ())
 g=paE.g;
 
 @test ≈(g,g3, rtol=1e-5)

@@ -16,6 +16,13 @@ function initialize(fp)
 	include(fp)
 end
 
+folder="Poisson"
+for t in ["testscript_RandomEigenfns.jl", "adj_state_expt", "adj_state", "testdAdx"]
+	fp = joinpath(folder, string(t, ".jl"))
+	initialize(fp)
+end
+
+
 folder="Models"
 for t in ["Models", "param_adj"]
 	fp = joinpath(folder, string(t, ".jl"))
@@ -35,6 +42,7 @@ for t in ["gradient_accuracy", "born_map"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end
+
 
 
 
