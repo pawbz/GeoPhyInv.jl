@@ -1,5 +1,4 @@
 using JuMIT
-using Revise
 using Calculus
 using Test
 #include("core.jl")
