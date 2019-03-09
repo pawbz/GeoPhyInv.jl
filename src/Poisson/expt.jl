@@ -27,8 +27,19 @@ mutable struct ParamExpt{T}
 	gtemp::Vector{T}
 end
 
-# allocate 
-function ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ; σobs=nothing, Qobs=nothing)
+"""
+some dummy ACQ, use `JuMIT.Acquisition.ACQmat` later
+"""
+function testACQ(nz,nx,nr)
+
+	ACQ=spzeros(nr,nz*nx)
+	for i in 1:2:nr*nz*nx
+		ACQ[i]=randn()
+	end
+end
+
+# allocate and forward modelling in true model 
+function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=nothing, Qobs=nothing)
 	nz=length(mgrid[1])
 	nx=length(mgrid[2])
 	nt=length(tgrid)
@@ -57,12 +68,10 @@ function ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ; σobs=nothing, Qobs=nothi
 #	datP=Data.TD_zeros([:P],tgrid,acqgeom)
 #	datLP=Data.TD_zeros([:P],tgrid,acqgeom)
 
-
-# 5 receivers
-nr=nz*nx
-	ACQ=spzeros(nr,nz*nx)
-	for i in 1:2:nr*nz*nx
-		ACQ[i]=randn()
+	if(ACQ===nothing)
+		ACQ=testACQ(nz,nx,5)
+	else
+		ACQ=ACQmat
 	end
 	data=zeros(nt,size(ACQ,1))
 	data_obs=randn(nt,size(ACQ,1))
@@ -116,8 +125,6 @@ function record!(data::Data.TD, snaps, mgrid)
 	end
 end
 =#
-
-
 
 # generate LP from P, need to optimize this routine, has a loop over snapshots
 function updateLP!(pa::ParamExpt, Q)
