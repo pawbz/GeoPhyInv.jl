@@ -36,6 +36,7 @@ function testACQ(nz,nx,nr)
 	for i in 1:2:nr*nz*nx
 		ACQ[i]=randn()
 	end
+	return ACQ
 end
 
 # allocate and forward modelling in true model 
