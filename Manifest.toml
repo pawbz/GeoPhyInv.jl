@@ -259,7 +259,7 @@ uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 deps = ["BenchmarkTools", "LinearAlgebra", "LinearMaps", "SparseArrays", "Test"]
 git-tree-sha1 = "1323f938ed8cbfe129aa1b83ecb63ae7d6030c9e"
 repo-rev = "master"
-repo-url = "git@github.com:pawbz/Interpolation.jl.git"
+repo-url = "https://github.com/pawbz/Interpolation.jl.git"
 uuid = "475ca4d2-b0ae-5dbf-b83e-9b10c0db9a39"
 version = "0.0.0"
 
@@ -273,7 +273,7 @@ version = "0.3.1"
 deps = ["BenchmarkTools", "Calculus", "DataFrames", "Misfits", "Optim", "Printf", "ProgressMeter", "RecipesBase", "Test", "TimerOutputs"]
 git-tree-sha1 = "c8b098a4aeb0f802b8b2c6a308082e0b185143d2"
 repo-rev = "master"
-repo-url = "git@github.com:pawbz/Inversion.jl.git"
+repo-url = "https://github.com/pawbz/Inversion.jl.git"
 uuid = "0a622ac7-8c5c-5314-a750-ace189c80c19"
 version = "1.0.0"
 
@@ -513,7 +513,7 @@ uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 deps = ["Conv", "DSP", "DistributedArrays", "Distributions", "FFTW", "Interpolation", "LinearAlgebra", "Misfits", "ProgressMeter", "SparseArrays", "Statistics", "Test"]
 git-tree-sha1 = "f7e3fc2e490d2fa2251e7ca27eef3a9e0ba572ca"
 repo-rev = "master"
-repo-url = "git@github.com:pawbz/Signals.jl.git"
+repo-url = "https://github.com/pawbz/Signals.jl.git"
 uuid = "6303bc30-01ab-52eb-8b10-60e47555a8d1"
 version = "0.0.0"
 
