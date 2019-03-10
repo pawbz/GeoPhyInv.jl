@@ -1,7 +1,7 @@
 # Julia Modeling and Inversion Toolbox
 
 ## Installation
-Install these packages following the order via Julia's package manager (i.e., after pressing `]` in the REPL):
+Install these packages in the given order via Julia's package manager (i.e., after pressing `]` in the REPL):
 ```julia
 add https://github.com/pawbz/Misfits.jl.git
 add https://github.com/pawbz/Inversion.jl.git
@@ -9,6 +9,11 @@ add https://github.com/pawbz/Interpolation.jl.git
 add https://github.com/pawbz/Conv.jl.git
 add https://github.com/pawbz/JuMIT.jl.git
 ```
+## Overview
+### Seismic
+
+### Poisson
+applies to electrical, gravity and magnetic fields
 
 ## Tutorial Notebooks
 

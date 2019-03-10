@@ -2,19 +2,26 @@ using Documenter, JuMIT
 
 #makedocs(modules=[JuMIT],
 #	         doctest=true)
-makedocs()
+#makedocs()
 
-#makedocs(
-#    format = :html,
-#    sitename = "Seismic Inversion Toolbox",
+makedocs(
+    format = Documenter.HTML(),
+   sitename = "Toolbox for Geophysical Inversion",
+   pages = Any["index.md",
+	       "modeling/page1.md"]
 #    modules = []
-#)
+)
  
+deploydocs(
+    repo   = "github.com/pawbz/JuMIT.jl.git",
+)
+#=
 deploydocs(
     deps   = Deps.pip("mkdocs", "python-markdown-math"),
     repo   = "github.com/pawbz/JuMIT.jl.git",
-    julia  = "0.6",
+    julia  = "1.0",
     osname = "linux",
     target = "build",
     make   = nothing
 )
+=#
