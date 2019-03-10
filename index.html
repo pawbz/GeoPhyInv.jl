@@ -1,208 +1,240 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  
-  
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Seismic Waveform Modeling and Inversion">
-    <meta name="author" content="Pawan Bharadwaj">
-    
-    <link rel="shortcut icon" href="./img/favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
-    <title>Julia Modeling and Inversion Toolbox</title>
-    <link href="./css/bootstrap-3.3.7.min.css" rel="stylesheet">
-    <link href="./css/font-awesome-4.7.0.css" rel="stylesheet">
-    <link href="./css/base.css" rel="stylesheet">
-    <link rel="stylesheet" href="./css/highlight.css">
-    <link href="./assets/Documenter.css" rel="stylesheet">
-    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
-    <!--[if lt IE 9]>
-        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
-        <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
-    <![endif]-->
-
-    <script src="./js/jquery-3.2.1.min.js"></script>
-    <script src="./js/bootstrap-3.3.7.min.js"></script>
-    <script src="./js/highlight.pack.js"></script>
-    
-      <script src="./js/elasticlunr.min.js"></script>
-    
-    <base target="_top">
-    <script>
-      var base_url = '.';
-      var is_top_frame = (window === window.parent);
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Seismic Waveform Modeling and Inversion">
+        <meta name="author" content="Pawan Bharadwaj">
         
-        var pageToc = [
-          {title: "SeismicInversionToolbox", url: "#_top", children: [
-              {title: "Coding Conventions", url: "#coding-conventions" },
-              {title: "Installation", url: "#installation" },
-              {title: "Input and Output Data Format", url: "#input-and-output-data-format" },
-              {title: "Demos", url: "#demos" },
-          ]},
-        ];
+        <link rel="shortcut icon" href="./img/favicon.ico">
 
-    </script>
-    <script src="./js/base.js"></script>
-      <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML - assets/mathjaxhelper.js"></script> 
-</head>
+	<title>Julia Modeling and Inversion Toolbox</title>
 
-<body>
-<script>
-if (is_top_frame) { $('body').addClass('wm-top-page'); }
-</script>
+        <link href="./css/bootstrap-custom.min.css" rel="stylesheet">
+        <link href="./css/font-awesome-4.0.3.css" rel="stylesheet">
+        <link rel="stylesheet" href="./css/highlight.css">
+        <link href="./css/base.css" rel="stylesheet">
+        <link href="./assets/Documenter.css" rel="stylesheet">
 
-<nav class="navbar wm-page-top-frame">
-  <div class="container-fluid wm-top-container">
-    
-    <div class="wm-top-tool pull-right wm-vcenter">
-      <form class="dropdown wm-vcentered" id="wm-search-form" action="./search.html">
+        <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+            <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+        <![endif]-->
+
         
-        <button id="wm-search-show" class="btn btn-sm btn-default" type="submit"
-          ><i class="fa fa-search" aria-hidden="true"></i></button>
+    </head>
 
-        <div class="input-group input-group-sm wm-top-search">
-          <input type="text" name="q" class="form-control" id="mkdocs-search-query" placeholder="Search" autocomplete="off">
-          <span class="input-group-btn" role="search">
-            
-            <button class="btn btn-default dropdown-toggle collapse" data-toggle="dropdown" type="button"><span class="caret"></span></button>
-            <ul id="mkdocs-search-results" class="dropdown-menu dropdown-menu-right"></ul>
-            <button id="wm-search-go" class="btn btn-default" type="submit"><i class="fa fa-search" aria-hidden="true"></i></button>
-          </span>
+    <body>
+
+        <div class="navbar navbar-default navbar-fixed-top" role="navigation">
+    <div class="container">
+
+        <!-- Collapsed navigation -->
+        <div class="navbar-header">
+            <!-- Expander button -->
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+
+            <!-- Main title -->
+            <a class="navbar-brand" href=".">Julia Modeling and Inversion Toolbox</a>
         </div>
-      </form>
+
+        <!-- Expanded navigation -->
+        <div class="navbar-collapse collapse">
+            <!-- Main navigation -->
+            <ul class="nav navbar-nav">
+            
+            
+                <li class="active">
+                    <a href=".">Home</a>
+                </li>
+            
+            
+            
+                <li >
+                    <a href="reference/">Reference</a>
+                </li>
+            
+            
+            
+                <li >
+                    <a href="../../notebooks/modeling/page1/">Tutorials</a>
+                </li>
+            
+            
+            </ul>
+
+            <!-- Search, Navigation and Repo links -->
+            <ul class="nav navbar-nav navbar-right">
+                <li>
+                    <a href="#" data-toggle="modal" data-target="#mkdocs_search_modal">
+                        <i class="fa fa-search"></i> Search
+                    </a>
+                </li>
+                <li class="disabled">
+                    <a rel="next" >
+                        <i class="fa fa-arrow-left"></i> Previous
+                    </a>
+                </li>
+                <li >
+                    <a rel="prev" href="reference/">
+                        Next <i class="fa fa-arrow-right"></i>
+                    </a>
+                </li>
+                
+                <li>
+                    <a href="https://github.com/pawbz/JuMIT.jl">
+                        
+                            <i class="fa fa-github"></i>
+                        
+                        GitHub
+                    </a>
+                </li>
+                
+            </ul>
+        </div>
     </div>
+</div>
 
+        <div class="container">
+            <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
+    <ul class="nav bs-sidenav">
     
-    <div class="wm-top-tool wm-vcenter pull-right wm-small-left">
-      <button id="wm-toc-button" type="button" class="btn btn-sm btn-default wm-vcentered"><i class="fa fa-th-list" aria-hidden="true"></i></button>
-    </div>
-
-    
-    
-
-    
-    <a href="" class="wm-top-brand wm-top-link wm-vcenter">
-      
-      <div class="wm-top-title">
-        Julia Modeling and Inversion Toolbox<br>
+        <li class="main active"><a href="#seismicinversiontoolbox">SeismicInversionToolbox</a></li>
         
-      </div>
-    </a>
-  </div>
-</nav>
-
-  <div id="main-content" class="wm-page-top-frame">
+            <li><a href="#coding-conventions">Coding Conventions</a></li>
+        
+            <li><a href="#installation">Installation</a></li>
+        
+            <li><a href="#input-and-output-data-format">Input and Output Data Format</a></li>
+        
+            <li><a href="#demos">Demos</a></li>
+        
     
-<nav class="wm-toc-pane">
-  
-    <ul class="wm-toctree wm-toc-repo">
-      <li class="wm-toc-li wm-toc-lev1">
-      <a class="wm-article-link wm-toc-text" href="https://github.com/pawbz/JuMIT.jl/">
-        <i class="fa fa-github"></i>
-        GitHub
-      </a>
-      </li>
     </ul>
-  <ul class="wm-toctree">
-        <li class="wm-toc-li wm-toc-lev1 "><a href="." class="wm-article-link wm-toc-text">Home</a>
-</li>
-        <li class="wm-toc-li wm-toc-lev1 "><a href="reference/" class="wm-article-link wm-toc-text">Reference</a>
-</li>
-        <li class="wm-toc-li wm-toc-lev1 "><a href="tut/" class="wm-article-link wm-toc-text">Tutorials</a>
-</li>
-  </ul>
-</nav>
+</div></div>
+            <div class="col-md-9" role="main">
 
-    <div class="wm-content-pane">
-      <iframe class="wm-article" name="article"></iframe>
-    </div>
-  </div>
-
-<div class="container-fluid wm-page-content">
-  <a name="_top"></a>
-    
-
-  <div class="row wm-article-nav-buttons" role="navigation" aria-label="navigation">
-    
-    <div class="wm-article-nav pull-right">
-      <a href="reference/" class="btn btn-xs btn-default pull-right">
-        Next
-        <i class="fa fa-chevron-right" aria-hidden="true"></i>
-      </a>
-      <a href="reference/" class="btn btn-xs btn-link">
-        Reference
-      </a>
-    </div>
-    
-  </div>
-
-    
-
-    <p><a id='SeismicInversionToolbox-1'></a></p>
 <h1 id="seismicinversiontoolbox">SeismicInversionToolbox</h1>
 <p>The main tasks of this software are:</p>
 <ul>
-<li>Forward problem, where the seismic data are generated</li>
+<li>
+<p>Forward problem, where the seismic data are generated 
+using synthetic Earth models and the acquisition parameters 
+corresponding to a seismic experiment.
+Forward modeling consists of a finite-difference simulation, followed
+by convolutions in the time domain using the source and
+receiver filters. The details about our finite-difference 
+scheme are given in XXX. 
+And the filters corresponding to 
+sources and receivers are described in XXX.</p>
+</li>
+<li>
+<p>Can perform inversion of synthetic scenarios.
+First, the seismic data are modeled as in the forward problem. Then the 
+data are used to perform full waveform inversion (FWI). The inverse 
+problem estimates
+the Earth models and the source and receiver filters 
+that resulted from the data.
+This task is necessary to test the performance of the inversion algorithm 
+in various geological scenarios using different acquisition parameters.</p>
+</li>
+<li>
+<p>Read 
+the measured seismic field data and parameters from a seismic experiment 
+to perform inversion like in the previous task. 
+The data measured in the field are not in a suitable format 
+yet for this software. 
+Pre-processing is necessary before it can be used as described.
+Also, the acquisition parameters from the field
+should be 
+converted to suitable 2-D coordinates as described.</p>
+</li>
 </ul>
-<p>using synthetic Earth models and the acquisition parameters  corresponding to a seismic experiment. Forward modeling consists of a finite-difference simulation, followed by convolutions in the time domain using the source and receiver filters. The details about our finite-difference  scheme are given in XXX.  And the filters corresponding to  sources and receivers are described in XXX.</p>
-<ul>
-<li>Can perform inversion of synthetic scenarios.</li>
-</ul>
-<p>First, the seismic data are modeled as in the forward problem. Then the  data are used to perform full waveform inversion (FWI). The inverse  problem estimates the Earth models and the source and receiver filters  that resulted from the data. This task is necessary to test the performance of the inversion algorithm  in various geological scenarios using different acquisition parameters.</p>
-<ul>
-<li>Read</li>
-</ul>
-<p>the measured seismic field data and parameters from a seismic experiment  to perform inversion like in the previous task.  The data measured in the field are not in a suitable format  yet for this software.  Pre-processing is necessary before it can be used as described. Also, the acquisition parameters from the field should be  converted to suitable 2-D coordinates as described.</p>
-<p><a id='Coding-Conventions-1'></a></p>
 <h2 id="coding-conventions">Coding Conventions</h2>
 <ul>
-<li>This software is organised into various modules.</li>
+<li>
+<p>This software is organised into various modules.
+Each module has various type definitions and methods declared.
+Commenting is 
+done inside each module file to describe the purpose of the module and its usage.
+Most of the comments in the code are inline with the text in this documentation. 
+Within each module, variable naming is done 
+to reduce the effort needed to understand the source code.
+For example, 
+\code{distance = velocity * time} is prefered over using 
+\code{a = b * c} in most parts of the software.
+The code inside each method is properly intended using spaces to facilitate 
+redability.
+We followed this documentation <a href="http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/"><img alt="guide" src="http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/" /></a></p>
+</li>
+<li>
+<p>The methods ending with <code>!</code> ideally should not allocate and memory. They are supposed to be fast and iteratively called inside loops.</p>
+</li>
 </ul>
-<p>Each module has various type definitions and methods declared. Commenting is  done inside each module file to describe the purpose of the module and its usage. Most of the comments in the code are inline with the text in this documentation.  Within each module, variable naming is done  to reduce the effort needed to understand the source code. For example,  \code{distance = velocity * time} is prefered over using  \code{a = b * c} in most parts of the software. The code inside each method is properly intended using spaces to facilitate  redability. We followed this documentation <a href="http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/"><img alt="guide" src="http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/" /></a></p>
-<ul>
-<li>The methods ending with <code>!</code> ideally should not allocate and memory. They are supposed to be fast and iteratively called inside loops.</li>
-</ul>
-<p><a id='Installation-1'></a></p>
 <h2 id="installation">Installation</h2>
-<p><a id='Input-and-Output-Data-Format-1'></a></p>
 <h2 id="input-and-output-data-format">Input and Output Data Format</h2>
-<p>It is recomended that the  input seismic data is  in the Seismic Unix (SU) format. The SU file should contain all the necessary headers  related to acquisition geometry that will be discussed in Section~\ref{sec:acq_geom}. Most of the seismic data pre-processing softwares  generate a SEGY file with headers.  We can use the following command to  convert an example SEGY file, \fname{exp.sgy}, to SU format. </p>
-<p><a id='Demos-1'></a></p>
+<p>It is recomended that the 
+input seismic data is 
+in the Seismic Unix (SU) format.
+The SU file should contain all the necessary headers 
+related to acquisition geometry that will be
+discussed in Section~\ref{sec:acq_geom}.
+Most of the seismic data pre-processing softwares 
+generate a SEGY file with headers. 
+We can use the following command to 
+convert an example SEGY file, \fname{exp.sgy}, to SU format. </p>
 <h2 id="demos">Demos</h2>
-<p>Demos preforming some of the tasks are provided along with the software in \fname{workdir/xfwi/demos/}. An example parameter file is also provided in Section~\ref{sec:para_file} of this manual.</p>
+<p>Demos preforming some of the tasks are provided along with the software in \fname{workdir/xfwi/demos/}.
+An example parameter file is also provided in Section~\ref{sec:para_file} of this manual.</p>
 <p><a href="https://travis-ci.org/pawbz/JuMIT.jl"><img alt="Build Status" src="https://travis-ci.org/pawbz/JuMIT.jl.svg?branch=master" /></a></p>
 <p><a href="https://coveralls.io/github/pawbz/JuMIT.jl?branch=master"><img alt="Coverage Status" src="https://coveralls.io/repos/pawbz/JuMIT.jl/badge.svg?branch=master&amp;service=github" /></a></p>
-<p><a href="http://codecov.io/github/pawbz/JuMIT.jl?branch=master"><img alt="codecov.io" src="http://codecov.io/github/pawbz/JuMIT.jl/coverage.svg?branch=master" /></a></p>
+<p><a href="http://codecov.io/github/pawbz/JuMIT.jl?branch=master"><img alt="codecov.io" src="http://codecov.io/github/pawbz/JuMIT.jl/coverage.svg?branch=master" /></a></p></div>
+        </div>
 
-  <br>
-    
+        <footer class="col-md-12">
+            <hr>
+            
+            <center>Documentation built with <a href="http://www.mkdocs.org/">MkDocs</a>.</center>
+        </footer>
 
-  <div class="row wm-article-nav-buttons" role="navigation" aria-label="navigation">
-    
-    <div class="wm-article-nav pull-right">
-      <a href="reference/" class="btn btn-xs btn-default pull-right">
-        Next
-        <i class="fa fa-chevron-right" aria-hidden="true"></i>
-      </a>
-      <a href="reference/" class="btn btn-xs btn-link">
-        Reference
-      </a>
-    </div>
-    
-  </div>
+        <script src="./js/jquery-1.10.2.min.js"></script>
+        <script src="./js/bootstrap-3.0.3.min.js"></script>
+        <script src="./js/highlight.pack.js"></script>
+        <script>var base_url = '.';</script>
+        <script data-main="./mkdocs/js/search.js" src="./mkdocs/js/require.js"></script>
+        <script src="./js/base.js"></script>
+        <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML - assets/mathjaxhelper.js"></script>
 
-    <br>
-</div>
-
-<footer class="col-md-12 wm-page-content">
-  <p>Documentation built with <a href="http://www.mkdocs.org/">MkDocs</a> using <a href="https://github.com/gristlabs/mkdocs-windmill">Windmill</a> theme by Grist Labs.</p>
-</footer>
-
-</body>
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="Search Modal" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                        <h4 class="modal-title" id="exampleModalLabel">Search</h4>
+                    </div>
+                    <div class="modal-body">
+                        <p>
+                            From here you can search these documents. Enter
+                            your search terms below.
+                        </p>
+                        <form role="form">
+                            <div class="form-group">
+                                <input type="text" class="form-control" placeholder="Search..." id="mkdocs-search-query">
+                            </div>
+                        </form>
+                        <div id="mkdocs-search-results"></div>
+                    </div>
+                    <div class="modal-footer">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
 </html>
-<!--
-MkDocs version : 0.17.4
-Build Date UTC : 2018-06-30 19:55:54
--->
