@@ -117,8 +117,6 @@ EditURL = "https://github.com/TRAVIS_REPO_SLUG/blob/master/"</p>
 ```@example page1
 using JuMIT
 using Statistics
-using Plots
-pyplot()
 </pre></div>
 
 
@@ -130,78 +128,7 @@ J.Models.Seismic_addon!(model, randn_perc=0.01)</p>
 
 ```@example page1
 acqgeom = JuMIT.Gallery.Geom(model.mgrid,:xwell);
-</pre></div>
-
-
-<p>plot the model and source, receivers</p>
-<p>```@example page1
-p1=JP.seismic(model)
-JP.geom!(acqgeom)
-plot(p1)</p>
-<div class="codehilite"><pre><span></span>generate time grid
-
-```@example page1
-tgrid = range(0.0,stop=2.0,length=1000)
-</pre></div>
-
-
-<p>Ricker wavelet</p>
-<p>```@example page1
-wav = JuMIT.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,);</p>
-<div class="codehilite"><pre><span></span>distribute the same source wavelet to all the supsersources
-
-```@example page1
-acqsrc=JuMIT.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
-</pre></div>
-
-
-<p>create <code>Fdtd.Param</code> object to prepare forward modelling
-* npw corresponds to the number of independently propagating wavefields (1 in most cases)</p>
-<p>```@example page1
-pa=JuMIT.Fdtd.Param(npw=1,model=model,
-    acqgeom=[acqgeom], acqsrc=[acqsrc],
-    sflags=[2], rflags=[1],
-    tgridmod=tgrid, verbose=true);</p>
-<div class="codehilite"><pre><span></span>Once the `Param` object is created, do the modelling &quot;without any memory allocations&quot; using `mod!`
-
-```@example page1
-@time JuMIT.Fdtd.mod!(pa);
-</pre></div>
-
-
-<p>plot a record after modelling</p>
-<p>```@example page1
-pdata=plot(pa.c.data[1].d[1,1])
-plot(pdata)</p>
-<div class="codehilite"><pre><span></span>create new seismic model
-
-```@example page1
-model_new=J.Gallery.Seismic(:acou_homo1) # prepare another model
-J.Models.Seismic_addon!(model_new, randn_perc=0.01)
-J.Models.Seismic_addon!(model_new, constant_pert=0.03) # perturb the model
-p2=JP.seismic(model_new) # plot new model
-JP.geom!(acqgeom)
-plot(p2)
-</pre></div>
-
-
-<p>Now, we the change the model in the <code>Param</code> object without memory allocation
-This routine can be used during FWI,
-where medium parameters are itertively updated in the same <code>Fdtd.Param</code> object</p>
-<p>```@example page1
-J.Fdtd.update_model!(pa.c, model_new)</p>
-<div class="codehilite"><pre><span></span>run modelling now and plot data again
-
-```@example page1
-@time JuMIT.Fdtd.mod!(pa);
-</pre></div>
-
-
-<p>plot a record after modelling</p>
-<p><code>@example page1
-plot!(pdata, pa.c.data[1].d[1,1])
-plot(pdata)</code></p>
-<p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></div>
+</pre></div></div>
         </div>
 
         <footer class="col-md-12">
