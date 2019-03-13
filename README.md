@@ -1,25 +1,35 @@
 # Julia Modeling and Inversion Toolbox
 
 ## Installation
-Install this package using:
+Install these packages in the given order via Julia's package manager (i.e., after pressing `]` in the REPL):
 ```julia
-Pkg.clone("https://github.com/pawbz/JuMIT.jl.git")
+add https://github.com/pawbz/Misfits.jl.git
+add https://github.com/pawbz/Inversion.jl.git
+add https://github.com/pawbz/Interpolation.jl.git
+add https://github.com/pawbz/Conv.jl.git
+add https://github.com/pawbz/JuMIT.jl.git
 ```
+## Overview
+### Seismic
 
-## Tutorials
-Various tutorials that demonstrate the use of this software are available 
-[here](https://github.com/pawbz/JuMITtutorials). Installation if `IJulia` is necessary.
+### Poisson
+applies to electrical, gravity and magnetic fields
+
+## Tutorial Notebooks
+
+### Forward Modeling
+* generate seismic data using a 2D finite-difference solver
+  * [notebook] (https://github.com/pawbz/JuMIT.jl/tree/master/notebooks/modeling/page1.ipynb)
 
 
-## Documentation
-Online documentation of various modules of this package can be found 
-[here](https://pawbz.github.io/JuMIT.jl/).
+* saving time snapshots during modelling
+  * [notebook] (https://github.com/pawbz/JuMIT.jl/tree/master/notebooks/modeling/page2.ipynb)
 
-
-##  Constrained inversion
-
+## Credits
+* Charles Clerget [@chclerget](https://github.com/chclerget) tested most of the methods of this package.
+* The Poisson solver (`JuMIT.Poisson`) was developed by Niels Grobbe, after adapting scripts from [Aime Fournier](https://erlweb.mit.edu/users/aimemitedu).
+* Finally, thanks of [Earth Resources Laboratory](https://erlweb.mit.edu), MIT. The project was supported by Aime Fournier via research funds from Equinor.
 
 
 [![Build Status](https://travis-ci.org/pawbz/JuMIT.jl.svg?branch=master)](https://travis-ci.org/pawbz/JuMIT.jl)
 [![codecov](https://codecov.io/gh/pawbz/JuMIT.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/pawbz/JuMIT.jl)
-

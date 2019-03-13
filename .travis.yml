@@ -4,7 +4,7 @@ os:
   - linux
   - osx
 julia:
-  - 0.6
+  - 1.0
   - nightly
 notifications:
   email: false
@@ -18,25 +18,18 @@ matrix:
   - julia: nightly
 
 ## uncomment and modify the following lines to manually install system packages
-#addons:
-#  apt: # apt-get for linux
-#    packages:
-#    - gfortran
+addons:
+  apt: # apt-get for linux
+    packages:
+    - gfortran
 #before_script: # homebrew for mac
 #  - if [ $TRAVIS_OS_NAME = osx ]; then brew install gcc; fi
 
 ## uncomment the following lines to override the default test script
-script:
-  - julia -e 'Pkg.clone("https://github.com/pawbz/Misfits.jl.git")'
-  - julia -e 'Pkg.clone("https://github.com/pawbz/Signals.jl.git")'
-  - julia -e 'Pkg.clone("https://github.com/pawbz/Conv.jl.git")'
-  - julia -e 'Pkg.clone("https://github.com/pawbz/Grid.jl.git")'
-  - julia -e 'Pkg.clone("https://github.com/pawbz/Interpolation.jl.git")'
-  - julia -e 'Pkg.clone("https://github.com/pawbz/Inversion.jl.git")'
-  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("JuMIT"); Pkg.test("JuMIT"; coverage=true)'
+#script:
+        #  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("JuMIT"); Pkg.test("JuMIT"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
   - julia -e 'cd(Pkg.dir("JuMIT")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
   # push coverage results to Codecov
   - julia -e 'cd(Pkg.dir("JuMIT")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
-

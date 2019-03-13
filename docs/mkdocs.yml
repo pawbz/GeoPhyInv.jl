@@ -27,7 +27,7 @@ docs_dir: 'src'
 pages:
           - Home: index.md
           - Reference: reference.md
-          - Tutorials: tut.md
+          - Tutorials: modeling/page1.md
 
 
 

@@ -1,5 +1,3 @@
-__precompile__()
-
 """
 This module defines a type called `Param` that is to be constructed 
 before performing 
@@ -17,11 +15,11 @@ module FWI
 
 using Interpolation
 using Conv
-using Grid
 using Misfits
 using Inversion
 using TimerOutputs
 using LinearMaps
+using LinearAlgebra
 using Ipopt
 
 import JuMIT.Models
@@ -32,6 +30,7 @@ import JuMIT.Fdtd
 using Optim, LineSearches
 using DistributedArrays
 using Calculus
+using Random
 
 
 global const to = TimerOutput(); # create a timer object
@@ -43,17 +42,22 @@ struct ModFdtdBorn end
 
 struct ModFdtdHBorn end
 
+# fields
+struct P end
+struct Vx end
+struct Vz end
+
 
 """
 FWI Parameters
 
 # Fields
 
-* `mgrid::Grid.M2D` : modelling grid
-* `igrid::Grid.M2D` : inversion grid
+* `mgrid::Vector{StepRangeLen}` : modelling grid
+* `igrid::Vector{StepRangeLen}` : inversion grid
 * `acqsrc::Acquisition.Src` : base source wavelet for modelling data
 * `acqgeom::Acquisition.Geom` : acquisition geometry
-* `tgrid::Grid.M1D` : 
+* `tgrid::StepRangeLen` : 
 * `attrib_mod`
 * `model_obs` : model used for generating observed data
 * `model0` : background velocity model (only used during Born modeling and inversion)
@@ -63,12 +67,12 @@ FWI Parameters
 
 TODO: add an extra attribute for coupling functions inversion and modelling
 """
-mutable struct Param{Tattrib_mod, Tdatamisfit}
+mutable struct Param{Tmod, Tdatamisfit}
 	"model inversion variable"
 	mx::Inversion.X{Float64,1}
 	mxm::Inversion.X{Float64,1}
 	"forward modelling parameters for"
-	paf::Fdtd.Param
+	paf::Tmod
 	"base source wavelet"
 	acqsrc::Acquisition.Src
 	"adjoint source functions"
@@ -77,8 +81,6 @@ mutable struct Param{Tattrib_mod, Tdatamisfit}
 	acqgeom::Acquisition.Geom
 	"acquisition geometry for adjoint propagation"
 	adjacqgeom::Acquisition.Geom
-	"modeling attribute"
-	attrib_mod::Tattrib_mod
 	"Seismic model on modeling grid"
 	modm::Models.Seismic
 	"background Seismic model"
@@ -89,8 +91,6 @@ mutable struct Param{Tattrib_mod, Tdatamisfit}
 	mod_initial::Models.Seismic
 	"prior model on the inversion grid"
 	priori::Models.Seismic
-	"prior weights on the inversion grid"
-	priorw::Models.Seismic
 	"gradient Seismic model on modeling grid"
 	gmodm::Models.Seismic
 	"gradient Seismic on inversion grid"
@@ -107,15 +107,34 @@ mutable struct Param{Tattrib_mod, Tdatamisfit}
 	attrib::Symbol
 end
 
+Base.print(pa::Param)=nothing
+Base.show(pa::Param)=nothing
+Base.display(pa::Param)=nothing
+
+# add data inverse covariance matrix here later
 struct LS end # just cls inversion
 
 struct LS_prior # cls inversion including prior 
-	α::Vector{Float64} # weights
+	# add data inverse covariance matrix here later, instead of just Float64
+	pdgls::Float64
+	# pdgls
+	pmgls::Misfits.P_gls{Float64}
+end
+LS_prior(α1::Float64, Q::LinearMap)=LS_prior(α1, Misfits.P_gls(Q))
+
+"""
+this method constructs prior term with Q=α*I
+* `ninv` : number of inversion variables, use `xfwi_ninv` 
+* `α` : scalar
+"""
+function LS_prior(ninv::Int, α=[1.0, 0.5])
+	Q=LinearMap(
+	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
+	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
+		      ninv, ninv, ismutating=true, issymmetric=true)
+	return LS_prior(α[1],Misfits.P_gls(Q))
 end
 
-function LS_prior()
-	return LS_prior([1.0, 0.5])
-end
 
 struct Migr end # returns first gradient
 
@@ -123,25 +142,33 @@ struct Migr_fd end # computes first gradient using FD
 
 include("core.jl")
 include("prior.jl")
+include("xfwi.jl")
+include("xwfwi.jl")
 
 """
 Convert the data `TD` to `Src` after time reversal.
 """
 function update_adjsrc!(adjsrc, δdat::Data.TD, adjacqgeom)
-	nt=δdat.tgrid.nx
+	(adjsrc.fields != δdat.fields) && error("dissimilar fields")
+	nt=length(δdat.tgrid)
 	for i in 1:adjacqgeom.nss
-		for j in 1:length(δdat.fields)
+		for (j,field) in enumerate(δdat.fields)
 			wav=adjsrc.wav[i,j] 
 			dat=δdat.d[i,j]
 			for ir in 1:δdat.acqgeom.nr[i]
 				for it in 1:nt
-					@inbounds wav[it,ir]=dat[nt-it+1,ir]
+					@inbounds wav[it,ir]=value_adjsrc(dat[nt-it+1,ir],eval(field)())
 				end
 			end
 		end
 	end
 	return nothing
 end
+
+value_adjsrc(s, ::P) = s
+value_adjsrc(s, ::Vx) = -1.0*s # see adj tests
+value_adjsrc(s, ::Vz) = -1.0*s
+
 
 function generate_adjsrc(fields, tgrid, adjacqgeom)
 	adjsrc=Acquisition.Src_zeros(adjacqgeom, fields, tgrid)
@@ -156,14 +183,14 @@ Constructor for `Param`
 
 * `acqsrc::Acquisition.Src` : source time functions
 * `acqgeom::Acquisition.Geom` : acquisition geometry
-* `tgrid::Grid.M1D` : modelling time grid
+* `tgrid::StepRangeLen` : modelling time grid
 * `attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}` : modelling attribute
 * `modm::Models.Seismic` : seismic model on modelling mesh 
 
 # Optional Arguments
-* `tgrid_obs::Grid.M1D` : time grid for observed data
+* `tgrid_obs::StepRangeLen` : time grid for observed data
 
-* `igrid::Grid.M2D=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
+* `igrid::Vector{StepRangeLen}=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
 * `igrid_interp_scheme` : interpolation scheme
   * `=:B1` linear 
   * `=:B2` second order 
@@ -185,29 +212,31 @@ Constructor for `Param`
 * `attrib::Symbol=:synthetic` : an attribute to control class
   * `=:synthetic` synthetic data inversion
   * `=:field` field data inversion
+* nworker : number of workers (input nothing to use all available)
 """
 function Param(
 	       acqsrc::Acquisition.Src,
 	       acqgeom::Acquisition.Geom,
-	       tgrid::Grid.M1D,
+	       tgrid::StepRangeLen,
 	       attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}, 
 	       modm::Models.Seismic;
 	       # other optional 
-	       tgrid_obs::Grid.M1D=deepcopy(tgrid),
-	       recv_fields=[:P],
-	       igrid::Grid.M2D=nothing,
+	       tgrid_obs::StepRangeLen=deepcopy(tgrid),
+	       rfields=[:P],
+	       igrid=nothing,
 	       igrid_interp_scheme::Symbol=:B2,
 	       mprecon_factor::Float64=1.0,
-	       dobs::Data.TD=Data.TD_zeros(recv_fields,tgrid_obs,acqgeom),
+	       dobs::Data.TD=Data.TD_zeros(rfields,tgrid_obs,acqgeom),
 	       dprecon=nothing,
 	       tlagssf_fracs=0.0,
 	       tlagrf_fracs=0.0,
 	       acqsrc_obs::Acquisition.Src=deepcopy(acqsrc),
 	       modm_obs::Models.Seismic=modm,
-	       modm0::Models.Seismic=fill!(deepcopy(modm),0.0),
+	       modm0=nothing,
 	       parameterization::Vector{Symbol}=[:χvp, :χρ, :null],
 	       verbose::Bool=false,
 	       attrib::Symbol=:synthetic,
+	       nworker=nothing,
 	       )
 
 	# make a copy of initial model
@@ -219,11 +248,21 @@ function Param(
 	# igrid has to truncated because the gradient evaluation 
 	# is inaccurate on boundaries
 	mg=modm.mgrid
-	igrid=Grid.M2D(max(mg.x[3],igrid.x[1]),
-		min(igrid.x[end],mg.x[end-2]),
-		max(igrid.z[1],mg.z[3]),
-		min(igrid.z[end],mg.z[end-2]),
-		 		igrid.δx,igrid.δz,igrid.npml)
+	amin=max(igrid[1][1],mg[1][3])
+	amax=min(igrid[1][end],mg[1][end-2])
+	if(length(igrid[1])==1)
+		grid1=range(amin,step=min(step(igrid[1]), mg[1][end-2]-amin),length=1)  
+	else
+		grid1=range(amin,stop=amax,length=length(igrid[1]))
+	end
+	amin=max(mg[2][3],igrid[2][1])
+	amax=min(igrid[2][end],mg[2][end-2])
+	if(length(igrid[2])==1)
+		grid2=range(amin,step=min(step(igrid[2]), mg[2][end-2]-amin),length=1)  
+	else
+		grid2=range(amin,stop=amax,length=length(igrid[2]))
+	end
+	igrid=[grid1, grid2]
 
 
 	# create modi according to igrid and interpolation of modm
@@ -237,39 +276,42 @@ function Param(
 
 	# allocate prior inputs
 	priori=similar(modi)
-	priorw=similar(modi)
 
-	# need a separate model for synthetic
+	# use default background model modm0
+	if(modm0 === nothing)
+		modm0=deepcopy(modm) # some dummy
+		fill!(modm0, 0.0)
+	end
+	isequal(modm0, modm_obs) && (@warn "modm0 == modm_obs")
+
 	if(attrib == :synthetic) 
-		((attrib_mod == :fdtd_hborn) | (attrib_mod == :fdtd_born)) && 
-		isequal(modm0, modm_obs) && error("change background model used for Born modelling")
-		isequal(modm, modm_obs) && error("initial model same as actual model")
+		isequal(modm, modm_obs) && error("initial model same as actual model, zero misfit?")
 	end
 
 	# acqgeom geometry for adjoint propagation
 	adjacqgeom = AdjGeom(acqgeom)
 
 	# generate adjoint sources
-	adjsrc=generate_adjsrc(recv_fields, tgrid, adjacqgeom)
-
-	if(typeof(attrib_mod) == ModFdtd)
-		born_flag=false
-	else
-		born_flag=true
-	end
+	adjsrc=generate_adjsrc(rfields, tgrid, adjacqgeom)
 
 	# generating forward and adjoint modelling engines
 	# to generate modelled data, border values, etc.
-	# most of the parameters given to this are dummy, except for born_flag
-	paf=Fdtd.Param(npw=2, model=modm, born_flag=born_flag,
+	# most of the parameters given to this are dummy
+	paf=Fdtd.Param(npw=2, model=modm, born_flag=true,
 		acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], 
+		rfields=rfields,
 		sflags=[3, 2], rflags=[1, 1],
 		backprop_flag=1, 
-		tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false)
+		tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
 
 
 	gmodm=similar(modm)
 	gmodi=similar(modi)
+
+	#println("added fake precon")
+	#dprecon=deepcopy(dobs)
+	#fill!(dprecon, 1.0)
+	#Data.taper!(dprecon, 20.)
 
 	# check dprecon
 	if(!(dprecon===nothing))
@@ -277,22 +319,22 @@ function Param(
 	end
 	
 	# create Parameters for data misfit
-	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, recv_fields, acqgeom)
+	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, rfields, acqgeom)
 	# choose the data misfit
 	#	(iszero(tlagssf_fracs)) 
  	# tlagssf_fracs==[0.0] | tlagssf_fracs=[0.0])
-	# paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
+	# paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
 	if(iszero(dobs))
-		randn!(dobs) # dummy dobs, update later
+		Random.randn!(dobs) # dummy dobs, update later
 	end
 
-	paTD=Data.P_misfit(Data.TD_zeros(recv_fields,tgrid,acqgeom),dobs,w=dprecon);
+	paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,acqgeom),dobs,w=dprecon);
 
-	paminterp=Interpolation.Kernel([modi.mgrid.x, modi.mgrid.z], [modm.mgrid.x, modm.mgrid.z], igrid_interp_scheme)
+	paminterp=Interpolation.Kernel([modi.mgrid[2], modi.mgrid[1]], [modm.mgrid[2], modm.mgrid[1]], igrid_interp_scheme)
 
-	mx=Inversion.X(modi.mgrid.nz*modi.mgrid.nx*count(parameterization.≠:null),2)
-	mxm=Inversion.X(modm.mgrid.nz*modm.mgrid.nx*count(parameterization.≠:null),2)
+	mx=Inversion.X(prod(length.(modi.mgrid))*count(parameterization.≠:null),2)
+	mxm=Inversion.X(prod(length.(modm.mgrid))*count(parameterization.≠:null),2)
 
 
 	# put modm as a vector, according to parameterization in mxm.x
@@ -302,12 +344,11 @@ function Param(
 	     mx, mxm,
 	     paf,
 	     deepcopy(acqsrc), 
-	     Acquisition.Src_zeros(adjacqgeom, recv_fields, tgrid),
+	     Acquisition.Src_zeros(adjacqgeom, rfields, tgrid),
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
-	     attrib_mod,  
 	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,
-	     priori, priorw,
+	     priori,
 	     gmodm,gmodi,
 	     parameterization,
 	     zeros(2,2), # dummy, update mprecon later
@@ -317,38 +358,51 @@ function Param(
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic))
-		# update model in the same forward engine
-		# save modm
-		modm_copy=deepcopy(pa.modm)
-
-		# change model to actual model
-		copy!(pa.modm, modm_obs)
-
-		F!(pa, nothing, pa.attrib_mod)
-
-		copy!(pa.paTD.y, pa.paTD.x)
-
-		# put back model and sources
-		copy!(pa.modm, modm_copy)
-
-	        Fdtd.initialize!(paf.c)  # clear everything
+		update_observed_data!(pa, modm_obs, attrib_mod)
 	end
+
 	iszero(dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
 
 	# generate modelled data
-	F!(pa, nothing, pa.attrib_mod)
+	F!(pa, nothing, attrib_mod)
 
 #	build_mprecon!(pa, Array(pa.paf.c.illum_stack), mprecon_factor)
 	pa.paf.c.illum_flag=false # switch off illum flag for speed
 
 	# default weights are 1.0
-	pa.mx.w[:]=1.0
+	fill!(pa.mx.w, 1.0)
 
-	# update priori and priorw in pa to defaults
+	# update priori in pa to defaults
 	update_prior!(pa)
 	
 	return pa
 end
+
+"""
+update the *synthetic* observed data in `Param`
+* allocated memory, don't use in inner loops
+"""
+function update_observed_data!(pa::Param, modm_obs, attrib_mod=ModFdtd())
+	# save modm of pa to put it back later
+	modm_copy=deepcopy(pa.modm)
+
+	# change modm in pa to actual model
+	copyto!(pa.modm, modm_obs)
+
+	# update models in the forward engine and do modelling
+	# ModFdtdBorn: modm0 will be used as a background model for Born modelling and modm will be perturbed model
+	# ModFdtd: modm will be *the* model
+	F!(pa, nothing, attrib_mod)
+
+	# get observed data
+	copyto!(pa.paTD.y, pa.paTD.x)
+
+	# put back model and sources
+	copyto!(pa.modm, modm_copy)
+
+	Fdtd.initialize!(pa.paf.c)  # clear everything
+end
+
 
 
 """
@@ -368,257 +422,6 @@ function wfwi_ninv(pa::Param)
 	return  pa.paTD.coup.tgridssf.nx
 end
 
-"""
-Update inversion variable with the initial model.
-At the same time, update the lower and upper bounds on the inversion variable.
-"""
-function initialize!(pa::Param)
-
-	randn!(pa.mx.last_x)  # reset last_x
-
-	# use mod_initial as starting model according to parameterization
-	Models.Seismic_get!(pa.mx.x, pa.mod_initial, pa.parameterization)
-
-	# bounds
-	Seismic_xbound!(pa.mx.lower_x, pa.mx.upper_x, pa)
-
-end
-
-# finalize xfwi or wfwi on pa
-function finalize!(pa::Param, xminimizer)
-	# update modm
-	x_to_modm!(pa, xminimizer)
-
-	# update calculated data using the minimizer
-	F!(pa, nothing, pa.attrib_mod)
-
-	# put minimizer into modi
-	Models.Seismic_reparameterize!(pa.modi, xminimizer, pa.parameterization) 
-
-	# update initial model using minimizer, so that running xfwi! next time will start with updated model
-	copy!(pa.mod_initial, pa.modi)
-end
-
-"""
-Full Waveform Inversion using `Optim` package.
-This method updates `pa.modm` and `pa.dcal`. More details about the
-optional parameters can be found in the documentation of the `Optim` 
-package.
-The gradiet is computed using the adjoint state method.
-`pa.modi` is used as initial model if non-zero.
-
-# Arguments
-
-* `pa::Param` : inversion object (updated inside method)
-* `obj::Union{LS,LS_prior}` : which objective function?
-  * `=LS()`
-  * `=LS_prior([1.0, 0.5])`
-
-# Optional Arguments
-
-* `optim_options` : see Optim.jl package for optimization options
-* `optim_scheme=LBFGS()` : see Optim.jl for other options
-* `bounded_flag=true` : use box constraints, see Optim.jl
-
-# Outputs
-
-* updated `modm` in the input `Param`
-* returns the result of optimization as an Optim.jl object
-  * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
-"""
-function xfwi!(pa::Param, obj::Union{LS,LS_prior}; 
-	   optim_scheme=LBFGS(),
-	   optim_options=Optim.Options(show_trace=true,
-	   store_trace=true, 
-	   extended_trace=false, 
-	   iterations=5,
-	   f_tol=1e-5, 
-	   g_tol=1e-8, 
-	   x_tol=1e-5, ),
-	       bounded_flag=false, solver=nothing, ipopt_options=nothing)
-
-	global to
-	reset_timer!(to)
-
-	println("updating modm and modi...")
-	println("> xfwi: number of inversion variables:\t", xfwi_ninv(pa)) 
-
-	initialize!(pa)
-
-	f(x) = ζfunc(x, pa.mx.last_x,  pa, obj)
-	g!(storage, x) = ζgrad!(storage, x, pa.mx.last_x, pa, obj)
-	if(!bounded_flag)
-		"""
-		Unbounded LBFGS inversion, only for testing
-		"""
-		@timeit to "xfwi!" begin
-			res = optimize(f, g!, pa.mx.x, optim_scheme, optim_options)
-		end
-	else
-		"""
-		Bounded LBFGS inversion
-		"""
-		if (solver == :ipopt)
-			function eval_f(x)
-			    return ζfunc(x, pa.mx.last_x,  pa, obj)
-			end
-
-
-			function eval_grad_f(x, grad_f)
-			    ζgrad!(grad_f, x, pa.mx.last_x, pa, obj)
-			end
-
-
-			function void_g(x, g)
-			    
-			end
-
-			function void_g_jac(x, mode, rows, cols, values)
-			    
-			end
-
-			prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, Array{Float64}(0), Array{Float64}(0), 0, 0,
-					eval_f, void_g, eval_grad_f, void_g_jac, nothing)
-
-			addOption(prob, "hessian_approximation", "limited-memory")
-
-			if !(ipopt_options === nothing)
-			    for i in 1:size(ipopt_options)[1]
-				addOption(prob, ipopt_options[i][1], ipopt_options[i][2])
-			    end
-			end
-
-			prob.x = pa.mx.x
-			    
-			@timeit to "xfwi!" begin
-				res = solveProblem(prob)
-			end
-		else
-			@timeit to "xfwi!" begin
-				res = optimize(f, g!, pa.mx.lower_x, pa.mx.upper_x,pa.mx.x, Fminbox(optim_scheme), optim_options)
-			end
-                end
-	end
-	show(to)
-
-	# print some stuff after optimization...
-	if (solver == :ipopt)
-		pa.verbose && println(ApplicationReturnStatus[res])
-	else
-		pa.verbose && println(res)
-	end
-	
-
-	# finalize optimization, using the optimizer... 
-	if solver == :ipopt
-		finalize!(pa, prob.x)
-	else
-		finalize!(pa, Optim.minimizer(res))
-	end
-
-
-	return res
-end
-
-		#=
-		Harvest the Optim result to plot functional and gradient --- to be updated later
-		if(extended_trace)
-			# convert gradient vector to model
-			gmodi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
-			gmodm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)] 
-			modi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
-			modm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)]
-			for itr=1:Optim.iterations(res)
-				# update modm and modi
-				Seismic_x!(modm[itr], modi[itr], Optim.x_trace(res)[itr], pa, -1)
-
-				# update gmodm and gmodi
-				Seismic_gx!(gmodm[itr],modm[itr],gmodi[itr],modi[itr],Optim.trace(res)[itr].metadata["g(x)"],pa,-1)
-			end
-			
-		else
-			f = Optim.minimum(res)
-		end
-		=#
-
-
-"""
-Return gradient at the first iteration, i.e., a migration image
-"""
-function xfwi!(pa::Param, obj::Migr)
-
-	global to
-	reset_timer!(to)
-
-	initialize!(pa)
-
-	g1=pa.mx.gm[1]
-	@timeit to "xfwi!" begin
-		grad!(g1, pa.mx.x, pa.mx.last_x,  pa)
-	end
-	show(to)
-
-	# convert gradient vector to model
-	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, g1, pa)
-
-	return pa.gmodi
-end
-
-
-"""
-Return gradient at the first iteration, i.e., a migration image, without using
-adjoint state method.
-"""
-function xfwi!(pa::Param, obj::Migr_fd)
-	global to
-	reset_timer!(to)
-
-	initialize!(pa)
-	gx=pa.mx.gm[1]
-
-	println("> number of functional evaluations:\t", xfwi_ninv(pa)) 
-
-	f(x) = ζfunc(x, pa.mx.last_x,  pa, LS())
-
-	gx = Calculus.gradient(f,pa.mx.x) # allocating new gradient vector here
-	
-	show(to)
-
-	# convert gradient vector to model
-	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)
-
-	return pa.gmodi
-end
-
-
-
-function xwfwi!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothing, roundtrip_tol=1e-6,
-		     optim_tols=[1e-6, 1e-6])
-
-	if(ParamAM_func===nothing)
-		ParamAM_func=x->Inversion.ParamAM(x, optim_tols=optim_tols,name="FWI with Source Wavelet Estimation",
-				    roundtrip_tol=roundtrip_tol, max_roundtrips=max_roundtrips,
-				    max_reroundtrips=max_reroundtrips,
-				    min_roundtrips=10,
-				    reinit_func=x->initialize!(pa),
-				    after_reroundtrip_func=x->(err!(pa); update_calsave!(pa);),
-				    )
-	end
-
-	
-	# create alternating minimization parameters
-	f1=x->FWI.wfwi!(pa, extended_trace=false)
-	f2=x->FWI.xfwi!(pa, extended_trace=false)
-	paam=ParamAM_func([f1, f2])
-
-	# do inversion
-	Inversion.go(paam)
-
-	# print errors
-	err!(pa)
-	println(" ")
-end
-
 
 "build a model precon"
 function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
@@ -626,7 +429,7 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 	(any(illum .<= 0.0)) && error("illum cannot be negative or zero")
 	(mprecon_factor < 1.0)  && error("invalid mprecon_factor")
 
-	illumi = zeros(pa.modi.mgrid.nz, pa.modi.mgrid.nx)
+	illumi = zeros(length(pa.modi.mgrid[1]), length(pa.modi.mgrid[2]))
 	Interpolation.interp_spray!(illumi, illum, pa.paminterp, :spray)
 	(any(illumi .<= 0.0)) && error("illumi cannot be negative or zero")
 
@@ -648,131 +451,6 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 end
 
 
-"""
-Return functional and gradient of the LS objective 
-* `last_x::Vector{Float64}` : buffer is only updated when x!=last_x, and modified such that last_x=x
-"""
-function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
-	global to
-
-	if(!isequal(x, last_x))
-		copy!(last_x, x)
-		# do forward modelling, apply F x
-		@timeit to "F!" F!(pa, x, pa.attrib_mod)
-	end
-
-	# compute misfit 
-	f = Data.func_grad!(pa.paTD)
-	return f
-end
-
-function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::Param)
-	global to
-
-	# (inactive when applied on same model)
-	if(!isequal(x, last_x))
-		copy!(last_x, x)
-		# do forward modelling, apply F x 
-		@timeit to "F!" F!(pa, x, pa.attrib_mod)
-	end
-
-	# compute functional and get ∇_d J (adjoint sources)
-	f = Data.func_grad!(pa.paTD, :dJx);
-
-	# update adjoint sources after time reversal
-	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
-
-	# do adjoint modelling here with adjoint sources Fᵀ F P x
-	@timeit to "Fadj!" Fadj!(pa)	
-
-	# adjoint of interpolation
-        spray_gradient!(storage,  pa, pa.attrib_mod)
-
-	return storage
-end 
-
-
-
-function ζfunc(x, last_x, pa::Param, ::LS)
-	return func(x, last_x, pa)
-end
-
-
-function ζgrad!(storage, x, last_x, pa::Param, ::LS)
-	return grad!(storage, x, last_x, pa)
-end
-
-
-function ζfunc(x, last_x, pa::Param, obj::LS_prior)
-	f1=func(x, last_x, pa)
-
-	f2=Misfits.error_squared_euclidean!(nothing, x, pa.mx.prior, pa.mx.w, norm_flag=false)
-
-	return f1*obj.α[1]+f2*obj.α[2]
-end
-
-function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior)
-	g1=pa.mx.gm[1]
-	grad!(g1, x, last_x, pa)
-
-	g2=pa.mx.gm[2]
-	Misfits.error_squared_euclidean!(g2, x, pa.mx.prior, pa.mx.w, norm_flag=false)
-
-	scale!(g1, obj.α[1])
-	scale!(g2, obj.α[2])
-	for i in eachindex(storage)
-		@inbounds storage[i]=g1[i]+g2[i]
-	end
-	return storage
-end
-
-
-"""
-Update pa.w
-"""
-function wfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., 
-	       f_tol::Float64=1e-8, g_tol::Float64=1e-8, x_tol::Float64=1e-8)
-
-	# convert initial model to the inversion variable
-	x = zeros(wfwi_ninv(pa));
-	last_x = rand(size(x)) # reset last_x
-
-	println("updating w...")
-	println("> wfwi: number of inversion variables:\t", length(x)) 
-
-	# initial w to x
-	Coupling_x!(x, pa, 1)
-
-	(iszero(pa.paTD.y)) && error("dcal zero wfwi")
-
-	f=x->func_grad_Coupling!(nothing, x,  pa)
-	g! =(storage,x)->func_grad_Coupling!(storage, x,  pa)
-
-	"""
-	Unbounded LBFGS inversion, only for testing
-	"""
-	res = optimize(f, g!, x, 
-		       LBFGS(),
-		       Optim.Options(g_tol = g_tol, f_tol=f_tol, x_tol=x_tol,
-		       iterations = 1000, store_trace = store_trace,
-		       extended_trace=extended_trace, show_trace = true))
-	"testing gradient using auto-differentiation"
-#	res = optimize(f, x, 
-#		       LBFGS(),
-#		       Optim.Options(g_tol = 1e-12,
-#	 	       iterations = 10, store_trace = true,
-#		       extended_trace=true, show_trace = true))
-
-	pa.verbose ? println(res) : nothing
-	# update w in pa
-
-	Coupling_x!(Optim.minimizer(res), pa, -1)
-
-	f = Optim.minimum(res)
-	return f
-end # wfwi
-
-
 # convert x to modm by interpolation
 # x is on the sparse grid, and is changed by parameterization
 function x_to_modm!(pa, x)
@@ -785,6 +463,18 @@ function x_to_modm!(pa, x)
 
 	# put dense x into modm, according to parameterization
 	Models.Seismic_reparameterize!(pa.modm,pa.mxm.x,pa.parameterization) 
+end
+
+
+function δx_to_δmods!(pa, δx)
+	# get x on dense grid
+	Interpolation.interp_spray!(δx, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
+
+	# reparameterize accordingly to get [δKI, δρI]
+	Models.pert_reparameterize!(pa.paf.c.δmod, pa.mxm.x, pa.modm0, pa.parameterization)
+
+	# input [δKI, δρI] to the modeling engine
+	Fdtd.update_δmods!(pa.paf.c, pa.paf.c.δmod)
 end
 
 """
@@ -804,7 +494,7 @@ end
 function spray_gradient!(gx, pa, ::ModFdtdBorn)
 
 	# apply chain rule on gmodm to get gradient w.r.t. dense x (note that background model is used for Born modeling here)
-	Models.gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm0, pa.parameterization)
+	Models.gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
 
 	# spray gradient w.r.t. dense x to the space of sparse x
 	Interpolation.interp_spray!(gx, pa.mxm.gx, pa.paminterp, :spray, count(pa.parameterization.≠:null))
@@ -820,7 +510,7 @@ Return bound vectors for the `Seismic` model,
 depeding on paramaterization
 """
 function Seismic_xbound!(lower_x, upper_x, pa)
-	nznx = pa.modi.mgrid.nz*pa.modi.mgrid.nx;
+	nznx = prod(length.(pa.modi.mgrid))
 
 	bound1 = similar(lower_x)
 	# create a Seismic model with minimum possible values

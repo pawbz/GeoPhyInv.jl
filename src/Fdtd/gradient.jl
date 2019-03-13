@@ -1,73 +1,3 @@
-
-
-
-function grad_modrr!(pac::Paramc)
-	@simd for i in eachindex(pac.grad_modrr_stack)
-		@inbounds pac.grad_modrr_stack[i] = (pac.grad_modrrvx_stack[i] + pac.grad_modrrvz_stack[i]) * (0.5)
-	end
-	grad_modrr_sprayrrvx!(pac.grad_modrr_stack,pac.grad_modrrvx_stack)
-	grad_modrr_sprayrrvz!(pac.grad_modrr_stack,pac.grad_modrrvz_stack)
-end
-function grad_modrr_sprayrrvx!(grad_modrr_stack,grad_modrrvx_stack)
-	for ix=2:size(grad_modrr_stack,2)-1
-		for iz=2:size(grad_modrr_stack,1)-1
-			@inbounds grad_modrr_stack[iz,ix+1] +=  0.5e0 * grad_modrrvx_stack[iz,ix]
-		end
-	end
-end
-function grad_modrr_sprayrrvz!(grad_modrr_stack,grad_modrrvz_stack)
-	for ix=2:size(grad_modrr_stack,2)-1
-		for iz=2:size(grad_modrr_stack,1)-1
-			@inbounds grad_modrr_stack[iz+1,ix] +=  0.5e0 * grad_modrrvz_stack[iz,ix]
-		end
-	end
-end
-
-function stack_grads!(pac::Paramc, pap::Paramp)
-	np=pac.model.mgrid.npml # to truncate the gradients in PML region
-	nx, nz=pac.nx, pac.nz
-	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
-
-	# theses are SharedArrays
-	grad_stack=pac.grad_stack
-	gmodrrvx=pac.grad_modrrvx_stack
-	gmodrrvz=pac.grad_modrrvz_stack
-	pass=pap.ss
-	for issp in 1:length(pass)
-		gs=pass[issp].grad_modtt
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		for i in 1:nznxd
-			grad_stack[i]+=gss[i]  # only update gmodtt
-		end
-		gs=pass[issp].grad_modrrvx
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		for i in 1:nznxd
-			gmodrrvx[i] += gss[i]
-		end
-		gs=pass[issp].grad_modrrvz
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
-		for i in 1:nznxd
-			gmodrrvz[i] += gss[i]
-		end
-	end
-	# combine rrvx and rrvz
-	grad_modrr!(pac::Paramc)
-	for i in 1:nznxd
-		grad_stack[nznxd+i]+=pac.grad_modrr_stack[i]  # update gmodrr
-	end
-
-end
-
-function update_gradient!(pac::Paramc)
-	nznxd = pac.model.mgrid.nz*pac.model.mgrid.nx
-	
-	for i in eachindex(pac.gradient)
-		pac.gradient[i]=pac.grad_stack[i] # parameterization is  [:KI, :ρI, :null]
-	end
-
-end
-
-
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
 @inbounds @fastmath function compute_gradient!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
 	# aliases
@@ -98,6 +28,8 @@ end
 		end
 	end
 end
+
+
 @inbounds @fastmath function gmodrrvx!(grad_modrrvx,dpdx,nx,nz)
 	dpdxw1=dpdx[1]
 	dpdxw2=dpdx[2]
@@ -127,9 +59,57 @@ end
 	"gradient is formed by intergration over time, hence multiply with δt, but why not?"
 	"I don't completely understand where the factors δx and δz are coming from..."
 	"probably the source term should not be multiplied by δxI and δzI during adjoint propagation"
-	scale!(grad_modtt,δ)
-	scale!(grad_modrrvx,δ)
-	scale!(grad_modrrvz,δ)
+	rmul!(grad_modtt,δ)
+	rmul!(grad_modrrvx,δ)
+	rmul!(grad_modrrvz,δ)
 end
 
+
+
+
+function grad_modrr!(pac::Paramc)
+	grad_modrr_sprayrr!(pac.grad_modrr_stack,pac.grad_modrrvx_stack,pac.grad_modrrvz_stack)
+	grad_modrr_sprayrrvx!(pac.grad_modrr_stack,pac.grad_modrrvx_stack)
+	grad_modrr_sprayrrvz!(pac.grad_modrr_stack,pac.grad_modrrvz_stack)
+end
+
+function stack_grads!(pac::Paramc, pap::Paramp)
+	# theses are SharedArrays
+	gmodtt=pac.grad_modtt_stack
+	gmodrrvx=pac.grad_modrrvx_stack
+	gmodrrvz=pac.grad_modrrvz_stack
+	pass=pap.ss
+	for issp in 1:length(pass)
+		gs=pass[issp].grad_modtt
+		for i in eachindex(gmodtt)
+			gmodtt[i]+=gs[i]  # only update gmodtt
+		end
+		gs=pass[issp].grad_modrrvx
+		for i in eachindex(gmodrrvx)
+			gmodrrvx[i]+=gs[i]
+		end
+		gs=pass[issp].grad_modrrvz
+		for i in eachindex(gmodrrvz)
+			gmodrrvz[i]+=gs[i]
+		end
+	end
+end
+
+function update_gradient!(pac::Paramc)
+	nx, nz=pac.nx, pac.nz
+	nznxd = prod(length.(pac.model.mgrid))
+
+	# combine rrvx and rrvz
+	grad_modrr!(pac)
+
+	gradient=pac.gradient
+	# truncate
+	gmodtt=view(pac.grad_modtt_stack,npml+1:nz-npml,npml+1:nx-npml)
+	gmodrr=view(pac.grad_modrr_stack,npml+1:nz-npml,npml+1:nx-npml)
+	for i in 1:nznxd
+		# parameterization is  [:KI, :ρI, :null]
+		gradient[i]=gmodtt[i]  # update gmodtt
+		gradient[nznxd+i]=gmodrr[i]  # update gmodrr
+	end
+end
 

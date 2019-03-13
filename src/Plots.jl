@@ -2,16 +2,13 @@ module Plots
 
 using StatsBase
 using RecipesBase
-using Interpolation
-using Grid
-using Conv
-using ImageFiltering
+using FFTW
+using DSP
+#using ImageFiltering
 import JuMIT.Acquisition
 import JuMIT.Data
 import JuMIT.Models
 
-function dummy_()
-end
 
 @userplot Seismic
 """
@@ -23,8 +20,8 @@ Plot the velocity and density seismic models.
 
 # Keyword Arguments
 
-* `xlim::Vector{Float64}=[model.mgrid.x[1],model.mgrid.x[end]]` : minimum and maximum limits of the second dimension while plotting
-* `zlim::Vector{Float64}=[model.mgrid.z[1],model.mgrid.z[end]]` : minimum and maximum limits of the first dimension while plotting
+* `xlim::Vector{Float64}=[model.mgrid[2][1],model.mgrid[2][end]]` : minimum and maximum limits of the second dimension while plotting
+* `zlim::Vector{Float64}=[model.mgrid[1][1],model.mgrid[1][end]]` : minimum and maximum limits of the first dimension while plotting
 * `fields::Vector{Symbol}=[:vp, :ρ]` : fields that are to be plotted, see Models.Seismic_get
 * `contrast_flag=false` : plot only the edges of the model
 * `use_bounds=false` : adjust `clim` to the bounds in the seismic model
@@ -35,25 +32,29 @@ Plot the velocity and density seismic models.
 		   contrast_flag=false,
 		   use_bounds=false,
 		  ) 
+	if(contrast_flag)
+		warn("ImageFiltering bug needs to be fixed")
+	end
 	model=p.args[1]
+	nz,nx=length.(model.mgrid)
 
-	nrow = (model.mgrid.nx <= model.mgrid.nz) ? 1 : length(fields)
-	ncol = (model.mgrid.nx <= model.mgrid.nz) ? length(fields) : 1
+	nrow = (nx <= nz) ? 1 : length(fields)
+	ncol = (nx <= nz) ? length(fields) : 1
 
 
 	layout --> (nrow,ncol)
 	for (i,iff) in enumerate(fields)
-		name=replace(string(iff), "ρ", "rho")
-		name=replace(name, "χ", "contrast\t")
+		name=replace(string(iff), "ρ" => "rho")
+		name=replace(name, "χ" => "contrast\t")
 
-		f0 = Symbol((replace("$(fields[i])", "χ", "")),0)
+		f0 = Symbol((replace("$(fields[i])", "χ" => "")),0)
 		m = Models.Seismic_get(model, iff)
-		mx = model.mgrid.x
-		mz = model.mgrid.z
+		mx = model.mgrid[2]
+		mz = model.mgrid[1]
 		if(contrast_flag)
 			mmin=minimum(m)
 			mmax=maximum(m)
-			m=imfilter(m, Kernel.Laplacian())
+			#m=imfilter(m, Kernel.Laplacian())
 			mmmin=minimum(m)
 			mmmax=maximum(m)
 			for j in eachindex(m)
@@ -120,7 +121,7 @@ end
 
 """
 Plot acquisition geometry `Acquisition.Geom` on
-and model grid `M2D`.
+and model grid.
 
 `attrib::Symbol=:unique` : default; plots unique source and receiver positions
 `ssvec::Vector{Int64}` : plot source and receivers of only these supersources
@@ -176,7 +177,7 @@ and model grid `M2D`.
 			legend --> false
 			markersize --> 7
 			markercolor := :red
-			markershape := :star7
+			markershape := :xcross
 			seriestype := :scatter
 			sx, sz
 		end
@@ -193,11 +194,11 @@ end
 	wav=p.args[1]
 	if(tgrid===nothing)
 		x=0:length(wav)
-		tgrid=Grid.M1D(0.0, Float64(length(wav)-1), 1.0)
+		tgrid=range(0.0, stop=Float64(length(wav)-1), step=1.0)
 	end
 
-	fgrid= Grid.M1D_rfft(tgrid)
-	powwav = (abs.(rfft(wav, [1])).^2)
+	fgrid= DSP.rfftfreq(length(tgrid), inv(step(tgrid)))
+	powwav = (abs.(FFTW.rfft(wav, [1])).^2)
 	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
 
 	@series begin        
@@ -205,7 +206,7 @@ end
 		legend := false
 		ylabel := "power (dB)"
 		xlabel := "frequency (Hz)"
-		fgrid.x, powwavdb
+		fgrid, powwavdb
 	end
 end
 
@@ -218,7 +219,6 @@ Plot the source wavelet used for acquisition.
 
 * `acqsrc::Acquisition.Src` : source acquisition parameters
 """
-
 @recipe function psrc(p::Src)
 	acqsrc=p.args[1]
 	tgrid=acqsrc.tgrid
@@ -230,18 +230,18 @@ Plot the source wavelet used for acquisition.
 		legend := false
 		xlabel := "time [s]"
 		ylabel := "amplitude" 
-		tgrid.x, wav 
+		tgrid, wav 
 	end
 
-	fgrid= Grid.M1D_rfft(tgrid)
-	powwav = (abs.(rfft(wav, [1])).^2)
+	fgrid= DSP.rfftfreq(length(tgrid), inv(step(tgrid)))
+	powwav = (abs.(FFTW.rfft(wav, [1])).^2)
 	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
 	@series begin        
 		subplot := 2
 		ylabel := "power [dB]"
 		xlabel := "frequency [Hz]"
 		legend := false
-		fgrid.x, powwavdb
+		fgrid, powwavdb
 	end
 
 end
@@ -274,15 +274,15 @@ Plot time-domain data of type `Data.TD`
 	any(ssvec .> dat.acqgeom.nss) && error("invalid ssvec")
 	ns = length(ssvec);
 	nr = maximum(dat.acqgeom.nr);
-	dd=getfield(dat,fieldnames(dat)[1])
-	fieldvec = findin(dat.fields, fields)
+	dd=getfield(dat,fieldnames(typeof(dat))[1])
+	fieldvec = findall(in(fields),dat.fields)
 	if(tr_flag)
 		dp = hcat(dd[ssvec,fieldvec][end:-1:1,:]...);
-		dz = dat.tgrid.x
+		dz = dat.tgrid
 		dx = 1:size(dp,2)
 	else
 		dp = hcat(dd[ssvec,fieldvec][:,:]...);
-		dz = dat.tgrid.x[end:-1:1]
+		dz = dat.tgrid[end:-1:1]
 		dx = 1:size(dp,2)
 	end
 

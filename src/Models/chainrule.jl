@@ -6,7 +6,7 @@
 * `gout` : output gradients according to parameterization
 """
 function gradient_chainrule!(gout, g, mod, parameterization)
-	nznx=mod.mgrid.nz*mod.mgrid.nx
+	nznx=prod(length.(mod.mgrid))
 	(length(gout)≠(count(parameterization.≠ :null)*nznx)) &&  error("size x")
 
 	ρ=mod.χρ; χ!(ρ, mod.ref.ρ,-1) # undo it later
@@ -33,9 +33,9 @@ function gradient_chainrule!(gout, g, mod, parameterization)
 		@inbounds for i in 1:nznx
 			gout[i]= χg(grad_of_vp(g[i], vp[i], ρ[i]), mod.ref.vp,1)
 		end
-	elseif(parameterization == [:χnull, :χρ, :null]) 
+	elseif(parameterization == [:null, :χρ, :null]) 
 		@inbounds for i in 1:nznx
-			gout[i]=χg(grad_of_ρ(g[i],g[nznx+i],vp[i],ρ[i]), mod.ref.ρ,1)
+			gout[i]=χg(grad_of_ρ(g[i],vp[i],ρ[i]), mod.ref.ρ,1)
 		end
 	end
 
@@ -47,8 +47,44 @@ end
 
 
 
-grad_of_vp(gKI, vp, ρ) = -2. * gKI * inv(vp*vp*vp*ρ)
-grad_of_ρ(gKI, gρI, vp, ρ) = -1. * inv(abs2(ρ)) * (inv(vp*vp)*gKI + gρI) 
+grad_of_vp(gKI, vp, ρ) = -2.0 * gKI * inv(vp*vp*vp*ρ)
+grad_of_ρ(gKI, gρI, vp, ρ) = -1.0 * inv(abs2(ρ)) * (inv(vp*vp)*gKI + gρI) 
+grad_of_ρ(gρI, vp, ρ) = -1.0 * inv(abs2(ρ)) * (gρI) 
+
+"""
+No different from the previous case, but...
+"""
+function pert_gradient_chainrule!(gout, g, mod, parameterization)
+	nznx=prod(length.(mod.mgrid))
+	(length(gout)≠(count(parameterization.≠ :null)*nznx)) &&  error("size x")
+	fill!(gout, 0.0)
+	if(parameterization == [:χKI, :χρI, :null]) 
+		@inbounds for i in 1:nznx
+			gout[i]=g[i]*mod.ref.KI
+			gout[nznx+i]=g[nznx+i]*mod.ref.ρI
+		end
+	elseif(parameterization == [:χKI, :null, :null]) 
+		@inbounds for i in 1:nznx
+			gout[i]=χg(g[i],mod.ref.KI,1)
+		end
+	elseif(parameterization == [:χvp, :χρ, :null]) 
+		@inbounds for i in 1:nznx
+			# derivative w.r.t vp
+			gout[i]= -2.0*mod.ref.KI*g[i]
+			# derivative w.r.t. ρ
+			gout[nznx+i]=-1.0*mod.ref.KI*g[i]-1.0*mod.ref.ρI*g[nznx+i]
+		end
+	elseif(parameterization == [:χvp, :null, :null]) 
+		@inbounds for i in 1:nznx
+			gout[i]=-2.0*mod.ref.KI*g[i]
+		end
+	elseif(parameterization == [:null, :χρ, :null]) 
+		@inbounds for i in 1:nznx
+			gout[i]=-1.0*mod.ref.ρI*g[i]
+		end
+	end
+end
+
 
 
 
@@ -81,7 +117,7 @@ function Seismic_chainrule!(
 		      flag::Int64=1
 		      )
 
-	nznx=mod.mgrid.nz*mod.mgrid.nx
+	nznx=prod(length.(mod.mgrid))
 	(length(g)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
 
 	ρ=mod.χρ; χ!(ρ, mod.ref.ρ,-1) # undo it later
@@ -93,9 +129,9 @@ function Seismic_chainrule!(
 				g[i]=χg(g[i],mod.ref.KI,-1)
 				g[nznx+i]=χg(g[nznx+i],mod.ref.ρI,-1)
 				# gradient w.r.t  χρ
-				gmod.χρ[i]= -1.*abs2(inv(ρ[i]))*g[nznx+i]-inv(vp[i]*vp[i]*ρ[i]*ρ[i])*g[i]
+				gmod.χρ[i]= -1.0*abs2(inv(ρ[i]))*g[nznx+i]-inv(vp[i]*vp[i]*ρ[i]*ρ[i])*g[i]
 				# gradient w.r.t χvp
-				gmod.χvp[i] = -2.*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
+				gmod.χvp[i] = -2.0*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
 				g[i]=χg(g[i],mod.ref.KI,1)
 				g[nznx+i]=χg(g[nznx+i],mod.ref.ρI,1)
 			end
@@ -105,7 +141,7 @@ function Seismic_chainrule!(
 			@inbounds for i in 1:nznx
 				g[i]=χg(g[i],mod.ref.KI,-1)
 				# gradient w.r.t χvp
-				gmod.χvp[i] = -2.*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
+				gmod.χvp[i] = -2.0*inv(vp[i]*vp[i]*vp[i])*inv(ρ[i])*g[i]
 				g[i]=χg(g[i],mod.ref.KI,1)
 			end
 			χg!(gmod.χvp,mod.ref.vp,1)

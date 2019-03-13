@@ -1,5 +1,3 @@
-
-__precompile__()
 module Smooth
 
 using Conv
@@ -92,8 +90,8 @@ end
 
 
 =#
-function gaussian!{N}(xg::Array{Float64,N}, 
-		      x::Array{Float64,N}, pa)
+function gaussian!(xg::Array{Float64,N}, 
+		      x::Array{Float64,N}, pa) where {N}
 	Conv.mod!(pa, :d, d=xg, g=x)
 end
 end

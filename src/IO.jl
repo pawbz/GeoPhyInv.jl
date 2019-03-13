@@ -1,10 +1,8 @@
-__precompile__()
-
 module IO
 
 #import JuMIT.Data
 
-type SegyHeader
+mutable struct SegyHeader
 	tracl::Int32
 	tracr::Int32
 	fldr::Int32
@@ -187,11 +185,11 @@ function GrabSegyHeader(stream,swap_bytes,nt,file_header_size,j)
 	seek(stream,position)
 	h = InitSegyHeader()
 	if (swap_bytes == false)
-		for field in fieldnames(h)
+		for field in fieldnames(typeof(h))
 			setfield!(h, field, read(stream,typeof(getfield(h,field))) )
 		end
 	else
-		for field in fieldnames(h)
+		for field in fieldnames(typeof(h))
 			setfield!(h, field, bswap(read(stream,typeof(getfield(h,field)))) )
 		end
 	end
@@ -202,7 +200,7 @@ end
 function PutSegyHeader(stream,h,nt,file_header_size,j)
 	position = file_header_size + (240+nt*4)*(j-1)
 	seek(stream,position)
-	for field in fieldnames(h)
+	for field in fieldnames(typeof(h))
 		write(stream,getfield(h,field))
 	end
 end
@@ -240,7 +238,7 @@ function readsu(fname, verbose=false)
 	verbose && println("number of traces: ",nrecords)
 	verbose && println("number of samples per trace: ",nt)
 
-	h_segy = Array{SegyHeader}(nrecords)
+	h_segy = Array{SegyHeader}(undef, nrecords)
 	seek(stream,file_hsize + segy_count["trace"])
 	h_segy[1] = GrabSegyHeader(stream,swap_bytes,nt,file_hsize,1)
 	dt = h_segy[1].dt/1000000 # convert to seconds
@@ -253,7 +251,9 @@ function readsu(fname, verbose=false)
 		# goto trace position
 		seek(stream,position)
 		# read trace
-		d[:,j] = convert(Array{Float64,1}, read(stream,Float32,nt))
+		for i in 1:nt
+			d[i,j] = read(stream,Float32)
+		end
 		# read header, seek is inside this function
 		h_segy[j] = GrabSegyHeader(stream,swap_bytes,nt,file_hsize,j)
 	end
@@ -315,8 +315,8 @@ end
 #	for iss=1:nss
 #		for ir=1:d.acqgeom.nr[iss]
 #			irec += 1
-#			h_segy[irec].ns = d.tgrid.nx
-#			h_segy[irec].dt = d.tgrid.δx*1000000 
+#			h_segy[irec].ns = length(d.tgrid)
+#			h_segy[irec].dt = step(d.tgrid)*1000000 
 #		end
 #	end
 #	writesu(fname, d, h_segy)

@@ -1,18 +1,29 @@
-__precompile__()
-
 module Fdtd
 
-using Grid
 using Interpolation
 using Signals
 import JuMIT.Models
 import JuMIT.Acquisition
 import JuMIT.Data
-import JuMIT.Gallery
 using ProgressMeter
 using TimerOutputs
+using Distributed
 using DistributedArrays
+using SharedArrays
+using LinearAlgebra
+using AxisArrays
+using Printf
 
+global const to = TimerOutput(); # create a timer object
+global const npml = 50
+global const nlayer_rand = 0
+
+# struct related to fields
+struct P end
+struct Vx end
+struct Vz end
+
+# 
 #As forward modeling method, the 
 #finite-difference method is employed. 
 #It uses a discrete version of the two-dimensional isotropic acoustic wave equation.
@@ -35,9 +46,9 @@ Modelling parameters common for all supersources
 
 * `gradient::Vector{Float64}=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
 * `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]`
-* `illum::Array{Float64,2}=zeros(model.mgrid.nz, model.mgrid.nx)` : source energy if `illum_flag`
+* `illum::Array{Float64,2}=zeros(length(model.mgrid[1]), length(model.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
-* `snaps::Array{Float64,4}=zeros(model.mgrid.nz,model.mgrid.nx,length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
+* `snaps::Array{Float64,4}=zeros(length(model.mgrid[1]),length(model.mgrid[2]),length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
 
 # Return (in order)
 
@@ -54,12 +65,11 @@ mutable struct Paramc
 	npw::Int64 
 	activepw::Vector{Int64}
 	exmodel::Models.Seismic
-	exmodel_pert::Models.Seismic
 	model::Models.Seismic
-	model_pert::Models.Seismic
 	acqgeom::Vector{Acquisition.Geom}
 	acqsrc::Vector{Acquisition.Src}
 	abs_trbl::Vector{Symbol}
+	sfields::Vector{Vector{Symbol}}
 	isfields::Vector{Vector{Int64}}
 	sflags::Vector{Int64} 
 	irfields::Vector{Int64}
@@ -86,21 +96,22 @@ mutable struct Paramc
 	b_z_half::Vector{Float64}
 	k_z_halfI::Vector{Float64}
 	modtt::Matrix{Float64}
-	modttI::Matrix{Float64}
+	modttI::Matrix{Float64} # just storing inv(modtt) for speed
 	modrr::Matrix{Float64}
 	modrrvx::Matrix{Float64}
 	modrrvz::Matrix{Float64}
 	δmodtt::Matrix{Float64}
-	modrr_pert::Matrix{Float64}
+	δmodrr::Matrix{Float64} 
 	δmodrrvx::Matrix{Float64}
 	δmodrrvz::Matrix{Float64}
-	grad_stack::SharedVector{Float64} # contains gmodtt and gmodrr
-	gradient::Vector{Float64}  # output gradient vector
-	grad_modrrvx_stack::SharedMatrix{Float64}
-	grad_modrrvz_stack::SharedMatrix{Float64}
-	grad_modrr_stack::Matrix{Float64}
+	δmod::Vector{Float64} # perturbation vector (KI, ρI)
+	gradient::Vector{Float64}  # output gradient vector w.r.t (KI, ρI)
+	grad_modtt_stack::SharedArrays.SharedArray{Float64,2} # contains gmodtt
+	grad_modrrvx_stack::SharedArrays.SharedArray{Float64,2}
+	grad_modrrvz_stack::SharedArrays.SharedArray{Float64,2}
+	grad_modrr_stack::Array{Float64,2}
 	illum_flag::Bool
-	illum_stack::SharedMatrix{Float64}
+	illum_stack::SharedArrays.SharedArray{Float64,2}
 	backprop_flag::Int64
 	snaps_flag::Bool
 	itsnaps::Vector{Int64}
@@ -112,7 +123,7 @@ mutable struct Paramc
 	ibz1::Int64
 	isx0::Int64
 	isz0::Int64
-	datamat::SharedArray{Float64,3}
+	datamat::SharedArrays.SharedArray{Float64,3}
 	data::Vector{Data.TD}
 	verbose::Bool
 end 
@@ -137,7 +148,6 @@ mutable struct Paramss
         boundary::Vector{Array{Float64,3}}
 	snaps::Array{Float64,3}
 	illum::Matrix{Float64}
-	born_svalue_stack::Matrix{Float64} 
 	grad_modtt::Matrix{Float64} 
 	grad_modrrvx::Matrix{Float64}
 	grad_modrrvz::Matrix{Float64}
@@ -158,6 +168,7 @@ mutable struct Paramp
 	memory_dp_dz::Vector{Array{Float64,2}}
 	memory_dvx_dx::Vector{Array{Float64,2}}
 	memory_dvz_dz::Vector{Array{Float64,2}}
+	born_svalue_stack::Matrix{Float64} 
 end
 
 mutable struct Param
@@ -165,22 +176,41 @@ mutable struct Param
 	c::Paramc # common parameters
 end
 
+Base.print(pa::Param)=nothing
+Base.show(pa::Param)=nothing
+
 function initialize!(pap::Paramp)
 	reset_per_ss!(pap)
 	for issp in 1:length(pap.ss)
 		pass=pap.ss[issp]
 		for i in 1:length(pass.records)
-			pass.records[i][:]=0.0
+			fill!(pass.records[i],0.0)
 		end
-		pass.snaps[:]=0.0
-		pass.illum[:]=0.0
-		pass.grad_modtt[:]=0.0
-		pass.grad_modrrvx[:]=0.0
-		pass.grad_modrrvz[:]=0.0
-		pass.born_svalue_stack[:]=0.0
+		fill!(pass.snaps,0.0)
+		fill!(pass.illum,0.0)
+		fill!(pass.grad_modtt,0.0)
+		fill!(pass.grad_modrrvx,0.0)
+		fill!(pass.grad_modrrvz,0.0)
 	end
 end
 
+function iszero_boundary(pa)
+	result=false
+	@sync begin
+		for (ip, p) in enumerate(procs(pa.p))
+			@async remotecall_wait(p) do 
+				pap=localpart(pa.p)
+				for issp in 1:length(pap.ss)
+					pass=pap.ss[issp]
+					for i in 1:length(pass.boundary)
+						result = result | iszero(pass.boundary[i])
+					end
+				end
+			end
+		end
+	end
+	return result
+end
 		
 
 function initialize_boundary!(pa)
@@ -192,7 +222,7 @@ function initialize_boundary!(pa)
 				for issp in 1:length(pap.ss)
 					pass=pap.ss[issp]
 					for i in 1:length(pass.boundary)
-						pass.boundary[i][:]=0.0
+						fill!(pass.boundary[i],0.0)
 					end
 				end
 			end
@@ -201,23 +231,13 @@ function initialize_boundary!(pa)
 end
 
 function initialize!(pac::Paramc)
-	# need explicit loops while zeroing out Shared Matrices? "fill!" takes memory!!!
-	for i in eachindex(pac.grad_stack)
-		pac.grad_stack[i]=0.0
-	end
 	fill!(pac.gradient,0.0)
-	for i in eachindex(pac.grad_modrrvx_stack)
-		pac.grad_modrrvx_stack[i]=0.0
-	end
-	for i in eachindex(pac.grad_modrrvz_stack)
-		pac.grad_modrrvz_stack[i]=0.
-	end
-	for i in eachindex(pac.grad_modrr_stack)
-		pac.grad_modrr_stack[i]=0.0
-	end
+	fill!(pac.grad_modtt_stack,0.0)
+	fill!(pac.grad_modrrvx_stack,0.0)
+	fill!(pac.grad_modrrvz_stack,0.0)
+	fill!(pac.grad_modrr_stack,0.0)
 	fill!(pac.illum_stack,0.0)
-	for ipw=1:pac.npw
-		dat=pac.data[ipw]
+	for dat in pac.data
 		fill!(dat, 0.0)
 	end
 	fill!(pac.datamat,0.0)
@@ -225,6 +245,7 @@ end
 
 function reset_per_ss!(pap::Paramp)
 	for ipw in 1:length(pap.p)
+		fill!(pap.born_svalue_stack,0.0)
 		fill!(pap.p[ipw],0.0)
 		fill!(pap.pp[ipw],0.0)
 		fill!(pap.ppp[ipw],0.0)
@@ -246,12 +267,11 @@ finite-difference modeling is performed.
 # Keyword Arguments
 
 * `npw::Int64=1` : number of independently propagating wavefields in `model`
-* `model::Models.Seismic=Gallery.Seismic(:acou_homo1)` : seismic medium parameters 
-* `model_pert::Models.Seismic=model` : perturbed model, i.e., model + δmodel, used only for Born modeling 
-* `tgridmod::Grid.M1D=Gallery.M1D(:acou_homo1)` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
-* `tgrid::Grid.M1D=tgridmod` : output records are resampled on this time grid
-* `acqgeom::Vector{Acquisition.Geom}=fill(Gallery.Geom(:acou_homo1),npw)` :  acquisition geometry for each independently propagating wavefield
-* `acqsrc::Vector{Acquisition.Src}=fill(Gallery.Src(:acou_homo1),npw)` : source acquisition parameters for each independently propagating wavefield
+* `model::Models.Seismic` : seismic medium parameters 
+* `tgridmod::StepRangeLen=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
+* `tgrid::StepRangeLen=tgridmod` : output records are resampled on this time grid
+* `acqgeom::Vector{Acquisition.Geom}` :  acquisition geometry for each independently propagating wavefield
+* `acqsrc::Vector{Acquisition.Src}` : source acquisition parameters for each independently propagating wavefield
 * `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
   * `=[0]` inactive sources
   * `=[1]` sources with injection rate
@@ -270,7 +290,7 @@ finite-difference modeling is performed.
 * `born_flag::Bool=false` : do only Born modeling instead of full wavefield modelling (to be updated soon)
 * `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
 * `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
-* `tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1)` : store snaps at these modelling times
+* `tsnaps::Vector{Float64}=fill(0.5*(tgridmod[end]+tgridmod[1]),1)` : store snaps at these modelling times
 * `snaps_flag::Bool=false` : return snaps or not
 * `verbose::Bool=false` : verbose flag
 
@@ -297,22 +317,25 @@ Author: Pawan Bharadwaj
 function Param(;
 	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
-	model::Models.Seismic=Gallery.Seismic(:acou_homo1),
+	model::Models.Seismic=nothing,
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
 	born_flag::Bool=false,
-	model_pert::Models.Seismic = model,
-	tgridmod::Grid.M1D = Gallery.M1D(:acou_homo1),
-	acqgeom::Vector{Acquisition.Geom} = fill(Gallery.Geom(model.mgrid,:surf,nss=1),npw),
-	acqsrc::Array{Acquisition.Src} = fill(Gallery.Src(:acou_homo1),npw),
+	tgridmod::StepRangeLen=nothing,
+	acqgeom::Vector{Acquisition.Geom}=nothing,
+	acqsrc::Array{Acquisition.Src}=nothing,
 	sflags::Vector{Int64}=fill(2,npw), 
 	rflags::Vector{Int64}=fill(1,npw),
 	rfields::Vector{Symbol}=[:P], 
 	backprop_flag::Int64=0,  
 	gmodel_flag::Bool=false,
 	illum_flag::Bool=false,
-	tsnaps::Vector{Float64}=fill(0.5*(tgridmod.x[end]+tgridmod.x[1]),1),
+	tsnaps::Vector{Float64}=fill(0.5*(tgridmod[end]+tgridmod[1]),1),
 	snaps_flag::Bool=false,
-	verbose::Bool=false)
+	verbose::Bool=false,
+	nworker=nothing)
+
+	#println("********PML Removed*************")
+	#abs_trbl=[:null]
 
 	# check sizes and errors based on input
 	#(length(TDout) ≠ length(findn(rflags))) && error("TDout dimension")
@@ -320,9 +343,9 @@ function Param(;
 	(length(acqsrc) ≠ npw) && error("acqsrc dimension")
 	(length(sflags) ≠ npw) && error("sflags dimension")
 	(length(rflags) ≠ npw) && error("rflags dimension")
-	(maximum(tgridmod.x) < maximum(acqsrc[1].tgrid.x)) && error("modeling time is less than source time")
+	(maximum(tgridmod) < maximum(acqsrc[1].tgrid)) && error("modeling time is less than source time")
 	#(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
-	#any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod.x) for ip=1:length(TDout)]) && error("output time > modeling time")
+	#any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod) for ip=1:length(TDout)]) && error("output time > modeling time")
 
 	#! no modeling if source wavelet is zero
 	#if(maxval(abs(src_wavelets)) .lt. tiny(rzero_de)) 
@@ -331,7 +354,7 @@ function Param(;
 
 	# all the propagating wavefields should have same supersources? check that?
 
-	# check dimension of model and model_pert
+	# check dimension of model
 
 	# check if all sources are receivers are inside model
 	any(.![Acquisition.Geom_check(acqgeom[ip], model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
@@ -344,13 +367,21 @@ function Param(;
 
 	# necessary that nss and fields should be same for all nprop
 	nss = acqgeom[1].nss;
-	sfields = [acqsrc[ipw].fields for ipw in 1:npw]
-	isfields = [findin([:P, :Vx, :Vz], acqsrc[ipw].fields) for ipw in 1:npw]
+	sfields=[acqsrc[ipw].fields for ipw in 1:npw]
+	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
+	for ipw in 1:npw
+		for (i,field) in enumerate(sfields[ipw])
+			isfields[ipw][i]=findfirst(isequal(field), [:P,:Vx,:Vz])
+		end
+	end
 	fill(nss, npw) != [getfield(acqgeom[ip],:nss) for ip=1:npw] ? error("different supersources") : nothing
 
 	# create acquisition geometry with each source shooting 
 	# at every unique receiver position
-	irfields = findin([:P, :Vx, :Vz], rfields)
+	irfields = Array{Int}(undef,length(rfields))
+	for (i,field) in enumerate(rfields)
+		irfields[i]=findfirst(isequal(field), [:P,:Vx,:Vz])
+	end
 
 
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
@@ -360,25 +391,26 @@ function Param(;
 	freqmax = Signals.DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
 
 	# minimum and maximum velocities
-	vpmin = minimum(broadcast(minimum,[model.vp0, model_pert.vp0]))
-	vpmax = maximum(broadcast(maximum,[model.vp0, model_pert.vp0]))
+	vpmin = minimum(broadcast(minimum,[model.vp0]))
+	vpmax = maximum(broadcast(maximum,[model.vp0]))
 	#verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
 
 
-	check_fd_stability(vpmin, vpmax, model.mgrid.δx, model.mgrid.δz, freqmin, freqmax, tgridmod.δx, verbose)
+	check_fd_stability(vpmin, vpmax, step(model.mgrid[2]), step(model.mgrid[1]), freqmin, freqmax, step(tgridmod), verbose)
 
 
-	# some constants for boundary
-	ibx0=model.mgrid.npml-2; ibx1=model.mgrid.nx+model.mgrid.npml+3
-	ibz0=model.mgrid.npml-2; ibz1=model.mgrid.nz+model.mgrid.npml+3
+	# where to store the boundary values (careful, born scaterrers cannot be inside these!?)
+	ibx0=npml-2; ibx1=length(model.mgrid[2])+npml+3
+	ibz0=npml-2; ibz1=length(model.mgrid[1])+npml+3
+#	ibx0=npml+1; ibx1=length(model.mgrid[2])+npml
+#	ibz0=npml+1; ibz1=length(model.mgrid[1])+npml
+#	println("**** Boundary Storage Changed **** ")
 
 	# for snaps
-	isx0, isz0=model.mgrid.npml, model.mgrid.npml
+	isx0, isz0=npml, npml
 
 	# extend models in the PML layers
-	exmodel = Models.Seismic_pml_pad_trun(model);
-	exmodel_pert = Models.Seismic_pml_pad_trun(model_pert);
-
+	exmodel = Models.Seismic_pml_pad_trun(model, nlayer_rand, npml);
 
 	"density values on vx and vz stagerred grids"
 	modrr=Models.Seismic_get(exmodel, :ρI)
@@ -390,74 +422,65 @@ function Param(;
 
 	if(born_flag)
 		(npw≠2) && error("born_flag needs npw=2")
-		isapprox(exmodel, exmodel_pert) || error("pertrubed model should be similar to background model")
-		"inverse density contrasts for Born Modelling"
-		modrr_pert = Models.Seismic_get(exmodel_pert, :ρI)
-		δmodrrvx = get_rhovxI(modrr_pert)
-		δmodrrvz = get_rhovzI(modrr_pert)
-		for i in eachindex(δmodrrvx)
-			δmodrrvx[i] -= modrrvx[i]
-			δmodrrvz[i] -= modrrvz[i]
-		end
-
-		"inverse Bulk Modulus contrasts for Born Modelling"
-		δmodtt = Models.Seismic_get(exmodel_pert, :KI)
-		for i in eachindex(δmodtt)
-			δmodtt[i] -= modtt[i]
-		end
-	else
-		δmodtt, δmodrrvx, δmodrrvz = zeros(1,1), zeros(1,1), zeros(1,1)
-		modrr_pert = zeros(1,1)
 	end
 
-
-
 	#create some aliases
-	nx, nz = exmodel.mgrid.nx, exmodel.mgrid.nz
-	nxd, nzd = model.mgrid.nx, model.mgrid.nz
-	δx, δz = exmodel.mgrid.δx, exmodel.mgrid.δz
-	δt = tgridmod.δx 
-	nt=tgridmod.nx
+	nz, nx = length.(exmodel.mgrid)
+	nzd, nxd = length.(model.mgrid)
+	δx, δz = step(exmodel.mgrid[2]), step(exmodel.mgrid[1])
+	δt = step(tgridmod)
+	nt=length(tgridmod)
 
-	δx24I, δz24I = (δx * 24.0)^(-1.0), (δz * 24.0)^(-1.0)
-	δxI, δzI = (δx)^(-1.0), (δz)^(-1.0)
-	δt = tgridmod.δx 
-	δtI = (δt)^(-1.0)
-	nt=tgridmod.nx
-	mesh_x, mesh_z = exmodel.mgrid.x, exmodel.mgrid.z
+	δx24I, δz24I = inv(δx * 24.0), inv(δz * 24.0)
+	δxI, δzI = inv(δx), inv(δz)
+	δt = step(tgridmod)
+	δtI = inv(δt)
+	nt=length(tgridmod)
+	mesh_x, mesh_z = exmodel.mgrid[2], exmodel.mgrid[1]
+
+
+	# perturbation vectors are required on full space
+	δmodtt = zeros(nz, nx)
+	δmod = zeros(2*nzd*nxd)
+	δmodrr = zeros(nz, nx)
+	δmodrrvx = zeros(nz, nx)
+	δmodrrvz = zeros(nz, nx)
 
 
 	# pml_variables
-	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax, 
+	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, npml-3, vpmax, vpmin, freqmin, freqmax, 
 							       [any(abs_trbl .== :left), any(abs_trbl .== :right)])
-	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, model.mgrid.npml-5, vpmax, vpmin, freqmin, freqmax,
+	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, npml-3, vpmax, vpmin, freqmin, freqmax,
 							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
 
-	grad_stack=SharedVector{Float64}(2*nzd*nxd)
 	gradient=zeros(2*nzd*nxd)
-	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
-	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nzd,nxd))
-	grad_modrr_stack=zeros(nzd,nxd)
+	grad_modtt_stack=SharedMatrix{Float64}(zeros(nz,nx))
+	# these are full size, as rhoI -> rhovx and rhovz is also full size
+	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nz,nx))
+	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nz,nx))
+	grad_modrr_stack=zeros(nz,nx)
 	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
-	itsnaps = [indmin(abs.(tgridmod.x-tsnaps[i])) for i in 1:length(tsnaps)]
+	itsnaps = [argmin(abs.(tgridmod .- tsnaps[i])) for i in 1:length(tsnaps)]
 
 	nrmat=[acqgeom[ipw].nr[iss] for ipw in 1:npw, iss in 1:acqgeom[1].nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),acqgeom[1].nss)
-	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]
+	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findall(!iszero, rflags))]
 
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
 	pac=Paramc(jobname,npw,activepw,
-	    exmodel,exmodel_pert,model,model_pert,
-	    acqgeom,acqsrc,abs_trbl,isfields,sflags,
+	    exmodel,model,
+	    acqgeom,acqsrc,abs_trbl,sfields,isfields,sflags,
 	    irfields,rflags,δt,δxI,δzI,
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modtt, modttI,modrr,modrrvx,modrrvz,
-	    δmodtt,modrr_pert,δmodrrvx,δmodrrvz,
-	    grad_stack,
+	    δmodtt,δmodrr,δmodrrvx,δmodrrvz,
+	    δmod,
 	    gradient,
-	    grad_modrrvx_stack,grad_modrrvz_stack,grad_modrr_stack,
+	    grad_modtt_stack,
+	    grad_modrrvx_stack,
+	    grad_modrrvz_stack,grad_modrr_stack,
 	    illum_flag,illum_stack,
 	    backprop_flag,
 	    snaps_flag,
@@ -470,11 +493,13 @@ function Param(;
 	    verbose)	
 
 	# dividing the supersources to workers
-	nwork = min(nss, nworkers())
-	work = workers()[1:nwork]
-	ssi=[round(Int, s) for s in linspace(0,nss,nwork+1)]
-	sschunks=Array{UnitRange{Int64}}(nwork)
-	for ib in 1:nwork       
+	if(nworker===nothing)
+		nworker = min(nss, Distributed.nworkers())
+	end
+	work = Distributed.workers()[1:nworker]
+	ssi=[round(Int, s) for s in range(0,stop=nss,length=nworker+1)]
+	sschunks=Array{UnitRange{Int64}}(undef, nworker)
+	for ib in 1:nworker       
 		sschunks[ib]=ssi[ib]+1:ssi[ib+1]
 	end
 
@@ -484,7 +509,6 @@ function Param(;
 	return Param(papa, pac)
 end
 
-
 """
 Create modeling parameters for each worker.
 Each worker performs the modeling of supersources in `sschunks`.
@@ -492,6 +516,8 @@ The parameters common to all workers are stored in `pac`.
 """
 function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 	nx=pac.nx; nz=pac.nz; npw=pac.npw
+
+	born_svalue_stack = zeros(nz, nx)
 
 	p=[zeros(nz,nx,3) for ipw in 1:npw]; 
 	dpdx=[zeros(nz,nx,3) for ipw in 1:npw]; 
@@ -508,53 +534,85 @@ function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 	
 	ss=[Paramss(iss, pac) for (issp,iss) in enumerate(sschunks)]
 
-	pap=Paramp(ss,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz)
+	pap=Paramp(ss,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz,
+	    born_svalue_stack)
 
 	return pap
 end
 
+
 """
-Update the `Seismic` models in `Paramc` without additional memory allocation.
+update the perturbation vector using the perturbed model
+in this case, model will be treated as the background model 
+* `δmod` is [δKI, δρI]
+"""
+function update_δmods!(pac::Paramc, δmod::Vector{Float64})
+	nx=pac.nx; nz=pac.nz
+	nznxd=prod(length.(pac.model.mgrid))
+	copyto!(pac.δmod, δmod)
+	fill!(pac.δmodtt,0.0)
+	δmodtt=view(pac.δmodtt,npml+1:nz-npml,npml+1:nx-npml)
+	for i in 1:nznxd
+		# put perturbation due to KI as it is
+		δmodtt[i] = δmod[i] 
+	end
+	fill!(pac.δmodrr,0.0)
+	δmodrr=view(pac.δmodrr,npml+1:nz-npml,npml+1:nx-npml)
+	for i in 1:nznxd
+		# put perturbation due to ρI here
+		δmodrr[i] = δmod[nznxd+i]
+	end
+	# project δmodrr onto the vz and vx grids
+	get_rhovxI!(pac.δmodrrvx, pac.δmodrr)
+	get_rhovzI!(pac.δmodrrvz, pac.δmodrr)
+	return nothing
+end
+
+"""
+This method should be executed only after the updating the main model.
+Update the `δmods` when a perturbed `model_pert` is input.
+The model through which the waves are propagating 
+is assumed to be the background model.
+"""
+function update_δmods!(pac::Paramc, model_pert::Models.Seismic)
+	nznxd=prod(length.(pac.model.mgrid))
+	fill!(pac.δmod,0.0)
+	Models.Seismic_get!(pac.δmod, model_pert, [:KI, :ρI])
+
+	for i in 1:nznxd
+		pac.δmod[i] -= pac.modtt[i] # subtracting the background model
+		pac.δmod[nznxd+i] -= pac.modrr[i] # subtracting the background model
+	end
+	update_δmods!(pac, pac.δmod)
+	return nothing
+end
+
+"""
+Update the `Seismic` model in `Paramc` without additional memory allocation.
 This routine is used during FWI, where medium parameters are itertively updated. 
 """
-function update_model!(pac::Paramc, model::Models.Seismic, model_pert=nothing)
+function update_model!(pac::Paramc, model::Models.Seismic)
 
-	copy!(pac.model, model)
+	copyto!(pac.model, model)
 
-	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model)
+	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model, nlayer_rand)
 
 	Models.Seismic_get!(pac.modttI, pac.exmodel, [:K]) 
-
+	Models.Seismic_get!(pac.modtt, pac.exmodel, [:KI]) 
 	Models.Seismic_get!(pac.modrr, pac.exmodel, [:ρI])
 	get_rhovxI!(pac.modrrvx, pac.modrr)
 	get_rhovzI!(pac.modrrvz, pac.modrr)
-
-	if(pac.born_flag && !(model_pert === nothing))
-		copy!(pac.model_pert, model_pert)
-		Models.Seismic_pml_pad_trun!(pac.exmodel_pert, pac.model_pert);
-		Models.Seismic_get!(pac.modrr_pert, pac.exmodel_pert, [:ρI])
-		get_rhovxI!(pac.δmodrrvx, pac.modrr_pert)
-		get_rhovzI!(pac.δmodrrvz, pac.modrr_pert)
-		for i in eachindex(pac.δmodrrvx)
-			pac.δmodrrvx[i] -= pac.modrrvx[i]
-			pac.δmodrrvz[i] -= pac.modrrvz[i]
-		end
-
-		Models.Seismic_get!(pac.δmodtt, pac.exmodel_pert, [:KI])
-		for i in eachindex(pac.δmodtt)
-			pac.δmodtt[i] -= pac.modtt[i]
-		end
-	end
+	return nothing
 end 
 
 function update_acqsrc!(pa::Param, acqsrc::Vector{Acquisition.Src}, sflags=nothing)
 	# update acqsrc in pa.c
 	(length(acqsrc) ≠ pa.c.npw) && error("cannot update")
 	for i in 1:length(acqsrc)
-		copy!(pa.c.acqsrc[i], acqsrc[i])
+		copyto!(pa.c.acqsrc[i], acqsrc[i])
 	end
 	if(!(sflags===nothing))
-		copy!(pa.c.sflags, sflags)
+		copyto!(pa.c.sflags, sflags)
 	end
 
 	# fill_wavelets for each supersource
@@ -565,7 +623,7 @@ function update_acqsrc!(pa::Param, acqsrc::Vector{Acquisition.Src}, sflags=nothi
 				for is in 1:length(pap.ss)
 					iss=pap.ss[is].iss
 					wavelets=pap.ss[is].wavelets
-					initialize_wavelets!(iss, wavelets)
+					fill!.(wavelets, 0.0)
 					fill_wavelets!(iss, wavelets, pa.c.acqsrc, pa.c.sflags)
 				end
 			end
@@ -584,12 +642,11 @@ function Paramss(iss::Int64, pac::Paramc)
 	npw=pac.npw
 	nt=pac.nt
 	nx=pac.nx; nz=pac.nz
-	nxd=pac.model.mgrid.nx
-	nzd=pac.model.mgrid.nz
+	nzd,nxd=length.(pac.model.mgrid)
 	acqgeom=pac.acqgeom
 	acqsrc=pac.acqsrc
 	sflags=pac.sflags
-	mesh_x, mesh_z = pac.exmodel.mgrid.x, pac.exmodel.mgrid.z
+	mesh_x, mesh_z = pac.exmodel.mgrid[2], pac.exmodel.mgrid[1]
 
 	# records_output, distributed array among different procs
 	records = [zeros(nt,pac.acqgeom[ipw].nr[iss],length(irfields)) for ipw in 1:npw]
@@ -608,15 +665,10 @@ function Paramss(iss::Int64, pac::Paramc)
 	wavelets = [zeros(pac.acqgeom[ipw].ns[iss],length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
 	fill_wavelets!(iss, wavelets, acqsrc, sflags)
 
-	if(pac.born_flag)
-		born_svalue_stack = zeros(nz, nx)
-	else
-		born_svalue_stack = zeros(1,1)
-	end
+	
 
 	# storing boundary values for back propagation
-	nx1, nz1=pac.model.mgrid.nx, pac.model.mgrid.nz
-	npml=pac.model.mgrid.npml
+	nz1, nx1=length.(pac.model.mgrid)
 	if(pac.backprop_flag ≠ 0)
 		boundary=[zeros(3,nx1+6,nt),
 		  zeros(nz1+6,3,nt),
@@ -665,7 +717,6 @@ function Paramss(iss::Int64, pac::Paramc)
 
 	pass=Paramss(iss,wavelets,ssprayw,records,rinterpolatew,
 	      isx1,isx2,isz1,isz2,irx1,irx2,irz1,irz2,boundary,snaps,illum, 
-	      born_svalue_stack,
 	      grad_modtt,grad_modrrvx,grad_modrrvz)
 
 
@@ -675,6 +726,7 @@ end
 include("source.jl")
 include("receiver.jl")
 include("core.jl")
+include("rho_projection.jl")
 include("gradient.jl")
 include("born.jl")
 include("boundary.jl")
@@ -707,7 +759,7 @@ Author: Pawan Bharadwaj
 """
 @fastmath function mod!(pa::Param=Param())
 
-	const to = TimerOutput(); # create a timer object
+	global to
 
 	reset_timer!(to)
 
@@ -752,15 +804,16 @@ Author: Pawan Bharadwaj
 
 	@timeit to "update gradient" begin
 		# update gradient model using grad_modtt_stack, grad_modrr_stack
-		update_gradient!(pa.c)
+		(pa.c.gmodel_flag) && update_gradient!(pa.c)
 	end
+
 
 	@timeit to "record data" begin
 	for ipw in pa.c.activepw
 		if(pa.c.rflags[ipw] ≠ 0) # record only if rflags is non-zero
 			for ifield in 1:length(pa.c.irfields)
 
-				pa.c.datamat[:]=0.0
+				fill!(pa.c.datamat, 0.0)
 				@sync begin
 					for (ip, p) in enumerate(procs(pa.p))
 						@sync remotecall_wait(p) do 
@@ -820,13 +873,12 @@ end
 	#		       tgridmod, acqgeom[1]) for iprop in 1:npw]
 
 function stack_illums!(pac::Paramc, pap::Paramp)
-	np=pac.model.mgrid.npml
 	nx, nz=pac.nx, pac.nz
 	illums=pac.illum_stack
 	pass=pap.ss
 	for issp in 1:length(pass)
 		gs=pass[issp].illum
-		gss=view(gs,np+1:nz-np,np+1:nx-np)
+		gss=view(gs,npml+1:nz-npml,npml+1:nx-npml)
 		@. illums += gss
 	end
 end
@@ -862,22 +914,24 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 			# force p[1] on boundaries
 			(pac.backprop_flag==-1) && boundary_force!(it,issp,pac,pap.ss,pap)
 	 
-			add_source!(it, issp, iss, pac, pap.ss, pap, Source_B0())
+			add_source!(it, issp, iss, pac, pap.ss, pap, Source_B1())
 
 			(pac.born_flag) && add_born_sources!(issp, pac, pap.ss, pap)
 
 			# record boundaries after time reversal already
 			(pac.backprop_flag==1) && boundary_save!(pac.nt-it+1,issp,pac,pap.ss,pap)
 
-			record!(it, issp, iss, pac, pap.ss, pap, Receiver_B0())
+			record!(it, issp, iss, pac, pap.ss, pap, Receiver_B1())
 
 			(pac.gmodel_flag) && compute_gradient!(issp, pac, pap.ss, pap)
 
 			(pac.illum_flag) && compute_illum!(issp, pap.ss, pap)
 
 			if(pac.snaps_flag)
-				itsnap = findin(pac.itsnaps,it)
-				(itsnap ≠ []) && (snaps_save!(itsnap[1],issp,pac,pap.ss,pap))
+				iitsnaps=findall(x->==(x,it),pac.itsnaps)
+				for itsnap in iitsnaps
+					snaps_save!(itsnap,issp,pac,pap.ss,pap)
+				end
 			end
 
 		end # time_loop
@@ -896,7 +950,7 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 		(pac.backprop_flag==1) && boundary_save_snap_vxvz!(issp,pac,pap.ss,pap)
 
 		"scale gradients for each issp"
-		(pac.gmodel_flag) && scale_gradient!(issp, pap.ss, pac.model.mgrid.δx*pac.model.mgrid.δz)
+		(pac.gmodel_flag) && scale_gradient!(issp, pap.ss, step(pac.model.mgrid[2])*step(pac.model.mgrid[1]))
 		
 
 	end # source_loop
@@ -910,8 +964,10 @@ end # mod_per_shot
 	# saving illumination to be used as preconditioner 
 	p=pap.p
 	illum=pass[issp].illum
-	pp=view(p,:,:,1,1)
-	@. illum += pp * pp
+	pp=view(p[1],:,:,1)
+	for i in eachindex(illum)
+		illum[i] += abs2(pp[i])
+	end
 end
 
 
@@ -928,54 +984,7 @@ end
 end
 
 
-"""
-Project density on to a staggerred grid using simple interpolation
-"""
 
-function get_rhovxI(rhoI::Array{Float64})
-	rhovxI = zeros(rhoI);
-	get_rhovxI!(rhovxI, rhoI)
-	return rhovxI
-end
-function get_rhovxI!(rhovxI, rhoI::Array{Float64})
-	for ix = 1:size(rhoI, 2)-1
-		for iz = 1:size(rhoI,1)
-			rhovxI[iz, ix] = 0.5e0 *(rhoI[iz,ix+1] + rhoI[iz,ix])
-		end
-	end
-	return nothing
-end # get_rhovxI
-
-"""
-Project density on to a staggerred grid using simple interpolation
-"""
-function get_rhovzI(rhoI::Array{Float64})
-	rhovzI = zeros(rhoI);
-	get_rhovzI!(rhovzI, rhoI)
-	return rhovzI
-end
-function get_rhovzI!(rhovzI, rhoI::Array{Float64})
-	for ix = 1: size(rhoI, 2)
-		for iz = 1: size(rhoI, 1)-1
-			rhovzI[iz, ix] =  0.5e0 * (rhoI[iz+1,ix] + rhoI[iz,ix])
-		end
-	end
-	return nothing
-end # get_rhovzI
-
-
-
-function initialize_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2})
-
-	npw = size(wavelets,1)
-	nt = size(wavelets,2)
-	ns, snfield = size(wavelets[1,1])
-	for ipw=1:npw, it=1:nt
-		for ifield=1:snfield, is=1:ns
-			wavelets[ipw,it][is,ifield] = 0.0
-		end
-	end
-end
 
 
 
@@ -983,15 +992,15 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 
 
 	# check spatial sampling
-	δs_temp=round(vpmin/5.0/freqmax,2);
+	δs_temp=round(vpmin/5.0/freqmax,digits=2);
 	δs_max = maximum([δx, δz])
 	str1=@sprintf("%0.2e",δs_max)
 	str2=@sprintf("%0.2e",δs_temp)
 	if(str1 ≠ str2)
 		if(all(δs_max .> δs_temp)) 
-			warn("decrease spatial sampling ($str1) below $str2", once=false)
+			@warn "decrease spatial sampling ($str1) below $str2"
 		else
-			info("spatial sampling ($str1) can be as high as $str2")
+			@info "spatial sampling ($str1) can be as high as $str2"
 		end
 	end
 
@@ -1002,9 +1011,9 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 	str2=@sprintf("%0.2e", δt_temp)
 	if(str1 ≠ str2)
 		if(all(δt .> δt_temp))
-			warn("decrease time sampling ($str1) below $str2", once=false)
+			@warn "decrease time sampling ($str1) below $str2"
 		else
-			info("time sampling ($str1) can be as high as $str2")
+			@info "time sampling ($str1) can be as high as $str2"
 		end
 	end
 
@@ -1107,7 +1116,7 @@ function pml_variables(
 #
 		# just in case, for -5 at the end
 		(alpha_x[ix] < 0.0) ? alpha_x[ix] = 0.0 : nothing
-		(alpha_x_half[ix] < 0.0)? alpha_x_half[ix] = 0.0 : nothing
+		(alpha_x_half[ix] < 0.0) ? alpha_x_half[ix] = 0.0 : nothing
 
 		b_x[ix] = exp(- (d_x[ix] / k_x[ix] + alpha_x[ix]) * δt)
 		b_x_half[ix] = exp(- (d_x_half[ix] / k_x_half[ix] + alpha_x_half[ix]) * δt)
@@ -1123,5 +1132,6 @@ function pml_variables(
 
 	return a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI
 end
+
 
 end # module
