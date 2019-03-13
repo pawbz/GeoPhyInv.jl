@@ -2,7 +2,7 @@ site_name:        Julia Modeling and Inversion Toolbox
 repo_url:         https://github.com/pawbz/JuMIT.jl
 site_description: Seismic Waveform Modeling and Inversion
 site_author:      Pawan Bharadwaj
-theme: windmill
+theme: slate
 
 extra_css:
           - assets/Documenter.css
@@ -22,7 +22,7 @@ markdown_extensions:
 extra_css:
           - assets/Documenter.css
 
-docs_dir: 'build'
+docs_dir: 'src'
 
 pages:
           - Home: index.md

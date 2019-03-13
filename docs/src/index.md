@@ -1,6 +1,23 @@
-# SeismicInversionToolbox
+# Toolbox for GeoPhysical Inversion (GPI) 
 
-The main tasks of this software are:
+```julia
+using GeoPhyInv
+```
+The methods in this software numerically solve some 
+differential equations of geophysics in Julia.
+Currently, the equations within the realm of this package 
+include:
+
+The methods within the realm of seismic modeling and inversion return:
+
+* the linearized forward modeling operator `F`, such that 
+`Fx` can be computed without explicitly storing the operator matrix (
+ see `LinearMaps.jl`);
+* the imaging/migration operator `F*`;
+
+These maps are the building blocks of iterative optimization schemes.
+* the acoustic 
+\$a\otimes b\$
 
 * Forward problem, where the seismic data are generated 
 using synthetic Earth models and the acquisition parameters 
@@ -34,7 +51,7 @@ converted to suitable 2-D coordinates as described.
 
 ## Coding Conventions
 
-* This software is organised into various modules.
+This software is organised into various modules.
 Each module has various type definitions and methods declared.
 Commenting is 
 done inside each module file to describe the purpose of the module and its usage.
@@ -42,8 +59,8 @@ Most of the comments in the code are inline with the text in this documentation.
 Within each module, variable naming is done 
 to reduce the effort needed to understand the source code.
 For example, 
-\code{distance = velocity * time} is prefered over using 
-\code{a = b * c} in most parts of the software.
+`distance = velocity * time` is prefered over using 
+`a = b * c` in most parts of the software.
 The code inside each method is properly intended using spaces to facilitate 
 redability.
 We followed this documentation [![guide](http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/)](http://www.stochasticlifestyle.com/finalizing-julia-package-documentation-testing-coverage-publishing/)
@@ -53,21 +70,6 @@ We followed this documentation [![guide](http://www.stochasticlifestyle.com/fina
 
 ## Installation
 
-## Input and Output Data Format
-It is recomended that the 
-input seismic data is 
-in the Seismic Unix (SU) format.
-The SU file should contain all the necessary headers 
-related to acquisition geometry that will be
-discussed in Section~\ref{sec:acq_geom}.
-Most of the seismic data pre-processing softwares 
-generate a SEGY file with headers. 
-We can use the following command to 
-convert an example SEGY file, \fname{exp.sgy}, to SU format. 
-
-## Demos
-Demos preforming some of the tasks are provided along with the software in \fname{workdir/xfwi/demos/}.
-An example parameter file is also provided in Section~\ref{sec:para_file} of this manual.
 
 
 
