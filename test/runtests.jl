@@ -23,6 +23,14 @@ for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx"
 end
 
 
+folder="Interpolation"
+for t in ["interp_tests"]
+	fp = joinpath(folder, string(t, ".jl"))
+	initialize(fp)
+end
+
+
+
 folder="Models"
 for t in ["Models", "param_adj"]
 	fp = joinpath(folder, string(t, ".jl"))

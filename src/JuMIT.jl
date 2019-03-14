@@ -1,6 +1,7 @@
 module JuMIT
 
 # include modules (note: due to dependencies, order is important!)
+include("Interpolation/Interpolation.jl")
 include("Utils/Utils.jl")
 include("Operators.jl")
 include("Smooth.jl")

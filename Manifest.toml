@@ -580,9 +580,9 @@ version = "0.4.0"
 
 [[TranscodingStreams]]
 deps = ["Pkg", "Random", "Test"]
-git-tree-sha1 = "90f845c65c50bc57d6ffc815dbab2a4003ccf75c"
+git-tree-sha1 = "d4718bd4db6b7850af3c3833556c6aedbb8e9904"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.9.1"
+version = "0.9.2"
 
 [[URIParser]]
 deps = ["Test", "Unicode"]
