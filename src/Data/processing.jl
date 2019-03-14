@@ -126,13 +126,13 @@ function TDcoup!(
 	wv=zeros(length(w.tgridssf))
 	for ifield = 1:length(fields), iss = 1:nss, ir = 1:nr[iss]
 		# receiver coupling
-	#	Signals.DSP.fast_filt!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],
+	#	conv!(s.d[iss, ifield][:, ir],r.d[iss, ifield][:, ir],
 #		 w.rf[iss, ifield][:,ir],:s)
 		# source coupling
 		sv=s.d[iss, ifield][:, ir]
 		rv=r.d[iss, ifield][:, ir]
 		wv=w.ssf[iss, ifield]
-		Signals.DSP.fast_filt!(sv, rv, wv, attrib)
+#		conv!(sv, rv, wv, attrib)
 		s.d[iss, ifield][:, ir]=copy(sv)
 		r.d[iss, ifield][:, ir]=copy(rv)
 		w.ssf[iss, ifield][:]=copy(wv)

@@ -1,7 +1,5 @@
 module Smooth
 
-using Conv
-using Signals
 
 #=
 """
@@ -89,9 +87,9 @@ function gaussian{N}(x::AbstractArray{Float64,N}, nwin::Vector{Int64})
 end
 
 
-=#
 function gaussian!(xg::Array{Float64,N}, 
 		      x::Array{Float64,N}, pa) where {N}
 	Conv.mod!(pa, :d, d=xg, g=x)
 end
+=#
 end

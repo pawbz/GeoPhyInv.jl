@@ -38,7 +38,7 @@ function TD_weight!(
 
 	itlim = sort(broadcast(indmin,[abs.(dw.tgrid-tlim[i]) for i in 1:2]))
 	twin=zeros(nt)
-	twin[itlim[1] : itlim[2]] = Signals.DSP.taper(ones(itlim[2]-itlim[1]+1),ttaperperc) 
+	twin[itlim[1] : itlim[2]] = Utils.taper(ones(itlim[2]-itlim[1]+1),ttaperperc) 
 
 	for ifield = 1:length(fields), iss = 1:nss
 		zo = sqrt.((rz[iss][:]-mean(sz[iss])).^2) # offsets computed using mean of source position

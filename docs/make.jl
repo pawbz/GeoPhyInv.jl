@@ -5,10 +5,11 @@ using Documenter, JuMIT
 #makedocs()
 
 makedocs(
-    format = Documenter.HTML(),
+	 format = Documenter.HTML(
+		  prettyurls = get(ENV, "CI", nothing) == "true"),
    sitename = "Toolbox for Geophysical Inversion",
-   pages = Any["index.md",
-	       "modeling/page1.md"]
+   pages = ["Home" => "index.md",
+	    "Tutorial" => "test/page1.md",]
 #    modules = []
 )
  

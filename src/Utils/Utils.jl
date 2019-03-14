@@ -6,9 +6,9 @@ using AxisArrays
 
 include("Wavelets.jl")
 
-for file in ["freq"]
+for file in ["freq", "taper"]
 	fn=joinpath(@__DIR__, string(file,".jl"))
-	#include(fn)
+	include(fn)
 end
 
 

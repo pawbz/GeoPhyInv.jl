@@ -44,12 +44,13 @@ function wfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, ti
 end # wfwi
 
 
+#=
 
 function xwfwi!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothing, roundtrip_tol=1e-6,
 		     optim_tols=[1e-6, 1e-6])
 
 	if(ParamAM_func===nothing)
-		ParamAM_func=x->Inversion.ParamAM(x, optim_tols=optim_tols,name="FWI with Source Wavelet Estimation",
+		ParamAM_func=x->ParamAM(x, optim_tols=optim_tols,name="FWI with Source Wavelet Estimation",
 				    roundtrip_tol=roundtrip_tol, max_roundtrips=max_roundtrips,
 				    max_reroundtrips=max_reroundtrips,
 				    min_roundtrips=10,
@@ -65,11 +66,12 @@ function xwfwi!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothin
 	paam=ParamAM_func([f1, f2])
 
 	# do inversion
-	Inversion.go(paam)
+	go(paam)
 
 	# print errors
 	err!(pa)
 	println(" ")
 end
 
+=#
 

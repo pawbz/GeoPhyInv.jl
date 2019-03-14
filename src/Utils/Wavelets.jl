@@ -1,7 +1,6 @@
 module Wavelets
 
 using FFTW
-import Signals.DSP
 using Distributions
 
 """

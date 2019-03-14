@@ -1,8 +1,8 @@
 module Fdtd
 
 using Interpolation
-using Signals
 import JuMIT.Models
+import JuMIT.Utils
 import JuMIT.Acquisition
 import JuMIT.Data
 using ProgressMeter
@@ -387,8 +387,8 @@ function Param(;
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
 	# find maximum and minimum frequencies in the source wavelets
-	freqmin = Signals.DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
-	freqmax = Signals.DSP.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
+	freqmin = Utils.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
+	freqmax = Utils.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
 
 	# minimum and maximum velocities
 	vpmin = minimum(broadcast(minimum,[model.vp0]))

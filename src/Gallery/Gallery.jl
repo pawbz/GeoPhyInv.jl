@@ -1,6 +1,5 @@
 module Gallery
 
-using Signals
 using Pkg
 import JuMIT.IO
 import JuMIT.Models

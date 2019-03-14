@@ -14,9 +14,7 @@ of the `Param` after performing the inversion.
 module FWI
 
 using Interpolation
-using Conv
 using Misfits
-using Inversion
 using TimerOutputs
 using LinearMaps
 using LinearAlgebra
@@ -32,6 +30,7 @@ using DistributedArrays
 using Calculus
 using Random
 
+include("X.jl")
 
 global const to = TimerOutput(); # create a timer object
 
@@ -69,8 +68,8 @@ TODO: add an extra attribute for coupling functions inversion and modelling
 """
 mutable struct Param{Tmod, Tdatamisfit}
 	"model inversion variable"
-	mx::Inversion.X{Float64,1}
-	mxm::Inversion.X{Float64,1}
+	mx::X{Float64,1}
+	mxm::X{Float64,1}
 	"forward modelling parameters for"
 	paf::Tmod
 	"base source wavelet"
@@ -333,8 +332,8 @@ function Param(
 
 	paminterp=Interpolation.Kernel([modi.mgrid[2], modi.mgrid[1]], [modm.mgrid[2], modm.mgrid[1]], igrid_interp_scheme)
 
-	mx=Inversion.X(prod(length.(modi.mgrid))*count(parameterization.≠:null),2)
-	mxm=Inversion.X(prod(length.(modm.mgrid))*count(parameterization.≠:null),2)
+	mx=X(prod(length.(modi.mgrid))*count(parameterization.≠:null),2)
+	mxm=X(prod(length.(modm.mgrid))*count(parameterization.≠:null),2)
 
 
 	# put modm as a vector, according to parameterization in mxm.x

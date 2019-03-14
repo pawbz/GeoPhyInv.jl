@@ -7,14 +7,12 @@ seismic data.
 """
 module Data
 
-using Conv
 using Interpolation
-#using DeConv
 using Misfits
-using Signals
 using LinearAlgebra
 using Statistics
 import JuMIT.Acquisition
+import JuMIT.Utils
 import JuMIT.Coupling
 using DSP
 using Random
@@ -74,7 +72,7 @@ function taper!(data::TD, perc=0.0; bperc=perc,eperc=perc)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
-		Signals.DSP.taper!(dd,bperc=bperc,eperc=eperc)
+		Utils.taper!(dd,bperc=bperc,eperc=eperc)
 	end
 	return data
 end
@@ -186,22 +184,22 @@ end
 
 
 #=
-function DDeConv(d::TD, wav::AbstractVector{Float64}, ϵ=1e-2)
+function DDecon(d::TD, wav::AbstractVector{Float64}, ϵ=1e-2)
 
 	dout=TD_zeros(d)
 	ntd=length(dout.tgrid)
 	wavv=deepcopy(wav);
 
-	paD=DeConv.ParamD(ntd=ntd,nts=length(wav), s=wavv)
+	paD=Decon.ParamD(ntd=ntd,nts=length(wav), s=wavv)
 
 	paD.ϵ=ϵ
 
-	DDeConv!(dout, d, paD)
+	DDecon!(dout, d, paD)
 	return dout
 end
 
 
-function DDeConv!(dataout::TD, data::TD, paD)
+function DDecon!(dataout::TD, data::TD, paD)
 	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
@@ -210,7 +208,7 @@ function DDeConv!(dataout::TD, data::TD, paD)
 			for it in 1:nt
 				paD.d[it]=dd[it,ir]
 			end
-			DeConv.mod!(paD)
+			Decon.mod!(paD)
 			for it in 1:nt
 				ddo[it,ir]=paD.g[it]
 			end

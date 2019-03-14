@@ -14,8 +14,8 @@ include("Fdtd/Fdtd.jl")
 include("FWI/FWI.jl")
 include("Poisson/Poisson.jl")
 include("Gallery/Gallery.jl")
-include("Interferometry.jl")
 include("Plots.jl")
+
 
 const J=JuMIT
 export J

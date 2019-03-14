@@ -17,6 +17,9 @@ applies to electrical, gravity and magnetic fields
 
 ## Tutorial Notebooks
 
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://pawbz.github.io/JuMIT.jl/stable)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://pawbz.github.io/JuMIT.jl/dev)
+
 ### Forward Modeling
 * generate seismic data using a 2D finite-difference solver
   * [notebook] (https://github.com/pawbz/JuMIT.jl/tree/master/notebooks/modeling/page1.ipynb)

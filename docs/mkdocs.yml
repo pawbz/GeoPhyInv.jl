@@ -8,8 +8,8 @@ extra_css:
           - assets/Documenter.css
 
 extra_javascript:
-          - https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML
-              - assets/mathjaxhelper.js
+          - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS_HTML
+          - assets/mathjaxhelper.js
 
 markdown_extensions:
           - codehilite
@@ -22,12 +22,12 @@ markdown_extensions:
 extra_css:
           - assets/Documenter.css
 
-docs_dir: 'src'
+docs_dir: 'build'
 
 pages:
-          - Home: index.md
-          - Reference: reference.md
-          - Tutorials: modeling/page1.md
+                  - Home: index.md
+            #    - Reference: reference.md
+            #    - Tutorials: modeling/page1
 
 
 
