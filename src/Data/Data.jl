@@ -7,10 +7,10 @@ seismic data.
 """
 module Data
 
-using Interpolation
 using Misfits
 using LinearAlgebra
 using Statistics
+import JuMIT.Interpolation
 import JuMIT.Acquisition
 import JuMIT.Utils
 import JuMIT.Coupling

@@ -13,13 +13,13 @@ of the `Param` after performing the inversion.
 """
 module FWI
 
-using Interpolation
 using Misfits
 using TimerOutputs
 using LinearMaps
 using LinearAlgebra
 using Ipopt
 
+import JuMIT.Interpolation
 import JuMIT.Models
 import JuMIT.Acquisition
 import JuMIT.Data

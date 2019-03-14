@@ -3,13 +3,13 @@ module Models
 
 using DataFrames
 using CSV
-using Interpolation
 using Statistics
 using LinearAlgebra
 using Distributions
 using Random
 #using ImageFiltering
 import JuMIT.Smooth
+import JuMIT.Interpolation
 
 """
 Store reference model parameters
