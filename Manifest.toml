@@ -259,14 +259,6 @@ version = "0.5.4+"
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
-[[Interpolation]]
-deps = ["BenchmarkTools", "LinearAlgebra", "LinearMaps", "SparseArrays", "Test"]
-git-tree-sha1 = "1323f938ed8cbfe129aa1b83ecb63ae7d6030c9e"
-repo-rev = "master"
-repo-url = "https://github.com/pawbz/Interpolation.jl.git"
-uuid = "475ca4d2-b0ae-5dbf-b83e-9b10c0db9a39"
-version = "0.0.0"
-
 [[IntervalSets]]
 deps = ["Compat"]
 git-tree-sha1 = "9dc556002f23740de13946e8c2e41798e09a9249"
