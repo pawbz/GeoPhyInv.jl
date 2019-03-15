@@ -7,7 +7,7 @@
 #Contact: ngrobbe@gmail.com
 
 
-using JuMIT
+using GeoPhyInv
 using Polynomials
 using Test
 using StatsBase
@@ -66,7 +66,7 @@ for i = 1 : ntst
     psi_ref = psi_ref./sigma;
     println("Solving Poisson equation, testrun number:",i)
 
-#    psi = JuMIT.Poisson.solve(src,sigma,1) # call forward solver
+#    psi = GeoPhyInv.Poisson.solve(src,sigma,1) # call forward solver
     pa=J.Poisson.Param(size(sigma)...)
     J.Poisson.updateA!(pa, sigma)
     @time psi = J.Poisson.solve(src,pa,1) # call forward solver

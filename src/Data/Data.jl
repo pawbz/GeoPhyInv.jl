@@ -10,10 +10,10 @@ module Data
 using Misfits
 using LinearAlgebra
 using Statistics
-import JuMIT.Interpolation
-import JuMIT.Acquisition
-import JuMIT.Utils
-import JuMIT.Coupling
+import GeoPhyInv.Interpolation
+import GeoPhyInv.Acquisition
+import GeoPhyInv.Utils
+import GeoPhyInv.Coupling
 using DSP
 using Random
 

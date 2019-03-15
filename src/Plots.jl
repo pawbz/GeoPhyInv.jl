@@ -5,9 +5,9 @@ using RecipesBase
 using FFTW
 using DSP
 #using ImageFiltering
-import JuMIT.Acquisition
-import JuMIT.Data
-import JuMIT.Models
+import GeoPhyInv.Acquisition
+import GeoPhyInv.Data
+import GeoPhyInv.Models
 
 
 @userplot Seismic

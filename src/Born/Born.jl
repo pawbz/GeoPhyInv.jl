@@ -1,8 +1,8 @@
 module Born
 
-import JuMIT.Acquisition
-import JuMIT.Models
-import JuMIT.Data
+import GeoPhyInv.Acquisition
+import GeoPhyInv.Models
+import GeoPhyInv.Data
 using SpecialFunctions
 using FFTW
 using DSP

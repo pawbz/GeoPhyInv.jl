@@ -19,12 +19,12 @@ using LinearMaps
 using LinearAlgebra
 using Ipopt
 
-import JuMIT.Interpolation
-import JuMIT.Models
-import JuMIT.Acquisition
-import JuMIT.Data
-import JuMIT.Coupling
-import JuMIT.Fdtd
+import GeoPhyInv.Interpolation
+import GeoPhyInv.Models
+import GeoPhyInv.Acquisition
+import GeoPhyInv.Data
+import GeoPhyInv.Coupling
+import GeoPhyInv.Fdtd
 using Optim, LineSearches
 using DistributedArrays
 using Calculus

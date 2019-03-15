@@ -7,8 +7,8 @@ help their construction.
 """
 module Acquisition
 
-import JuMIT.Models
-import JuMIT.Utils
+import GeoPhyInv.Models
+import GeoPhyInv.Utils
 using Distributions
 using DataFrames
 using Random

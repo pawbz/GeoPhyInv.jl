@@ -1,4 +1,4 @@
-using JuMIT
+using GeoPhyInv
 using Calculus
 using Test
 #include("core.jl")

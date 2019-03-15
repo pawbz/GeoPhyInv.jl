@@ -1,5 +1,5 @@
 site_name:        Julia Modeling and Inversion Toolbox
-repo_url:         https://github.com/pawbz/JuMIT.jl
+repo_url:         https://github.com/pawbz/GeoPhyInv.jl
 site_description: Seismic Waveform Modeling and Inversion
 site_author:      Pawan Bharadwaj
 theme: slate

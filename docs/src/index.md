@@ -73,6 +73,6 @@ We followed this documentation [![guide](http://www.stochasticlifestyle.com/fina
 
 
 
-[![Build Status](https://travis-ci.org/pawbz/JuMIT.jl.svg?branch=master)](https://travis-ci.org/pawbz/JuMIT.jl)
+[![Build Status](https://travis-ci.org/pawbz/GeoPhyInv.jl.svg?branch=master)](https://travis-ci.org/pawbz/GeoPhyInv.jl)
 
-[![codecov.io](http://codecov.io/github/pawbz/JuMIT.jl/coverage.svg?branch=master)](http://codecov.io/github/pawbz/JuMIT.jl?branch=master)
+[![codecov.io](http://codecov.io/github/pawbz/GeoPhyInv.jl/coverage.svg?branch=master)](http://codecov.io/github/pawbz/GeoPhyInv.jl?branch=master)

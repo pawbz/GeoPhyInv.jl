@@ -2,7 +2,7 @@ using Distributed
 addprocs(5)
 
 using LinearAlgebra
-using JuMIT
+using GeoPhyInv
 using Test
 using Signals
 using Misfits

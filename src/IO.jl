@@ -1,6 +1,6 @@
 module IO
 
-#import JuMIT.Data
+#import GeoPhyInv.Data
 
 mutable struct SegyHeader
 	tracl::Int32

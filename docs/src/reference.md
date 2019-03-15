@@ -5,65 +5,65 @@ that either modify the type variable or construct them.
 
 # Coupling 
 ```@autodocs
-Modules = [JuMIT.Coupling]
+Modules = [GeoPhyInv.Coupling]
 Order   = [:module, :type, :function]
 ```
 
 # Acquisition
 ```@autodocs
-Modules = [JuMIT.Acquisition]
+Modules = [GeoPhyInv.Acquisition]
 Order   = [:module, :type, :function]
 ```
 
 # Models
 ```@autodocs
-Modules = [JuMIT.Models]
+Modules = [GeoPhyInv.Models]
 Order   = [:module, :type, :function]
 ```
 
 # Data
 ```@autodocs
-Modules = [JuMIT.Data]
+Modules = [GeoPhyInv.Data]
 Order   = [:module, :type, :function]
 ```
 
 # Gallery
 ```@autodocs
-Modules = [JuMIT.Gallery]
+Modules = [GeoPhyInv.Gallery]
 Order   = [:module, :type, :function]
 ```
 
 # Fdtd
 
 ```@autodocs
-Modules = [JuMIT.Fdtd]
+Modules = [GeoPhyInv.Fdtd]
 Order   = [:module, :type, :function]
 ```
  
 # FWI
 
 ```@autodocs
-Modules = [JuMIT.FWI]
+Modules = [GeoPhyInv.FWI]
 Order   = [:module, :type, :function]
 ```
 
 # Interferometry
 
 ```@autodocs
-Modules = [JuMIT.Interferometry]
+Modules = [GeoPhyInv.Interferometry]
 Order   = [:module, :type, :function]
 ```
 
 
 # Poisson
 ```@autodocs
-Modules = [JuMIT.Poisson]
+Modules = [GeoPhyInv.Poisson]
 Order   = [:module, :type, :function]
 ```
 
 # Plots
 ```@autodocs
-Modules = [JuMIT.Plots]
+Modules = [GeoPhyInv.Plots]
 Order   = [:module, :type, :function]
 ```
 # Index

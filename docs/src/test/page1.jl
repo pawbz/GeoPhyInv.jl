@@ -1,6 +1,6 @@
 # load packages
 
-using JuMIT
+using GeoPhyInv
 using Statistics
 
 # create simple (almost) homogeneous acoustic model
@@ -10,6 +10,6 @@ J.Models.Seismic_addon!(model, randn_perc=0.01)
 
 # a simple acquisition geometry
 
-acqgeom = JuMIT.Gallery.Geom(model.mgrid,:xwell);
+acqgeom = GeoPhyInv.Gallery.Geom(model.mgrid,:xwell);
 
 

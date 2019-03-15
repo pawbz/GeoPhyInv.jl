@@ -1,9 +1,9 @@
-using JuMIT
+using GeoPhyInv
 using Base.Test
 using BenchmarkTools
 using Calculus
 
-const JD=JuMIT.Data
+const JD=GeoPhyInv.Data
 
 
 fields=[:P]
@@ -11,9 +11,9 @@ fields=[:P]
 tgrid1=range(0., stop=1., length=5);
 tgrid2=range(0., stop=1., length=10);
 
-acqgeom=JuMIT.Acquisition.Geom_fixed(10,10,10,10,10,10,10,10)
+acqgeom=GeoPhyInv.Acquisition.Geom_fixed(10,10,10,10,10,10,10,10)
 
-x=JuMIT.Data.TD_ones(fields,tgrid1,acqgeom)
+x=GeoPhyInv.Data.TD_ones(fields,tgrid1,acqgeom)
 
 
 yvec=randn(length(x))
@@ -30,18 +30,18 @@ end
 
 
 @testset "simple LS error: x and y same time grid" begin
-	y=JuMIT.Data.TD_ones(fields,tgrid1,acqgeom)
+	y=GeoPhyInv.Data.TD_ones(fields,tgrid1,acqgeom)
 
 	randn!(x)
 	randn!(y)
 
-	pa=JuMIT.Data.P_misfit(x,y);
-	@time JuMIT.Data.func_grad!(pa,:dJx);
+	pa=GeoPhyInv.Data.P_misfit(x,y);
+	@time GeoPhyInv.Data.func_grad!(pa,:dJx);
 	gg1=vec(pa.dJx)
 
 
 	xvec=vec(pa.x)
-	gg2=Calculus.gradient(x -> (copy!(pa.x, x); return JuMIT.Data.func_grad!(pa)), xvec)
+	gg2=Calculus.gradient(x -> (copy!(pa.x, x); return GeoPhyInv.Data.func_grad!(pa)), xvec)
 
 	# check gradient with Finite Differencing
 	@test gg1 ≈ gg2
@@ -56,7 +56,7 @@ rrrrrr
 
 
 # loop over same time grid and different time grid (interp_flag on/off)
-for y in [JuMIT.Data.TD_ones(fields,tgrid2,acqgeom), JuMIT.Data.TD_ones(fields,tgrid1,acqgeom)]
+for y in [GeoPhyInv.Data.TD_ones(fields,tgrid2,acqgeom), GeoPhyInv.Data.TD_ones(fields,tgrid1,acqgeom)]
 	println("#########################################")
 
 
@@ -65,16 +65,16 @@ for y in [JuMIT.Data.TD_ones(fields,tgrid2,acqgeom), JuMIT.Data.TD_ones(fields,t
 	randn!(x.d[1,1])
 
 	for func_attrib in [:cls]
-		coup=JuMIT.Coupling.TD_delta(y.tgrid, [0.1,0.1], 0.0,  x.fields, x.acqgeom)
+		coup=GeoPhyInv.Coupling.TD_delta(y.tgrid, [0.1,0.1], 0.0,  x.fields, x.acqgeom)
 		randn!(coup.ssf[1,1])
-		pa=JuMIT.Data.P_misfit(x,y, func_attrib=func_attrib, coup=coup);
+		pa=GeoPhyInv.Data.P_misfit(x,y, func_attrib=func_attrib, coup=coup);
 
 
 
 		xvec=vec(pa.x.d[1,1])
 		gg2=Calculus.gradient(x -> err(x), xvec)
 
-		@time JuMIT.Data.func_grad!(pa,:dJx);
+		@time GeoPhyInv.Data.func_grad!(pa,:dJx);
 		gg1=vec(pa.dJx.d[1,1])
 		# check gradient with Finite Differencing
 		@test gg1 ≈ gg2
@@ -85,13 +85,13 @@ for y in [JuMIT.Data.TD_ones(fields,tgrid2,acqgeom), JuMIT.Data.TD_ones(fields,t
 				pa.coup.ssf[1,1][i]=xvec[i]
 			end
 
-			return JuMIT.Data.func_grad!(pa)
+			return GeoPhyInv.Data.func_grad!(pa)
 		end
 
 		xvec=vec(pa.coup.ssf[1,1])
 		gg2=Calculus.gradient(x -> errw(x), xvec)
 
-		@time JuMIT.Data.func_grad!(pa,:dJssf);
+		@time GeoPhyInv.Data.func_grad!(pa,:dJssf);
 		gg1=vec(pa.dJssf[1,1])
 		# check gradient with Finite Differencing
 		@test gg1 ≈ gg2

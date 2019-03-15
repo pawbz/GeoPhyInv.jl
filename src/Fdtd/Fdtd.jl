@@ -1,10 +1,10 @@
 module Fdtd
 
 using Interpolation
-import JuMIT.Models
-import JuMIT.Utils
-import JuMIT.Acquisition
-import JuMIT.Data
+import GeoPhyInv.Models
+import GeoPhyInv.Utils
+import GeoPhyInv.Acquisition
+import GeoPhyInv.Data
 using ProgressMeter
 using TimerOutputs
 using Distributed
@@ -297,8 +297,8 @@ finite-difference modeling is performed.
 # Example
 
 ```julia
-pa = JuMIT.Fdtd.Param(acqgeom=acqgeom, acqsrc=acqsrc, model=model, tgridmod=tgridmod);
-JuMIT.Fdtd.mod!(pa);
+pa = GeoPhyInv.Fdtd.Param(acqgeom=acqgeom, acqsrc=acqsrc, model=model, tgridmod=tgridmod);
+GeoPhyInv.Fdtd.mod!(pa);
 ```
 # Credits 
 
@@ -749,7 +749,7 @@ This method updated the input `Fdtd.Param` after the wave propagation.
 # Example
 
 ```julia
-JuMIT.Fdtd.mod!(pa)
+GeoPhyInv.Fdtd.mod!(pa)
 ```
 # Credits 
 

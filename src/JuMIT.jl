@@ -1,4 +1,4 @@
-module JuMIT
+module GeoPhyInv
 
 # include modules (note: due to dependencies, order is important!)
 include("Interpolation/Interpolation.jl")
@@ -18,22 +18,28 @@ include("Gallery/Gallery.jl")
 include("Plots.jl")
 
 
-const J=JuMIT
+const JuMIT=GeoPhyInv
+export JuMIT
+
+const GPI=GeoPhyInv
+export GPI
+
+const J=GeoPhyInv
 export J
 
-const JP=JuMIT.Plots
+const JP=GeoPhyInv.Plots
 export JP
 
-const JF=JuMIT.FWI
+const JF=GeoPhyInv.FWI
 export JF
 
-const JD=JuMIT.Data
+const JD=GeoPhyInv.Data
 export JD
 
-const JA=JuMIT.Acquisition
+const JA=GeoPhyInv.Acquisition
 export JA
 
-const JG=JuMIT.Gallery
+const JG=GeoPhyInv.Gallery
 export JG
 
 end # module

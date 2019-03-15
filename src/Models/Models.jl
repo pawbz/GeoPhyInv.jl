@@ -8,8 +8,8 @@ using LinearAlgebra
 using Distributions
 using Random
 #using ImageFiltering
-import JuMIT.Smooth
-import JuMIT.Interpolation
+import GeoPhyInv.Smooth
+import GeoPhyInv.Interpolation
 
 """
 Store reference model parameters

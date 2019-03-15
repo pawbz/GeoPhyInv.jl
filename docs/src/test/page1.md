@@ -5,7 +5,7 @@ EditURL = "https://github.com/TRAVIS_REPO_SLUG/blob/master/"
 load packages
 
 ```@example page1
-using JuMIT
+using GeoPhyInv
 using Statistics
 ```
 
@@ -19,7 +19,7 @@ J.Models.Seismic_addon!(model, randn_perc=0.01)
 a simple acquisition geometry
 
 ```@example page1
-acqgeom = JuMIT.Gallery.Geom(model.mgrid,:xwell);
+acqgeom = GeoPhyInv.Gallery.Geom(model.mgrid,:xwell);
 ```
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*

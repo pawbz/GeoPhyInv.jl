@@ -1,6 +1,6 @@
-using Documenter, JuMIT
+using Documenter, GeoPhyInv
 
-#makedocs(modules=[JuMIT],
+#makedocs(modules=[GeoPhyInv],
 #	         doctest=true)
 #makedocs()
 
@@ -14,12 +14,12 @@ makedocs(
 )
  
 deploydocs(
-    repo   = "github.com/pawbz/JuMIT.jl.git",
+    repo   = "github.com/pawbz/GeoPhyInv.jl.git",
 )
 #=
 deploydocs(
     deps   = Deps.pip("mkdocs", "python-markdown-math"),
-    repo   = "github.com/pawbz/JuMIT.jl.git",
+    repo   = "github.com/pawbz/GeoPhyInv.jl.git",
     julia  = "1.0",
     osname = "linux",
     target = "build",

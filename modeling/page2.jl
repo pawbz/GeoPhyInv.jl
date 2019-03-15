@@ -1,7 +1,7 @@
 # the aim is to save snapshots, at given `t` in Fdtd
 # we start with loading some packages
 
-using JuMIT
+using GeoPhyInv
 using Statistics
 using Plots
 pyplot()
@@ -13,7 +13,7 @@ J.Models.Seismic_addon!(model, randn_perc=0.01)
 
 # a simple acquisition geometry
 
-acqgeom = JuMIT.Gallery.Geom(model.mgrid,:xwell);
+acqgeom = GeoPhyInv.Gallery.Geom(model.mgrid,:xwell);
 
 # plot the model and source, receivers
 p1=JP.seismic(model) 
@@ -26,16 +26,16 @@ tgrid = range(0.0,stop=2.0,length=1000)
 
 # Ricker wavelet
 
-wav = JuMIT.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,);
+wav = GeoPhyInv.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,);
 
 # distribute the same source wavelet to all the supsersources 
 
-acqsrc=JuMIT.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
+acqsrc=GeoPhyInv.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
 
 # create `Fdtd.Param` object to prepare forward modelling
 # * npw corresponds to the number of independently propagating wavefields (1 in most cases)
 
-pa=JuMIT.Fdtd.Param(npw=1,model=model,
+pa=GeoPhyInv.Fdtd.Param(npw=1,model=model,
 	acqgeom=[acqgeom], acqsrc=[acqsrc],
 	sflags=[2], rflags=[1],
 	snaps_flag=true,
@@ -45,7 +45,7 @@ pa=JuMIT.Fdtd.Param(npw=1,model=model,
 
 # Once the `Param` object is created, do the modelling "without any memory allocations" using `mod!`
 
-@time JuMIT.Fdtd.mod!(pa);
+@time GeoPhyInv.Fdtd.mod!(pa);
 
 # plotting snapshots of the first supersource
 

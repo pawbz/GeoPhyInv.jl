@@ -15,7 +15,7 @@ before applying the time-domain filter data type  described in this module:
 """
 module Coupling
 
-import JuMIT.Acquisition
+import GeoPhyInv.Acquisition
 
 """
 Time-domain source and receiver filters.

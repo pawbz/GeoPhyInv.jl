@@ -28,7 +28,7 @@ mutable struct ParamExpt{T}
 end
 
 """
-some dummy ACQ, use `JuMIT.Acquisition.ACQmat` later
+some dummy ACQ, use `GeoPhyInv.Acquisition.ACQmat` later
 """
 function testACQ(nz,nx,nr)
 

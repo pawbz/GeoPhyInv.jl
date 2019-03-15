@@ -1,11 +1,11 @@
 module Gallery
 
 using Pkg
-import JuMIT.IO
-import JuMIT.Models
-import JuMIT.Acquisition
-import JuMIT.FWI
-import JuMIT.Utils
+import GeoPhyInv.IO
+import GeoPhyInv.Models
+import GeoPhyInv.Acquisition
+import GeoPhyInv.FWI
+import GeoPhyInv.Utils
 using Statistics
 
 global marmousi_folder=joinpath(@__DIR__, "marmousi2")

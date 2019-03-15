@@ -7,7 +7,7 @@
 #Contact: ngrobbe@gmail.com
 
 
-using JuMIT
+using GeoPhyInv
 using Polynomials
 using Test
 using StatsBase
