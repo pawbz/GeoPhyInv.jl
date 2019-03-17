@@ -9,7 +9,7 @@ makedocs(
 		  prettyurls = get(ENV, "CI", nothing) == "true"),
    sitename = "Toolbox for Geophysical Inversion",
    pages = ["Home" => "index.md",
-	    "Tutorial" => "test/page1.md",]
+	    "Poisson Solver" => "Poisson/adj_state_expt.md",]
 #    modules = []
 )
  

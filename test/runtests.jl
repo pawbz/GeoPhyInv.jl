@@ -8,6 +8,7 @@ using Misfits
 using BenchmarkTools
 using Profile
 
+
 function initialize(fp)
 	println(" *********************************")
 	println(" *********** $(fp) ***************")
@@ -15,7 +16,7 @@ function initialize(fp)
 	include(fp)
 end
 
-folder="Poisson"
+
 for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)

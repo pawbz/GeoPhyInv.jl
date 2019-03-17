@@ -2,6 +2,7 @@
 module Utils
 
 using DSP
+using FFTW
 using AxisArrays
 
 include("Wavelets.jl")
