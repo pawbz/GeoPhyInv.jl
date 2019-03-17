@@ -27,6 +27,9 @@ export GPI
 const J=GeoPhyInv
 export J
 
+const GInterp=GeoPhyInv.Interpolation
+export GInterp
+
 const JP=GeoPhyInv.Plots
 export JP
 

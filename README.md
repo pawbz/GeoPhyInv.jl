@@ -1,4 +1,4 @@
-# Julia Modeling and Inversion Toolbox
+# Julia Toolbox for Geophysical Modeling and Inverse Problems
 
 ## Installation
 Install these packages in the given order via Julia's package manager (i.e., after pressing `]` in the REPL):
