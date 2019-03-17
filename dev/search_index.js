@@ -17,27 +17,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "#Coding-Conventions-1",
-    "page": "Home",
-    "title": "Coding Conventions",
-    "category": "section",
-    "text": "This software is organised into various modules. Each module has various type definitions and methods declared. Commenting is  done inside each module file to describe the purpose of the module and its usage. Most of the comments in the code are inline with the text in this documentation.  Within each module, variable naming is done  to reduce the effort needed to understand the source code. For example,  distance = velocity * time is prefered over using  a = b * c in most parts of the software. The code inside each method is properly intended using spaces to facilitate  redability. We followed this documentation (Image: guide)The methods ending with ! ideally should not allocate and memory. They are supposed to be fast and iteratively called inside loops."
-},
-
-{
-    "location": "#Installation-1",
-    "page": "Home",
-    "title": "Installation",
-    "category": "section",
-    "text": "(Image: Build Status)(Image: codecov.io)"
-},
-
-{
-    "location": "test/page1/#",
-    "page": "Tutorial",
-    "title": "Tutorial",
+    "location": "Poisson/adj_state_expt/#",
+    "page": "Poisson Solver",
+    "title": "Poisson Solver",
     "category": "page",
-    "text": "EditURL = \"https://github.com/TRAVIS_REPO_SLUG/blob/master/\"load packagesusing GeoPhyInv\nusing Statisticscreate simple (almost) homogeneous acoustic modelmodel=J.Gallery.Seismic(:acou_homo1)\nJ.Models.Seismic_addon!(model, randn_perc=0.01)a simple acquisition geometryacqgeom = GeoPhyInv.Gallery.Geom(model.mgrid,:xwell);This page was generated using Literate.jl."
+    "text": "EditURL = \"https://github.com/TRAVIS_REPO_SLUG/blob/master/\"This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media, i.e. media having spatially varying (space-dependent) medium parameters. The following functionality is currently available in this module:Apply operator A=(σ(xz)) on a field ψ.\nApply A^-1 in order to solve for ψ in Aψ=p, given p.Current implementation assumes Neumann boundary conditions at all boundaries.As a demo, start with loading some packages.using SparseArrays\nusing StatsBase\nusing LinearAlgebra\nusing Random\nusing ProgressMeter\nusing LinearAlgebra\nusing Test\nusing ForwardDiff\nusing Calculus\n#include(\"core.jl\")\n#include(\"expt.jl\")Dimensions and spatial grids are allocated as follows.nx=20\nnz=20\nnt=4\nnznx=nz*nx\nmgrid=[range(0.0,step=0.5, length=nz), range(0.0,step=0.5, length=nz)]\ntgrid=range(0.0,step=0.5, length=nt)\n\np=randn(nznx+1)\np[end]=0.0\nQv=abs.(randn(nz,nx))\nη=abs.(randn(nz,nx))\nk=abs.(randn(nz,nx))\nσ=abs.(randn(nz,nx))\nσobs=abs.(randn(nz,nx))\nQobs=abs.(randn(nz,nx))\npsi0=randn(nznx)\n\nsnaps=randn(nz,nx,nt)Generate the parameters for the Poisson experiment.paE=J.Poisson.ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs)J.Poisson.updateLP!(paE, paE.Q)Calculate the data misfit.@time f=J.Poisson.func(σ,paE)Compute the gradient with finite-difference approximation.f = x->J.Poisson.func(x, paE);\ngcalc = Calculus.gradient(f);\ng_fd=reshape(gcalc(vec(σ)),nz,nx);Compute the gradient using adjoint state method.@time J.Poisson.mod!(paE,σ,J.Poisson.FGσ())\ng=paE.g;Check gradient accuracy.@test ≈(g,g_fd, rtol=1e-5)This page was generated using Literate.jl."
 },
 
 ]}

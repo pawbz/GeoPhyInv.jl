@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Poisson Solver · Toolbox for Geophysical Inversion</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Toolbox for Geophysical Inversion</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li class="current"><a class="toctext" href>Poisson Solver</a><ul class="internal"></ul></li></ul></nav><article id="docs"><header><nav><ul><li><a href>Poisson Solver</a></li></ul><a class="edit-page" href="https://github.com/TRAVIS_REPO_SLUG/blob/master/"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Poisson Solver</span><a class="fa fa-bars" href="#"></a></div></header><p>This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media, i.e. media having spatially varying (space-dependent) medium parameters. The following functionality is currently available in this module:</p><ul><li>Apply operator <span>$A=∇⋅(σ(x,z)∇)$</span> on a field <span>$ψ$</span>.</li><li>Apply <span>$A^{-1}$</span> in order to solve for <span>$ψ$</span> in <span>$Aψ=p$</span>, given <span>$p$</span>.</li></ul><p>Current implementation assumes Neumann boundary conditions at all boundaries.</p><p>As a demo, start with loading some packages.</p><pre><code class="language-">using SparseArrays
+using StatsBase
+using LinearAlgebra
+using Random
+using ProgressMeter
+using LinearAlgebra
+using Test
+using ForwardDiff
+using Calculus
+#include(&quot;core.jl&quot;)
+#include(&quot;expt.jl&quot;)</code></pre><p>Dimensions and spatial grids are allocated as follows.</p><div><pre><code class="language-julia">nx=20
+nz=20
+nt=4
+nznx=nz*nx
+mgrid=[range(0.0,step=0.5, length=nz), range(0.0,step=0.5, length=nz)]
+tgrid=range(0.0,step=0.5, length=nt)
+
+p=randn(nznx+1)
+p[end]=0.0
+Qv=abs.(randn(nz,nx))
+η=abs.(randn(nz,nx))
+k=abs.(randn(nz,nx))
+σ=abs.(randn(nz,nx))
+σobs=abs.(randn(nz,nx))
+Qobs=abs.(randn(nz,nx))
+psi0=randn(nznx)
+
+snaps=randn(nz,nx,nt)</code></pre><pre><code class="language-none">20×20×4 Array{Float64,3}:
+[:, :, 1] =
+ -1.72839     0.132461    -1.51528     …   2.16882    -0.137206   0.577362
+  1.74059    -0.607172     1.50045         0.816239    0.688055  -1.10436
+ -0.859501    2.58035      0.363043       -0.409986    1.01258   -0.521562
+  0.676829    0.115553    -1.52939        -0.646851   -0.714164  -0.881954
+ -0.509472    1.34295      0.768985        0.345337    0.957155   0.428449
+  0.970665   -0.327583    -0.523254    …  -1.07312    -1.54303   -1.34196
+ -0.893287   -0.0427051    0.0252693      -0.592532   -1.54995    1.29161
+ -0.420398   -0.0410381   -0.138521       -1.9092     -0.268871   0.0614012
+  0.0452703   1.10376     -0.303546        1.47326     0.684642  -0.492146
+ -0.260292   -1.23514      0.457089       -0.742732   -2.63969   -0.962381
+ -0.0125648  -1.20644     -0.801777    …  -0.618492   -0.335047  -2.16712
+ -1.9422     -0.86626      0.333442       -0.555001    0.705807   0.569048
+  1.33038     0.135136    -0.147752       -0.412607    1.4368     1.39788
+ -0.881314    0.125481    -0.665111       -0.655629   -1.32117   -1.23246
+ -1.01946    -0.299519     0.649524       -1.35118    -1.34953    1.36549
+  0.205603   -0.00749382   0.00752507  …  -0.060726    1.75477    0.967862
+  0.64681     0.182311    -0.376234        0.135669   -0.538076  -0.205769
+  0.287121   -2.29626      0.0777892       0.748941    1.01292    0.451988
+ -1.61001     1.11038     -1.19673         0.0876177   0.37997    0.608417
+ -0.775324   -0.966455    -1.10456        -0.0746828  -1.94606   -0.204384
+
+[:, :, 2] =
+ -0.510067    0.324218    1.19262    …  -2.18833    0.398341   -0.81066
+ -1.51194    -0.311569    1.71759        1.88672   -0.0168319   1.45475
+  0.385033    0.341908   -1.20924        0.351502   0.514821   -0.417622
+  0.0441238  -1.47122     0.471036       2.6492     0.266507   -0.147604
+ -1.14342     2.4126      1.47309       -1.27214   -1.25915     1.26456
+ -0.170593   -0.167762    0.383804   …   1.17481    0.927145    1.14121
+  1.73035    -0.972419   -0.0663185     -0.583058   0.106518   -1.0653
+ -1.39065     1.44479    -1.81645        2.8942    -0.402307   -1.48212
+ -2.07044    -1.33605    -0.771486      -0.61098    0.631406    2.09274
+ -1.13336    -0.469129   -0.131592       0.456893   0.136357   -2.18836
+  0.565603    0.311477   -0.0120062  …   0.949721  -0.46899    -0.614465
+ -1.43652     0.447499   -2.09127        0.737765   2.30476     1.87708
+ -1.05179     0.264267   -0.343964       0.139589  -0.579822   -0.284678
+ -1.02811     0.25514     0.516275      -0.196174   0.926447    0.257133
+  1.35898     0.445457    1.0475         1.18143    0.0490531   0.131776
+ -0.532041    0.294546   -1.01414    …   0.21435   -0.909451   -1.66229
+ -1.32209    -0.326707   -1.81851        1.01501   -0.645233   -0.154572
+ -1.8187     -0.300909   -1.4434        -0.333237   2.16156    -1.44015
+ -0.388597   -0.0500885   1.1355         0.379523   0.873222    0.0780243
+ -1.57903     0.829212    0.856012       1.11835    0.419448   -1.97255
+
+[:, :, 3] =
+ -0.408906    0.669383   0.448702  …   2.35962    0.139403    0.101225
+ -0.342493    0.575623  -1.02854      -0.943671   0.143782    0.362172
+  1.15012    -0.882644  -0.875459     -1.66818    1.82263     2.85704
+  0.0438005  -0.124098   1.49119       1.25157   -0.40391     0.941695
+ -0.234759   -1.23337   -0.105363      1.38606    0.558065   -1.05405
+ -0.349585   -0.523711  -0.694607  …  -1.63735   -0.925871   -1.38057
+  0.169316   -0.901795  -0.999514      0.267394  -0.286043    0.0662736
+  0.0923348  -0.281662  -0.038759      0.650453   0.658278   -0.50352
+  0.128262    0.532119   0.55214       0.718419  -0.875684    1.61569
+ -0.100605   -3.15989    1.62789       1.4377     0.414974   -0.799119
+  1.95964     0.28161    1.0976    …   0.753683  -0.077218   -2.48676
+  2.15073    -1.65008   -0.357406      0.512302   0.0911083  -1.5169
+ -0.252446   -1.53544   -1.27172      -0.812926   0.770623    0.708937
+ -0.113353    2.34546   -1.59633      -1.18889    0.164564   -0.81433
+  1.22482    -1.69549    0.276512     -0.533829   0.133252    1.05603
+ -0.481304   -0.989751  -2.13601   …  -0.709595  -0.648114    0.747171
+ -1.46197    -0.259754  -0.390844     -0.868445  -0.0276428   0.24632
+  0.56453    -2.15033   -1.37061       1.66173    0.512684   -0.499139
+  0.126708    0.140426  -0.289188     -0.354452   1.82835     1.03459
+ -0.232474    1.33687   -0.677959      1.59635   -0.553626    0.808498
+
+[:, :, 4] =
+ -0.563906   -0.798506    0.0299728  …   0.444969   1.20813    -0.938404
+ -0.604433   -1.72728     0.967969      -0.182769  -1.19922    -0.38292
+  2.21553    -2.00977     0.408092      -0.200152  -1.80794     1.1005
+ -0.126713    0.0949827  -0.149122       0.503078   0.929436   -1.18978
+  1.42402     0.185025   -0.990803       0.362743  -0.0702636   3.39857
+ -1.42218     0.962164   -2.51874    …  -0.388565  -0.881116   -1.24504
+  0.351132    0.405485   -1.6127         0.538269  -0.699151   -1.40357
+ -0.989885   -0.639948    1.52871        0.293875   0.334335    0.2391
+ -0.412816    0.213777    0.191746      -0.74728    0.0992457   0.388519
+  0.0138097   0.250488   -0.71185        0.5538    -1.17402    -0.1168
+ -1.41052     1.64207    -0.838957   …   0.169192  -0.442406   -0.727354
+  0.44954     0.0990241   0.624344      -0.230582  -1.6585      0.476442
+  1.27245    -0.3461     -1.29214        0.501348   0.0643089  -1.66857
+ -0.848997    0.0496838   1.08782       -1.78556   -1.40897    -0.684807
+ -0.566809   -0.198845    1.91224        0.529293   2.54032    -0.66621
+ -1.10425    -0.578683   -1.61839    …   0.415926  -1.3292      1.57935
+  1.8274     -0.485739   -0.54069        1.09073   -1.16394    -2.54256
+ -0.0243574   0.208719    0.924496       0.406443  -0.279087    0.378699
+  1.21259     0.310282    0.568492      -2.2462    -1.28955    -0.873824
+  0.55956     2.37741     0.583393       1.1225     0.99961    -1.84599</code></pre></div><p>Generate the parameters for the Poisson experiment.</p><pre><code class="language-">paE=J.Poisson.ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs)</code></pre><pre><code class="language-">J.Poisson.updateLP!(paE, paE.Q)</code></pre><p>Calculate the data misfit.</p><pre><code class="language-">@time f=J.Poisson.func(σ,paE)</code></pre><p>Compute the gradient with finite-difference approximation.</p><pre><code class="language-">f = x-&gt;J.Poisson.func(x, paE);
+gcalc = Calculus.gradient(f);
+g_fd=reshape(gcalc(vec(σ)),nz,nx);</code></pre><p>Compute the gradient using adjoint state method.</p><pre><code class="language-">@time J.Poisson.mod!(paE,σ,J.Poisson.FGσ())
+g=paE.g;</code></pre><p>Check gradient accuracy.</p><pre><code class="language-">@test ≈(g,g_fd, rtol=1e-5)</code></pre><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p><footer><hr/><a class="previous" href="../../"><span class="direction">Previous</span><span class="title">Home</span></a></footer></article></body></html>
