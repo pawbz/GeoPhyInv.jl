@@ -18,8 +18,8 @@ include("Gallery/Gallery.jl")
 include("Plots.jl")
 
 
-const JuMIT=GeoPhyInv
-export JuMIT
+#const JuMIT=GeoPhyInv
+#export JuMIT
 
 const GPI=GeoPhyInv
 export GPI
