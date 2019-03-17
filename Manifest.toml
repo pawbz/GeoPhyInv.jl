@@ -338,7 +338,7 @@ version = "0.7.7"
 deps = ["BenchmarkTools", "Calculus", "Distances", "ForwardDiff", "LinearAlgebra", "LinearMaps", "StatsBase", "Test"]
 git-tree-sha1 = "6c6d8e923030d64dea5bbc4a5a0fb4b6b2f75f9d"
 repo-rev = "master"
-repo-url = "git@github.com:pawbz/Misfits.jl.git"
+repo-url = "https://github.com/pawbz/Misfits.jl.git"
 uuid = "b5bed6b1-4eab-585a-ab29-0604291a8c0e"
 version = "0.0.0"
 
