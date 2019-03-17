@@ -1,4 +1,4 @@
-# Julia Toolbox for Geophysical Modeling and Inverse Problems
+# Toolbox for Geophysical Modeling and Inverse Problems
 
 ## Installation
 At the moment, `GeoPhyInv` depends on another unregistered package `Misfits`. For complete installation,
