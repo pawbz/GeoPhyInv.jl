@@ -1,4 +1,5 @@
 name = "GeoPhyInv"
+uuid = "e0ed03db-c84c-5109-9210-aed666ad9ba8"
 version = "1.0.0"
 
 [deps]
