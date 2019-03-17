@@ -1,7 +1,7 @@
 module Fdtd
 
-using Interpolation
 import GeoPhyInv.Models
+import GeoPhyInv.Interpolation
 import GeoPhyInv.Utils
 import GeoPhyInv.Acquisition
 import GeoPhyInv.Data

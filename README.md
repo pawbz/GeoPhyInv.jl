@@ -1,10 +1,12 @@
 # Julia Toolbox for Geophysical Modeling and Inverse Problems
 
 ## Installation
-Install these packages in the given order via Julia's package manager (i.e., after pressing `]` in the REPL):
+At the moment, `GeoPhyInv` depends on another unregistered package `Misfits`. For complete installation,
+enter these package manager commands in the REPL:
 ```julia
-add https://github.com/pawbz/Misfits.jl.git
-add https://github.com/pawbz/GeoPhyInv.jl.git
+using Pkg
+Pkg.add(PackageSpec(name="Misfits",url="git@github.com:pawbz/Misfits.jl.git"))
+Pkg.add(PackageSpec(name="GeoPhyInv",url="git@github.com:pawbz/GeoPhyInv.jl.git"))
 ```
 ## Overview
 ### Seismic
