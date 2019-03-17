@@ -47,13 +47,6 @@ Modules = [GeoPhyInv.FWI]
 Order   = [:module, :type, :function]
 ```
 
-# Interferometry
-
-```@autodocs
-Modules = [GeoPhyInv.Interferometry]
-Order   = [:module, :type, :function]
-```
-
 
 # Poisson
 ```@autodocs

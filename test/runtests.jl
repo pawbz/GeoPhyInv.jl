@@ -4,7 +4,6 @@ addprocs(5)
 using LinearAlgebra
 using GeoPhyInv
 using Test
-using Signals
 using Misfits
 using BenchmarkTools
 using Profile
