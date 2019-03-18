@@ -7,7 +7,7 @@ i.e. media having spatially varying (space-dependent) medium parameters.
 The following functionality is currently available in this module:
 * Apply operator ``A=∇⋅(σ(x,z)∇)`` on a field ``ψ``.
 * Apply ``A^{-1}`` in order to solve for ``ψ`` in ``Aψ=p``, given ``p``.
-Current implementation assumes Neumann boundary conditions at all boundaries.
+Current implementation assumes Neumann boundary conditions at all the boundaries.
 
 As a demo, start with loading some packages.
 
@@ -21,8 +21,6 @@ using LinearAlgebra
 using Test
 using ForwardDiff
 using Calculus
-#include("core.jl")
-#include("expt.jl")
 ```
 
 Dimensions and spatial grids are allocated as follows.

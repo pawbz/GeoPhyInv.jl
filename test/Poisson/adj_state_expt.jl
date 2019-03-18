@@ -1,9 +1,9 @@
 # This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media,
 # i.e. media having spatially varying (space-dependent) medium parameters.
 # The following functionality is currently available in this module:
-# * Apply operator ``A=∇⋅(σ(x,z)∇)`` on a field ``ψ``.
+# * Apply operator ``A=∇⋅(σ(x,z)∇)`` on a field ``ψ`` to get ``p``.
 # * Apply ``A^{-1}`` in order to solve for ``ψ`` in ``Aψ=p``, given ``p``.
-# Current implementation assumes Neumann boundary conditions at all boundaries.
+# Current implementation assumes Neumann boundary conditions at all the boundaries.
 
 #-
 
@@ -18,10 +18,18 @@ using LinearAlgebra
 using Test
 using ForwardDiff
 using Calculus
-#include("core.jl")
-#include("expt.jl")
+#src # include("core.jl")
+#src # include("expt.jl")
 
 
+
+# From here on, consider the following Poisson experiment: 
+# ```math
+# ∇⋅(σ(x,z)∇) ψ(t) = ∇⋅(Q(x,z)∇) p(t),
+# ```
+# ```math
+# Q = k * Qv / η.
+# ```
 # Dimensions and spatial grids are allocated as follows.
 
 nx=20
@@ -31,25 +39,24 @@ nznx=nz*nx
 mgrid=[range(0.0,step=0.5, length=nz), range(0.0,step=0.5, length=nz)]
 tgrid=range(0.0,step=0.5, length=nt)
 
-p=randn(nznx+1)
-p[end]=0.0
+# Now lets allocate the inputs for a toy experiment.
+
 Qv=abs.(randn(nz,nx))
 η=abs.(randn(nz,nx))
 k=abs.(randn(nz,nx))
 σ=abs.(randn(nz,nx))
+p=randn(nz,nx,nt)
+
+# These medium parameters are used to generate the *observed* field ``ψ``.
+
 σobs=abs.(randn(nz,nx))
 Qobs=abs.(randn(nz,nx))
-psi0=randn(nznx)
 
-snaps=randn(nz,nx,nt)
+# Generate the configuration for the Poisson experiment, using the arrays above.
 
-# Generate the parameters for the Poisson experiment.
+paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs)
 
-paE=J.Poisson.ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs)
-
-# 
-
-J.Poisson.updateLP!(paE, paE.Q)
+#src # J.Poisson.updateLP!(paE, paE.Q)
 
 # Calculate the data misfit.
 
