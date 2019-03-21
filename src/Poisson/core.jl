@@ -236,7 +236,11 @@ function boundary!(A, nx, nz)
 	# To 'fix' the nullspace, and make the source consistent with the nullspace
 	#A[nz*nx+1,:] .= 1.0
 	A[nz*nx+1,:] .= 0.0
+	# the average of four corners would go to zero
 	A[nz*nx+1,1] = 1.0
+	A[nz*nx+1,nz] = 1.0
+	A[nz*nx+1,nz*(nx-1)+1] = 1.0
+	A[nz*nx+1,nz*nx] = 1.0
 
 	return nothing
 end

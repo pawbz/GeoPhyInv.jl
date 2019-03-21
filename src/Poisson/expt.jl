@@ -15,11 +15,13 @@ mutable struct ParamExpt{T}
 #	datP::Data.TD
 #	datLP::Data.TD
 	ψ::Vector{T} # state variable, we are going to record this state data=ACQ*ψ  
+	ψ0::Vector{T} # background state variable, only used for born modelling
 	adjsrc::Vector{T}
 	adjψ::Vector{T} # adjoint state variable
 	adjψ2::Vector{T} # some storage of size adjψ
 	paQ::Param{T} # Param for each snapshot
 	paσ::Param{T} # Param for each snapshot
+	paσ0::Param{T} # Param for each snapshot, only used for Born modelling
 	tgrid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}} # tgrid of snapshots
 	mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}} # model grid of snapshots
 	ACQ::SparseMatrixCSC{T,Int64}
@@ -52,6 +54,7 @@ function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=no
 
 	LP=zero(snaps);
 	ψ=zeros(nz*nx);	
+	ψ0=zeros(nz*nx);	
 
 	adjsrc=zeros(nz*nx);	
 	adjψ=zeros(nz*nx+1);	
@@ -65,6 +68,7 @@ function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=no
 
 	paQ=Param(mgrid, Q)
 	paσ=Param(mgrid, σ)
+	paσ0=Param(mgrid, σ)
 
 #	datP=Data.TD_zeros([:P],tgrid,acqgeom)
 #	datLP=Data.TD_zeros([:P],tgrid,acqgeom)
@@ -84,7 +88,7 @@ function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=no
 	      data,
 	      data_obs,
 	      data_misfit,
-	      ψ,
+	      ψ,ψ0,
 	      adjsrc,
 	      adjψ,
 	      adjψ2,
@@ -92,7 +96,7 @@ function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=no
 	     # data,
 	     #datP, datLP, 
 	     #ψ, 
-	     paQ, paσ, 
+	     paQ, paσ, paσ0,
 	     tgrid, mgrid,
 	     ACQ,
 	    zero(σ),zeros(length(σ)))
@@ -163,6 +167,7 @@ function mod!(pa::ParamExpt, σ, mode)
 	return pa
 end
 
+
 function forwψ!(ψ, src, pa::Param,qrA)
 	applyinvA!(ψ, src, pa; A=qrA)
 end
@@ -174,8 +179,14 @@ function adjψ!(adjψ, adjψ2, ψ, adjsrc, g, gtemp, ACQ, data_misfit, data_obs,
 	for i in eachindex(data_misfit)
 		data_misfit[i] -= data_obs[i]
 	end
+	rmul!(data_misfit,-2.0)
+
+	adjψ_core!(adjψ, adjψ2, ψ, adjsrc, g, gtemp, ACQ, data_misfit, pa, qrAt)
+
+end
+function adjψ_core!(adjψ, adjψ2, ψ, adjsrc, g, gtemp, ACQ, data_misfit, pa, qrAt)
+
 	mul!(adjsrc, transpose(ACQ), data_misfit)
-	rmul!(adjsrc,-2.0)
 
 	applyinvAt!(adjψ, adjsrc, pa, At=qrAt)
 
@@ -191,6 +202,7 @@ function adjψ!(adjψ, adjψ2, ψ, adjsrc, g, gtemp, ACQ, data_misfit, data_obs,
 	end
 
 end
+
 
 function abT_T_dX!(g, ψ, adjψ, adjψ2, A)
 	n=length(ψ)
@@ -225,6 +237,7 @@ function update_observed_data!(pa::ParamExpt, σobs)
 	σsave=copy(pa.σ)
 	mod!(pa, σobs, Fσ())
 	copyto!(pa.data_obs, pa.data)
+	fill!(pa.data, 0.0) # clear data
 	# put sigma back
 	copyto!(pa.σ, σsave)
 	# dummy modeling, just to remove traces of σobs
