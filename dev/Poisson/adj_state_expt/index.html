@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>PoissonExpt · Toolbox for Geophysical Inversion</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Toolbox for Geophysical Inversion</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><a class="toctext" href="../../Fdtd/create_snaps/">SeismicExpt: generate snaps</a></li><li class="current"><a class="toctext" href>PoissonExpt</a><ul class="internal"></ul></li></ul></nav><article id="docs"><header><nav><ul><li><a href>PoissonExpt</a></li></ul><a class="edit-page" href="https://github.com/TRAVIS_REPO_SLUG/blob/master/"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>PoissonExpt</span><a class="fa fa-bars" href="#"></a></div></header><p>This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media, i.e. media having spatially varying (space-dependent) medium parameters. The following functionality is currently available in this module:</p><ul><li>Apply operator <span>$A=∇⋅(σ(x,z)∇)$</span> on a field <span>$ψ$</span>.</li><li>Apply <span>$A^{-1}$</span> in order to solve for <span>$ψ$</span> in <span>$Aψ=p$</span>, given <span>$p$</span>.</li></ul><p>Current implementation assumes Neumann boundary conditions at all the boundaries.</p><p>As a demo, start with loading some packages.</p><pre><code class="language-">using SparseArrays
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>PoissonExpt · Toolbox for Geophysical Inversion</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Toolbox for Geophysical Inversion</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><a class="toctext" href="../../Fdtd/create_snaps/">SeismicExpt: generate snaps</a></li><li class="current"><a class="toctext" href>PoissonExpt</a><ul class="internal"></ul></li></ul></nav><article id="docs"><header><nav><ul><li><a href>PoissonExpt</a></li></ul><a class="edit-page" href="https://github.com/TRAVIS_REPO_SLUG/blob/master/"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>PoissonExpt</span><a class="fa fa-bars" href="#"></a></div></header><p>This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media, i.e. media having spatially varying (space-dependent) medium parameters. The following functionality is currently available in this module:</p><ul><li>Apply operator <span>$A=∇⋅(σ(x,z)∇)$</span> on a field <span>$ψ$</span> to get <span>$p$</span>.</li><li>Apply <span>$A^{-1}$</span> in order to solve for <span>$ψ$</span> in <span>$Aψ=p$</span>, given <span>$p$</span>.</li></ul><p>Current implementation assumes Neumann boundary conditions at all the boundaries.</p><p>As a demo, start with loading some packages.</p><pre><code class="language-">using SparseArrays
 using StatsBase
 using LinearAlgebra
 using Random
@@ -7,111 +7,57 @@ using ProgressMeter
 using LinearAlgebra
 using Test
 using ForwardDiff
-using Calculus</code></pre><p>Dimensions and spatial grids are allocated as follows.</p><div><pre><code class="language-julia">nx=20
-nz=20
+using Calculus</code></pre><p>From here on, consider the following Poisson experiment:</p><div>\[∇⋅(σ(x,z)∇) ψ(t) = ∇⋅(Q(x,z)∇) p(t),\]</div><div>\[Q = k * Qv / η.\]</div><p>Dimensions and spatial grids are allocated as follows.</p><div><pre><code class="language-julia">nx=21
+nz=21
 nt=4
 nznx=nz*nx
-mgrid=[range(0.0,step=0.5, length=nz), range(0.0,step=0.5, length=nz)]
-tgrid=range(0.0,step=0.5, length=nt)
-
-p=randn(nznx+1)
-p[end]=0.0
-Qv=abs.(randn(nz,nx))
+mgrid=[range(-div(nz,2), step=1.0, length=nz), range(-div(nx,2), step=1.0, length=nx)]
+tgrid=range(0.0,step=0.5, length=nt)</code></pre><pre><code class="language-none">0.0:0.5:1.5</code></pre></div><p>Now lets allocate the inputs for a toy experiment.</p><div><pre><code class="language-julia">Qv=abs.(randn(nz,nx))
 η=abs.(randn(nz,nx))
 k=abs.(randn(nz,nx))
 σ=abs.(randn(nz,nx))
-σobs=abs.(randn(nz,nx))
+p=randn(nz,nx,nt)
+
+for it in 1:nt
+	for ix in 1:nx
+		for iz in 1:nz
+			p[iz,ix,it]=inv(abs(iz-11)+1)*inv(abs(ix-11)+1)
+		end
+	end
+end</code></pre></div><p>These medium parameters are used to generate the <em>observed</em> field <span>$ψ$</span>.</p><div><pre><code class="language-julia">σobs=abs.(randn(nz,nx))
 Qobs=abs.(randn(nz,nx))
-psi0=randn(nznx)
 
-snaps=randn(nz,nx,nt)</code></pre><pre><code class="language-none">20×20×4 Array{Float64,3}:
-[:, :, 1] =
-  0.816047   -0.917952    -2.04107    …   1.21684    -0.496794  -0.134094
- -0.285026   -1.82225     -1.61302        0.353579    0.711668   1.41363
-  0.542049   -1.32961      2.03135        1.61763    -0.268568   0.93245
- -0.458795    0.962401    -0.176442      -0.420818   -0.475369  -1.07029
-  1.02524    -0.326346     1.07504        0.0843509   1.111      0.459408
-  0.89472     0.764969     0.92712    …  -0.0802163   0.245967   0.349492
- -0.568932    1.01537      0.819728      -0.338112    1.34332    0.595546
-  1.03967    -0.00871008   0.194849      -1.46232    -0.83706    0.378822
- -0.461976   -0.289578     0.258047       0.105464   -1.22858   -0.242376
-  0.507043    0.972514    -1.75949        0.517015    0.432347   0.45047
- -0.325278   -0.567839     0.497936   …  -2.74403    -2.40687   -1.54646
-  1.29741     0.985552     0.556128      -0.997245    0.543112  -0.51535
-  0.0111115   0.739819    -1.01371       -1.45746    -0.746035  -0.109291
-  0.320913    2.02431     -0.5557        -0.944623   -1.55631   -0.972637
-  0.202405   -0.616074     0.753425       0.619838   -1.11754   -1.50658
-  0.262936    0.939732    -0.0711041  …   0.693194   -0.641404   0.263298
-  1.66914    -0.331005     0.191301      -0.360981   -1.82015   -0.927173
- -1.15261    -1.24577     -0.184047       0.144122    0.106229   0.580972
-  1.42448     1.91931      1.05161        0.0833839   0.591093  -1.03822
-  0.622855   -0.773279     0.0388002      0.543363   -0.922879   0.667932
-
-[:, :, 2] =
-  1.15455     0.854891   -1.77759    …  -0.671724    1.37093    1.53508
- -0.329008    1.04885     0.537628      -0.688186    0.213351   0.687966
-  0.0278809  -2.19024     0.652036      -0.253639   -0.775742  -0.701676
-  0.340461   -0.319083    0.816233      -0.815204   -0.569179  -0.655853
- -0.807906   -1.23735    -0.0483313     -0.0733252  -0.566799  -0.169414
- -0.066421   -0.0424058   0.0646071  …  -1.74614    -0.751456  -0.572499
-  2.0763      0.650294    0.270453      -0.116882    0.668132   0.778804
- -0.851379    0.407786    0.171456      -0.896103   -0.302412   0.93846
-  1.92145     1.13293     1.07056       -0.512298    2.4115     0.339444
-  0.159825    0.340922    0.0618467     -1.25407     0.460502   0.248249
-  0.999731   -0.959981   -0.663682   …  -0.397474   -1.90846   -2.46198
- -1.57638    -0.546866   -0.478833      -1.66547     0.855787  -0.240977
- -0.662377    1.47166    -0.177179      -0.18288     1.30454    0.0331147
-  0.466869    0.122578   -0.514151      -0.130728   -2.58808    0.327692
-  0.344413   -0.946167    0.547831      -0.666335   -1.02538   -1.46436
-  0.753725    2.20925    -0.311912   …   1.23799     0.704098  -0.966205
-  1.28277    -0.108418   -0.885534       0.175807   -1.85018   -1.83016
-  1.41856     0.99688    -0.332399      -0.664239   -0.259507   1.42078
- -0.192399    2.15807    -0.0893009     -0.935345    1.15225    0.53619
- -0.450727   -1.35524    -0.366995       2.007      -0.629478  -0.436016
-
-[:, :, 3] =
- -0.824814     -0.343701   -0.178543   …   0.55065     1.08639     0.313629
- -0.715452      0.0720913   0.530971      -0.96759    -1.21821    -0.316134
- -0.000310957   0.77064    -0.718519       0.590403    0.769229    0.0219338
-  0.734604      0.972787   -0.767712       2.48866     0.552562    0.896001
-  0.0334095    -0.818098    0.771071       1.73678    -0.402592    0.263427
- -0.15995      -0.613791    1.46309    …  -1.47055     0.25166     1.57756
-  3.14866       0.450576   -1.12819       -1.09346     0.641766   -0.356601
-  0.408746      2.02732     1.65823        1.24736     0.720717    0.812532
-  1.32757      -0.523096    0.060066      -0.554663   -1.90798    -1.21552
-  0.147946      1.97559    -0.385405      -2.7666      0.35581    -0.0511259
- -1.07386       0.689033   -0.618412   …  -1.58057     0.63844     0.544885
- -0.313187     -1.02937     0.843958      -0.166846    0.479452    0.457104
-  0.746075     -0.648271    0.674752      -1.04284     1.76711    -0.155035
- -0.577658     -1.33548    -0.0253626      0.0212684   0.797396   -0.494887
-  0.0687006     0.717303    0.500516      -0.886813    1.76743    -1.42697
-  0.683387      0.903042    0.18999    …   0.679086    1.23366    -0.441516
-  0.30149      -0.787474    0.296958       1.42706     0.0496828   0.143112
-  1.05345       0.954129   -0.473557       0.0876026  -0.794603   -1.30678
- -0.282634      0.241577   -0.297171      -0.406083   -0.236405    0.903547
-  2.19744       0.390955   -1.04331        1.48959    -0.203079   -1.11223
-
-[:, :, 4] =
-  0.5537     -0.514713     0.779718   …  -0.055337   -0.177603   -0.477921
-  0.242162   -0.728299     0.486604       1.65198     0.567572   -1.56389
-  0.629329    0.778415     1.51065       -1.064      -0.340727    0.212292
- -2.67828    -1.27761     -0.304841       1.92394     0.497036    2.44622
-  1.19828     0.425285     0.611095       0.991835    0.885619   -0.751536
-  1.57375    -0.332525     0.924242   …  -0.123131   -0.153869    0.168982
- -0.12912    -0.616852     0.0818759     -1.00503     0.698486   -1.23682
- -0.309098   -0.00526373  -1.98565        1.3688      0.716869   -1.54773
- -2.12025    -0.55594      0.842576      -1.81932     0.0982014   1.00052
- -1.39698     0.221843    -0.678248       0.0347582  -1.07361    -1.16097
-  0.657654   -0.330559     0.176329   …  -1.00053    -1.64547    -0.83699
-  0.395538    0.289688    -0.912454       0.226717   -0.578605   -1.80197
- -0.282343   -1.81723      0.085505      -0.0756118  -0.607167    0.359349
-  1.53683    -0.600749    -1.3506         1.19588     0.654447   -0.361368
-  0.251736    2.36364      1.45382       -0.534779    0.282616    2.12573
-  1.72363    -0.0180717   -1.13917    …  -0.104637   -0.690557   -0.219756
-  0.865222   -2.54227      0.473934       1.03464    -0.224954   -0.639903
-  0.345516    0.208292     0.152622      -1.52358     0.391935   -1.18105
-  0.448202   -0.262555     0.686697       0.146679   -0.127064   -0.25657
-  0.0878209  -1.00226     -0.662988       1.92348    -0.169562   -0.547459</code></pre></div><p>Generate the parameters for the Poisson experiment.</p><pre><code class="language-">paE=J.Poisson.ParamExpt(snaps, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs)</code></pre><pre><code class="language-">J.Poisson.updateLP!(paE, paE.Q)</code></pre><p>Calculate the data misfit.</p><pre><code class="language-">@time f=J.Poisson.func(σ,paE)</code></pre><p>Compute the gradient with finite-difference approximation.</p><pre><code class="language-">f = x-&gt;J.Poisson.func(x, paE);
+fill!(σobs, 1.0)
+fill!(Qobs, 1.0)
+fill!(Qv, 1.0)
+fill!(η, 1.0)
+fill!(k, 1.0)
+σobs[11,11]=20.0
+fill!(σ, 1.0)</code></pre><pre><code class="language-none">21×21 Array{Float64,2}:
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0  …  1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0  …  1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ ⋮                        ⋮              ⋱       ⋮                        ⋮
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0  …  1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0     1.0  1.0  1.0  1.0  1.0  1.0  1.0
+ 1.0  1.0  1.0  1.0  1.0  1.0  1.0  1.0  …  1.0  1.0  1.0  1.0  1.0  1.0  1.0</code></pre></div><p>Generate the configuration for the Poisson experiment, using the arrays above.</p><pre><code class="language-">acqgeom=J.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.])
+#ACQ=sprandn(200,441,0.9)
+ACQ=J.Acquisition.ACQmat(acqgeom,mgrid)
+paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
+#paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs,)</code></pre><p>Calculate the data misfit.</p><pre><code class="language-">@time f=J.Poisson.func(σ,paE)</code></pre><p>Compute the gradient with finite-difference approximation.</p><pre><code class="language-">f = x-&gt;J.Poisson.func(x, paE);
 gcalc = Calculus.gradient(f);
 g_fd=reshape(gcalc(vec(σ)),nz,nx);</code></pre><p>Compute the gradient using adjoint state method.</p><pre><code class="language-">@time J.Poisson.mod!(paE,σ,J.Poisson.FGσ())
 g=paE.g;</code></pre><p>Check gradient accuracy.</p><pre><code class="language-">@test ≈(g,g_fd, rtol=1e-5)</code></pre><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p><footer><hr/><a class="previous" href="../../Fdtd/create_snaps/"><span class="direction">Previous</span><span class="title">SeismicExpt: generate snaps</span></a></footer></article></body></html>
