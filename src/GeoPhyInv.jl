@@ -20,6 +20,8 @@ include("Plots.jl")
 # export the Expt for Seismic Forward Modelling
 const SeisForwExpt=GeoPhyInv.Fdtd.Param
 export SeisForwExpt
+import GeoPhyInv.Fdtd.mod!
+export mod!
 
 # export the Expt for Seismic Inversion
 const SeisInvExpt=GeoPhyInv.FWI.Param

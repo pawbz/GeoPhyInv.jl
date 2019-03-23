@@ -14,6 +14,7 @@ using LinearAlgebra
 using AxisArrays
 using Printf
 
+
 global const to = TimerOutput(); # create a timer object
 global const npml = 50
 global const nlayer_rand = 0
@@ -172,6 +173,7 @@ mutable struct Paramp
 end
 
 mutable struct Param
+	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
 	p::DistributedArrays.DArray{Paramp,1,Paramp} # distributed parameters among workers
 	c::Paramc # common parameters
 end
@@ -506,7 +508,7 @@ function Param(;
 	# a distributed array of Paramp --- note that the parameters for each super source are efficiently distributed here
 	papa=ddata(T=Paramp, init=I->Paramp(sschunks[I...][1],pac), pids=work);
 
-	return Param(papa, pac)
+	return Param(sschunks, papa, pac)
 end
 
 """
@@ -1133,5 +1135,7 @@ function pml_variables(
 	return a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI
 end
 
+
+include("getprop.jl")
 
 end # module
