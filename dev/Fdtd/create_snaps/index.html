@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>SeismicExpt: generate snaps · Toolbox for Geophysical Inversion</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Toolbox for Geophysical Inversion</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li class="current"><a class="toctext" href>SeismicExpt: generate snaps</a><ul class="internal"></ul></li><li><a class="toctext" href="../../Poisson/adj_state_expt/">PoissonExpt</a></li></ul></nav><article id="docs"><header><nav><ul><li><a href>SeismicExpt: generate snaps</a></li></ul><a class="edit-page" href="https://github.com/TRAVIS_REPO_SLUG/blob/master/"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>SeismicExpt: generate snaps</span><a class="fa fa-bars" href="#"></a></div></header><p>A forward experiment, where the seismic data are generated using some models and acquisition parameters from our gallery. Forward modeling consists of a finite-difference simulation of the acoustic wave-equation. We specifically aim to save the snapshots, at given time steps in <code>SeisForwExpt</code>.</p><h3><a class="nav-anchor" id="Loading-some-packages...-1" href="#Loading-some-packages...-1">Loading some packages...</a></h3><div><pre><code class="language-julia">using GeoPhyInv
+using Statistics</code></pre></div><p>Then, load a simple homogeneous acoustic model from the gallery.</p><div><pre><code class="language-julia">model=GIPh.Gallery.Seismic(:acou_homo1);</code></pre><pre><code class="language-none">GeoPhyInv.Models.Seismic([1500.0, 3500.0], [1.0, 1.0], [1500.0, 3500.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}[-1000.0:10.0:1000.0, -1000.0:10.0:1000.0], [3.375e9, 4.2875e10], [1500.0, 3500.0], [2.33236e-11, 2.96296e-10], [0.000285714, 0.000666667], [0.000285714, 0.000666667], GeoPhyInv.Models.Seismic_ref{Float64}(2500.0, 1.0, 2500.0, 2.3125e10, 2500.0, 1.5980995572832306e-10, 0.0004761904761904762, 0.0004761904761904762))</code></pre></div><p>Add some random noise to the model.</p><div><pre><code class="language-julia">GIPh.Models.Seismic_addon!(model, randn_perc=0.01);</code></pre><pre><code class="language-none">GeoPhyInv.Models.Seismic([1500.0, 3500.0], [1.0, 1.0], [1500.0, 3500.0], [-0.000122944 0.000137758 … 0.00010651 0.000165853; -3.33928e-5 -2.18135e-5 … 0.000113754 3.69675e-5; … ; -8.43713e-6 0.000108628 … -9.11921e-5 -3.26137e-5; 4.10857e-5 -7.33532e-6 … -6.16146e-5 -9.75669e-5], [-1.99073e-5 0.000114097 … 5.86728e-5 0.000141913; 4.93529e-5 0.000152195 … 7.88003e-6 6.80684e-5; … ; 0.000117261 -0.000122489 … 6.38613e-5 0.000171596; -1.14426e-5 -9.44943e-5 … -1.11615e-5 0.000107597], [6.52155e-5 -0.000112783 … -8.12066e-5 -5.79941e-5; -0.000119621 4.95643e-5 … 0.000112348 -2.38532e-5; … ; -0.000126005 -1.555e-5 … 0.000148248 -2.88347e-5; -0.000153254 0.000192797 … -5.84873e-5 -0.000109007], StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}[-1000.0:10.0:1000.0, -1000.0:10.0:1000.0], [3.375e9, 4.2875e10], [1500.0, 3500.0], [2.33236e-11, 2.96296e-10], [0.000285714, 0.000666667], [0.000285714, 0.000666667], GeoPhyInv.Models.Seismic_ref{Float64}(2500.0, 1.0, 2500.0, 2.3125e10, 2500.0, 1.5980995572832306e-10, 0.0004761904761904762, 0.0004761904761904762))</code></pre></div><p>Load a simple acquisition geometry from the gallery using the field <code>mgrid</code> of the seismic model.</p><div><pre><code class="language-julia">acqgeom=GIPh.Gallery.Geom(model.mgrid,:xwell);</code></pre><pre><code class="language-none">	Acquisition Geometry:	xwell
+	&gt; number of supersources:	2
+	&gt; sources per supersource:	min	1	max	1
+	&gt; receivers per supersource:	min	2	max	2
+	&gt; number of unique positions of:	sources	2	receivers	2
+GeoPhyInv.Acquisition.Geom(Array{Float64,1}[[-800.0], [-800.0]], Array{Float64,1}[[-800.0], [800.0]], Array{Float64,1}[[800.0, 800.0], [800.0, 800.0]], Array{Float64,1}[[-800.0, 800.0], [-800.0, 800.0]], 2, [1, 1], [2, 2])</code></pre></div><p>Plot the model, source and receivers using these commands: <code>using Plots</code> <code>p1=JP.seismic(model);</code> <code>JP.geom!(acqgeom);</code> <code>plot(p1);</code></p><p>Generate a time grid.</p><div><pre><code class="language-julia">tgrid = range(0.0,stop=2.0,length=1000)</code></pre><pre><code class="language-none">0.0:0.002002002002002002:2.0</code></pre></div><p>Ricker wavelet.</p><div><pre><code class="language-julia">wav = GIPh.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,);</code></pre><pre><code class="language-none">1000-element Array{Float64,1}:
+ -1.9870467865289043e-25
+ -5.230093630279587e-25
+ -1.365579190638542e-24
+ -3.536953905378872e-24
+ -9.087532901157192e-24
+ -2.3161445285358508e-23
+ -5.855814763281941e-23
+ -1.4686217029939201e-22
+ -3.653695795682802e-22
+ -9.016822617740584e-22
+  ⋮
+ -0.0
+ -0.0
+ -0.0
+ -0.0
+ -0.0
+ -0.0
+ -0.0
+ -0.0
+ -0.0</code></pre></div><p>Distribute the same source wavelet to all the supsersources.</p><div><pre><code class="language-julia">acqsrc=GIPh.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);</code></pre><pre><code class="language-none">GeoPhyInv.Acquisition.Src(2, [1, 1], Symbol[:P], Array{Float64,2}[[-1.98705e-25; -5.23009e-25; … ; -0.0; -0.0]; [-1.98705e-25; -5.23009e-25; … ; -0.0; -0.0]], 0.0:0.002002002002002002:2.0)</code></pre></div><p>Now we have all the required variables to create <code>SeisForwExpt</code> object and prepare the forward modelling. While creating, we switched the <code>snaps_flag</code> on, and instructed recording field at <code>tsnaps</code>. Once the <code>Expt</code> object is created, do the modelling &quot;without approximately any memory allocations&quot; using <code>mod!</code></p><div><pre><code class="language-julia">paE=SeisForwExpt(model=model,
+	acqgeom=[acqgeom], acqsrc=[acqsrc],
+	snaps_flag=true,
+	tsnaps=[0.3, 0.4, 0.5],
+	tgridmod=tgrid, verbose=true);
+
+@time mod!(paE);</code></pre><pre><code class="language-none">[ Info: spatial sampling (1.00e+01) can be as high as 1.02e+01
+┌ Warning: decrease time sampling (2.00e-03) below 1.43e-03
+└ @ GeoPhyInv.Fdtd ~/build/pawbz/GeoPhyInv.jl/src/Fdtd/Fdtd.jl:1016
+	modeling supershot 1/2  28%|███████▋                   |  ETA: 0:00:03[K	modeling supershot 1/2  71%|███████████████████▎       |  ETA: 0:00:01[K	modeling supershot 1/2 100%|███████████████████████████| Time: 0:00:03[K
+	modeling supershot 2/2  38%|██████████▏                |  ETA: 0:00:02[K	modeling supershot 2/2  80%|█████████████████████▊     |  ETA: 0:00:00[K	modeling supershot 2/2 100%|███████████████████████████| Time: 0:00:02[K
+ ──────────────────────────────────────────────────────────────────────────
+                                   Time                   Allocations
+                           ──────────────────────   ───────────────────────
+     Tot / % measured:          10.0s / 90.3%            284MiB / 92.2%
+
+ Section           ncalls     time   %tot     avg     alloc   %tot      avg
+ ──────────────────────────────────────────────────────────────────────────
+ mod_per_proc!          1    7.69s  85.3%   7.69s    167MiB  63.7%   167MiB
+ initialize!            1    758ms  8.41%   758ms   53.6MiB  20.5%  53.6MiB
+ stack_grads!           1    385ms  4.27%   385ms   32.6MiB  12.5%  32.6MiB
+ record data            1    182ms  2.01%   182ms   8.88MiB  3.39%  8.88MiB
+ update gradient        1    875ns  0.00%   875ns     0.00B  0.00%    0.00B
+ ────────────────────────────────────────────────────────────────────────── 11.790862 seconds (9.32 M allocations: 454.350 MiB, 4.71% gc time)</code></pre></div><p>Extracting snaps of the first supersource. The dimensions of the snaps is <code>[nz,nx,nt]</code>.</p><div><pre><code class="language-julia">snaps=paE[:snaps,1];</code></pre><pre><code class="language-none">201×201×3 Array{Float64,3}:
+[:, :, 1] =
+  -19.7932        -26.2059       …   2.75221e-96   -5.40513e-97
+  -26.2059        -34.2426          -1.66039e-96    6.11842e-97
+  -33.7887        -43.5406          -3.35833e-97   -5.11257e-97
+  -42.4541        -53.9054           2.97211e-96    2.51155e-97
+  -52.0213        -65.0292          -6.07452e-96    1.85792e-97
+  -62.2199        -76.4992       …   8.71583e-96   -7.322e-97
+  -72.7074        -87.836           -1.06168e-95    1.27223e-96
+  -83.0964        -98.5362           1.17458e-95   -1.80961e-96
+  -92.9964       -108.129           -1.12304e-95    2.21145e-96
+ -102.048        -116.221            9.96251e-96   -2.45293e-96
+    ⋮                            ⋱                  ⋮
+   -1.39728e-90     1.61985e-90     -1.91427e-262   3.27414e-264
+    1.19176e-91    -2.24391e-91      3.3273e-264   -5.60754e-266
+    9.28472e-93     9.7019e-93      -5.68592e-266   9.4505e-268
+   -5.13743e-93     3.61958e-93  …   9.55498e-268  -1.56589e-269
+    9.28547e-94    -1.08958e-93     -1.5807e-269    2.55215e-271
+   -8.38764e-95     1.60132e-94      2.56878e-271  -4.08845e-273
+   -3.40327e-96    -9.77102e-96     -4.10729e-273   6.43835e-275
+    2.74746e-96    -1.65859e-96      6.45445e-275  -9.96985e-277
+   -5.3943e-97      6.11183e-97  …  -9.97127e-277   1.51738e-278
+
+[:, :, 2] =
+   8.67901       -6.30753      -18.1956       …   2.24151e-72   -1.51424e-72
+  -6.3058       -18.7658       -28.0398           8.23806e-72   -1.64002e-72
+ -18.1915       -28.0372       -34.78             1.40378e-71   -1.14182e-72
+ -27.1564       -34.4775       -38.9093           1.75625e-71    3.2604e-74
+ -33.5322       -38.5418       -40.9659           1.70404e-71    1.73976e-72
+ -37.7302       -40.7157       -41.4687       …   1.14677e-71    3.6741e-72
+ -40.1801       -41.4606       -40.8781           9.53406e-73    5.44886e-72
+ -41.2938       -41.1858       -39.5776          -1.34545e-71    6.68349e-72
+ -41.4358       -40.234        -37.8688          -2.98777e-71    7.09642e-72
+ -40.9131       -38.8761       -35.9769          -4.62881e-71    6.54984e-72
+   ⋮                                          ⋱                  ⋮
+   5.0134e-67     1.6902e-66     2.87367e-66     -1.94598e-167   1.21662e-168
+  -3.26473e-67   -3.47929e-67   -2.46094e-67      1.24184e-168  -7.67261e-170
+   8.81082e-69   -2.72874e-68   -7.22016e-68     -7.80874e-170   4.77237e-171
+   9.41473e-69    1.27958e-68    1.29173e-68  …   4.83899e-171  -2.92582e-172
+  -9.99363e-70   -1.44799e-70    1.2316e-69      -2.96023e-172   1.76966e-173
+  -2.04067e-70   -3.73241e-70   -4.8185e-70       1.78418e-173  -1.05501e-174
+   4.59919e-71    3.36948e-71    8.14798e-73     -1.06115e-174   6.2035e-176
+   2.23148e-72    8.22847e-72    1.4037e-71       6.22127e-176  -3.59844e-177
+  -1.51312e-72   -1.64029e-72   -1.14372e-72  …  -3.59878e-177   2.05878e-178
+
+[:, :, 3] =
+ -3.20091      -3.06926      -2.95168      …  -3.03407e-51    3.18329e-52
+ -3.07035      -2.94617      -2.83514         -3.98763e-51    1.02788e-52
+ -2.95365      -2.83604      -2.73078         -4.68848e-51   -2.08189e-52
+ -2.84935      -2.73753      -2.63733         -5.00196e-51   -5.97307e-52
+ -2.75609      -2.64936      -2.55359         -4.82653e-51   -1.03663e-51
+ -2.67266      -2.57037      -2.47848      …  -4.10758e-51   -1.49151e-51
+ -2.59793      -2.49952      -2.41098         -2.84327e-51   -1.92775e-51
+ -2.53091      -2.43585      -2.35019         -1.07674e-51   -2.31154e-51
+ -2.47073      -2.37856      -2.29535          1.09531e-51   -2.61825e-51
+ -2.41672      -2.327        -2.24589          3.56583e-51   -2.82965e-51
+  ⋮                                        ⋱                  ⋮
+  3.608e-47     1.46006e-47  -1.64398e-47      3.55173e-120  -2.1278e-120
+  1.82848e-47   2.39499e-47   2.83313e-47     -2.19187e-120   4.83659e-121
+ -1.9097e-48   -5.84749e-49   1.29721e-48      4.94852e-121  -7.26827e-122
+ -1.05166e-48  -1.36792e-48  -1.6035e-48   …  -7.39026e-122   6.54496e-123
+  1.02826e-49   2.6182e-50   -8.21695e-50      6.62033e-123   1.81873e-124
+  5.77367e-50   7.51851e-50   8.79712e-50      1.86915e-124  -2.23658e-124
+ -5.67118e-51  -1.48853e-51   4.45474e-51     -2.25566e-124   5.58453e-125
+ -3.03236e-51  -3.98697e-51  -4.69087e-51      5.60581e-125  -9.31596e-126
+  3.18739e-52   1.03256e-52  -2.08084e-52  …  -9.31623e-126   1.08681e-126</code></pre></div><p>Extracting snaps of the second supersource.</p><div><pre><code class="language-julia">snaps=paE[:snaps,2];</code></pre><pre><code class="language-none">201×201×3 Array{Float64,3}:
+[:, :, 1] =
+  -5.40046e-97     6.12604e-97  …  -9.96792e-277   1.51763e-278
+   2.74926e-96    -1.66159e-96      6.45177e-275  -9.96682e-277
+  -3.39266e-96    -9.7965e-96      -4.10346e-273   6.43506e-275
+  -8.40423e-95     1.60435e-94      2.56711e-271  -4.08633e-273
+   9.29681e-94    -1.09208e-93     -1.57929e-269   2.55098e-271
+  -5.13475e-93     3.61981e-93  …   9.55295e-268  -1.56548e-269
+   9.25353e-93     9.74209e-93     -5.68384e-266   9.44878e-268
+   1.1945e-91     -2.24922e-91      3.3255e-264   -5.60723e-266
+  -1.39829e-90     1.62156e-90     -1.91308e-262   3.27346e-264
+   7.51213e-90    -5.92705e-90      1.08278e-260  -1.87923e-262
+   ⋮                            ⋱                  ⋮
+ -93.0008       -108.135           -1.12381e-95    2.21095e-96
+ -83.0999        -98.5417           1.17545e-95   -1.80962e-96
+ -72.7088        -87.8393          -1.06214e-95    1.27203e-96
+ -62.2205        -76.501        …   8.70544e-96   -7.30437e-97
+ -52.0202        -65.0292          -6.07173e-96    1.84802e-97
+ -42.452         -53.9049           2.96619e-96    2.52287e-97
+ -33.7861        -43.5391          -3.32487e-97   -5.11937e-97
+ -26.2044        -34.2421          -1.65875e-96    6.11597e-97
+ -19.7918        -26.2052       …   2.74756e-96   -5.397e-97
+
+[:, :, 2] =
+  -1.51295e-72   -1.63938e-72   -1.14055e-72  …  -3.59757e-177   2.05913e-178
+   2.23903e-72    8.24587e-72    1.40512e-71      6.21872e-176  -3.5969e-177
+   4.59769e-71    3.36304e-71    6.44637e-73     -1.05995e-174   6.19894e-176
+  -2.04149e-70   -3.73579e-70   -4.82277e-70      1.78265e-173  -1.05426e-174
+  -9.98572e-70   -1.42071e-70    1.23743e-69     -2.95749e-172   1.76844e-173
+   9.40627e-69    1.27949e-68    1.29113e-68  …   4.8377e-171   -2.92463e-172
+   8.78385e-69   -2.73371e-68   -7.23625e-68     -7.8038e-170    4.77062e-171
+  -3.26224e-67   -3.47856e-67   -2.45659e-67      1.24119e-168  -7.67112e-170
+   5.01251e-67    1.69099e-66    2.87769e-66     -1.94472e-167   1.2163e-168
+   9.10624e-66    7.10012e-66    1.31012e-66      3.00477e-166  -1.90108e-167
+   ⋮                                          ⋱                  ⋮
+ -41.4566       -40.2518       -37.884           -2.98878e-71    7.09895e-72
+ -41.3126       -41.2017       -39.5908          -1.3474e-71     6.68533e-72
+ -40.1959       -41.4736       -40.8888           9.42237e-73    5.44954e-72
+ -37.7425       -40.726        -41.4766       …   1.14852e-71    3.67456e-72
+ -33.5413       -38.5494       -40.9709           1.70515e-71    1.73947e-72
+ -27.1598       -34.4799       -38.9105           1.75765e-71    3.2193e-74
+ -18.1892       -28.0347       -34.7765           1.40501e-71   -1.14169e-72
+  -6.2993       -18.76         -28.034            8.23798e-72   -1.63945e-72
+   8.6901        -6.29909      -18.1887       …   2.23753e-72   -1.51239e-72
+
+[:, :, 3] =
+  3.18242e-52   1.01998e-52  -2.09372e-52  …  -9.31214e-126   1.08691e-126
+ -3.03264e-51  -3.98732e-51  -4.6896e-51       5.60072e-125  -9.30902e-126
+ -5.66467e-51  -1.46577e-51   4.48816e-51     -2.25076e-124   5.57687e-125
+  5.77277e-50   7.51972e-50   8.799e-50        1.85557e-124  -2.23262e-124
+  1.02786e-49   2.58413e-50  -8.27785e-50      6.61663e-123   1.80843e-124
+ -1.05067e-48  -1.36766e-48  -1.60336e-48  …  -7.38676e-122   6.54388e-123
+ -1.90853e-48  -5.81333e-49   1.30756e-48      4.94307e-121  -7.2646e-122
+  1.82722e-47   2.39548e-47   2.8338e-47      -2.18921e-120   4.83421e-121
+  3.60655e-47   1.45583e-47  -1.66032e-47      3.54489e-120  -2.12678e-120
+ -3.02254e-46  -4.02342e-46  -4.83767e-46      4.38702e-119   3.37615e-120
+  ⋮                                        ⋱                  ⋮
+ -2.46917      -2.37736      -2.29472          1.09743e-51   -2.61927e-51
+ -2.53021      -2.43548      -2.35028         -1.07241e-51   -2.31255e-51
+ -2.59849      -2.50043      -2.41229         -2.83964e-51   -1.9287e-51
+ -2.6746       -2.57274      -2.48125      …  -4.1087e-51    -1.4927e-51
+ -2.75927      -2.65307      -2.55774         -4.82781e-51   -1.03769e-51
+ -2.85337      -2.74221      -2.6425          -5.00412e-51   -5.98418e-52
+ -2.95794      -2.84115      -2.73645         -4.68966e-51   -2.09096e-52
+ -3.07424      -2.95104      -2.84068         -3.9859e-51     1.02437e-52
+ -3.2038       -3.0733       -2.95652      …  -3.03109e-51    3.1815e-52</code></pre></div><p>We can plot snapshots using these commands: <code>p1=[heatmap(snaps[:,:,ii]) for ii in 1:3];</code> <code>plot(p1..., layout=(1,3), aspect_ratio=:equal)</code></p><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p><footer><hr/><a class="previous" href="../../"><span class="direction">Previous</span><span class="title">Home</span></a><a class="next" href="../../Poisson/adj_state_expt/"><span class="direction">Next</span><span class="title">PoissonExpt</span></a></footer></article></body></html>
