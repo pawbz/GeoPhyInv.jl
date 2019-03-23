@@ -11,7 +11,7 @@ acqsrc=GIPh.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid); # distribute th
 	&gt; sources per supersource:	min	1	max	1
 	&gt; receivers per supersource:	min	2	max	2
 	&gt; number of unique positions of:	sources	2	receivers	2
-[ Info: We are ready for the modeling.</code></pre></div><p>One can plot the model, source and receivers using these commands: <code>using Plots;</code> <code>p1=JP.seismic(model);</code> <code>JP.geom!(acqgeom);</code> <code>plot(p1);</code> Now we have all the required variables to create <code>SeisForwExpt</code> object and prepare the forward modelling. While creating, we switched the <code>snaps_flag</code> on, and instructed recording field at <code>tsnaps</code>. Once the <code>Expt</code> object is created, do the modelling &quot;without approximately any memory allocations&quot; using <code>mod!</code></p><div><pre><code class="language-julia">paE=SeisForwExpt(model=model,
+[ Info: We are ready for the modeling.</code></pre></div><h3><a class="nav-anchor" id="Final-step-1" href="#Final-step-1">Final step</a></h3><p>One can plot the model, source and receivers using these commands: <code>using Plots;</code> <code>p1=JP.seismic(model);</code> <code>JP.geom!(acqgeom);</code> <code>plot(p1);</code> Now we have all the required variables to create <code>SeisForwExpt</code> object and prepare the forward modelling. While creating, we switched the <code>snaps_flag</code> on, and instructed recording field at <code>tsnaps</code>. Once the <code>Expt</code> object is created, do the modelling &quot;without approximately any memory allocations&quot; using <code>mod!</code></p><div><pre><code class="language-julia">paE=SeisForwExpt(model=model,
 	acqgeom=[acqgeom], acqsrc=[acqsrc],
 	snaps_flag=true,
 	tsnaps=[0.3, 0.4, 0.5],
@@ -19,21 +19,21 @@ acqsrc=GIPh.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid); # distribute th
 
 @time mod!(paE);</code></pre><pre><code class="language-none">[ Info: spatial sampling (1.00e+01) can be as high as 1.02e+01
 [ Info: time sampling (1.00e-03) can be as high as 1.43e-03
-	modeling supershot 1/2  11%|██▉                        |  ETA: 0:00:09[K	modeling supershot 1/2  30%|████████▎                  |  ETA: 0:00:05[K	modeling supershot 1/2  50%|█████████████▍             |  ETA: 0:00:03[K	modeling supershot 1/2  69%|██████████████████▋        |  ETA: 0:00:02[K	modeling supershot 1/2  89%|████████████████████████   |  ETA: 0:00:01[K	modeling supershot 1/2 100%|███████████████████████████| Time: 0:00:06[K
-	modeling supershot 2/2  14%|███▊                       |  ETA: 0:00:06[K	modeling supershot 2/2  34%|█████████▏                 |  ETA: 0:00:04[K	modeling supershot 2/2  55%|██████████████▉            |  ETA: 0:00:02[K	modeling supershot 2/2  75%|████████████████████▍      |  ETA: 0:00:01[K	modeling supershot 2/2  96%|██████████████████████████ |  ETA: 0:00:00[K	modeling supershot 2/2 100%|███████████████████████████| Time: 0:00:05[K
+	modeling supershot 1/2  10%|██▉                        |  ETA: 0:00:09[K	modeling supershot 1/2  29%|███████▉                   |  ETA: 0:00:06[K	modeling supershot 1/2  47%|████████████▊              |  ETA: 0:00:04[K	modeling supershot 1/2  65%|█████████████████▌         |  ETA: 0:00:02[K	modeling supershot 1/2  83%|██████████████████████▌    |  ETA: 0:00:01[K	modeling supershot 1/2 100%|███████████████████████████| Time: 0:00:06[K
+	modeling supershot 2/2  13%|███▍                       |  ETA: 0:00:07[K	modeling supershot 2/2  30%|████████                   |  ETA: 0:00:05[K	modeling supershot 2/2  47%|████████████▋              |  ETA: 0:00:03[K	modeling supershot 2/2  66%|█████████████████▊         |  ETA: 0:00:02[K	modeling supershot 2/2  84%|██████████████████████▋    |  ETA: 0:00:01[K	modeling supershot 2/2 100%|███████████████████████████| Time: 0:00:06[K
  ──────────────────────────────────────────────────────────────────────────
                                    Time                   Allocations
                            ──────────────────────   ───────────────────────
-     Tot / % measured:          15.4s / 93.9%            284MiB / 92.2%
+     Tot / % measured:          16.5s / 93.7%            284MiB / 92.2%
 
  Section           ncalls     time   %tot     avg     alloc   %tot      avg
  ──────────────────────────────────────────────────────────────────────────
- mod_per_proc!          1    13.2s  91.0%   13.2s    168MiB  63.9%   168MiB
- initialize!            1    766ms  5.28%   766ms   53.1MiB  20.3%  53.1MiB
- stack_grads!           1    378ms  2.61%   378ms   32.6MiB  12.4%  32.6MiB
- record data            1    166ms  1.15%   166ms   8.88MiB  3.39%  8.88MiB
- update gradient        1   1.23μs  0.00%  1.23μs     0.00B  0.00%    0.00B
+ mod_per_proc!          1    14.1s  91.3%   14.1s    168MiB  63.9%   168MiB
+ initialize!            1    696ms  4.51%   696ms   53.1MiB  20.3%  53.1MiB
+ stack_grads!           1    429ms  2.78%   429ms   32.6MiB  12.4%  32.6MiB
+ record data            1    209ms  1.36%   209ms   8.88MiB  3.39%  8.88MiB
+ update gradient        1   1.38μs  0.00%  1.38μs     0.00B  0.00%    0.00B
  ──────────────────────────────────────────────────────────────────────────
- 17.012075 seconds (9.35 M allocations: 455.577 MiB, 3.19% gc time)</code></pre></div><p>Extracting snaps of the first supersource. The dimensions of the snaps is <code>[nz,nx,nt]</code>.</p><div><pre><code class="language-julia">snaps=paE[:snaps,1]; # extracting snaps of the first supersource
+ 17.935057 seconds (9.35 M allocations: 455.570 MiB, 2.52% gc time)</code></pre></div><h3><a class="nav-anchor" id="Extracting-snaps-from-Expt-1" href="#Extracting-snaps-from-Expt-1">Extracting snaps from Expt</a></h3><div><pre><code class="language-julia">snaps=paE[:snaps,1]; # extracting snaps of the first supersource
 snaps=paE[:snaps,2]; # second supersource
 @info &quot;The dimensions of the snaps is [nz,nx,nt].&quot;</code></pre><pre><code class="language-none">[ Info: The dimensions of the snaps is [nz,nx,nt].</code></pre></div><p>We can now plot snapshots using these commands: <code>p1=[heatmap(snaps[:,:,ii]) for ii in 1:3];</code> <code>plot(p1..., layout=(1,3), aspect_ratio=:equal)</code></p><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p><footer><hr/><a class="previous" href="../../"><span class="direction">Previous</span><span class="title">Home</span></a><a class="next" href="../../Poisson/adj_state_expt/"><span class="direction">Next</span><span class="title">PoissonExpt</span></a></footer></article></body></html>

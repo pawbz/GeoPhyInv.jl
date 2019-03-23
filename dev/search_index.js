@@ -37,7 +37,23 @@ var documenterSearchIndex = {"docs": [
     "page": "SeismicExpt: generate snaps",
     "title": "Setting up the variables necessary to create the Expt",
     "category": "section",
-    "text": "model=GIPh.Gallery.Seismic(:acou_homo1); # load a simple homogeneous acoustic model from the gallery\nGIPh.Models.Seismic_addon!(model, randn_perc=0.01); # add some random noise to the model\nacqgeom=GIPh.Gallery.Geom(model.mgrid,:xwell); # load a simple acquisition geometry using `mgrid` of the seismic model\ntgrid = range(0.0,stop=2.0,length=2000) # generate a time grid\nwav = GIPh.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,); # ricker wavelet\nacqsrc=GIPh.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid); # distribute the same source wavelet to all the supsersources\n@info \"We are ready for the modeling.\"One can plot the model, source and receivers using these commands: using Plots; p1=JP.seismic(model); JP.geom!(acqgeom); plot(p1); Now we have all the required variables to create SeisForwExpt object and prepare the forward modelling. While creating, we switched the snaps_flag on, and instructed recording field at tsnaps. Once the Expt object is created, do the modelling \"without approximately any memory allocations\" using mod!paE=SeisForwExpt(model=model,\n	acqgeom=[acqgeom], acqsrc=[acqsrc],\n	snaps_flag=true,\n	tsnaps=[0.3, 0.4, 0.5],\n	tgridmod=tgrid, verbose=true);\n\n@time mod!(paE);Extracting snaps of the first supersource. The dimensions of the snaps is [nz,nx,nt].snaps=paE[:snaps,1]; # extracting snaps of the first supersource\nsnaps=paE[:snaps,2]; # second supersource\n@info \"The dimensions of the snaps is [nz,nx,nt].\"We can now plot snapshots using these commands: p1=[heatmap(snaps[:,:,ii]) for ii in 1:3]; plot(p1..., layout=(1,3), aspect_ratio=:equal)This page was generated using Literate.jl."
+    "text": "model=GIPh.Gallery.Seismic(:acou_homo1); # load a simple homogeneous acoustic model from the gallery\nGIPh.Models.Seismic_addon!(model, randn_perc=0.01); # add some random noise to the model\nacqgeom=GIPh.Gallery.Geom(model.mgrid,:xwell); # load a simple acquisition geometry using `mgrid` of the seismic model\ntgrid = range(0.0,stop=2.0,length=2000) # generate a time grid\nwav = GIPh.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,); # ricker wavelet\nacqsrc=GIPh.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid); # distribute the same source wavelet to all the supsersources\n@info \"We are ready for the modeling.\""
+},
+
+{
+    "location": "Fdtd/create_snaps/#Final-step-1",
+    "page": "SeismicExpt: generate snaps",
+    "title": "Final step",
+    "category": "section",
+    "text": "One can plot the model, source and receivers using these commands: using Plots; p1=JP.seismic(model); JP.geom!(acqgeom); plot(p1); Now we have all the required variables to create SeisForwExpt object and prepare the forward modelling. While creating, we switched the snaps_flag on, and instructed recording field at tsnaps. Once the Expt object is created, do the modelling \"without approximately any memory allocations\" using mod!paE=SeisForwExpt(model=model,\n	acqgeom=[acqgeom], acqsrc=[acqsrc],\n	snaps_flag=true,\n	tsnaps=[0.3, 0.4, 0.5],\n	tgridmod=tgrid, verbose=true);\n\n@time mod!(paE);"
+},
+
+{
+    "location": "Fdtd/create_snaps/#Extracting-snaps-from-Expt-1",
+    "page": "SeismicExpt: generate snaps",
+    "title": "Extracting snaps from Expt",
+    "category": "section",
+    "text": "snaps=paE[:snaps,1]; # extracting snaps of the first supersource\nsnaps=paE[:snaps,2]; # second supersource\n@info \"The dimensions of the snaps is [nz,nx,nt].\"We can now plot snapshots using these commands: p1=[heatmap(snaps[:,:,ii]) for ii in 1:3]; plot(p1..., layout=(1,3), aspect_ratio=:equal)This page was generated using Literate.jl."
 },
 
 {
