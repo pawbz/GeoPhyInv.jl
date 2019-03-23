@@ -1,6 +1,11 @@
 
-# create pizza problem
-
+"""
+Gallery of `SeisInvExpt`.
+# Arguments
+* `attrib::Symbol` : name 
+  * `=:pizza` all around sources and receivers
+  * `=:downhole` sources and receivers along a drill-bit
+"""
 function SeisInvExpt(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=0.0, parameterization=[:χvp, :χρ, :null])
 
 	if(attrib==:pizza)

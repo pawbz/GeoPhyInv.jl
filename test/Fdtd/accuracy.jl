@@ -23,7 +23,7 @@ pa=GeoPhyInv.Fdtd.Param(npw=1,model=model,
         sflags=[2], rflags=[1],
 	    tgridmod=tgrid, verbose=true );
 
-@btime GeoPhyInv.Fdtd.mod!(pa);
+@time GeoPhyInv.Fdtd.mod!(pa);
 
 
 # least-squares misfit

@@ -32,11 +32,11 @@ using Calculus
 # ```
 # Dimensions and spatial grids are allocated as follows.
 
-nx=20
-nz=20
+nx=21
+nz=21
 nt=4
 nznx=nz*nx
-mgrid=[range(0.0,step=0.5, length=nz), range(0.0,step=0.5, length=nz)]
+mgrid=[range(-div(nz,2), step=1.0, length=nz), range(-div(nx,2), step=1.0, length=nx)]
 tgrid=range(0.0,step=0.5, length=nt)
 
 # Now lets allocate the inputs for a toy experiment.
@@ -47,14 +47,34 @@ k=abs.(randn(nz,nx))
 σ=abs.(randn(nz,nx))
 p=randn(nz,nx,nt)
 
+for it in 1:nt
+	for ix in 1:nx
+		for iz in 1:nz
+			p[iz,ix,it]=inv(abs(iz-11)+1)*inv(abs(ix-11)+1)
+		end
+	end
+end
+
 # These medium parameters are used to generate the *observed* field ``ψ``.
 
 σobs=abs.(randn(nz,nx))
 Qobs=abs.(randn(nz,nx))
 
+fill!(σobs, 1.0)
+fill!(Qobs, 1.0)
+fill!(Qv, 1.0)
+fill!(η, 1.0)
+fill!(k, 1.0)
+σobs[11,11]=20.0
+fill!(σ, 1.0)
+
 # Generate the configuration for the Poisson experiment, using the arrays above.
 
-paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs)
+acqgeom=J.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.])
+#ACQ=sprandn(200,441,0.9)
+ACQ=J.Acquisition.ACQmat(acqgeom,mgrid)
+paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
+#paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs,)
 
 #src # J.Poisson.updateLP!(paE, paE.Q)
 
