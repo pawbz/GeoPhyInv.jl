@@ -41,10 +41,10 @@ paE=SeisForwExpt(model=model,
 
 @time mod!(paE);
 
-# Extracting snaps of the first supersource. The dimensions of the snaps is `[nz,nx,nt]`.
+# ### Extracting snaps from `Expt`
 snaps=paE[:snaps,1]; # extracting snaps of the first supersource
 snaps=paE[:snaps,2]; # second supersource
-@info "The dimensions of the snaps is [nz,nx,nt]."
+@info string("The dimensions of the snaps are (nz,nx,nt)=", size(snaps))
 
 # We can now plot snapshots using these commands:
 # `p1=[heatmap(snaps[:,:,ii]) for ii in 1:3];`

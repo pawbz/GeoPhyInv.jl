@@ -26,6 +26,8 @@ acqsrc=GIPh.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid); # distribute th
 @info "We are ready for the modeling."
 ```
 
+### Final step
+
 One can plot the model, source and receivers using these commands:
 `using Plots;`
 `p1=JP.seismic(model);`
@@ -48,7 +50,7 @@ paE=SeisForwExpt(model=model,
 @time mod!(paE);
 ```
 
-Extracting snaps of the first supersource. The dimensions of the snaps is `[nz,nx,nt]`.
+### Extracting snaps from Expt
 
 ```@example create_snaps
 snaps=paE[:snaps,1]; # extracting snaps of the first supersource
