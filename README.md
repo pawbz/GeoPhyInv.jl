@@ -9,25 +9,9 @@ At the moment, `GeoPhyInv` depends on another unregistered package `Misfits`. Fo
 enter these package manager commands in the REPL:
 ```julia
 using Pkg
-Pkg.add(PackageSpec(name="Misfits",url="git@github.com:pawbz/Misfits.jl.git"))
-Pkg.add(PackageSpec(name="GeoPhyInv",url="git@github.com:pawbz/GeoPhyInv.jl.git"))
+Pkg.add(PackageSpec(name="Misfits",url="https://github.com/pawbz/Misfits.jl.git"))
+Pkg.add(PackageSpec(name="GeoPhyInv",url="https://github.com/pawbz/GeoPhyInv.jl.git"))
 ```
-## Overview
-### Seismic
-
-### Poisson
-applies to electrical, gravity and magnetic fields
-
-## Tutorial Notebooks
-
-
-### Forward Modeling
-* generate seismic data using a 2D finite-difference solver
-  * [notebook] (https://github.com/pawbz/GeoPhyInv.jl/tree/master/notebooks/modeling/page1.ipynb)
-
-
-* saving time snapshots during modelling
-  * [notebook] (https://github.com/pawbz/GeoPhyInv.jl/tree/master/notebooks/modeling/page2.ipynb)
 
 ## Credits
 * Charles Clerget [@chclerget](https://github.com/chclerget) tested most of the methods of this package.

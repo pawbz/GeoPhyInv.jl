@@ -1,8 +1,16 @@
 
+# he linearized forward modeling operator `F`, such that
+# `Fx` can be computed without explicitly storing the operator matrix (
+#  see `LinearMaps.jl`);
+# the imaging/migration operator `F*`;
+
+# These maps are the building blocks of iterative optimization schemes.
+
+
 for scenario in [:downhole, :pizza]
 	println("@@@@@@@@@@@@TESTING ", scenario)
 	for rfields in [[:P], [:Vx], [:Vz]]
-		pa, model=JG.xfwi_problem(scenario, born_flag=true, rfields=rfields)
+		pa=JG.SeisInvExpt(scenario, born_flag=true, rfields=rfields)
 
 
 		F=JF.operator_Born(pa);

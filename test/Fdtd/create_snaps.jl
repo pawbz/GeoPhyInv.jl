@@ -1,3 +1,12 @@
+
+# Forward problem, where the seismic data are generated
+# using synthetic Earth models and the acquisition parameters
+#corresponding to a seismic experiment.
+# Forward modeling consists of a finite-difference simulation, followed
+
+
+# \$a\otimes b\$
+
 # the aim is to save snapshots, at given `t` in Fdtd
 # we start with loading some packages
 

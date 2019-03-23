@@ -17,12 +17,24 @@ include("Poisson/Poisson.jl")
 include("Gallery/Gallery.jl")
 include("Plots.jl")
 
+# export the Expt for Seismic Forward Modelling
+const SeisForwExpt=GeoPhyInv.Fdtd.Param
+export SeisForwExpt
+
+# export the Expt for Seismic Inversion
+const SeisInvExpt=GeoPhyInv.FWI.Param
+export SeisInvExpt
+
+# export the Expt for Poisson
+const PoissonExpt=GeoPhyInv.Poisson.Param
+export PoissonExpt
+
 
 const JuMIT=GeoPhyInv
 export JuMIT
 
-const GPI=GeoPhyInv
-export GPI
+const GIPh=GeoPhyInv
+export GIPh
 
 const J=GeoPhyInv
 export J

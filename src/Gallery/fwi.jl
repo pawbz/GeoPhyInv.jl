@@ -1,7 +1,7 @@
 
 # create pizza problem
 
-function xfwi_problem(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=0.0, parameterization=[:χvp, :χρ, :null])
+function SeisInvExpt(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=0.0, parameterization=[:χvp, :χρ, :null])
 
 	if(attrib==:pizza)
 		# starting model
@@ -61,7 +61,7 @@ function xfwi_problem(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=
 		       igrid=igrid, parameterization=parameterization, verbose=false);
 	end
 
-	return pa, model
+	return pa
 end
 
 
