@@ -18,8 +18,8 @@ mutable struct Param{T}
 	dz::Float64
 end
 
-#include("operatorA_old.jl")
-include("operatorA.jl")
+include("operatorA_old.jl")
+#include("operatorA.jl")
 
 function Param(nx::Int,nz::Int,mpars=nothing)
 
