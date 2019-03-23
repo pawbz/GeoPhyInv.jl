@@ -1,4 +1,4 @@
-# Toolbox for GeoPhysical Inversion (GPI) 
+# The Expt Type 
 
 ```julia
 using GeoPhyInv

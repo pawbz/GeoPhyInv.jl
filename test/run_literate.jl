@@ -19,3 +19,4 @@ run_literate(["adj_state_expt"], "Poisson")
 
 run_literate(["gradient_accuracy","born_map"], "FWI")
 
+run_literate(["create_snaps"], "Fdtd")
