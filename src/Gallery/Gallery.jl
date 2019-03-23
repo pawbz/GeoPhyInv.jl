@@ -15,20 +15,24 @@ global marmousi_folder=joinpath(@__DIR__, "marmousi2")
 Gallery of `Seismic` models.
 
 # Arguments 
-* `attrib::Symbol` : 
+* `attrib::Symbol` : name of the model
+
+# Optional Arguments
+* `δ::Real` : spatial sampling to resample the models 
 
 # Outputs
 * `attrib=:acou_homo1` : an homogeneous acoustic model with `vp0=2000` and `ρ0=2000`
-  * `attrib=:acou_homo2` : same as above, but with spatial sampling as 40 m (faster testing)
-  * `attrib=:seismic_marmousi2` : marmousi model with lower resolution; ideal for surface seismic experiments
-  * `attrib=:seismic_marmousi2_high_res` : marmousi model high resolution; slower to load
-  * `attrib=:seismic_marmousi2_xwell` : boxed marmousi model ideal for crosswell experiments 
-  * `attrib=:seismic_marmousi2_surf` : boxed marmousi2 for surface seismic experiments
-  * `attrib=:seismic_marmousi2_downhole` : boxed marmousi2 for downhole seismic experiments  
+* `attrib=:acou_homo2` : same as above, but with spatial sampling as 40 m (faster testing)
+* `attrib=:seismic_marmousi2` : marmousi model with lower resolution; ideal for surface seismic experiments
+* `attrib=:seismic_marmousi2_high_res` : marmousi model high resolution; slower to load
+* `attrib=:seismic_marmousi2_xwell` : boxed marmousi model ideal for crosswell experiments 
+* `attrib=:seismic_marmousi2_surf` : boxed marmousi2 for surface seismic experiments
+* `attrib=:seismic_marmousi2_downhole` : boxed marmousi2 for downhole seismic experiments  
 
 """
-function Seismic(attrib::Symbol, δ::Float64=0.0; verbose=false)
+function Seismic(attrib::Symbol, δ::Real=0.0; verbose=false)
 	bfrac=0.1; 
+	δ=Float64(δ)
 	if((attrib == :acou_homo1))
 		vp0 = [1500., 3500.] # bounds for vp
 		vs0 = [1.0, 1.0] # dummy

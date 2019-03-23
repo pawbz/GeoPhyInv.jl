@@ -12,12 +12,12 @@
 
 using GeoPhyInv
 using Statistics
-using Plots
-pyplot()
 
-# create simple (almost) homogeneous acoustic model
+# Load a simple (almost) homogeneous acoustic model from the gallery.
 
-model=J.Gallery.Seismic(:acou_homo1)
+model=GIPh.Gallery.Seismic(:acou_homo1)
+
+
 J.Models.Seismic_addon!(model, randn_perc=0.01)
 
 # a simple acquisition geometry
@@ -27,7 +27,7 @@ acqgeom = GeoPhyInv.Gallery.Geom(model.mgrid,:xwell);
 # plot the model and source, receivers
 p1=JP.seismic(model) 
 JP.geom!(acqgeom)
-plot(p1)
+#plot(p1)
 
 # generate time grid
 
@@ -59,11 +59,11 @@ pa=GeoPhyInv.Fdtd.Param(npw=1,model=model,
 # plotting snapshots of the first supersource
 
 p1=[heatmap(pa.p.localpart.ss[1].snaps[:,:,ii]) for ii in 1:3]
-plot(p1..., layout=(1,3), aspect_ratio=:equal)
+#plot(p1..., layout=(1,3), aspect_ratio=:equal)
 
 # plotting snapshots of the second supersource
 
 p1=[heatmap(pa.p.localpart.ss[2].snaps[:,:,ii]) for ii in 1:3]
-plot(p1..., layout=(1,3), aspect_ratio=:equal)
+#plot(p1..., layout=(1,3), aspect_ratio=:equal)
 
 

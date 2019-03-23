@@ -2,20 +2,31 @@
 EditURL = "https://github.com/TRAVIS_REPO_SLUG/blob/master/"
 ```
 
+Forward problem, where the seismic data are generated
+using synthetic Earth models and the acquisition parameters
+
+```@example create_snaps
+#corresponding to a seismic experiment.
+```
+
+Forward modeling consists of a finite-difference simulation, followed
+
+\$a\otimes b\$
+
 the aim is to save snapshots, at given `t` in Fdtd
 we start with loading some packages
 
 ```@example create_snaps
 using GeoPhyInv
 using Statistics
-using Plots
-pyplot()
 ```
 
-create simple (almost) homogeneous acoustic model
+Load a simple (almost) homogeneous acoustic model from the gallery.
 
 ```@example create_snaps
-model=J.Gallery.Seismic(:acou_homo1)
+model=GIPh.Gallery.Seismic(:acou_homo1)
+
+
 J.Models.Seismic_addon!(model, randn_perc=0.01)
 ```
 
@@ -30,7 +41,7 @@ plot the model and source, receivers
 ```@example create_snaps
 p1=JP.seismic(model)
 JP.geom!(acqgeom)
-plot(p1)
+#plot(p1)
 ```
 
 generate time grid
@@ -73,14 +84,14 @@ plotting snapshots of the first supersource
 
 ```@example create_snaps
 p1=[heatmap(pa.p.localpart.ss[1].snaps[:,:,ii]) for ii in 1:3]
-plot(p1..., layout=(1,3), aspect_ratio=:equal)
+#plot(p1..., layout=(1,3), aspect_ratio=:equal)
 ```
 
 plotting snapshots of the second supersource
 
 ```@example create_snaps
 p1=[heatmap(pa.p.localpart.ss[2].snaps[:,:,ii]) for ii in 1:3]
-plot(p1..., layout=(1,3), aspect_ratio=:equal)
+#plot(p1..., layout=(1,3), aspect_ratio=:equal)
 ```
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*

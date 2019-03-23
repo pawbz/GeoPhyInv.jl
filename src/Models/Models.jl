@@ -7,7 +7,7 @@ using Statistics
 using LinearAlgebra
 using Distributions
 using Random
-#using ImageFiltering
+using ImageFiltering
 import GeoPhyInv.Smooth
 import GeoPhyInv.Interpolation
 
@@ -369,20 +369,22 @@ end
 
 
 """
-Add features to a model.
+In-place method to add features to the input model.
 
 # Arguments
 * `mod::Seismic` : model that is modified
 
 # Keyword Arguments
 
-* `point_loc::Vector{Float64}=[0., 0.,]` : approx location of point pert.
+* `point_loc::Vector{Float64}=[0., 0.,]` : approx location of point pert
 * `point_pert::Float64=0.0` : perturbation at the point scatterer
 * `ellip_loc::Vector{Float64}=nothing` : location of center of perturbation, [z, x]
-* `ellip_rad::Float64=0.0` : radius of circular perturbation
-* `ellip_pert::Float64=0.1` : perturbation inside a circle
+* `ellip_rad::Float64=0.0` : size of elliptic perturbation
+* `ellip_pert::Float64=0.1` : perturbation inside the ellipse
+* `ellip_α=0.0` : rotate the ellipse
 * `rect_loc::Array{Float64}=nothing` : rectangle location, [zmin, xmin, zmax, xmax]
 * `rect_pert::Float64=0.1` : perturbation in a rectangle
+* `constant_pert::Float64=0.0` : constant perturbation 
 * `randn_pert::Float64=0.0` : percentage of reference values for additive random noise
 * `fields::Vector{Symbol}=[:χvp,:χρ,:χvs]` : which fields are to be modified?
 * `onlyin` : `mod` is modified only when field values are in these ranges 
@@ -491,7 +493,7 @@ function Seismic_smooth(mod::Seismic, zperc::Real, xperc::Real=zperc;
 	for (i,iff) in enumerate(fields)
 		m=view(getfield(mod, iff),izmin:izmax,ixmin:ixmax)
 		mg=view(getfield(modg, iff),izmin:izmax,ixmin:ixmax)
-#		imfilter!(mg, m, Kernel.gaussian([znwin,xnwin]));
+		imfilter!(mg, m, Kernel.gaussian([znwin,xnwin]));
 	end
 	return modg
 end

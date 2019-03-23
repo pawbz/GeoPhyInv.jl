@@ -2,6 +2,15 @@
 EditURL = "https://github.com/TRAVIS_REPO_SLUG/blob/master/"
 ```
 
+Can perform inversion of synthetic scenarios.
+First, the seismic data are modeled as in the forward problem. Then the
+data are used to perform full waveform inversion (FWI). The inverse
+problem estimates
+the Earth models and the source and receiver filters
+that resulted from the data.
+This task is necessary to test the performance of the inversion algorithm
+in various geological scenarios using different acquisition parameters.
+
 ```@example gradient_accuracy
 model = J.Gallery.Seismic(:acou_homo2);
 J.Models.Seismic_addon!(model,randn_perc=1, fields=[:χvp,:χρ])
