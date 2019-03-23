@@ -19,6 +19,8 @@ wav = GIPh.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,); # ricker wavelet
 acqsrc=GIPh.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid); # distribute the same source wavelet to all the supsersources
 @info "We are ready for the modeling."
 
+# ### Final step
+
 # One can plot the model, source and receivers using these commands:
 # `using Plots;`
 # `p1=JP.seismic(model);`
