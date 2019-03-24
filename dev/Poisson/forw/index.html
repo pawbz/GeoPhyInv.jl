@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>PoissonExpt: record data · Toolbox for Geophysical Inversion</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Toolbox for Geophysical Inversion</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><a class="toctext" href="../../Fdtd/create_snaps/">SeisForwExpt: generate snaps</a></li><li class="current"><a class="toctext" href>PoissonExpt: record data</a><ul class="internal"></ul></li></ul></nav><article id="docs"><header><nav><ul><li><a href>PoissonExpt: record data</a></li></ul><a class="edit-page" href="https://github.com/TRAVIS_REPO_SLUG/blob/master/"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>PoissonExpt: record data</span><a class="fa fa-bars" href="#"></a></div></header><h3><a class="nav-anchor" id="Loading-some-packages-1" href="#Loading-some-packages-1">Loading some packages</a></h3><pre><code class="language-">using GeoPhyInv
+using SparseArrays
+using StatsBase
+using LinearAlgebra
+using Random
+using ProgressMeter
+using LinearAlgebra
+using Test
+using ForwardDiff
+using Calculus</code></pre><h3><a class="nav-anchor" id="Solve-for-ψ-in-a-PoissonExpt-1" href="#Solve-for-ψ-in-a-PoissonExpt-1">Solve for <span>$ψ$</span> in a <code>PoissonExpt</code></a></h3><p>This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media, i.e. media having spatially varying (space-dependent) medium parameters. Current implementation assumes Neumann boundary conditions at all the boundaries.</p><p>Consider the following Poisson experiment:</p><div>\[∇⋅(σ(x,z)∇) ψ(t) = ∇⋅(Q(x,z)∇) p(t),\]</div><div>\[Q = k * Q_v / η.\]</div><p>We start with the dimensions and spatial grids are allocated as follows.</p><div><pre><code class="language-julia">nx=21
+nz=21
+nt=4
+nznx=nz*nx
+mgrid=[range(-div(nz,2), step=1.0, length=nz), range(-div(nx,2), step=1.0, length=nx)]
+tgrid=range(0.0,step=0.5, length=nt)
+@info &quot;Grids are all set.&quot;</code></pre><pre><code class="language-none">[ Info: Grids are all set.</code></pre></div><p>Now lets allocate the inputs for a toy experiment. These medium parameters are used to generate the <em>observed</em> field <span>$ψ$</span>.</p><div><pre><code class="language-julia">Qv=abs.(randn(nz,nx))
+η=abs.(randn(nz,nx))
+k=abs.(randn(nz,nx))
+σ=abs.(randn(nz,nx))
+p=randn(nz,nx,nt)
+@info &quot;Medium parameters allocated.&quot;</code></pre><pre><code class="language-none">[ Info: Medium parameters allocated.</code></pre></div><h3><a class="nav-anchor" id="Acquisition-1" href="#Acquisition-1">Acquisition</a></h3><p>Now, we will generate an acquisition geometry and allocate a projection matrix <code>ACQ</code>.</p><div><pre><code class="language-julia">acqgeom=GIPh.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.]);
+ACQ=GIPh.Acquisition.ACQmat(acqgeom,mgrid);
+@info &quot;ACQ will be used to project ψ onto receivers.&quot;</code></pre><pre><code class="language-none">	Acquisition Geometry:	circular acquisition geometry
+	&gt; number of supersources:	1
+	&gt; sources per supersource:	min	1	max	1
+	&gt; receivers per supersource:	min	30	max	30
+	&gt; number of unique positions of:	sources	1	receivers	30
+[ Info: ACQ will be used to project ψ onto receivers.</code></pre></div><h3><a class="nav-anchor" id="Generate-PoissonExpt-and-then-applying-mod!-1" href="#Generate-PoissonExpt-and-then-applying-mod!-1">Generate <code>PoissonExpt</code> and then applying <code>mod!</code></a></h3><p>This will first</p><ul><li>apply operator <span>$A=∇⋅(Q(x,z)∇)$</span> on a field <span>$p$</span>;</li><li>then apply <span>$(∇⋅(σ(x,z)∇))^{-1}$</span> in order to solve for <span>$ψ$</span>;</li><li>finally, records <span>$ψ$</span> at the receiver locations to generate data.</li></ul><div><pre><code class="language-julia">paE=PoissonExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ)
+mod!(paE)</code></pre></div><h3><a class="nav-anchor" id="Extracting-data-from-Expt-1" href="#Extracting-data-from-Expt-1">Extracting data from <code>Expt</code></a></h3><div><pre><code class="language-julia">data=paE[:data]
+@info string(&quot;The dimensions of data are (nt,nr)=&quot;,size(data))</code></pre><pre><code class="language-none">[ Info: The dimensions of data are (nt,nr)=(4, 30)</code></pre></div><footer><hr/><a class="previous" href="../../Fdtd/create_snaps/"><span class="direction">Previous</span><span class="title">SeisForwExpt: generate snaps</span></a></footer></article></body></html>
