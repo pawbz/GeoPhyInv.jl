@@ -724,7 +724,6 @@ function ACQmat(acqgeom::Geom,mgrid,iss=1)
 	for ir = 1:acqgeom.nr[iss]
 		irx=argmin(abs.(mgrid[2].-acqgeom.rx[iss][ir]))
 		irz=argmin(abs.(mgrid[1].-acqgeom.rz[iss][ir]))
-		println("FFQE\t", irx, "\t", irz, "\t", acqgeom.rx[iss][ir], "\t", acqgeom.rz[iss][ir])
 		ACQ[ir,irz+(irx-1)*nz]=1.0
 	end
 	return ACQ

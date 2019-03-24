@@ -1139,4 +1139,5 @@ end
 
 include("getprop.jl")
 
+export mod!
 end # module

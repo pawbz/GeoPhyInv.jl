@@ -18,7 +18,7 @@ end
 
 
 folder="Poisson"
-for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx"]
+for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx", "forw"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end
@@ -41,7 +41,7 @@ end
 
 
 folder="Fdtd"
-for t in ["accuracy", "backprop", "rho_projection"]
+for t in ["accuracy", "backprop", "rho_projection", "create_snaps"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end

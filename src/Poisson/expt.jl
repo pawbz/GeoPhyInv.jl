@@ -132,14 +132,20 @@ end
 =#
 
 # generate LP from P, need to optimize this routine, has a loop over snapshots
-function updateLP!(pa::ParamExpt, Q)
+function updateLP!(pa::ParamExpt, Q=pa.Q)
 	updateA!(pa.paQ, Q)
 	@showprogress "time loop LP\t" for it in 1:length(pa.tgrid)
 		snap_in=view(pa.P,:,:,it)
 		snap_out=view(pa.LP,:,:,it)
 		applyA!(snap_out, snap_in, pa.paQ; A=pa.paQ.A)
 	end
-	return pa
+	return nothing
+end
+
+
+function mod!(pa::ParamExpt)
+	updateLP!(pa)
+	mod!(pa, pa.σ, Fσ())
 end
 
 # forward modeling to generate ψ
@@ -164,7 +170,7 @@ function mod!(pa::ParamExpt, σ, mode)
 		      pa.adjsrc, pa.g, pa.gtemp,
 		      pa.ACQ, pa.data_misfit, dat_slice_obs, pa.paσ, qrAt, mode)
 	end
-	return pa
+	return nothing
 end
 
 

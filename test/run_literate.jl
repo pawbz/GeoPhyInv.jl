@@ -10,12 +10,12 @@ function run_literate(names, folder)
 		fp = joinpath(folder, string(t, ".jl"))
 		output_folder=joinpath(@__DIR__, "..", "docs", "src", folder) 
 		println(output_folder)
-		Literate.markdown(fp, output_folder, documenter=true)
+		Literate.markdown(fp, output_folder, documenter=true,credit=false)
 	end
 end
 
 
-run_literate(["adj_state_expt"], "Poisson")
+run_literate(["forw"], "Poisson")
 
 run_literate(["gradient_accuracy","born_map"], "FWI")
 

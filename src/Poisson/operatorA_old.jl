@@ -60,7 +60,6 @@ end
 transpose of dAdx
 """
 function dAdmpars(dx,dz,nx,nz,T)
-	println("Helleoeor")
 
 	ddz = inv(dz*dz); # for simplicity below
 	ddx = inv(dx*dx);

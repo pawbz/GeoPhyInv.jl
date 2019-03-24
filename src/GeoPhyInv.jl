@@ -20,17 +20,20 @@ include("Plots.jl")
 # export the Expt for Seismic Forward Modelling
 const SeisForwExpt=GeoPhyInv.Fdtd.Param
 export SeisForwExpt
-import GeoPhyInv.Fdtd.mod!
-export mod!
+mod!(a::SeisForwExpt)=GeoPhyInv.Fdtd.mod!(a)
 
 # export the Expt for Seismic Inversion
 const SeisInvExpt=GeoPhyInv.FWI.Param
 export SeisInvExpt
 
 # export the Expt for Poisson
-const PoissonExpt=GeoPhyInv.Poisson.Param
+const PoissonExpt=GeoPhyInv.Poisson.ParamExpt
 export PoissonExpt
+mod!(a::PoissonExpt,b,c)=GeoPhyInv.Poisson.mod!(a,b,c)
+mod!(a::PoissonExpt,b)=GeoPhyInv.Poisson.mod!(a,b)
+mod!(a::PoissonExpt)=GeoPhyInv.Poisson.mod!(a)
 
+export mod!
 
 const JuMIT=GeoPhyInv
 export JuMIT
@@ -58,5 +61,6 @@ export JA
 
 const JG=GeoPhyInv.Gallery
 export JG
+
 
 end # module
