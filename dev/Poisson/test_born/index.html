@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Born map · Toolbox for Geophysical Inversion</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Toolbox for Geophysical Inversion</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">SeisForwExpt</span><ul><li><a class="toctext" href="../../Fdtd/create_snaps/">Generate snaps</a></li></ul></li><li><span class="toctext">PoissonExpt</span><ul><li><a class="toctext" href="../forw/">Record data</a></li><li class="current"><a class="toctext" href>Born map</a><ul class="internal"></ul></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>PoissonExpt</li><li><a href>Born map</a></li></ul><a class="edit-page" href="https://github.com/TRAVIS_REPO_SLUG/blob/master/"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Born map</span><a class="fa fa-bars" href="#"></a></div></header><p>The linearized forward modeling operator <code>F</code> and its adjoint (aka Migration operator) are the building blocks of iterative optimization schemes. For the <code>PoissonExpt</code>, we have the functionality to compute <code>F*x</code> without explicitly storing the operator matrix (see <code>LinearMaps.jl</code>). Here is a small tutorial.</p><h3><a class="nav-anchor" id="Load-some-packages-1" href="#Load-some-packages-1">Load some packages</a></h3><pre><code class="language-">using GeoPhyInv
+using SparseArrays
+using StatsBase
+using LinearAlgebra
+using Random
+using ProgressMeter
+using LinearAlgebra
+using Test
+using ForwardDiff
+using Calculus
+using LinearMaps</code></pre><h3><a class="nav-anchor" id="Setting-up-the-spatial-and-temporal-grids-1" href="#Setting-up-the-spatial-and-temporal-grids-1">Setting up the spatial and temporal grids</a></h3><div><pre><code class="language-julia">nx=21
+nz=21
+nt=4
+nznx=nz*nx
+mgrid=[range(-div(nz,2), step=1.0, length=nz), range(-div(nx,2), step=1.0, length=nx)]
+tgrid=range(0.0,step=0.5, length=nt)
+@info &quot;Grids are all set.&quot;</code></pre><pre><code class="language-none">[ Info: Grids are all set.</code></pre></div><h3><a class="nav-anchor" id="Allocating-medium-parameters-1" href="#Allocating-medium-parameters-1">Allocating medium parameters</a></h3><div><pre><code class="language-julia">Qv=abs.(randn(nz,nx))
+η=abs.(randn(nz,nx))
+k=abs.(randn(nz,nx))
+σ=abs.(randn(nz,nx))
+p=randn(nz,nx,nt)
+
+σobs=abs.(randn(nz,nx))
+Qobs=abs.(randn(nz,nx))
+nr=10 # number of abstract receivers
+ACQ=sprandn(nr,nz*nx,0.6); # choose a random acquisition operator
+@info &quot;We are ready for the PoissonExpt.&quot;</code></pre><pre><code class="language-none">[ Info: We are ready for the PoissonExpt.</code></pre></div><h3><a class="nav-anchor" id="Create-an-Expt,-and-then-extract-a-linear-forward-map-out-of-it-1" href="#Create-an-Expt,-and-then-extract-a-linear-forward-map-out-of-it-1">Create an <code>Expt</code>, and then extract a linear forward map out of it</a></h3><div><pre><code class="language-julia">paE=PoissonExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
+F=operator_Born(paE, σ); # extract the linearized forward operator from `Expt`
+GIPh.Utils.test_linearmap(F) # finally do some tests on the linearmap</code></pre><pre><code class="language-none">must be positive: 167334.22066332644
+adjoint test: -284.7926409557915	-284.79264095579055</code></pre></div><h3><a class="nav-anchor" id="Usage-1" href="#Usage-1">Usage</a></h3><div><pre><code class="language-julia">δx=randn(size(F,2)) # random model pertubation
+δd=F*δx # corresponding pertubation in data
+@info string(&quot;Length of data: (nt*nr)=&quot;,length(δd))</code></pre><pre><code class="language-none">[ Info: Length of data: (nt*nr)=40</code></pre></div><footer><hr/><a class="previous" href="../forw/"><span class="direction">Previous</span><span class="title">Record data</span></a></footer></article></body></html>
