@@ -9,10 +9,17 @@ makedocs(
 		  prettyurls = get(ENV, "CI", nothing) == "true"),
    sitename = "Toolbox for Geophysical Inversion",
    pages = ["Home" => "index.md",
-	    "SeisForwExpt: generate snaps" => "Fdtd/create_snaps.md",
+	    "SeisForwExpt" => Any[
+	#			  "Basic usage" => "Fdtd/reuse_expt.md",
+				  "Generate snaps" => "Fdtd/create_snaps.md",
+				  ],
+	    "PoissonExpt" => Any[
+				 "Record data" => "Poisson/forw.md",
+				 "Born map" => "Poisson/test_born.md",
+				 ],
+	    ]
 #	    "Seismic Born Modeling" => "FWI/born_map.md",
 #	    "Seismic Full Waveform Inversion" => "FWI/gradient_accuracy.md",
-	    "PoissonExpt: record data" => "Poisson/forw.md",]
 #    modules = []
 )
  

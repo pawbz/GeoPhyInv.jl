@@ -1,100 +1,83 @@
-
-# born forward modeling to generate δψ
-# update psi using LP, has a loop over snapshots
-# most expensive routine
+using LinearMaps
+"""
+A(σ₀)δψ=-A(δσ)ψ₀
+Therefore,
+perturbed data: δψ=-A⁻¹(σ₀)A(δσ)ψ₀
+"""
 function bornmod!(pa::ParamExpt, δσ, σ0)
 	updateA!(pa.paσ, δσ)
 	updateA!(pa.paσ0, σ0)
-	qrA=factorize(pa.paσ.A)
+	# pa.paσ.A[end,:] .= 0.0 # is it necessary? A=A(σ₀)+A(δσ), except for the last row
 	qrA0=factorize(pa.paσ0.A)
-	fill!(pa.g, 0.0)
-	@showprogress "time loop ψ\t" for it in 1:length(pa.tgrid)
+	@showprogress 5 "time loop ψ\t" for it in 1:length(pa.tgrid)
 		snap_in=view(pa.LP,:,:,it)
 		# generate ψ0
-		forwψ!(pa.ψ0,snap_in,pa.paσ0,qrA)
+		forwψ!(pa.ψ0,snap_in,pa.paσ0,qrA0)
 
 		# compute A(δσ)*ψ0, store this in adjψ
-		applyA!(pa.adjψ, pa.ψ0, pa.paσ; A=qrA)
+		applyA!(pa.adjψ, pa.ψ0, pa.paσ; A=pa.paσ.A)
 
 		# compute A(σ0)⁻¹ * adjψ
-		applyinvA!(pa.ψ, pa.adjψ, pa.paσ0; A=qrA0)
+		# do we need to mute boundary source?! --- otherwise it seems to bug!
+		applyinvA!(pa.ψ, pa.adjψ, pa.paσ0; A=qrA0, mute_boundary_source=false)
 
 		# record
 		dat_slice=view(pa.data,it,:)
 		mul!(dat_slice,pa.ACQ,pa.ψ) # record
-
+		rmul!(dat_slice, -1.0)
 	end
-	return pa
+	return nothing
 end
 
 
-
-function operator_Born(pa)
-	fw=(y,x)->Fborn_map!(y, x, pa)
-	bk=(y,x)->Fadj_map!(y, x, pa)
-
-	return LinearMap(fw, bk, 
-		  length(pa.paTD.dJx),  # length of output
-		  xfwi_ninv(pa), # length of input
-		  ismutating=true)
-end
-
+# just want to extract the data out into δd
 function Fborn_map!(δd, δσ, pa, σ0)
 	bornmod!(pa, δσ, σ0)
 	copyto!(δd, pa.data)
 end
 
-function Fadj_map!(δy, δx, pa)
-	updateA!(pa.paσ, δσ)
+function Fadj_map!(δσ, δd, pa, σ0)
 	updateA!(pa.paσ0, σ0)
-	qrA=factorize(pa.paσ.A)
+	qrAt0=factorize(pa.paσ0.At)
 	qrA0=factorize(pa.paσ0.A)
 	fill!(pa.g, 0.0)
-	@showprogress "time loop ψ\t" for it in 1:length(pa.tgrid)
+	@showprogress 10 "time loop ψ\t" for it in 1:length(pa.tgrid)
 		snap_in=view(pa.LP,:,:,it)
 		# generate ψ0
-		forwψ!(pa.ψ0,snap_in,pa.paσ0,qrA)
+		forwψ!(pa.ψ0,snap_in,pa.paσ0,qrA0)
 
-		# compute A(δσ)*ψ0, store this in adjψ
-		applyA!(pa.adjψ, pa.ψ0, pa.paσ; A=qrA)
-
-		# compute A(σ0)⁻¹ * adjψ
-		applyinvA!(pa.ψ, pa.adjψ, pa.paσ0; A=qrA0)
-
-		# record
-		dat_slice=view(pa.data,it,:)
-		mul!(dat_slice,pa.ACQ,pa.ψ) # record
-
-
-		adjψ!(pa.adjψ, pa.adjψ2, pa.ψ0, 
+		# prepare the adjoint source
+		for ir in 1:size(pa.ACQ,1)
+			pa.data_misfit[ir]=δd[it+(ir-1)*length(pa.tgrid)]
+		end
+		# migrate the data!; using this routine will also test its consistency
+		adjψ_core!(pa.adjψ, pa.adjψ2, pa.ψ0, 
 		      pa.adjsrc, pa.g, pa.gtemp,
-		      pa.ACQ, pa.data_misfit, pa.paσ, qrAt)
+		      pa.ACQ, pa.data_misfit, pa.paσ0, qrAt0)
 
 	end
-	return pa
-
-
-	adjψ_core!(adjψ, adjψ2, ψ, adjsrc, g, gtemp, ACQ, data_misfit, pa, qrAt)
-updateA!(pa.paσ, σ)
-	qrA=factorize(pa.paσ.A)
-	qrAt=factorize(pa.paσ.At)
-	fill!(pa.g, 0.0)
-	@showprogress "time loop ψ\t" for it in 1:length(pa.tgrid)
-		snap_in=view(pa.LP,:,:,it)
-		forwψ!(pa.ψ,snap_in,pa.paσ,qrA)
-
-		# record
-		dat_slice=view(pa.data,it,:)
-		mul!(dat_slice,pa.ACQ,pa.ψ) # record
-
-		# wanna do adjoint modeling? depends on mode
-		dat_slice_obs=view(pa.data_obs,it,:)
-		adjψ!(pa.adjψ, pa.adjψ2, pa.ψ, 
-		      pa.adjsrc, pa.g, pa.gtemp,
-		      pa.ACQ, pa.data_misfit, dat_slice_obs, pa.paσ, qrAt, mode)
-	end
-	return pa
-
+	copyto!(δσ,pa.g)
+	return nothing
 end
 
+
+
+
+"""
+Return a `LinearMap` object to perform linearized modeling and its transpose.
+
+# Arguments
+* `pa::PoissonExpt` 
+* `σ0::Array` 
+"""
+function operator_Born(pa::ParamExpt, σ0)
+	@assert length(σ0)==prod(length.(pa.mgrid))
+	fw=(y,x)->Fborn_map!(y, x, pa, σ0)
+	bk=(y,x)->Fadj_map!(y, x, pa, σ0)
+
+	return LinearMap(fw, bk, 
+		  length(pa.data),  # length of output
+		  length(pa.σ), # length of input
+		  ismutating=true)
+end
 

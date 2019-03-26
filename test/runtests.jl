@@ -18,7 +18,7 @@ end
 
 
 folder="Poisson"
-for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx", "forw"]
+for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx", "forw", "test_born"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end

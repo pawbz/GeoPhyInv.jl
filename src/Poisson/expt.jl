@@ -134,7 +134,7 @@ end
 # generate LP from P, need to optimize this routine, has a loop over snapshots
 function updateLP!(pa::ParamExpt, Q=pa.Q)
 	updateA!(pa.paQ, Q)
-	@showprogress "time loop LP\t" for it in 1:length(pa.tgrid)
+	@showprogress 10 "time loop LP\t" for it in 1:length(pa.tgrid)
 		snap_in=view(pa.P,:,:,it)
 		snap_out=view(pa.LP,:,:,it)
 		applyA!(snap_out, snap_in, pa.paQ; A=pa.paQ.A)
@@ -156,7 +156,7 @@ function mod!(pa::ParamExpt, σ, mode)
 	qrA=factorize(pa.paσ.A)
 	qrAt=factorize(pa.paσ.At)
 	fill!(pa.g, 0.0)
-	@showprogress "time loop ψ\t" for it in 1:length(pa.tgrid)
+	@showprogress 10 "time loop ψ\t" for it in 1:length(pa.tgrid)
 		snap_in=view(pa.LP,:,:,it)
 		forwψ!(pa.ψ,snap_in,pa.paσ,qrA)
 
@@ -210,6 +210,7 @@ function adjψ_core!(adjψ, adjψ2, ψ, adjsrc, g, gtemp, ACQ, data_misfit, pa, 
 end
 
 
+# imaging condition
 function abT_T_dX!(g, ψ, adjψ, adjψ2, A)
 	n=length(ψ)
 	fill!(g, 0.0)

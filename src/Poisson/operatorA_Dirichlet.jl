@@ -2,9 +2,7 @@
 # useful guide here http://math.mit.edu/~stevenj/18.303/fall13/lecture-10.html
 
 diff1(n, d=1.) = inv(d) .* [ [1.0 zeros(1,n-1)]; diagm(1=>ones(n-1)) - diagm(0=>ones(n)) ]
-
 project_on_diff1(n) = [[1 zeros(1,n-1)]; diagm(1=>0.5.*ones(n-1)) + diagm(0=>vcat(0.5.*ones(n-1), [1.0]))]
-
 project_on_Dx(nz,nx) = kron(project_on_diff1(nx), diagm(0=>ones(nz)))
 project_on_Dz(nz,nx) = kron(diagm(0=>ones(nx)), project_on_diff1(nz))
 diff1x(nz,nx,dz=1.,dx=1.) = kron(diff1(nx,dx), diagm(0=>ones(nz)))

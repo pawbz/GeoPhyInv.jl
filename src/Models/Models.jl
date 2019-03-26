@@ -478,7 +478,6 @@ function Seismic_smooth(mod::Seismic, zperc::Real, xperc::Real=zperc;
 		 xmin::Real=mod.mgrid[2][1], xmax::Real=mod.mgrid[2][end],
 		 fields=[:χvp, :χρ, :χvs]
 			)
-	warn("ImageFiltering bug, not active")
 	xwidth = Float64(xperc) * 0.01 * abs(mod.mgrid[2][end]-mod.mgrid[2][1])
 	zwidth = Float64(zperc) * 0.01 * abs(mod.mgrid[1][end]-mod.mgrid[1][1])
 	xnwin=Int(div(xwidth,step(mod.mgrid[2])*2.))

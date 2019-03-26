@@ -32,8 +32,9 @@ export PoissonExpt
 mod!(a::PoissonExpt,b,c)=GeoPhyInv.Poisson.mod!(a,b,c)
 mod!(a::PoissonExpt,b)=GeoPhyInv.Poisson.mod!(a,b)
 mod!(a::PoissonExpt)=GeoPhyInv.Poisson.mod!(a)
+operator_Born(a::PoissonExpt,b)=GeoPhyInv.Poisson.operator_Born(a,b)
 
-export mod!
+export mod!, operator_Born
 
 const JuMIT=GeoPhyInv
 export JuMIT

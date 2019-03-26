@@ -18,8 +18,8 @@ mutable struct Param{T}
 	dz::Float64
 end
 
-include("operatorA_old.jl")
-#include("operatorA.jl")
+include("operatorA_Neumann.jl")
+#include("operatorA_Dirichlet.jl")
 
 function Param(nx::Int,nz::Int,mpars=nothing)
 
@@ -61,7 +61,7 @@ end
 
 """
 """
-function applyinvA!(fout, fin, pa; A=pa.A) 
+function applyinvA!(fout, fin, pa; A=pa.A, mute_boundary_source=true) 
 	nx=pa.nx
 	nz=pa.nz
 	nznx=nz*nx
@@ -75,29 +75,31 @@ function applyinvA!(fout, fin, pa; A=pa.A)
 		x2[i]=fin[i]
 	end
 
-	for j = 2 : nx - 1 # interior x (column) loop:
-	    k = 1 + nz*(j - 1);# initial boundary z for this x (k = i + m*(j - 1))
-	    for i = [1 nz]  # % north & south boundary z (row) loop:
-		x2[k] = 0; # 0 to equate boundary values in source term ... (?)
-		k = k + nz - 1; #% from north to south boundary
-	    end
-	end
+	if(mute_boundary_source)
+		for j = 2 : nx - 1 # interior x (column) loop:
+		    k = 1 + nz*(j - 1);# initial boundary z for this x (k = i + m*(j - 1))
+		    for i = [1 nz]  # % north & south boundary z (row) loop:
+			x2[k] = 0; # 0 to equate boundary values in source term ... (?)
+			k = k + nz - 1; #% from north to south boundary
+		    end
+		end
 
 
-	for j = [1 nx] # west & east boundary x (column) loop:
-	    k = 2 + nz*(j - 1); #% initial interior z for this x (k = i + m*(j - 1))
-	    for i = 2 : nz - 1 # interior z (row) loop:
-		x2[k]= 0;  #% 0 to equate boundary values
-		k = k + 1; #% to next z
-	    end
-	 end
+		for j = [1 nx] # west & east boundary x (column) loop:
+		    k = 2 + nz*(j - 1); #% initial interior z for this x (k = i + m*(j - 1))
+		    for i = 2 : nz - 1 # interior z (row) loop:
+			x2[k]= 0;  #% 0 to equate boundary values
+			k = k + 1; #% to next z
+		    end
+		 end
 
-	for j = [1 nx] #% west & east boundary x (column) loop:
-	    k = 1 + nz*(j - 1); #% start on north boundary
-	    for i = [1 nz] #% north & south boundary y (row) loop:
-		x2[k] = 0; #% 0 to equate boundary values 
-		k = k + nz - 1; #% from north to south boundary
-	    end
+		for j = [1 nx] #% west & east boundary x (column) loop:
+		    k = 1 + nz*(j - 1); #% start on north boundary
+		    for i = [1 nz] #% north & south boundary y (row) loop:
+			x2[k] = 0; #% 0 to equate boundary values 
+			k = k + nz - 1; #% from north to south boundary
+		    end
+		 end
 	 end
 
 #	LinearAlgebra.ldiv!(x1,A,x2) # direct inverse solve using backslash operator
@@ -140,6 +142,7 @@ end
 Apply `A` to `fin` without allocating memory.
 """
 function applyA!(fout, fin, pa; A=pa.A) 
+	fill!(fout, 0.0) # clear output
 	nx=pa.nx
 	nz=pa.nz
 	nznx=nz*nx

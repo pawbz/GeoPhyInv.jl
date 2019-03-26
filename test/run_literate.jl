@@ -15,8 +15,8 @@ function run_literate(names, folder)
 end
 
 
-run_literate(["forw"], "Poisson")
+run_literate(["forw", "test_born"], "Poisson")
 
 run_literate(["gradient_accuracy","born_map"], "FWI")
 
-run_literate(["create_snaps"], "Fdtd")
+run_literate(["create_snaps","reuse_expt"], "Fdtd")
