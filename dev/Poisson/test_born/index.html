@@ -27,7 +27,7 @@ nr=10 # number of abstract receivers
 ACQ=sprandn(nr,nz*nx,0.6); # choose a random acquisition operator
 @info &quot;We are ready for the PoissonExpt.&quot;</code></pre><pre><code class="language-none">[ Info: We are ready for the PoissonExpt.</code></pre></div><h3><a class="nav-anchor" id="Create-an-Expt,-and-then-extract-a-linear-forward-map-out-of-it-1" href="#Create-an-Expt,-and-then-extract-a-linear-forward-map-out-of-it-1">Create an <code>Expt</code>, and then extract a linear forward map out of it</a></h3><div><pre><code class="language-julia">paE=PoissonExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
 F=operator_Born(paE, σ); # extract the linearized forward operator from `Expt`
-GIPh.Utils.test_linearmap(F) # finally do some tests on the linearmap</code></pre><pre><code class="language-none">must be positive: 120286.85371548169
-adjoint test: -334.7717299530815	-334.7717299530826</code></pre></div><h3><a class="nav-anchor" id="Usage-1" href="#Usage-1">Usage</a></h3><div><pre><code class="language-julia">δx=randn(size(F,2)) # random model pertubation
+GIPh.Utils.test_linearmap(F) # finally do some tests on the linearmap</code></pre><pre><code class="language-none">must be positive: 448495.6498723223
+adjoint test: -719.9755682606652	-719.9755682606528</code></pre></div><h3><a class="nav-anchor" id="Usage-1" href="#Usage-1">Usage</a></h3><div><pre><code class="language-julia">δx=randn(size(F,2)) # random model pertubation
 δd=F*δx # corresponding pertubation in data
 @info string(&quot;Length of data: (nt*nr)=&quot;,length(δd))</code></pre><pre><code class="language-none">[ Info: Length of data: (nt*nr)=40</code></pre></div><footer><hr/><a class="previous" href="../forw/"><span class="direction">Previous</span><span class="title">Record data</span></a></footer></article></body></html>
