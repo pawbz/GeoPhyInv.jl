@@ -3,7 +3,15 @@
 # For the `PoissonExpt`, we have the 
 # functionality to compute `F*x` without explicitly storing the operator matrix 
 # (see `LinearMaps.jl`).
-# Here is a small tutorial.
+# The perturbed field `δψ` due to a perturbation in `σ` is given by
+# ```math 
+# δψ=-A⁻¹(σ₀)A(δσ)ψ₀,
+# ```
+# where
+# ```math
+# ∇⋅(σ₀(x,z)∇) ψ₀(t)=A(σ₀)ψ₀(t)=f(t).
+# ```
+# Lets start a tutorial.
 
 
 # ### Load some packages
