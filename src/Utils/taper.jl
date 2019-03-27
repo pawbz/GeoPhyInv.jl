@@ -1,31 +1,36 @@
 
 
 """
-Cosine taper a N-dimensional array along its first dimension.
+Cosine taper a N-dimensional array along given dimensions.
 
 # Arguments
 * `x::Array{Float64,N}` : 
 * `perc::Float64` : taper percentage
 """
-function taper(x::AbstractArray,perc::Float64)
+function taper(x::AbstractArray,perc::Float64;dims=[1])
 	xout=copy(x);
-	taper!(xout,perc)
+	taper!(xout,perc,dims=dims)
 	return xout
 end
 
-function taper!(x, perc=0.0; bperc=perc,eperc=perc)
-
-	nt=size(x,1)
-	nttb=min(round(Int,nt*bperc*0.01), nt)
-	ntte=min(round(Int,nt*eperc*0.01), nt)
-	kb=inv(2.0*round(Int,nt*bperc*0.01)-1)*pi
-	ke=inv(2.0*round(Int,nt*eperc*0.01)-1)*pi
-	for i in CartesianIndices(size(x))
-		if(1≤i[1]≤nttb)
-			x[i] *= sin((i[1]-1)*kb)
-		end
-		if(nt-ntte+1≤i[1]≤nt)
-			x[i] *= sin((-i[1]+nt)*ke)
+"""
+# no allocations
+* `dims=[1]` : taper along these dimensions (default only first)
+"""
+function taper!(x, perc=0.0; bperc=perc, eperc=perc, dims=[1])
+	for dim in dims
+		nt=size(x,dim)
+		nttb=min(round(Int,nt*bperc*0.01), nt)
+		ntte=min(round(Int,nt*eperc*0.01), nt)
+		kb=inv(2.0*round(Int,nt*bperc*0.01)-1)*pi
+		ke=inv(2.0*round(Int,nt*eperc*0.01)-1)*pi
+		for i in CartesianIndices(size(x))
+			if(1≤i[dim]≤nttb)
+				x[i] *= sin((i[dim]-1)*kb)
+			end
+			if(nt-ntte+1≤i[dim]≤nt)
+				x[i] *= sin((-i[dim]+nt)*ke)
+			end
 		end
 	end
 end
