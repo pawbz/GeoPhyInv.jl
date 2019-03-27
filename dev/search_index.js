@@ -109,7 +109,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Born map",
     "title": "Born map",
     "category": "page",
-    "text": "EditURL = \"https://github.com/TRAVIS_REPO_SLUG/blob/master/\"The linearized forward modeling operator F and its adjoint (aka Migration operator) are the building blocks of iterative optimization schemes. For the PoissonExpt, we have the functionality to compute F*x without explicitly storing the operator matrix (see LinearMaps.jl). Here is a small tutorial."
+    "text": "EditURL = \"https://github.com/TRAVIS_REPO_SLUG/blob/master/\"The linearized forward modeling operator F and its adjoint (aka Migration operator) are the building blocks of iterative optimization schemes. For the PoissonExpt, we have the functionality to compute F*x without explicitly storing the operator matrix (see LinearMaps.jl). The perturbed field δψ due to a perturbation in σ is given byδψ=-A¹(σ₀)A(δσ)ψ₀where(σ₀(xz)) ψ₀(t)=A(σ₀)ψ₀(t)=f(t)Lets start a tutorial."
 },
 
 {
