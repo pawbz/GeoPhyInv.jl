@@ -203,6 +203,27 @@ function xfwi!(pa::Param, obj::Migr_fd, attrib_mod)
 
 	return pa.gmodi, gx
 end
+                
+
+"""
+Return posterior covariance matrix and estimate.
+"""
+function blue(H_obs, C_obs, C_prior, est_0, y_obs; compute_update = false)
+    C_prior_inv = inv(C_prior)
+    C_prior_inv = 0.5 * (C_prior_inv + C_prior_inv')
+    
+    C_obs_inv = inv(C_obs)
+    C_obs_inv = 0.5 * (C_obs_inv + C_obs_inv')
+    
+    C_post = inv((H_obs' * C_obs_inv * H_obs + C_prior_inv))
+    
+    if compute_update
+        est = C_post * (C_prior_inv * est_0 + H_obs' * C_obs_inv * y_obs)
+        return C_post, est;
+    else
+        return C_post;    
+    end
+end
 
 
 
