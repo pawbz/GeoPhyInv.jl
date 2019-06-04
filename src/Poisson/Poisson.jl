@@ -19,5 +19,6 @@ include("core.jl")
 include("expt.jl")
 include("expt_born.jl")
 include("getprop.jl")
+include("inversion.jl")
 
 end # end module Poisson

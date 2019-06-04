@@ -180,5 +180,3 @@ function applyA(fin,pa;A=pa.A)
 	applyA!(fout,fin,pa,A=A)
 	return fout
 end
-
-
