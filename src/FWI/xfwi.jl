@@ -208,12 +208,16 @@ end
 """
 Return posterior covariance matrix and estimate.
 """
-function blue(H_obs, C_obs, C_prior, est_0, y_obs; compute_update = false)
+function blue(H_obs, C_obs, C_prior, est_0, y_obs; compute_update = false, diag = false)
     C_prior_inv = inv(C_prior)
     C_prior_inv = 0.5 * (C_prior_inv + C_prior_inv')
     
-    C_obs_inv = inv(C_obs)
-    C_obs_inv = 0.5 * (C_obs_inv + C_obs_inv')
+    if diag
+        C_obs_inv = 1 ./ C_obs
+    else
+        C_obs_inv = inv(C_obs)
+        C_obs_inv = 0.5 * (C_obs_inv + C_obs_inv')
+    end
     
     C_post = inv((H_obs' * C_obs_inv * H_obs + C_prior_inv))
     
