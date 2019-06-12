@@ -206,7 +206,18 @@ end
                 
 
 """
-Return posterior covariance matrix and estimate.
+Return posterior covariance matrix and estimate as given by Best Linear Unbiased Analysis.
+    # Arguments
+    - H_obs : observation operator
+    - C_obs : observation error covariance matrix
+    - C_prior : prior covariance matrix
+    - est_0 : prior estimate
+    - y_obs : observation vector
+    - compute_update : if true returns posterior mean and covariance, if false only covariance
+    - diag : if true, assumes that observation covariance matrix is diag and uses it to siply inverse calculation
+                
+    # Output
+    Posterior covariance and mean (if compute_update = true)
 """
 function blue(H_obs, C_obs, C_prior, est_0, y_obs; compute_update = false, diag = false)
     C_prior_inv = inv(C_prior)
