@@ -10,10 +10,12 @@ makedocs(
    sitename = "Toolbox for Geophysical Inversion",
    pages = ["Home" => "index.md",
 	    "SeisForwExpt" => Any[
+				  "Introduction" => "Fdtd/intro.md",
 	#			  "Basic usage" => "Fdtd/reuse_expt.md",
 				  "Generate snaps" => "Fdtd/create_snaps.md",
 				  ],
 	    "PoissonExpt" => Any[
+				  "Introduction" => "Poisson/intro.md",
 				 "Record data" => "Poisson/forw.md",
 				 "Born map" => "Poisson/test_born.md",
 				 ],

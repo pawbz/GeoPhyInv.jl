@@ -19,5 +19,3 @@ To get started, as an example, simply load a seismic inversion experiment alread
 using GeoPhyInv # load GIPh (after installation)
 paE=GIPh.Gallery.SeisInvExpt(:pizza); # "pizza" is the name of the experiment
 ```
-
-
