@@ -111,7 +111,8 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior}, attrib_mod;
 			    
 			end
 
-			prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, Array{Float64}(0), Array{Float64}(0), 0, 0,
+			prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, 
+				Array{Float64}(undef,0), Array{Float64}(undef,0), 0, 0,
 					eval_f, void_g, eval_grad_f, void_g_jac, nothing)
 
 			addOption(prob, "hessian_approximation", "limited-memory")
@@ -133,7 +134,7 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior}, attrib_mod;
 			end
                 end
 	end
-	show(to)
+	println(to)
 
 	# print some stuff after optimization...
 	if (solver == :ipopt)
@@ -169,7 +170,7 @@ function xfwi!(pa::Param, obj::Migr, attrib_mod)
 	@timeit to "xfwi!" begin
 		grad!(g1, pa.mx.x, pa.mx.last_x,  pa, attrib_mod)
 	end
-	show(to)
+	println(to)
 
 	# convert gradient vector to model
 	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, g1, pa)
@@ -195,7 +196,7 @@ function xfwi!(pa::Param, obj::Migr_fd, attrib_mod)
 
 	gx = Calculus.gradient(f,pa.mx.x) # allocating new gradient vector here
 	
-	show(to)
+	println(to)
 
 	# convert gradient vector to model
 	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)

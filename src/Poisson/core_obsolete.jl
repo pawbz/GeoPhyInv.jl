@@ -4,7 +4,7 @@ i.e. media having spatially varying (space-dependent) medium parameters.
 The following functionality is currently available in this module:
 * 'Forward' problem: given the source, and the conductivity distribution, solve for the electrical potential ψ:
 	 Example problem: solve Aψ=∇⋅j; A=∇⋅(σ(x,z)∇), for ψ.
-* 'Inverse' problem: given wave propagation related pore pressure, and mechanical medium properties, calculate the source term:  
+* 'Inverse' problem: given wave propagation related pore pressure, and mechanical medium properties, calculate the source term:
 	 Example problem: solve Aψ=-∇⋅j; A=∇⋅([Q*k/η](x,z)∇B*P), for ∇⋅j;
 * The Boundary Value Problem that is currently implemented assumes Neumann boundary conditions at all boundaries.
 Developed by:\\\n
@@ -15,17 +15,19 @@ Contact: ngrobbe@gmail.com
 """
 module Poisson
 
+using SparseArrays
+using StatsBase
 
 """
 Poisson.solve(field,mpars,solflag) solves the forward or inverse Poisson problem in a heterogeneous medium.
 # Function input arguments:
-* `field` : either source term used in 'forward' mode to get field, or the field (e.g. pore pressure) used in 'inverse' mode to calculate source-term 
+* `field` : either source term used in 'forward' mode to get field, or the field (e.g. pore pressure) used in 'inverse' mode to calculate source-term
 * `mpars` : medium parameters for forward or inverse mode
 * `solflag` : Solution flag determining whether to use forward (solflag=1) or inverse mode (solflag=-1) of Poisson solver.
 """
 function solve(field,mpars,solflag::Int64) # fields: either field or source, mpars=medium pars
 
-if(solflag==-1) 
+if(solflag==-1)
 	pp=field; #
 elseif(solflag==1)
 	src=field;
@@ -38,23 +40,22 @@ nz=size(mpars,1);
 nx=size(mpars,2);
 dz= inv(nz - 1);
 dx= inv(nx - 1);
-
 z=(0 : nz - 1)*dz;
 x=(0:nx-1)*dx;
-    
-#--------------------  Build explicit operator matrix A=∇⋅(mpars(x,z)∇) for direct Poisson solver --------------------    
-# Some notes: 
-# We build the operator matrix explicitly like this to properly deal with the Neumann boundary conditions at all boundaries. 
+
+#--------------------  Build explicit operator matrix A=∇⋅(mpars(x,z)∇) for direct Poisson solver --------------------
+# Some notes:
+# We build the operator matrix explicitly like this to properly deal with the Neumann boundary conditions at all boundaries.
 # The standard Kronecker product approach for building sparse operator matrices seemed to generate some errors at the boundaries.
-# Medium properties calculated on staggered grid.  
-# Directions: z-direction row-wise, x-direction column-wise. 
+# Medium properties calculated on staggered grid.
+# Directions: z-direction row-wise, x-direction column-wise.
 
 # Allocate non-zero operator entries
 k = 5*(nz - 2)*(nx - 2)+ # pentadiagonal operator entry allocation: 5, since using 5-point finite-difference stencil (star-shaped)
     2*(2*(nz - 2) + 2*(nx - 2)+  # bidiagonal non-corner 4-boundary allocation # for boundaries (2 points only)
     4); # bidiagonal corner boundary allocation
-# The sparse() function is often a handy way to construct sparse matrices. 
-# It takes as its input a vector I of row indices, a vector J of column indices, and a vector V of nonzero values. 
+# The sparse() function is often a handy way to construct sparse matrices.
+# It takes as its input a vector I of row indices, a vector J of column indices, and a vector V of nonzero values.
 # Sparse(I,J,V) constructs a sparse matrix such that S[I[k], J[k]] = V[k].
 iz=Array{Float64,1};
 ix=Array{Float64,1};
@@ -62,10 +63,11 @@ iz=collect(1:nz*nx); # same row: row index=1 --> vectors must have same length [
 ix=collect(1:nz*nx); # column indices
 val=zeros(nz*nx); # actual values
 
-A=sparse(ix,iz,val,nz*nx,nz*nx); # pre-allocate sparse operator matrix A
+global A=sparse(ix,iz,val,nz*nx,nz*nx); # pre-allocate sparse operator matrix A
 
 dz = dz.^2; # for simplicity below
 dx = dx.^2;
+println("fffffff", dz*dx)
 
 #-------------- Create operator A for the interior points (without boundary)---------------------------------------
 for j = 2 : nx - 1 # interior x (column) loop (for amount of internal nodes)
@@ -84,7 +86,7 @@ end
 #------------- Create operator A for the top and bottom boundaries including Neumann conditions (without the corners)-------------
 
 if(solflag==-1) # for 'inverse' problem: source plays no role here, so just allocate zeros with proper size.
-	src=zeros(nz,nx); 
+	src=zeros(nz,nx);
 
 elseif(solflag==1) # for 'forward' problem
 	src = src[:]; # vectorize source (which was function input argument)
@@ -124,7 +126,7 @@ for j = [1 nx] #% west & east boundary x (column) loop:
         Int(sign(j - .5*nx))*nz; # inward from west or east boundary # two terms to move diagonal
         A[k,k] = A[o,o]; #% nonzero, alas asymmetric ...
         A[k,o] = -A[k,k]; #% ... cancelation implies equation
-        src[k] = 0; #% 0 to equate boundary values 
+        src[k] = 0; #% 0 to equate boundary values
         k = k + nz - 1; #% from north to south boundary
     end
  end
@@ -151,10 +153,10 @@ elseif(solflag==1) # forward problem: source+medium --> fields
 
 	psi_vec=A\src[:]; # direct inverse solve using backslash operator
 	psi = reshape(psi_vec, nz, nx); # reshape electrical potential vector psi into 2D electrical potential map (z,x)
-	psi = psi - mean(mean(psi)); # alternative to 'fix' nullspace: make zero-mean...
+	psi = psi .- StatsBase.mean(StatsBase.mean(psi)); # alternative to 'fix' nullspace: make zero-mean...
 #	src=reshape(src,nz,nx); # reshape source vector into 2D source map for plotting purposes only.
-    
-    	return psi  # function command --> return these variables, in this case electrical potential ψ
+
+    	return psi,A  # function command --> return these variables, in this case electrical potential ψ
 end # end solflag if statement
 
 end # function command
@@ -162,3 +164,4 @@ end # function command
 
 
 end # end module Poisson
+

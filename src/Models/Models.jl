@@ -3,12 +3,13 @@ module Models
 
 using DataFrames
 using CSV
-using Grid
-using Interpolation
 using Statistics
 using LinearAlgebra
-#using ImageFiltering
-import JuMIT.Smooth
+using Distributions
+using Random
+using ImageFiltering
+import GeoPhyInv.Smooth
+import GeoPhyInv.Interpolation
 
 """
 Store reference model parameters
@@ -34,10 +35,10 @@ A contrast function for a model m is given by ``χ(m) = \frac{m}{m0}-1``.
 * `vp0::Vector{Float64}` : [vpmin, vpmax]
 * `vs0::Vector{Float64}` : [vsmin, vsmax]
 * `ρ0::Vector{Float64}` : [ρmin, ρmax]
-* `χvp::Array{Float64,2}` : two-dimensional contrast model (χ) for vp, for e.g., zeros(mgrid.nz, mgrid.nx)
-* `χvs::Array{Float64}` : two-dimensional contrast model (χ) for vs, for e.g., zeros(mgrid.nz, mgrid.nx)
-* `χρ::Array{Float64}` : two-dimensional contrast model (χ) for density, for e.g., zeros(mgrid.nz, mgrid.nx)
-* `mgrid::Grid.M2D` : two-dimensional grid to determine the dimensions of models
+* `χvp::Array{Float64,2}` : two-dimensional contrast model (χ) for vp, for e.g., zeros(length(mgrid[1]), length(mgrid[2]))
+* `χvs::Array{Float64}` : two-dimensional contrast model (χ) for vs, for e.g., zeros(length(mgrid[1]), length(mgrid[2]))
+* `χρ::Array{Float64}` : two-dimensional contrast model (χ) for density, for e.g., zeros(length(mgrid[1]), length(mgrid[2]))
+* `mgrid` : array of ranges to determine the dimensions of models
 """
 mutable struct Seismic
 	vp0::Vector{Float64}
@@ -46,7 +47,7 @@ mutable struct Seismic
 	χvp::Array{Float64,2}
 	χvs::Array{Float64,2}
 	χρ::Array{Float64,2}
-	mgrid::Grid.M2D
+	mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}}
 	# all derived fields from previous
 	K0::Vector{Float64}
 	μ0::Vector{Float64}
@@ -66,9 +67,9 @@ mutable struct Seismic
 		     #all([all(vs0 .≠ 0.0), any(χ(χvs,vs0,-1) .> vs0[2])]), # check vs bounds
 		     #all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .< ρ0[1])]), # check ρ bounds
 		     #all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .> ρ0[2])]), # check ρ bounds
-		     size(χvp) != (length(mgrid.z), length(mgrid.x)), # dimension check
-		     size(χvs) != (length(mgrid.z), length(mgrid.x)), # dimension check
-		     size(χρ) != (length(mgrid.z), length(mgrid.x)) # dimension check
+		     size(χvp) != (length(mgrid[1]), length(mgrid[2])), # dimension check
+		     size(χvs) != (length(mgrid[1]), length(mgrid[2])), # dimension check
+		     size(χρ) != (length(mgrid[1]), length(mgrid[2])) # dimension check
 		    ]) ? 
 		       error("error in Seismic construction") : new(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid,K0,μ0,KI0,μI0,ρI0,ref)
 end
@@ -80,7 +81,8 @@ function isbounded(mod::Seismic)
 end
 
 # method to create Seismic object without using derived fields
-function Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, mgrid::Grid.M2D)
+function Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, 
+		 mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}})
 	mod=Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, mgrid,
 	    zeros(2), zeros(2), zeros(2), zeros(2), zeros(2),
 	    Seismic_ref(zeros(8)...))
@@ -105,8 +107,8 @@ Print information about `Seismic`
 """
 function Base.print(mod::Seismic, name::String="")
 	println("\tSeismic Model:\t",name)
-	println("\t> number of samples:\t","x\t",mod.mgrid.nx,"\tz\t",mod.mgrid.nz)
-	println("\t> sampling intervals:\t","x\t",mod.mgrid.δx,"\tz\t",mod.mgrid.δz)
+	println("\t> number of samples:\t","x\t",length(mod.mgrid[2]),"\tz\t",length(mod.mgrid[1]))
+	println("\t> sampling intervals:\t","x\t",step(mod.mgrid[2]),"\tz\t",step(mod.mgrid[1]))
 	println("\t> vp:\t","min\t",minimum(Seismic_get(mod,:vp)),"\tmax\t",maximum(Seismic_get(mod,:vp)))
 	println("\t> vp bounds:\t","min\t",mod.vp0[1],"\tmax\t",mod.vp0[2])
 	println("\t> ρ:\t","min\t",minimum(Seismic_get(mod,:ρ)),"\tmax\t",maximum(Seismic_get(mod,:ρ)))
@@ -144,8 +146,8 @@ Since the reference values are adjust the χ fields should also be changed
 """
 function adjust_bounds!(mod::Seismic, frac::Float64=0.1)
 	for f in [:χvp, :χρ, :χvs]
-		f0 = Symbol((replace("$(f)", "χ", "")),0)
-		fm = Symbol((replace("$(f)", "χ", "")))
+		f0 = Symbol((replace("$(f)", "χ" => "")),0)
+		fm = Symbol((replace("$(f)", "χ" => "")))
 		m = Seismic_get(mod, fm)
 		m0 = bounds(m, frac)
 		setfield!(mod, f0, m0)
@@ -160,12 +162,12 @@ Return `Seismic` with zeros everywhere;
 this method is used for preallocation.
 
 # Arguments
-* `mgrid::Grid.M2D` : used for sizes of χ fields 
+* `mgrid` : used for sizes of χ fields 
 """
-function Seismic_zeros(mgrid::Grid.M2D)
+function Seismic_zeros(mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}})
 	return Seismic(fill(0.0,2), fill(0.0,2), fill(0.0,2), 
-		zeros(mgrid.nz, mgrid.nx), zeros(mgrid.nz, mgrid.nx),
-		zeros(mgrid.nz, mgrid.nx), deepcopy(mgrid))
+		zeros(length(mgrid[1]), length(mgrid[2])), zeros(length(mgrid[1]), length(mgrid[2])),
+		zeros(length(mgrid[1]), length(mgrid[2])), deepcopy(mgrid))
 end
 
 function Base.fill!(mod::Seismic, k::Float64=0.0)
@@ -231,7 +233,7 @@ end
 
 function Seismic_get(mod::Seismic, attrib::Symbol)
 	# allocate
-	rout=zeros(mod.mgrid.nz, mod.mgrid.nx)
+	rout=zeros(length(mod.mgrid[1]), length(mod.mgrid[2]))
 	Seismic_get!(rout, mod, [attrib])
 	return rout
 end
@@ -290,54 +292,7 @@ function Seismic_get!(x, mod::Seismic, attribvec::Vector{Symbol})
 	return x
 end
 
-"""
-Re-parameterization routine 
-that modifies the fields 
-`χvp` and `χρ` of an input seismic model
-using two input vectors.
-
-# Arguments
-
-* `mod::Seismic` : to be updated
-* `x1::Array{Float64,2}` : contrast of inverse bulk modulus
-* `x2::Array{Float64,2}` : contrast of inverse density
-* `attribvec:::Vector{Symbol}` : [:χKI, :χρI]
-"""
-function Seismic_reparameterize!(
-	              mod::Seismic,
-		      x,
-		      attribvec::Vector{Symbol}=[:χKI, :χρI, :null]
-		      )
-	iszero(mod) ? error("mod cannot be zero") : nothing
-	nznx=mod.mgrid.nz*mod.mgrid.nx
-	(length(x)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
-	if(attribvec == [:χKI, :χρI, :null]) 
-		@inbounds for i in 1:nznx 
-			K=inv(χ(x[i],mod.ref.KI,-1))
-			ρ=inv(χ(x[nznx+i],mod.ref.ρI,-1))
-			mod.χvp[i]=χ(sqrt(K*inv(ρ)),mod.ref.vp,1)
-			mod.χρ[i]=χ(ρ,mod.ref.ρ,1)
-		end
-	elseif(attribvec == [:χKI, :null, :null]) 
-		@inbounds for i in 1:nznx 
-			K=inv(χ(x[i],mod.ref.KI,-1))
-			ρ=χ(mod.χρ[i],mod.ref.ρ,-1)
-			mod.χvp[i]=χ(sqrt(K*inv(ρ)),mod.ref.vp,1)
-			mod.χρ[i]=χ(ρ,mod.ref.ρ,1)
-		end
-	elseif(attribvec == [:χvp, :χρ, :null]) 
-		@inbounds for i in 1:nznx; mod.χvp[i]=x[i]; end
-		@inbounds for i in 1:nznx; mod.χρ[i]=x[nznx+i]; end
-	elseif(attribvec == [:null, :χρ, :null]) 
-		@inbounds for i in 1:nznx; mod.χρ[i]=x[i]; end
-	elseif(attribvec == [:χvp, :null, :null]) 
-		@inbounds for i in 1:nznx; mod.χvp[i]=x[i]; end
-	else
-		error("invalid attribvec")
-	end
-	return mod
-end
-
+include("reparameterize.jl")
 
 include("chainrule.jl")
 
@@ -414,20 +369,22 @@ end
 
 
 """
-Add features to a model.
+In-place method to add features to the input model.
 
 # Arguments
 * `mod::Seismic` : model that is modified
 
 # Keyword Arguments
 
-* `point_loc::Vector{Float64}=[0., 0.,]` : approx location of point pert.
+* `point_loc::Vector{Float64}=[0., 0.,]` : approx location of point pert
 * `point_pert::Float64=0.0` : perturbation at the point scatterer
 * `ellip_loc::Vector{Float64}=nothing` : location of center of perturbation, [z, x]
-* `ellip_rad::Float64=0.0` : radius of circular perturbation
-* `ellip_pert::Float64=0.1` : perturbation inside a circle
+* `ellip_rad::Float64=0.0` : size of elliptic perturbation
+* `ellip_pert::Float64=0.1` : perturbation inside the ellipse
+* `ellip_α=0.0` : rotate the ellipse
 * `rect_loc::Array{Float64}=nothing` : rectangle location, [zmin, xmin, zmax, xmax]
 * `rect_pert::Float64=0.1` : perturbation in a rectangle
+* `constant_pert::Float64=0.0` : constant perturbation 
 * `randn_pert::Float64=0.0` : percentage of reference values for additive random noise
 * `fields::Vector{Symbol}=[:χvp,:χρ,:χvs]` : which fields are to be modified?
 * `onlyin` : `mod` is modified only when field values are in these ranges 
@@ -449,10 +406,10 @@ function Seismic_addon!(mod::Seismic;
 	rect_loc=convert.(Float64,rect_loc);
 	ellip_loc=convert.(Float64,ellip_loc);
 
-	temp = zeros(mod.mgrid.nz, mod.mgrid.nx)
+	temp = zeros(length(mod.mgrid[1]), length(mod.mgrid[2]))
 
-	ipointlocx = Interpolation.indminn(mod.mgrid.x, Float64(point_loc[2]), 1)[1] 
-	ipointlocz = Interpolation.indminn(mod.mgrid.z, Float64(point_loc[1]), 1)[1] 
+	ipointlocx = Interpolation.indminn(mod.mgrid[2], Float64(point_loc[2]), 1)[1] 
+	ipointlocz = Interpolation.indminn(mod.mgrid[1], Float64(point_loc[1]), 1)[1] 
 	temp[ipointlocz, ipointlocx] += point_pert
 
 	if(!(ellip_pert == 0.0))
@@ -460,19 +417,19 @@ function Seismic_addon!(mod::Seismic;
 		# circle or ellipse
 		rads= (length(ellip_rad)==1) ? [ellip_rad[1],ellip_rad[1]] : [ellip_rad[1],ellip_rad[2]]
 
-		temp += [(((((mod.mgrid.x[ix]-ellip_loc[2])*cos(α)+(mod.mgrid.z[iz]-ellip_loc[1])*sin(α))^2*inv(rads[1]^2) + 
-	      ((-mod.mgrid.z[iz]+ellip_loc[1])*cos(α)+(mod.mgrid.x[ix]-ellip_loc[2])*sin(α))^2*inv(rads[2]^2)) <= 1.) ? ellip_pert : 0.0)  for 
-	   		iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx ]
+		temp += [(((((mod.mgrid[2][ix]-ellip_loc[2])*cos(α)+(mod.mgrid[1][iz]-ellip_loc[1])*sin(α))^2*inv(rads[1]^2) + 
+	      ((-mod.mgrid[1][iz]+ellip_loc[1])*cos(α)+(mod.mgrid[2][ix]-ellip_loc[2])*sin(α))^2*inv(rads[2]^2)) <= 1.) ? ellip_pert : 0.0)  for 
+	   		iz in 1:length(mod.mgrid[1]), ix in 1:length(mod.mgrid[2]) ]
 	end
 	if(!(rect_pert == 0.0))
 		temp += [
-			(((mod.mgrid.x[ix]-rect_loc[4]) * (mod.mgrid.x[ix]-rect_loc[2]) < 0.0) & 
-			((mod.mgrid.z[iz]-rect_loc[3]) * (mod.mgrid.z[iz]-rect_loc[1]) < 0.0)) ?
+			(((mod.mgrid[2][ix]-rect_loc[4]) * (mod.mgrid[2][ix]-rect_loc[2]) < 0.0) & 
+			((mod.mgrid[1][iz]-rect_loc[3]) * (mod.mgrid[1][iz]-rect_loc[1]) < 0.0)) ?
 			rect_pert : 0.0  for
-			iz in 1:mod.mgrid.nz, ix in 1:mod.mgrid.nx ]
+			iz in 1:length(mod.mgrid[1]), ix in 1:length(mod.mgrid[2]) ]
 	end
 	if(!(constant_pert == 0.0))
-		temp += constant_pert
+		temp .+= constant_pert
 	end
 
 
@@ -510,33 +467,32 @@ Apply smoothing to `Seismic` using a Gaussian filter of zwidth and xwidth
 
 # Keyword Arguments
 
-* `zmin::Real=mod.mgrid.z[1]` : 
-* `zmax::Real=mod.mgrid.z[end]` : 
-* `xmin::Real=mod.mgrid.x[1]` : 
-* `xmax::Real=mod.mgrid.x[end]` : 
+* `zmin::Real=mod.mgrid[1][1]` : 
+* `zmax::Real=mod.mgrid[1][end]` : 
+* `xmin::Real=mod.mgrid[2][1]` : 
+* `xmax::Real=mod.mgrid[2][end]` : 
 * `fields` : fields of seismic model that are to be smooth
 """
 function Seismic_smooth(mod::Seismic, zperc::Real, xperc::Real=zperc;
-		 zmin::Real=mod.mgrid.z[1], zmax::Real=mod.mgrid.z[end],
-		 xmin::Real=mod.mgrid.x[1], xmax::Real=mod.mgrid.x[end],
+		 zmin::Real=mod.mgrid[1][1], zmax::Real=mod.mgrid[1][end],
+		 xmin::Real=mod.mgrid[2][1], xmax::Real=mod.mgrid[2][end],
 		 fields=[:χvp, :χρ, :χvs]
 			)
-	warn("ImageFiltering bug, not active")
-	xwidth = Float64(xperc) * 0.01 * abs(mod.mgrid.x[end]-mod.mgrid.x[1])
-	zwidth = Float64(zperc) * 0.01 * abs(mod.mgrid.z[end]-mod.mgrid.z[1])
-	xnwin=Int(div(xwidth,mod.mgrid.δx*2.))
-	znwin=Int(div(zwidth,mod.mgrid.δz*2.))
+	xwidth = Float64(xperc) * 0.01 * abs(mod.mgrid[2][end]-mod.mgrid[2][1])
+	zwidth = Float64(zperc) * 0.01 * abs(mod.mgrid[1][end]-mod.mgrid[1][1])
+	xnwin=Int(div(xwidth,step(mod.mgrid[2])*2.))
+	znwin=Int(div(zwidth,step(mod.mgrid[1])*2.))
 
-	izmin = Interpolation.indminn(mod.mgrid.z, Float64(zmin), 1)[1]
-	izmax = Interpolation.indminn(mod.mgrid.z, Float64(zmax), 1)[1]
-	ixmin = Interpolation.indminn(mod.mgrid.x, Float64(xmin), 1)[1]
-	ixmax = Interpolation.indminn(mod.mgrid.x, Float64(xmax), 1)[1]
+	izmin = Interpolation.indminn(mod.mgrid[1], Float64(zmin), 1)[1]
+	izmax = Interpolation.indminn(mod.mgrid[1], Float64(zmax), 1)[1]
+	ixmin = Interpolation.indminn(mod.mgrid[2], Float64(xmin), 1)[1]
+	ixmax = Interpolation.indminn(mod.mgrid[2], Float64(xmax), 1)[1]
 
 	modg=deepcopy(mod)
 	for (i,iff) in enumerate(fields)
 		m=view(getfield(mod, iff),izmin:izmax,ixmin:ixmax)
 		mg=view(getfield(modg, iff),izmin:izmax,ixmin:ixmax)
-#		imfilter!(mg, m, Kernel.gaussian([znwin,xnwin]));
+		imfilter!(mg, m, Kernel.gaussian([znwin,xnwin]));
 	end
 	return modg
 end
@@ -551,34 +507,30 @@ the input bounds cannot be strictly imposed.
 
 # Keyword Arguments
 
-* `zmin::Float64=mod.mgrid.z[1]` : 
-* `zmax::Float64=mod.mgrid.z[end]` : 
-* `xmin::Float64=mod.mgrid.x[1]` : 
-* `xmax::Float64=mod.mgrid.x[end]` : 
+* `zmin::Float64=mod.mgrid[1][1]` : 
+* `zmax::Float64=mod.mgrid[1][end]` : 
+* `xmin::Float64=mod.mgrid[2][1]` : 
+* `xmax::Float64=mod.mgrid[2][end]` : 
 """
 function Seismic_trun(mod::Seismic;
-			 zmin::Float64=mod.mgrid.z[1], zmax::Float64=mod.mgrid.z[end],
-			 xmin::Float64=mod.mgrid.x[1], xmax::Float64=mod.mgrid.x[end] 
+			 zmin::Float64=mod.mgrid[1][1], zmax::Float64=mod.mgrid[1][end],
+			 xmin::Float64=mod.mgrid[2][1], xmax::Float64=mod.mgrid[2][end],
 			 )
 
-	izmin = Interpolation.indminn(mod.mgrid.z, zmin, 1)[1]
-	izmax = Interpolation.indminn(mod.mgrid.z, zmax, 1)[1]
-	ixmin = Interpolation.indminn(mod.mgrid.x, xmin, 1)[1]
-	ixmax = Interpolation.indminn(mod.mgrid.x, xmax, 1)[1]
+	izmin = Interpolation.indminn(mod.mgrid[1], zmin, 1)[1]
+	izmax = Interpolation.indminn(mod.mgrid[1], zmax, 1)[1]
+	ixmin = Interpolation.indminn(mod.mgrid[2], xmin, 1)[1]
+	ixmax = Interpolation.indminn(mod.mgrid[2], xmax, 1)[1]
 
-	x = mod.mgrid.x[ixmin:ixmax]
-	z = mod.mgrid.z[izmin:izmax]
-	npml =  mod.mgrid.npml
-	δx, δz = mod.mgrid.δx, mod.mgrid.δz
+	x = mod.mgrid[2][ixmin:ixmax]
+	z = mod.mgrid[1][izmin:izmax]
 
-	mgrid_trun = Grid.M2D(x, z, length(x), length(z), npml, δx, δz)
-	
 	# allocate model
-	mod_trun = Seismic_zeros(mgrid_trun)
+	mod_trun = Seismic_zeros([z,x])
 	adjust_bounds!(mod_trun, mod)
 
 	for f in [:χvp, :χvs, :χρ]
-		f0 = Symbol((replace("$(f)", "χ", "")),0)
+		f0 = Symbol((replace("$(f)", "χ" => "")),0)
 		setfield!(mod_trun, f, getfield(mod, f)[izmin:izmax, ixmin:ixmax])
 		setfield!(mod_trun, f0, getfield(mod, f0)) # adjust bounds later after truncation if necessary
 	end
@@ -589,24 +541,35 @@ end
 """
 Extend a seismic model into PML layers
 """
-function Seismic_pml_pad_trun(mod::Seismic)
-	modex=Seismic_zeros(Grid.M2D_pml_pad_trun(mod.mgrid))
+function Seismic_pml_pad_trun(mod::Seismic, nlayer_rand, npml)
+
+	mg=mod.mgrid
+	mgex=[
+        range(mg[1][1] - npml*step(mg[1]),
+	     stop=mg[1][end] + npml*step(mg[1]), length=length(mg[1])+2*npml),
+        range(mg[2][1] - npml*step(mg[2]),
+	     stop=mg[2][end] + npml*step(mg[2]), length=length(mg[2])+2*npml)
+	]
+
+	modex=Seismic_zeros(mgex)
 	adjust_bounds!(modex,mod)
-	Seismic_pml_pad_trun!(modex, mod)
+	Seismic_pml_pad_trun!(modex, mod, nlayer_rand)
 
 	return modex
 end
 
 "only padding implemented"
-function Seismic_pml_pad_trun!(modex::Seismic, mod::Seismic)
+function Seismic_pml_pad_trun!(modex::Seismic, mod::Seismic, nlayer_rand)
 	vp=mod.χvp; χ!(vp,mod.ref.vp,-1)
 	vs=mod.χvs; χ!(vs,mod.ref.vs,-1)
 	ρ=mod.χρ; χ!(ρ,mod.ref.ρ,-1)
 
 	vpex=modex.χvp; vsex=modex.χvs; ρex=modex.χρ;
-	pml_pad_trun!(vpex,vp,1);	pml_pad_trun!(vsex,vs,1);	pml_pad_trun!(ρex,ρ,1)
-	χ!(vpex,modex.ref.vp,1);	χ!(vsex,modex.ref.vs,1);	χ!(ρex,modex.ref.ρ,1)
-	χ!(vp,mod.ref.vp,1);	χ!(vs,mod.ref.vs,1);	χ!(ρ,mod.ref.ρ,1)
+	pml_pad_trun!(vpex,vp,mod.vp0,nlayer_rand,50.0);	
+	pml_pad_trun!(vsex,vs,[1,2],nlayer_rand,0.0);	
+	pml_pad_trun!(ρex,ρ,mod.ρ0,nlayer_rand,0.0)
+	χ!(vpex,modex.ref.vp,1); χ!(vsex,modex.ref.vs,1); χ!(ρex,modex.ref.ρ,1)
+	χ!(vp,mod.ref.vp,1); χ!(vs,mod.ref.vs,1); χ!(ρ,mod.ref.ρ,1)
 end
 
 function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
@@ -626,37 +589,85 @@ end
 """
 PML Extend a model on all four sides
 """
-function pml_pad_trun!(modex::Array{Float64,2}, mod::Array{Float64,2}, flag::Int64=1)
+function pml_pad_trun!(modex::Array{Float64,2}, mod::Array{Float64,2}, bounds, nlayer_rand, var_fact=1.)
 	np=(size(modex,1)-size(mod,1) == size(modex,2)-size(mod,2)) ? 
 			div(size(modex,2)-size(mod,2),2) : error("modex size")
-	if(isequal(flag,1)) 
-		nz = size(mod,1); nx = size(mod,2)
-		modexc=view(modex,np+1:np+nz,np+1:np+nx)
-		@. modexc = mod
-		for ix in 1:size(modex,2)
-			for iz in 1:np
-				modex[iz,ix] = modex[np+1,ix]
-			end
-			for iz in nz+1+np:size(modex,1)
-				modex[iz,ix] = modex[nz+np,ix];
-			end
+	nz = size(mod,1); nx = size(mod,2)
+	#=
+	# first fill with random numbers
+	Random.seed!(1)
+	#for i in eachindex(modex)
+	#	modex[i]=rand(Distributions.Uniform(bounds...))
+	#end
+	# experiments with random boundary conditions
+	sample = v->rand(Distributions.Truncated(Distributions.Normal(mean(bounds),v),bounds[1],bounds[2]))
+	for ix in 1+np:np+nx
+		for iz in 1:np
+			v=var_fact*(np-iz)/np+1e-5
+			modex[iz,ix] = sample(v)
 		end
-		for iz in 1:size(modex,1)
-			for ix in 1:np
-				modex[iz,ix] = modex[iz,np+1]
-			end
-			for ix in nx+1+np:size(modex,2)
-				modex[iz,ix] = modex[iz,nx+np]
-			end
+		for iz in nz+1+np:size(modex,1)
+			v=var_fact*(iz-np-nz-1)/np+1e-5
+			modex[iz,ix] = sample(v)
 		end
-		return modex
-	elseif(isequal(flag,-1)) 
-		nz = size(modex,1); nx = size(modex,2)
-		modexc=view(modex,np+1:nz-np,np+1:nx-np)
-		@. mod=modexc
-	else
-		error("invalid flag")
 	end
+	for iz in 1+np:np+nz
+		for ix in 1:np
+			v=var_fact*(np-ix)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+		for ix in nx+1+np:size(modex,2)
+			v=var_fact*(ix-np-nz-1)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+	end
+
+	for ix in 1:np
+		for iz in 1:np
+			v=var_fact*sqrt((np-iz)^2+(np-ix)^2)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+		for iz in nz+1+np:size(modex,1)
+			v=var_fact*sqrt((iz-np-nz-1)^2+(np-ix)^2)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+	end
+	for ix in np+nx+1:size(modex,1)
+		for iz in 1:np
+			v=var_fact*sqrt((np-iz)^2+(ix-np-nx-1)^2)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+		for iz in nz+1+np:size(modex,1)
+			v=var_fact*sqrt((iz-np-nz-1)^2+(ix-np-nx-1)^2)/np+1e-5
+			modex[iz,ix] = sample(v)
+		end
+	end
+
+	=#
+	for ix in 1:nx
+		for iz in 1:nz
+			modex[np+iz,np+ix]=mod[iz,ix]
+		end
+	end
+
+	# flood borders
+	for ix in 1:size(modex,2)
+		for iz in 1:np-nlayer_rand
+			modex[iz,ix] = modex[np+1-nlayer_rand,ix]
+		end
+		for iz in nz+1+np+nlayer_rand:size(modex,1)
+			modex[iz,ix] = modex[nz+np+nlayer_rand,ix];
+		end
+	end
+	for iz in 1:size(modex,1)
+		for ix in 1:np-nlayer_rand
+			modex[iz,ix] = modex[iz,np+1-nlayer_rand]
+		end
+		for ix in nx+1+np+nlayer_rand:size(modex,2)
+			modex[iz,ix] = modex[iz,nx+np+nlayer_rand]
+		end
+	end
+	return modex
 end
 
 
@@ -669,7 +680,7 @@ function to resample in the model domain
 """
 function interp_spray!(mod::Seismic, modi::Seismic, attrib::Symbol, Battrib::Symbol=:B2; pa=nothing)
 	if(pa===nothing)
-		pa=Interpolation.Kernel([mod.mgrid.x, mod.mgrid.z], [modi.mgrid.x, modi.mgrid.z], Battrib)
+		pa=Interpolation.Kernel([mod.mgrid[2], mod.mgrid[1]], [modi.mgrid[2], modi.mgrid[1]], Battrib)
 	end
 
 	"loop over fields in `Seismic`"
@@ -684,14 +695,15 @@ end
 
 function save(mod::Seismic, folder; N=100)
 	!(isdir(folder)) && error("invalid directory")
+	error("need to be updated")
 
-	nx=mod.mgrid.nx
-	nz=mod.mgrid.nz
+	nx=length(mod.mgrid[2])
+	nz=length(mod.mgrid[1])
 	n=max(nx,nz);
 	fact=(n>N) ? round(Int,n/N) : 1
-	mgrid=Grid.M2D_resamp(mod.mgrid, mod.mgrid.δx*fact, mod.mgrid.δz*fact)
-	x=mgrid.x
-	z=mgrid.z
+	#mgrid=resamp(mod.mgrid, step(mod.mgrid[2])*fact, step(mod.mgrid[1])*fact)
+	x=mgrid[2]
+	z=mgrid[1]
 	nx=length(x)
 	nz=length(z)
 	modo=Seismic_zeros(mgrid)

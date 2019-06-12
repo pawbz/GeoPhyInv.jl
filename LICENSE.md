@@ -1,4 +1,4 @@
-The JuMIT.jl package is licensed under the MIT "Expat" License:
+The GeoPhyInv.jl package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2017: Pawan Bharadwaj.
 > 

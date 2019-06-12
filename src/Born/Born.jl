@@ -1,9 +1,11 @@
 module Born
 
-using Grid
-import JuMIT.Acquisition
-import JuMIT.Models
-import JuMIT.Data
+import GeoPhyInv.Acquisition
+import GeoPhyInv.Models
+import GeoPhyInv.Data
+using SpecialFunctions
+using FFTW
+using DSP
 
 mutable struct Param
 end
@@ -24,8 +26,8 @@ function mod(;
 	     ρ0::Float64=2000.0,
 	     model_pert::Models.Seismic=nothing,
              born_flag::Bool=false,
-	     tgridmod::Grid.M1D=nothing,
-	     tgrid::Grid.M1D = tgridmod,
+	     tgridmod::StepRangeLen=nothing,
+	     tgrid::StepRangeLen = tgridmod,
 	     acqgeom::Acquisition.Geom=nothing,
 	     acqsrc::Acquisition.Src=nothing,
 	     src_flag::Int64=2,
@@ -34,26 +36,24 @@ function mod(;
 	(getfield(acqgeom,:ns) != getfield(acqsrc,:ns))  ? error("different sources") : nothing
 
 
-	nt = (length(tgridmod.x) == length(acqsrc.tgrid.x)) ? tgrid.nx : error("acqsrc tgrid")
-	np2 = nextpow2(2*nt);	
+	nt = (length(tgridmod) == length(acqsrc.tgrid)) ? length(tgrid) : error("acqsrc tgrid")
+	np2 = nextpow(2, 2*nt);	
 		
 
 	if(born_flag)
-		mesh_x=model_pert.mgrid.x
-		mesh_z=model_pert.mgrid.z
-		nz=model_pert.mgrid.nz
-		nx=model_pert.mgrid.nx
-		δx = model_pert.mgrid.δx
-		δz = model_pert.mgrid.δz
+		mesh_x=model_pert.mgrid[2]
+		mesh_z=model_pert.mgrid[1]
+		nz=length(mesh_z)
+		nx=length(mesh_x)
+		δx = step(mesh_x)
+		δz = step(mesh_z)
 
 		δmodtt = Models.Seismic_get(model_pert, :KI) - (vp0 * vp0 * ρ0)^(-1)
 		δmodrr = Models.Seismic_get(model_pert, :ρI) - (ρ0)^(-1)
 	end
 
-	# npow2 grid for time
-	tnpow2grid = Grid.M1D_fft(np2, tgridmod.δx);
-	# corresponding npow2 frequency grid 
-	fnpow2grid = Grid.M1D_fft(tnpow2grid);
+	
+	fnpow2grid = DSP.fftfreq(np2,inv(step(tgridmod)));
 
 	nss = acqgeom.nss
 	nr = acqgeom.nr
@@ -80,7 +80,7 @@ function mod(;
 			for it in 1:nt
 				wpow2[it]=complex(acqsrc.wav[iss,ifield][it,is])
 			end
-			fft!(wpow2) # source wavelet in the frequency domain
+			FFTW.fft!(wpow2) # source wavelet in the frequency domain
 
 			x = sx[is] - rx[ir]
 			z = sz[is] - rz[ir]
@@ -88,7 +88,7 @@ function mod(;
 			dpow2 = complex.(zeros(np2), zeros(np2)); 
 			dpow2[1] = complex.(0.0, 0.0)
 			for iω in 2:np2
-				ω = 2. * pi * abs(fnpow2grid.x[iω])
+				ω = 2. * pi * abs(fnpow2grid[iω])
 				k = ω / vp0
 
 				if(born_flag)
@@ -107,14 +107,14 @@ function mod(;
 					if(src_flag == 2)
 						term = G0_homo_acou(x, z, k, ρ0);
 					elseif(src_flag == 1)
-						dpow2[iω] = G0_homo_acou(x, z, k, ρ0) * im * abs(fnpow2grid.x[iω])
+						dpow2[iω] = G0_homo_acou(x, z, k, ρ0) * im * abs(fnpow2grid[iω])
 					else
 						error("invalid src_flag")
 					end
 				end
-				if(fnpow2grid.x[iω] > 0) 
+				if(fnpow2grid[iω] > 0) 
 					dpow2[iω] = term;
-				elseif(fnpow2grid.x[iω] < 0)
+				elseif(fnpow2grid[iω] < 0)
 					dpow2[iω] = conj(term);
 				end
 
@@ -124,7 +124,7 @@ function mod(;
 		end
 
 		# back to time domain
-		ifft!(dpow2all)
+		FFTW.ifft!(dpow2all)
 
 		# truncate
 		for it in 1:nt

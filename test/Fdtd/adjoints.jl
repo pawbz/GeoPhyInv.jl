@@ -1,10 +1,10 @@
 
 using Random
 using Test
-using JuMIT
+using GeoPhyInv
 using LinearAlgebra
 
-const JF=JuMIT.Fdtd
+const JF=GeoPhyInv.Fdtd
 
 function Δxtest(nx)
 	(nx<6) && error("test requires nx>6")

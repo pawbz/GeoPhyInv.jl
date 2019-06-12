@@ -57,9 +57,11 @@ end
 function ζfunc(x, last_x, pa::Param, obj::LS_prior, attrib_mod)
 	f1=func(x, last_x, pa, attrib_mod)
 
-	f2=Misfits.error_squared_euclidean!(nothing, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+	# calculate the generalized least-squares error
+	# note: change the inverse model covariance matrix `pmgls.Q` accordingly
+	f2=Misfits.func_grad!(nothing, x, pa.mx.prior, obj.pmgls)
 
-	return f1*obj.α[1]+f2*obj.α[2]
+	return f1*obj.pdgls+f2
 end
 
 function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior, attrib_mod)
@@ -67,10 +69,10 @@ function ζgrad!(storage, x, last_x, pa::Param, obj::LS_prior, attrib_mod)
 	grad!(g1, x, last_x, pa, attrib_mod)
 
 	g2=pa.mx.gm[2]
-	Misfits.error_squared_euclidean!(g2, x, pa.mx.prior, pa.mx.w, norm_flag=false)
+	Misfits.func_grad!(g2, x, pa.mx.prior, obj.pmgls)
 
-	rmul!(g1, obj.α[1])
-	rmul!(g2, obj.α[2])
+	rmul!(g1, obj.pdgls)
+
 	for i in eachindex(storage)
 		@inbounds storage[i]=g1[i]+g2[i]
 	end
@@ -128,16 +130,23 @@ end
 Born modeling with `modm` as the perturbed model and `modm0` as the background model.
 """
 function F!(pa::Param, x, ::ModFdtdBorn)
-	# switch on born scattering
-	pa.paf.c.born_flag=true
 
+	# update background model in the forward engine 
+	Fdtd.update_model!(pa.paf.c, pa.modm0)
 	if(!(x===nothing))
 		# project x, which lives in modi, on to model space (modm)
 		x_to_modm!(pa, x)
 	end
+	# update perturbed models in the forward engine
+	Fdtd.update_δmods!(pa.paf.c, pa.modm)
 
-	# update background and perturbed models in the forward engine
-	Fdtd.update_model!(pa.paf.c, pa.modm0, pa.modm)
+	Fbornmod!(pa::Param)
+end
+
+function Fbornmod!(pa::Param) 
+
+	# switch on born scattering
+	pa.paf.c.born_flag=true
 
 	pa.paf.c.activepw=[1,2] # two wavefields are active
 	pa.paf.c.illum_flag=false 
@@ -179,7 +188,7 @@ function Fadj!(pa::Param)
 	pa.paf.c.illum_flag=false
 
 	# force boundaries in first pw and back propagation for second pw
-	pa.paf.c.sflags=[3,2] 
+	pa.paf.c.sflags=[-2,2] 
 	pa.paf.c.backprop_flag=-1
 
 	# update source wavelets in paf using adjoint sources
@@ -208,13 +217,14 @@ function operator_Born(pa)
 		  ismutating=true)
 end
 
-function Fborn_map!(y, x, pa)
-	F!(pa, x, ModFdtdBorn())
-	copyto!(y, pa.paTD.x)
+function Fborn_map!(δy, δx, pa)
+	δx_to_δmods!(pa, δx)
+	Fbornmod!(pa)
+	copyto!(δy, pa.paTD.x)
 end
 
-function Fadj_map!(y, x, pa)
-	copyto!(pa.paTD.dJx, x)
+function Fadj_map!(δy, δx, pa)
+	copyto!(pa.paTD.dJx, δx)
 
 	# adjoint sources
 	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
@@ -222,8 +232,13 @@ function Fadj_map!(y, x, pa)
 	# adjoint simulation
 	Fadj!(pa)
 
-	# adjoint of interpolation
-	spray_gradient!(y,  pa, ModFdtdBorn())
+	# chain rule corresponding to reparameterization
+	Models.pert_gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm0, pa.parameterization)
+
+	# finally, adjoint of interpolation
+	Interpolation.interp_spray!(δy, 
+			     pa.mxm.gx, pa.paminterp, :spray, 
+			     count(pa.parameterization.≠:null))
 end
 
 

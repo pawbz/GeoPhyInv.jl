@@ -54,7 +54,6 @@ function func_grad!(pa::P_misfit, grad=nothing)
 		else
 			error("invalid grad")
 		end
-
 		J += JJ 
 	end
 	return J
@@ -85,9 +84,9 @@ mutable struct P_misfit_ssf
 	dJssf::Matrix{Vector{Float64}} # gradient w.r.t source filters
 	ynorm::Float64 # normalize functional with energy of y
 	coup::Coupling.TD
-	paconvssf::Vector{Conv.P_conv{Float64,2,2,1}} # convolutional model for source filters
-	paconvrf::Conv.P_conv{Float64,1} # convolutional model for receiver filters
-	pacse::Matrix{Conv.P_misfit_xcorr}
+	paconvssf::Vector{FBD.P_conv{Float64,2,2,1}} # convolutional model for source filters
+	paconvrf::FBD.P_conv{Float64,1} # convolutional model for receiver filters
+	pacse::Matrix{FBD.P_misfit_xcorr}
 	func::Matrix{Function} # function to compute misfit for every ss and fields
 	painterp::Interpolation.Param{Float64}
 	interp_flag # decide if interpolation is necessary or not
@@ -100,12 +99,12 @@ function P_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 	end
 
 
-	paconvssf=[Conv.P_conv(ssize=[coup.tgridssf.nx], 
-			dsize=[y.tgrid.nx,y.acqgeom.nr[iss]], 
-			gsize=[y.tgrid.nx,y.acqgeom.nr[iss]], 
+	paconvssf=[FBD.P_conv(ssize=[coup.tgridssf.nx], 
+			dsize=[length(y.tgrid),y.acqgeom.nr[iss]], 
+			gsize=[length(y.tgrid),y.acqgeom.nr[iss]], 
 		      slags=coup.ssflags, 
-		      dlags=[y.tgrid.nx-1, 0], 
-		      glags=[y.tgrid.nx-1, 0]) for iss in 1:y.acqgeom.nss]
+		      dlags=[length(y.tgrid)-1, 0], 
+		      glags=[length(y.tgrid)-1, 0]) for iss in 1:y.acqgeom.nss]
 
 	dJssf=deepcopy(coup.ssf)
 
@@ -123,14 +122,14 @@ function P_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 	ynorm = dot(y, y)
 	(ynorm == 0.0) && error("y cannot be zero")
 
-	dJxc=zeros(y.tgrid.nx)
+	dJxc=zeros(length(y.tgrid))
 
 	if(func_attrib==:cls)
-		pacse=[Conv.P_misfit_xcorr(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
+		pacse=[FBD.P_misfit_xcorr(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
 		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	elseif(func_attrib==:xcorrcls)
-		pacse=[Conv.P_misfit_xcorr(y.tgrid.nx, y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
-		func=[(dJx,x)->Conv.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		pacse=[FBD.P_misfit_xcorr(length(y.tgrid), y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->FBD.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
 	end
 
 	pa=P_misfit(x,y,w,xr,xrc,dJxr,dJxrc,
@@ -171,7 +170,7 @@ function func_grad!(pa::P_misfit_ssf, grad=nothing)
 
 		paconv=pa.paconvssf[iss]
 		# xrc <- xr apply source filter to xr
-		Conv.mod!(paconv, :d, g=xrr, s=wav, d=xrcc)
+		FBD.mod!(paconv, :d, g=xrr, s=wav, d=xrcc)
 
 		if(grad===nothing)
 			JJ=pa.func[iss,ifield](nothing,  xrcc)
@@ -186,13 +185,13 @@ function func_grad!(pa::P_misfit_ssf, grad=nothing)
 		if(grad==:dJx)
 			dJxrr=pa.dJxr.d[iss,ifield]
 			dJxrcc=pa.dJxrc.d[iss,ifield]
-			Conv.mod!(paconv, :g, g=dJxrr, s=wav, d=dJxrcc)
+			FBD.mod!(paconv, :g, g=dJxrr, s=wav, d=dJxrcc)
 		end
 
 		# dJssf <- dJxrc 
 		if(grad==:dJssf)
 			dJwav=pa.dJssf[iss,ifield]
-			Conv.mod!(paconv, :s, g=xrr, s=dJwav, d=dJxrcc)
+			FBD.mod!(paconv, :s, g=xrr, s=dJwav, d=dJxrcc)
 		end
 		J += JJ 
 	end

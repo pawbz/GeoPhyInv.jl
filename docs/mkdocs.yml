@@ -1,15 +1,15 @@
 site_name:        Julia Modeling and Inversion Toolbox
-repo_url:         https://github.com/pawbz/JuMIT.jl
+repo_url:         https://github.com/pawbz/GeoPhyInv.jl
 site_description: Seismic Waveform Modeling and Inversion
 site_author:      Pawan Bharadwaj
-theme: windmill
+theme: slate
 
 extra_css:
           - assets/Documenter.css
 
 extra_javascript:
-          - https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML
-              - assets/mathjaxhelper.js
+          - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS_HTML
+          - assets/mathjaxhelper.js
 
 markdown_extensions:
           - codehilite
@@ -25,9 +25,9 @@ extra_css:
 docs_dir: 'build'
 
 pages:
-          - Home: index.md
-          - Reference: reference.md
-          - Tutorials: tut.md
+                  - Home: index.md
+            #    - Reference: reference.md
+            #    - Tutorials: modeling/page1
 
 
 

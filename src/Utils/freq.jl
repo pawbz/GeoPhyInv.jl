@@ -1,4 +1,5 @@
 
+#=
 
 """
 Return the normalized and stacked (along dim=1) power spectra of time series x in dB 
@@ -21,15 +22,18 @@ function stacked_power_spectra(x, fs=1.0)
 
 
 end
+=#
+
 
 function findfreq(
 		  x::Array{Float64, ND},
-		  tgrid::Grid.M1D;
+		  tgrid;
 		  attrib::Symbol=:peak,
 		  threshold::Float64=-50.
 		  ) where {ND}
 
-	fgrid=Grid.M1D_rfft(tgrid);
+	cx=rfft(x,[1]);
+	fgrid=DSP.rfftfreq(length(tgrid),inv(step(tgrid))) # corresponding fgrid
 
 	ax = (abs.(cx).^2); # power spectrum in dB
 
@@ -47,8 +51,8 @@ function findfreq(
 	elseif(attrib == :peak)
 		iii=argmax(ax)
 	end
-	ii=ind2sub(size(ax),iii)[1]
-	return fgrid.x[ii]
+	ii=CartesianIndices(size(ax))[iii][1]
+	return fgrid[ii]
 
 end
 

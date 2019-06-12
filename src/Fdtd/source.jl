@@ -3,11 +3,11 @@ function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc:
 
 	npw = size(wavelets,1)
 	nt = size(wavelets,2)
-	δt = acqsrc[1].tgrid.δx
+	δt = step(acqsrc[1].tgrid)
 	for ipw=1:npw
 		ns, snfield = size(wavelets[ipw,1]) # ns may vary with ipw
 		for ifield=1:snfield, is=1:ns
-			snt = acqsrc[ipw].tgrid.nx;
+			snt = length(acqsrc[ipw].tgrid)
 			if(sflags[ipw] == 0)
 				# nothing # just put zeros, no sources added
 				for it=1:nt
@@ -20,7 +20,7 @@ function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc:
 					wavelets[ipw,it][is,ifield] = source_term
 				end
 			elseif(sflags[ipw] == -1)
-				"use this to add source sink fro previous case "
+				"source sink for 1"
 				"ϕ[t] = -s[t]"
 				for it=2:snt
 					source_term = acqsrc[ipw].wav[iss,ifield][it,is]
@@ -45,12 +45,10 @@ function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc:
 				if(nt > snt)
 					wavelets[ipw,snt+1:end][is,ifield] = wavelets[ipw,snt][is,ifield]
 				end
-			elseif(sflags[ipw] == 3)
-				"use this to add source sink: need during adjoint propagation from boundary"
-				"multiplication with -1 for subtraction"
-				"time reversal"
-				"as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
-				"ϕ[t] = "
+			elseif(sflags[ipw] == -2)
+				"source sink for 2"
+				# multiplication with -1 for subtraction #time reversal
+				# as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
 				source_term_stack = 0.0;
 				for it=1:snt-1
 					source_term_stack += (acqsrc[ipw].wav[iss,ifield][it,is] .* δt)
@@ -80,46 +78,40 @@ struct Source_B0 end
 	isz2=pass[issp].isz2
 	ssprayw=pass[issp].ssprayw
 	modttI=pac.modttI
+	modrr=pac.modrrvz
 	"""
 	adding source to pressure field at [it] 
 	"""
 	for ipw in pac.activepw
+		sfields=pac.sfields[ipw]
+		isfields=pac.isfields[ipw]
 	if(pac.sflags[ipw] ≠ 0) # only if sflags is non-zero
 		pw=p[ipw]	
-		for (ifields, ifield) in enumerate(pac.isfields[ipw])
+		for (iff, ifield) in enumerate(isfields)
 		@simd for is = 1:acqgeom[ipw].ns[iss]
 			"""
 			use wavelets at [it], i.e., sum of source terms
 			until [it-1]
 			division of source term with δx and δz (see Jan's fdelmodc manual)
 			"""
-			source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
+			source_term = wavelets[ipw,it][is, iff] * pac.δt * pac.δxI * pac.δzI
 			
 			"""
 			multiplication with modttI
 			"""
 			pw[isz1[ipw][is], isx1[ipw][is],ifield] += 
-				source_term * 
-				ssprayw[ipw][1,is] * 
-				modttI[isz1[ipw][is], isx1[ipw][is]]  
+				source(source_term,ssprayw[ipw][1,is], pac, isz1[ipw][is], isx1[ipw][is],eval(sfields[iff])())
 			pw[isz1[ipw][is], isx2[ipw][is],ifield] += 
-				source_term * 
-				ssprayw[ipw][2,is] * 
-				modttI[isz1[ipw][is], isx2[ipw][is]]
+				source(source_term,ssprayw[ipw][2,is], pac, isz1[ipw][is], isx2[ipw][is],eval(sfields[iff])())
 			pw[isz2[ipw][is], isx1[ipw][is],ifield] += 
-				source_term * 
-				ssprayw[ipw][3,is] * 
-				modttI[isz2[ipw][is], isx1[ipw][is]]
+				source(source_term,ssprayw[ipw][3,is], pac, isz2[ipw][is], isx1[ipw][is],eval(sfields[iff])())
 			pw[isz2[ipw][is], isx2[ipw][is],ifield] += 
-				source_term * 
-				ssprayw[ipw][4,is] * 
-				modttI[isz2[ipw][is], isx2[ipw][is]]
+				source(source_term,ssprayw[ipw][4,is], pac, isz2[ipw][is], isx2[ipw][is],eval(sfields[iff])())
 		end
 		end
 	end
 	end
 end
-
 
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
@@ -136,25 +128,38 @@ end
 	adding source to pressure field at [it] 
 	"""
 	for ipw in pac.activepw
+		sfields=pac.sfields[ipw]
+		isfields=pac.isfields[ipw]
 	if(pac.sflags[ipw] ≠ 0) # only if sflags is non-zero
 		pw=p[ipw]
-		for (ifields, ifield) in enumerate(pac.isfields[ipw])
+		for (iff, ifield) in enumerate(isfields)
 		@simd for is = 1:acqgeom[ipw].ns[iss]
 			"""
 			use wavelets at [it], i.e., sum of source terms
 			until [it-1]
 			division of source term with δx and δz (see Jan's fdelmodc manual)
 			"""
-			source_term = wavelets[ipw,it][is, ifields] * pac.δt * pac.δxI * pac.δzI
+			source_term = wavelets[ipw,it][is, iff] * pac.δt * pac.δxI * pac.δzI
 			
 			"""
 			multiplication with modttI
 			"""
-			pw[isz1[ipw][is], isx1[ipw][is],ifield] += source_term * modttI[isz1[ipw][is], isx1[ipw][is]]  
+			pw[isz1[ipw][is], isx1[ipw][is],ifield] += source(source_term,1.0,pac,isz1[ipw][is],isx1[ipw][is],eval(sfields[iff])())
 		end
 	end
 	end
 	end
 end
+
+
+# on pressure grid
+source(source_term, spray, pac, iz, ix, ::P) = source_term * spray * pac.modttI[iz,ix]
+
+# on Vx grid
+source(source_term, spray, pac, iz, ix, ::Vx) = source_term * spray * pac.modrrvx[iz,ix]
+
+# on Vz grid
+source(source_term, spray, pac, iz, ix, ::Vz) = source_term * spray * pac.modrrvz[iz,ix]
+
 
 

@@ -15,9 +15,7 @@ before applying the time-domain filter data type  described in this module:
 """
 module Coupling
 
-
-using Grid
-import JuMIT.Acquisition
+import GeoPhyInv.Acquisition
 
 """
 Time-domain source and receiver filters.
@@ -27,16 +25,16 @@ Time-domain source and receiver filters.
 * `ssf::Array{Array{Float64,1},2}` : source filters for each supersource and recorded component
 * `rf::Array{Array{Float64,2},2}` : receiver filters for each receiver, supersource and recorded component
 * `fields::Vector{Symbol}` :  number of recorded components at receivers
-* `tgridssf::Grid.M1D` : a  time grid for source filters with both positive and negative lags
-* `tgridrf::Grid.M1D` : a  time grid for receiver filters with both positive and negative lags
+* `tgridssf` : a  time grid for source filters with both positive and negative lags
+* `tgridrf` : a  time grid for receiver filters with both positive and negative lags
 * `acqgeom::Acquisition.Geom` : acquisition geometry
 """
 mutable struct TD
 	ssf::Array{Array{Float64,1},2}
 	rf::Array{Array{Float64,2},2}
 	fields::Vector{Symbol}
-	tgridssf::Grid.M1D
-	tgridrf::Grid.M1D
+	tgridssf::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
+	tgridrf::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
 	ssflags::Vector{Int}
 	rflags::Vector{Int}
 	acqgeom::Acquisition.Geom
@@ -44,7 +42,7 @@ mutable struct TD
 		any([
 		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
 		  length(fields) == 0,
-		  broadcast(size,ssf) != [(tgridssf.nx,) for iss=1:acqgeom.nss, ifield=1:length(fields)]
+		  broadcast(size,ssf) != [(length(tgridssf),) for iss=1:acqgeom.nss, ifield=1:length(fields)]
 		  ]) ? 
 		error("error in TD construction") : new(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, acqgeom)
 
@@ -74,15 +72,16 @@ function TD_delta(
 		  acqgeom::Acquisition.Geom
 		 )
 	δt=tgriddata.δx
-	tot_t=abs(tgriddata.x[end]-tgriddata.x[1])
+	tot_t=abs(tgriddata[end]-tgriddata[1])
 
-	tgridssf, ssflags = Grid.M1D_lag(tot_t.*tlagssf_fracs, δt)
-	tgridrf, rflags = Grid.M1D_lag(tot_t.*tlagrf_fracs, δt)
+	error("fix these")
+	#tgridssf, ssflags = lag(tot_t.*tlagssf_fracs, δt)
+	#tgridrf, rflags =lag(tot_t.*tlagrf_fracs, δt)
 
-	spiss = zeros(tgridssf.nx); spir = zeros(tgridrf.nx);
+	spiss = zeros(length(tgridssf)); spir = zeros(length(tgridrf));
 	# check where to put spikes
-	nspikessf=(findn(tgridssf.x.==0.0) == []) ? error("no t=0") : findn(tgridssf.x.==0.0)
-	nspikerf=(findn(tgridrf.x.==0.0) == []) ? error("no t=0") : findn(tgridrf.x.==0.0)
+	nspikessf=(findall(tgridssf.==0.0) == []) ? error("no t=0") : findall(tgridssf.==0.0)
+	nspikerf=(findall(tgridrf.==0.0) == []) ? error("no t=0") : findall(tgridrf.==0.0)
 	# put spikes
 	spiss[nspikessf] = 1.0; spir[nspikerf] = 1.0; 
 	# number of unique receivers (implement in future)

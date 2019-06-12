@@ -7,12 +7,12 @@ help their construction.
 """
 module Acquisition
 
-using Grid
-import JuMIT.Models
-using Signals
+import GeoPhyInv.Models
+import GeoPhyInv.Utils
 using Distributions
 using DataFrames
 using Random
+using SparseArrays
 using CSV
 
 """
@@ -158,6 +158,7 @@ function Geom_find(acq::Geom; rpos::Array{Float64,1}=nothing, rpos0::Array{Float
 	return sson
 end
 
+#=
 """
 Modify input `Geom` such that the output `Geom` has
 either sources or receivers on the boundary of 
@@ -166,18 +167,18 @@ either sources or receivers on the boundary of
 # Arguments
 
 * `acqgeom::Geom` : input geometry
-* `mgrid::Grid.M2D` : grid to determine the boundary
+* `mgridi` : grid to determine the boundary
 * `attrib::Symbol` : decide return
   * `=:srcborder` sources on boundary (useful for back propagation)
   * `=:recborder` receivers on boundary
 """
 function Geom_boundary(acqgeom::Geom,
-	      mgrid::Grid.M2D,
+	      mgrid
 	      attrib::Symbol
 	     )
 
 	if((attrib == :recborder) | (attrib == :srcborder))
-		bz, bx, nb = Grid.M2D_border(mgrid, 3, :inner)
+		bz, bx, nb = border(mgrid, 3, :inner)
 	end
 	"change the position of receivers to the boundary"
 	if(attrib == :recborder)
@@ -195,6 +196,7 @@ function Geom_boundary(acqgeom::Geom,
 		error("invalid attrib")
 	end
 end
+=#
 
 
 """
@@ -204,8 +206,8 @@ Check if all the sources and receivers in `Geom` are within the model
 
 * `true` if all the positions within the model, `false` otherwise
 """
-function Geom_check(geom::Geom, mgrid::Grid.M2D)
-	xmin, zmin, xmax, zmax = mgrid.x[1], mgrid.z[1], mgrid.x[end], mgrid.z[end]
+function Geom_check(geom::Geom, mgrid)
+	xmin, zmin, xmax, zmax = mgrid[2][1], mgrid[1][1], mgrid[2][end], mgrid[1][end]
 
 
 	checkvec=fill(false, geom.nss)
@@ -298,21 +300,21 @@ function Geom_fixed(
 
 
 	ssarray = isequal(nss,1) ? fill(ssmin,1) : (rand_flags[1] ? 
-					   Random.rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : range(ssmin,stop=ssmax,length=nss))
+					     Random.rand(Uniform(minimum([ssmin,ssmax]),maximum([ssmin,ssmax])),nss) : range(ssmin,stop=ssmax,length=nss))
 	if(ssattrib==:horizontal)
-		ssz = ss0+(ssarray-minimum(ssarray))*sin(ssα)/cos(ssα); ssx=ssarray
+		ssz = ss0.+(ssarray.-minimum(ssarray)).*sin(ssα)/cos(ssα); ssx=ssarray
 	elseif(ssattrib==:vertical)
-		ssx = ss0+(ssarray-minimum(ssarray))*sin(ssα)/cos(ssα); ssz=ssarray
+		ssx = ss0.+(ssarray.-minimum(ssarray)).*sin(ssα)/cos(ssα); ssz=ssarray
 	else
 		error("invalid ssattrib")
 	end
 
 	rarray = isequal(nr,1) ? fill(rmin,1) : (rand_flags[2] ? 
-				        Random.rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : range(rmin,stop=rmax,length=nr))
+					  Random.rand(Uniform(minimum([rmin,rmax]),maximum([rmin,rmax])),nr) : range(rmin,stop=rmax,length=nr))
 	if(rattrib==:horizontal)
-		rz = r0+(rarray-minimum(rarray))*sin(rα)/cos(rα); rx = rarray
+		rz = r0.+(rarray.-minimum(rarray)).*sin(rα)/cos(rα); rx = rarray
 	elseif(rattrib==:vertical)
-		rx = r0+(rarray-minimum(rarray))*sin(rα)/cos(rα); rz = rarray
+		rx = r0.+(rarray.-minimum(rarray)).*sin(rα)/cos(rα); rz = rarray
 	else
 		error("invalid rattrib")
 	end
@@ -341,10 +343,10 @@ function Geom_fixed(mod::Models.Seismic,
 	      nr::Int64=5,
 	      ns::Vector{Int64}=ones(Int,nss))
 
-	xmin=mod.mgrid.x[1]
-	xmax=mod.mgrid.x[end]
-	zmin=mod.mgrid.z[1]
-	zmax=mod.mgrid.z[end]
+	xmin=mod.mgrid[2][1]
+	xmax=mod.mgrid[2][end]
+	zmin=mod.mgrid[1][1]
+	zmax=mod.mgrid[1][end]
 
 	rxall = [Random.rand(Uniform(xmin,xmax),nr) for iss=1:nss];
 	rzall = [Random.rand(Uniform(xmin,xmax),nr) for iss=1:nss];
@@ -378,9 +380,9 @@ of the angular offset are given by `θlim`
 function Geom_circ(;
 		   nss::Int64=10,
 		   nr::Int64=10,
-		   loc::Vector{Float64}=[0.,0.],
-		   rad::Vector{Float64}=[100.,100.],
-		   θlim::Vector{Float64}=[0.,π]
+		   loc::Vector=[0.,0.],
+		   rad::Vector=[100.,100.],
+		   θlim::Vector=[0.,π]
 	       )
 
 	# modify nr such that approximately nr receivers are present in θlim
@@ -472,10 +474,10 @@ Advance either source or receiver array in an acquisition geometry in horizontal
 function Geom_advance(geom::Geom, advances::Vector{Vector{Float64}}=[[0.,0.], [0.,0.]]) 
 	geom_out=deepcopy(geom)
 	for iss=1:geom.nss
-		geom_out.sx[iss][:] += advances[1][2]
-		geom_out.sz[iss][:] += advances[1][1]
-		geom_out.rx[iss][:] += advances[2][2]
-		geom_out.rz[iss][:] += advances[2][1]
+		geom_out.sx[iss][:] .+= advances[1][2]
+		geom_out.sz[iss][:] .+= advances[1][1]
+		geom_out.rx[iss][:] .+= advances[2][2]
+		geom_out.rz[iss][:] .+= advances[2][1]
 	end
 	return geom_out
 end
@@ -498,19 +500,19 @@ Data type for the source related parameters during acquisiton.
 * `ns::Array{Int64}` : number of sources for each supersource
 * `fields::Vector{Symbol}` : number of fields
 * `wav::Array{Float64}` : wavelets in time domain
-* `tgrid::Grid.M1D` : time grid 
+* `tgrid` : time grid 
 """
 mutable struct Src
 	nss::Int64
 	ns::Vector{Int64}
 	fields::Vector{Symbol}
 	wav::Array{Array{Float64,2},2}
-	tgrid::Grid.M1D
+	tgrid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
 	Src(nss, ns, fields, wav, tgrid) = 
 		any([
 		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
 		  length(fields) == 0,
-		  broadcast(size,wav) ≠ [(tgrid.nx,ns[iss]) for iss=1:nss, ifield=1:length(fields)]
+		  broadcast(size,wav) ≠ [(length(tgrid),ns[iss]) for iss=1:nss, ifield=1:length(fields)]
 		  ]) ? 
 		error("error in Src construction") : new(nss, ns, fields, wav, tgrid)
 end
@@ -543,8 +545,8 @@ end
 """
 Allocate `Src` with zeros depending on the acquisition geometry.
 """
-function Src_zeros(acqgeom::Geom,  fields::Vector{Symbol}, tgrid::Grid.M1D)
-	wavsrc = [zeros(tgrid.nx,acqgeom.ns[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)] 
+function Src_zeros(acqgeom::Geom,  fields::Vector{Symbol}, tgrid::StepRangeLen)
+	wavsrc = [zeros(length(tgrid),acqgeom.ns[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)] 
 	return Src(acqgeom.nss, acqgeom.ns, fields, wavsrc, deepcopy(tgrid))
 end
 
@@ -558,8 +560,8 @@ function Base.print(src::Src, name::String="")
 	
 	freqmin, freqmax, freqpeak = freqs(src)
 	println("\t> frequency:\t","min\t",freqmin, "\tmax\t",freqmax,"\tpeak\t",freqpeak)
-	println("\t> time:\t","min\t",src.tgrid.x[1], "\tmax\t", src.tgrid.x[end])
-	println("\t> samples:\t",src.tgrid.nx)
+	println("\t> time:\t","min\t",src.tgrid[1], "\tmax\t", src.tgrid[end])
+	println("\t> samples:\t",length(src.tgrid))
 end
 
 
@@ -567,9 +569,9 @@ end
 Return minimum, maximum and peak frequencies of `Src`
 """
 function freqs(src::Src)
-	freqmin = minimum([Signals.DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:min) for i in 1:src.nss, j in 1:length(src.fields)])
-	freqmax = maximum([Signals.DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:max) for i in 1:src.nss, j in 1:length(src.fields)])
-	freqpeak = mean([Signals.DSP.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:peak) for i in 1:src.nss, j in 1:length(src.fields)])
+	freqmin = minimum([Utils.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:min) for i in 1:src.nss, j in 1:length(src.fields)])
+	freqmax = maximum([Utils.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:max) for i in 1:src.nss, j in 1:length(src.fields)])
+	freqpeak = mean([Utils.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:peak) for i in 1:src.nss, j in 1:length(src.fields)])
 	return freqmin, freqmax, freqpeak
 end
 
@@ -583,13 +585,13 @@ Uses same source wavelet, i.e., `wav` for all sources and supersources
 * `ns::Int64` : number of sources
 * `fields::Vector{Symbol}` : number of fields the sources are exciting
 * `wav::Array{Float64}` : a source wavelet that is used for all sources and supersources
-* `tgrid::Grid.M1D` : time grid for the wavelet
+* `tgrid` : time grid for the wavelet
 """
 function Src_fixed(nss::Int64, 
 	     ns::Int64, 
 	     fields::Vector{Symbol},
 	     wav::Array{Float64},
-	     tgrid::Grid.M1D
+	     tgrid::StepRangeLen
 	     )
 
 	wavsrc = [repeat(wav,inner=(1,ns)) for iss=1:nss, ifield=1:length(fields)] 
@@ -610,18 +612,18 @@ the model has `nλ` wavelengths.
 
 * `mod::Models.Seismic` :
 * `nλ::Int64=10` : number of wavelengths in the mod
-* `wav_func::Function=(fqdom, tgrid)->Signals.Wavelets.ricker(fqdom,tgrid)` : which wavelet to generate, see Signals.Wavelets.jl
+* `wav_func::Function=(fqdom, tgrid)->Utils.Wavelets.ricker(fqdom,tgrid)` : which wavelet to generate, see Utils.Wavelets.jl
 * `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the model, use this fraction to increase of reduce the maximum time
 """
 function Src_fixed_mod(
 		nss::Int64, ns::Int64, fields::Vector{Symbol}; 
 		mod::Models.Seismic=nothing, 
 		nλ::Int64=10,
-		wav_func::Function=(fqdom, tgrid)->Signals.Wavelets.ricker(fqdom,tgrid),
+		wav_func::Function=(fqdom, tgrid)->Utils.Wavelets.ricker(fqdom,tgrid),
 		tmaxfrac::Float64=1.0
 		)
 
-	x=mod.mgrid.x; z=mod.mgrid.z
+	x=mod.mgrid[2]; z=mod.mgrid[1]
 	# dominant wavelength using mod dimensions
 	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nλ)
 	# average P velocity
@@ -636,14 +638,14 @@ function Src_fixed_mod(
 	tmax=2.0*d*inv(vavg)*tmaxfrac
 
 	# choose sampling interval to obey max freq of source wavelet
-	δmin = minimum([mod.mgrid.δx, mod.mgrid.δz])
+	δmin = minimum([step(mod.mgrid[2]), step(mod.mgrid[1])])
 	vpmax = mod.vp0[2]
 	δt=0.5*δmin/vpmax
 
 	# check if δt is reasonable
 	#(δt > 0.1/fqdom) : error("decrease spatial sampling or nλ")
 
-	tgrid=Grid.M1D(0.0, tmax, δt)
+	tgrid=range(0.0, stop=tmax, step=δt)
 	wav = wav_func(fqdom, tgrid);
 
 
@@ -662,11 +664,11 @@ function Src_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol};
 			  sparsepvec=[1. for iss in 1:nss],
 			  fmin::Float64=0.0, 
 			  fmax::Float64=0.0, 
-			  tgrid::Grid.M1D=nothing, 
+			  tgrid::StepRangeLen=nothing, 
 			  tmaxfrac::Float64=1.0)
-	wavsrc = [repeat(zeros(tgrid.nx),inner=(1,ns)) for iss=1:nss, ifield=1:length(fields)] 
+	wavsrc = [repeat(zeros(length(tgrid)),inner=(1,ns)) for iss=1:nss, ifield=1:length(fields)] 
 	for ifield in 1:length(fields), iss in 1:nss, is in 1:ns
-		wavsrc[iss, ifield][:,is] = Signals.DSP.get_tapered_random_tmax_signal(tgrid, fmin=fmin, fmax=fmax, tmaxfrac=tmaxfrac, dist=distvec[iss], 
+		wavsrc[iss, ifield][:,is] = Utils.get_tapered_random_tmax_signal(tgrid, fmin=fmin, fmax=fmax, tmaxfrac=tmaxfrac, dist=distvec[iss], 
 								 sparsep=sparsepvec[iss])
 	end
 	src=Src(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
@@ -680,7 +682,7 @@ Function that returns Src after time reversal
 """
 function Src_tr(src::Src)
 	return Src(src.nss,src.ns,src.fields,
-	    [flipdim(src.wav[i,j],1) for i in 1:src.nss, j in 1:length(src.fields)],deepcopy(src.tgrid))
+	    [reverse(src.wav[i,j],dims=1) for i in 1:src.nss, j in 1:length(src.fields)],deepcopy(src.tgrid))
 end
 
 
@@ -696,7 +698,7 @@ function Src_uspos(src::Vector{Src}, acq::Vector{Geom})
 	nus=Geom_get(acq,:nus) 
 	uspos=Geom_get(acq,:uspos)
 	# all zeros for all unique positions
-	wavout = [[zeros(src[ip].tgrid.nx,nus) for iss=1:src[ip].nss, ifield=1:length(src[ip].fields)] for ip=1:np]
+	wavout = [[zeros(src[ip].length(tgrid),nus) for iss=1:src[ip].nss, ifield=1:length(src[ip].fields)] for ip=1:np]
 	# fill source wavelets when necessary
 	for ip=1:np
 		for ifield=1:length(src[ip].fields), iss=1:src[ip].nss, is=1:acq[ip].ns[iss]
@@ -709,6 +711,22 @@ function Src_uspos(src::Vector{Src}, acq::Vector{Geom})
 	# output src
 	return [Src(src[ip].nss,fill(nus, src[ip].nss),
 	     src[ip].fields,wavout[ip],src[ip].tgrid) for ip=1:np]
+end
+
+
+"""
+Return a sparse ACQ matrix, for a given acqgeom
+data=ACQ*snapshot
+"""
+function ACQmat(acqgeom::Geom,mgrid,iss=1)
+	nz,nx=length.(mgrid)
+	ACQ=spzeros(acqgeom.nr[iss],prod(length.(mgrid)))
+	for ir = 1:acqgeom.nr[iss]
+		irx=argmin(abs.(mgrid[2].-acqgeom.rx[iss][ir]))
+		irz=argmin(abs.(mgrid[1].-acqgeom.rz[iss][ir]))
+		ACQ[ir,irz+(irx-1)*nz]=1.0
+	end
+	return ACQ
 end
 
 

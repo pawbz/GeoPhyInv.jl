@@ -24,7 +24,7 @@ function Base.isapprox(dat1::TD, dat2::TD)
 end
 
 function Base.length(data::TD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	l=0
 	for ifield = 1:length(data.fields), iss = 1:nss
 		for ir = 1:nr[iss]
@@ -41,7 +41,7 @@ Return a vec of data object sorted in the order
 time, receivers, supersource, fields
 """
 function Base.vec(data::TD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	v=Vector{Float64}()
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
@@ -55,8 +55,8 @@ end
 Method to Devectorize data!
 No memory allocations
 """
-function Base.copyto!(dataout::TD, v::Vector{Float64})
-	nr = dataout.acqgeom.nr;	nss = dataout.acqgeom.nss;	nt = dataout.tgrid.nx;
+function Base.copyto!(dataout::TD, v::AbstractVector{Float64})
+	nr = dataout.acqgeom.nr;	nss = dataout.acqgeom.nss;	nt = length(dataout.tgrid);
 	dout=getfield(dataout, :d)
 	i0=0
 	for iss=1:nss, ifield=1:length(dataout.fields)
@@ -76,8 +76,8 @@ end
 Method to vectorize data!
 No memory allocations
 """
-function Base.copyto!(v::Vector{Float64}, data::TD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+function Base.copyto!(v::AbstractVector{Float64}, data::TD)
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	d=getfield(data, :d)
 	i0=0
 	for iss=1:nss, ifield=1:length(data.fields)
@@ -96,7 +96,7 @@ end
 Fill with randn values
 """
 function Random.randn!(data::TD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = data.tgrid.nx;
+	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		Random.randn!(dd)
@@ -151,7 +151,7 @@ function LinearAlgebra.dot(data1::TD, data2::TD)
 	if(isapprox(data1, data2))
 		dotd = 0.0;
 		for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
-			for ir = 1:data1.acqgeom.nr[iss], it = 1:data1.tgrid.nx
+			for ir = 1:data1.acqgeom.nr[iss], it = 1:length(data1.tgrid)
 				dotd += data1.d[iss, ifield][it, ir] * data2.d[iss, ifield][it, ir]
 			end
 		end

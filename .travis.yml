@@ -4,10 +4,10 @@ os:
   - linux
   - osx
 julia:
-  - 0.7
+  - 1.0
   - nightly
 notifications:
-  email: false
+  email: true
 git:
   depth: 99999999
 
@@ -27,9 +27,23 @@ addons:
 
 ## uncomment the following lines to override the default test script
 #script:
-        #  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("JuMIT"); Pkg.test("JuMIT"; coverage=true)'
+        #  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("GeoPhyInv"); Pkg.test("GeoPhyInv"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
-  - julia -e 'cd(Pkg.dir("JuMIT")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
+  - julia -e 'cd(Pkg.dir("GeoPhyInv")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
   # push coverage results to Codecov
-  - julia -e 'cd(Pkg.dir("JuMIT")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - julia -e 'cd(Pkg.dir("GeoPhyInv")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+
+
+
+jobs:
+  include:
+    - stage: "Documentation"
+      julia: 1.0
+      os: linux
+      script:
+        - julia --project=docs/ -e 'using Pkg; Pkg.add("Documenter"); Pkg.add("Plots"); Pkg.add("PyPlot"); Pkg.add(PackageSpec(name="Misfits",url="https://github.com/pawbz/Misfits.jl.git"));                                      Pkg.develop(PackageSpec(path=pwd()));
+                                               Pkg.instantiate()'
+        - julia --project=docs/ docs/make.jl
+      after_success: skip
+
