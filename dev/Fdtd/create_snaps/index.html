@@ -19,21 +19,21 @@ acqsrc=GIPh.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid); # distribute th
 
 @time mod!(paE);</code></pre><pre><code class="language-none">[ Info: spatial sampling (1.00e+01) can be as high as 1.02e+01
 [ Info: time sampling (1.00e-03) can be as high as 1.43e-03
-	modeling supershot 1/2  11%|███▏                       |  ETA: 0:00:08[K	modeling supershot 1/2  27%|███████▎                   |  ETA: 0:00:05[K	modeling supershot 1/2  45%|████████████▏              |  ETA: 0:00:04[K	modeling supershot 1/2  63%|█████████████████▏         |  ETA: 0:00:02[K	modeling supershot 1/2  82%|██████████████████████▏    |  ETA: 0:00:01[K	modeling supershot 1/2  99%|██████████████████████████▊|  ETA: 0:00:00[K	modeling supershot 1/2 100%|███████████████████████████| Time: 0:00:06[K
-	modeling supershot 2/2  12%|███▏                       |  ETA: 0:00:08[K	modeling supershot 2/2  26%|███████▏                   |  ETA: 0:00:06[K	modeling supershot 2/2  42%|███████████▍               |  ETA: 0:00:04[K	modeling supershot 2/2  57%|███████████████▍           |  ETA: 0:00:03[K	modeling supershot 2/2  72%|███████████████████▌       |  ETA: 0:00:02[K	modeling supershot 2/2  91%|████████████████████████▌  |  ETA: 0:00:01[K	modeling supershot 2/2 100%|███████████████████████████| Time: 0:00:06[K
+	modeling supershot 1/2  16%|████▏                      |  ETA: 0:00:05[K	modeling supershot 1/2  41%|███████████▏               |  ETA: 0:00:03[K	modeling supershot 1/2  67%|██████████████████▏        |  ETA: 0:00:01[K	modeling supershot 1/2  92%|████████████████████████▉  |  ETA: 0:00:00[K	modeling supershot 1/2 100%|███████████████████████████| Time: 0:00:04[K
+	modeling supershot 2/2  16%|████▍                      |  ETA: 0:00:05[K	modeling supershot 2/2  40%|██████████▉                |  ETA: 0:00:03[K	modeling supershot 2/2  62%|████████████████▋          |  ETA: 0:00:02[K	modeling supershot 2/2  85%|██████████████████████▉    |  ETA: 0:00:01[K	modeling supershot 2/2 100%|███████████████████████████| Time: 0:00:04[K
  ──────────────────────────────────────────────────────────────────────────
                                    Time                   Allocations
                            ──────────────────────   ───────────────────────
-     Tot / % measured:          12.5s / 100%            1.23MiB / 100%
+     Tot / % measured:          9.01s / 100%            1.22MiB / 100%
 
  Section           ncalls     time   %tot     avg     alloc   %tot      avg
  ──────────────────────────────────────────────────────────────────────────
- mod_per_proc!          1    12.5s   100%   12.5s   1.18MiB  96.3%  1.18MiB
- initialize!            1   4.97ms  0.04%  4.97ms   36.3KiB  2.90%  36.3KiB
- record data            1    170μs  0.00%   170μs   8.30KiB  0.66%  8.30KiB
- stack_grads!           1   73.9μs  0.00%  73.9μs   2.05KiB  0.16%  2.05KiB
- update gradient        1    196ns  0.00%   196ns     0.00B  0.00%    0.00B
+ mod_per_proc!          1    9.00s   100%   9.00s   1.17MiB  96.3%  1.17MiB
+ initialize!            1   5.02ms  0.06%  5.02ms   36.0KiB  2.89%  36.0KiB
+ record data            1    161μs  0.00%   161μs   8.23KiB  0.66%  8.23KiB
+ stack_grads!           1   74.3μs  0.00%  74.3μs   2.05KiB  0.16%  2.05KiB
+ update gradient        1    216ns  0.00%   216ns     0.00B  0.00%    0.00B
  ──────────────────────────────────────────────────────────────────────────
- 12.554108 seconds (37.57 k allocations: 1.317 MiB)</code></pre><h3><a class="nav-anchor" id="Extracting-snaps-from-Expt-1" href="#Extracting-snaps-from-Expt-1">Extracting snaps from <code>Expt</code></a></h3><pre><code class="language-julia">snaps=paE[:snaps,1]; # extracting snaps of the first supersource
+  9.013848 seconds (37.45 k allocations: 1.310 MiB)</code></pre><h3><a class="nav-anchor" id="Extracting-snaps-from-Expt-1" href="#Extracting-snaps-from-Expt-1">Extracting snaps from <code>Expt</code></a></h3><pre><code class="language-julia">snaps=paE[:snaps,1]; # extracting snaps of the first supersource
 snaps=paE[:snaps,2]; # second supersource
 @info string(&quot;The dimensions of the snaps are (nz,nx,nt)=&quot;, size(snaps))</code></pre><pre><code class="language-none">[ Info: The dimensions of the snaps are (nz,nx,nt)=(201, 201, 3)</code></pre><p>We can now plot snapshots using these commands: <code>p1=[heatmap(snaps[:,:,ii]) for ii in 1:3];</code> <code>plot(p1..., layout=(1,3), aspect_ratio=:equal)</code></p><footer><hr/><a class="previous" href="../intro/"><span class="direction">Previous</span><span class="title">Introduction</span></a><a class="next" href="../../Poisson/intro/"><span class="direction">Next</span><span class="title">Introduction</span></a></footer></article></body></html>
