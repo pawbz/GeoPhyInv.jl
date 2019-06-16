@@ -11,7 +11,7 @@ makedocs(
    pages = ["Home" => "index.md",
 	    "SeisForwExpt" => Any[
 				  "Introduction" => "Fdtd/intro.md",
-	#			  "Basic usage" => "Fdtd/reuse_expt.md",
+				  "Basic usage" => "Fdtd/reuse_expt.md",
 				  "Generate snaps" => "Fdtd/create_snaps.md",
 				  ],
 	    "PoissonExpt" => Any[
