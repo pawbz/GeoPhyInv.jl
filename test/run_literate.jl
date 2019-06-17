@@ -14,6 +14,7 @@ function run_literate(names, folder)
 	end
 end
 
+run_literate(["gallery"], "Geom")
 
 run_literate(["forw", "test_born"], "Poisson")
 

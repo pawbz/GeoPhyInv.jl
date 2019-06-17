@@ -19,3 +19,16 @@ To get started, as an example, simply load a seismic inversion experiment alread
 using GeoPhyInv # load GIPh (after installation)
 paE=GIPh.Gallery.SeisInvExpt(:pizza); # "pizza" is the name of the experiment
 ```
+
+### Grids
+
+It is necessary to input the evenly-spaced spatial and temporal grids while creating the `Expt` variables.
+These grids can be simply created using `Base.range` in Julia, as shown below.
+
+```julia
+zgrid=range(0,stop=1000.0,length=201) # create vertical grid from 0 to 1000 m
+xgrid=range(0,stop=1000.0,length=201) # create horizontal grid
+mgrid=[zgrid, xgrid] # spatial-grid bundle
+@info string("spatial sampling intervals (dz,dx)=", step.(mgrid))
+tgrid=range(0,stop=1.0,step=0.001) # a temporal grid from 0 to 1.0 s
+```

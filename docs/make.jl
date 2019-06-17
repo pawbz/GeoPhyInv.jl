@@ -9,6 +9,7 @@ makedocs(
 		  prettyurls = get(ENV, "CI", nothing) == "true"),
    sitename = "Toolbox for Geophysical Inversion",
    pages = ["Home" => "index.md",
+	    "Geom" => "Geom/gallery.md",
 	    "SeisForwExpt" => Any[
 				  "Introduction" => "Fdtd/intro.md",
 				  "Basic usage" => "Fdtd/reuse_expt.md",
@@ -19,6 +20,7 @@ makedocs(
 				 "Record data" => "Poisson/forw.md",
 				 "Born map" => "Poisson/test_born.md",
 				 ],
+#	    "SeisInvExpt" => Any[]
 	    ]
 #	    "Seismic Born Modeling" => "FWI/born_map.md",
 #	    "Seismic Full Waveform Inversion" => "FWI/gradient_accuracy.md",
