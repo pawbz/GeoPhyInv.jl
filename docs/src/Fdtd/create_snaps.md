@@ -2,16 +2,14 @@
 EditURL = "https://github.com/TRAVIS_REPO_SLUG/blob/master/"
 ```
 
-A forward experiment, where the seismic data are generated
-using some models and acquisition parameters from our gallery.
-Forward modeling consists of a finite-difference simulation of the acoustic wave-equation.
-We specifically aim to save the snapshots, at given time steps in `SeisForwExpt`.
+We aim to save the snapshots, at given time steps in `SeisForwExpt`.
 
 ### Loading some packages
 
 ```@example create_snaps
 using GeoPhyInv
 using Statistics
+using Plots
 ```
 
 ### Setting up the variables necessary to create the `Expt`
@@ -59,6 +57,9 @@ snaps=paE[:snaps,2]; # second supersource
 ```
 
 We can now plot snapshots using these commands:
-`p1=[heatmap(snaps[:,:,ii]) for ii in 1:3];`
-`plot(p1..., layout=(1,3), aspect_ratio=:equal)`
+
+```@example create_snaps
+p1=[heatmap(snaps[:,:,ii]) for ii in 1:3];
+plot(p1..., layout=(1,3), aspect_ratio=:equal)
+```
 

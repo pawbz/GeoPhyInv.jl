@@ -203,6 +203,42 @@ function migr_fd!(pa::Param, attrib_mod)
 
 	return pa.gmodi, gx
 end
+                
+
+"""
+Return posterior covariance matrix and estimate as given by Best Linear Unbiased Analysis.
+    # Arguments
+    - H_obs : observation operator
+    - C_obs : observation error covariance matrix
+    - C_prior : prior covariance matrix
+    - est_0 : prior estimate
+    - y_obs : observation vector
+    - compute_update : if true returns posterior mean and covariance, if false only covariance
+    - diag : if true, assumes that observation covariance matrix is diag and uses it to siply inverse calculation
+                
+    # Output
+    Posterior covariance and mean (if compute_update = true)
+"""
+function blue(H_obs, C_obs, C_prior, est_0, y_obs; compute_update = false, diag = false)
+    C_prior_inv = inv(C_prior)
+    C_prior_inv = 0.5 * (C_prior_inv + C_prior_inv')
+    
+    if diag
+        C_obs_inv = 1 ./ C_obs
+    else
+        C_obs_inv = inv(C_obs)
+        C_obs_inv = 0.5 * (C_obs_inv + C_obs_inv')
+    end
+    
+    C_post = inv((H_obs' * C_obs_inv * H_obs + C_prior_inv))
+    
+    if compute_update
+        est = C_post * (C_prior_inv * est_0 + H_obs' * C_obs_inv * y_obs)
+        return C_post, est;
+    else
+        return C_post;    
+    end
+end
 
 
 

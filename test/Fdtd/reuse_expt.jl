@@ -1,3 +1,13 @@
+# This tutorial first creates a variable `pa`, i.e. allocates
+# necessary memory to perform `SeisForwExpt`. 
+# Then, we perform forward modeling using an in-place 
+# function `mod!`. Finally, we will update `pa` with a different 
+# subsurface model and re-run the modeling task with no additional memory 
+# allocation. 
+# The ability to iteratively run the forward modeling task on  
+# various subsurface models is necessary while implementing inversion 
+# algorithms.
+
 # ### Load packages
 
 using GeoPhyInv
@@ -5,35 +15,46 @@ using Statistics
 using Plots
 
 
-model=GIPh.Gallery.Seismic(:acou_homo1); # load a homogeneous model 
+# ### Setup a spatial grid
+zgrid=range(-1000.0,stop=1000.0,length=201)
+xgrid=range(-1000.0,stop=1000.0,length=201)
+mgrid = [zgrid, xgrid]
+@info string("spatial sampling intervals (dz,dx)=", step.(mgrid))
+
+
+# ### Allocate a `Seismic` model, and adjust bounds
+vp0 = [1500., 3500.] # bounds for vp
+vs0 = [2000., 2500.] # dummy
+ρ0 = [1500., 3500.] # density bounds
+model=GIPh.Models.Seismic_zeros(mgrid)
+GIPh.Models.adjust_bounds!(model,vp0,vs0,ρ0)
+@info "a seismic model is created" 
+
+# ### Add some noise to the model (optional) 
 GIPh.Models.Seismic_addon!(model, randn_perc=0.01); # add some random noise
 
-# a simple acquisition geometry
+# ### A surface acquisition geometry
+acqgeom=GeoPhyInv.Gallery.Geom(model.mgrid,:surf, nss=3, nr=30);
 
-acqgeom=GeoPhyInv.Gallery.Geom(model.mgrid,:xwell);
-
-# plot the model and source, receivers
+# ### Plot the model and source, receivers
 p1=JP.seismic(model) 
 JP.geom!(acqgeom)
 plot(p1)
 
-# generate time grid
-
+# ### Generate a temporal grid
 tgrid = range(0.0,stop=2.0,length=1000)
 
-# Ricker wavelet
-
+# ### Choose a source wavelet
 wav = GeoPhyInv.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,);
 
-# distribute the same source wavelet to all the supsersources 
-
+# ### Distribute the same source wavelet to all the supsersources 
 acqsrc=GeoPhyInv.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
 
 # create `Fdtd.Param` object to prepare forward modelling
 # * npw corresponds to the number of independently propagating wavefields (1 in most cases)
 # Once the `Param` object is created, do the modelling "without any memory allocations" using `mod!`
 
-pa=GeoPhyInv.Fdtd.Param(npw=1,model=model,
+pa=SeisForwExpt(npw=1,model=model,
 	acqgeom=[acqgeom], acqsrc=[acqsrc],
 	sflags=[2], rflags=[1],
 	tgridmod=tgrid, verbose=true);

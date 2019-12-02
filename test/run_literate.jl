@@ -11,9 +11,11 @@ function run_literate(names, folder)
 		output_folder=joinpath(@__DIR__, "..", "docs", "src", folder) 
 		println(output_folder)
 		Literate.markdown(fp, output_folder, documenter=true,credit=false)
+		Literate.notebook(fp, output_folder, documenter=true,credit=false)
 	end
 end
 
+run_literate(["gallery"], "Geom")
 
 run_literate(["forw", "test_born"], "Poisson")
 
