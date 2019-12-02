@@ -23,11 +23,11 @@ using GeoPhyInv
 using Plots
 ```
 
-### Create and plot Geom
+### A surface acquisition
 
 ```@example gallery
 mgrid=repeat(range(-1000.0,stop=1000.0,length=201), 2) # test spatial grid
 geom_surf=GeoPhyInv.Gallery.Geom(mgrid,:surf,nss=5,nr=30);
-GIPh.Plots.geom(geom_surf)
+GIPh.Plots.geom!(geom_surf)
 ```
 
