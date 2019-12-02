@@ -25,6 +25,7 @@ mod!(a::SeisForwExpt)=GeoPhyInv.Fdtd.mod!(a)
 # export the Expt for Seismic Inversion
 const SeisInvExpt=GeoPhyInv.FWI.Param
 export SeisInvExpt
+export fit!
 
 # export the Expt for Poisson
 const PoissonExpt=GeoPhyInv.Poisson.ParamExpt

@@ -12,6 +12,7 @@ import GeoPhyInv.Utils
 using Distributions
 using DataFrames
 using Random
+using LinearAlgebra
 using SparseArrays
 using CSV
 
@@ -538,6 +539,14 @@ function Base.copyto!(srco::Src, src::Src)
 		return srco
 	else
 		error("attempt to copy dissimilar sources")
+	end
+end
+
+function LinearAlgebra.rmul!(src::Src, x::Number)
+	srcwav=getfield(src, :wav)
+	for iss=1:src.nss, ifield=1:length(src.fields) 
+		srcwavv=srcwav[iss,ifield]
+		rmul!(srcwavv, x)
 	end
 end
 

@@ -828,8 +828,10 @@ Author: Pawan Bharadwaj
 		end
 	end
 	end
-	pa.c.verbose && show(to)	
-	println(" ")
+	if(pa.c.verbose)
+		show(to)	
+		println("  ")
+	end
 	return nothing
 end
 

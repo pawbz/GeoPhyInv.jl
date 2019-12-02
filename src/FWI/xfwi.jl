@@ -58,7 +58,7 @@ The gradiet is computed using the adjoint state method.
 * returns the result of optimization as an Optim.jl object
   * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
 """
-function xfwi!(pa::Param, obj::Union{LS,LS_prior}, attrib_mod; 
+function fit!(pa::Param, obj::Union{LS,LS_prior}, attrib_mod; 
 	   optim_scheme=LBFGS(),
 	   optim_options=Optim.Options(show_trace=true,
 	   store_trace=true, 
@@ -111,7 +111,7 @@ function xfwi!(pa::Param, obj::Union{LS,LS_prior}, attrib_mod;
 			    
 			end
 
-			prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, 
+			global prob = createProblem(size(pa.mx.x)[1], pa.mx.lower_x, pa.mx.upper_x, 0, 
 				Array{Float64}(undef,0), Array{Float64}(undef,0), 0, 0,
 					eval_f, void_g, eval_grad_f, void_g_jac, nothing)
 
@@ -159,7 +159,7 @@ end
 """
 Return gradient at the first iteration, i.e., a migration image
 """
-function xfwi!(pa::Param, obj::Migr, attrib_mod)
+function migr!(pa::Param, attrib_mod)
 
 	global to
 	reset_timer!(to)
@@ -183,7 +183,7 @@ end
 Return gradient at the first iteration, i.e., a migration image, without using
 adjoint state method.
 """
-function xfwi!(pa::Param, obj::Migr_fd, attrib_mod)
+function migr_fd!(pa::Param, attrib_mod)
 	global to
 	reset_timer!(to)
 

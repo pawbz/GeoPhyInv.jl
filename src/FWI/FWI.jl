@@ -46,6 +46,8 @@ struct P end
 struct Vx end
 struct Vz end
 
+# exports
+export fit!
 
 """
 FWI Parameters
@@ -134,10 +136,6 @@ function LS_prior(ninv::Int, α=[1.0, 0.5])
 	return LS_prior(α[1],Misfits.P_gls(Q))
 end
 
-
-struct Migr end # returns first gradient
-
-struct Migr_fd end # computes first gradient using FD
 
 include("core.jl")
 include("prior.jl")
