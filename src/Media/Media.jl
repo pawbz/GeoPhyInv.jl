@@ -1,4 +1,4 @@
-module Models
+#module Media
 
 using DataFrames
 using NamedArrays
@@ -12,59 +12,38 @@ using ImageFiltering
 import GeoPhyInv.Smooth
 import GeoPhyInv.Interpolation
 
-mutable struct Model
+export update!, Medium
+
+mutable struct Medium
 	mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}}
-	m::AbstractArray{Array{Float64,2},1}
-	bounds::AbstractArray{Array{Float64,1},1}
-	ref::AbstractArray{Float64,1}
+	m::NamedArrays.NamedArray{Array{Float64,2},1,Array{Array{Float64,2},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
+	mdep::Array{Float64,2} # allocate memory for a dependent medium parameter
+	bounds::NamedArrays.NamedArray{Array{Float64,1},1,Array{Array{Float64,1},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
+	ref::NamedArray{Float64,1,Array{Float64,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 end
 
 
-struct Acoustic end
-
-function Model(::Acoustic,mgrid,m,mnames,mbounds=nothing)
-	@assert :vp ∈ mnames
-
-	nz=length(mgrid[1]); nx=length(mgrid[2])
-	return Seismic(mgrid,NamedArray([zeros(nz,nx),zeros(nx,nz)], ([:vp,:ρ],)),
-		       NamedArray([fill(0.0,2),fill(0.0,2)], ([:vp,:ρ],)), 
-		       NamedArray([0.0,0.0],([:vp,:ρ],)))
-
-end
+include("base.jl")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#=
 """
 Store reference model parameters
 """
 mutable struct Seismic_ref{T<:Real}
 	vp::T
 	vs::T
-	ρ::T
+	rho::T
 	K::T
-	μ::T
+	mu::T
 	KI::T
-	μI::T
-	ρI::T
+	muI::T
+	rhoI::T
 end
+=#
 
+
+#=
 
 
 """
@@ -75,42 +54,42 @@ A contrast function for a model m is given by ``χ(m) = \frac{m}{m0}-1``.
 
 * `vp0::Vector{Float64}` : [vpmin, vpmax]
 * `vs0::Vector{Float64}` : [vsmin, vsmax]
-* `ρ0::Vector{Float64}` : [ρmin, ρmax]
+* `rho0::Vector{Float64}` : [rhomin, rhomax]
 * `χvp::Array{Float64,2}` : two-dimensional contrast model (χ) for vp, for e.g., zeros(length(mgrid[1]), length(mgrid[2]))
 * `χvs::Array{Float64}` : two-dimensional contrast model (χ) for vs, for e.g., zeros(length(mgrid[1]), length(mgrid[2]))
-* `χρ::Array{Float64}` : two-dimensional contrast model (χ) for density, for e.g., zeros(length(mgrid[1]), length(mgrid[2]))
+* `χrho::Array{Float64}` : two-dimensional contrast model (χ) for density, for e.g., zeros(length(mgrid[1]), length(mgrid[2]))
 * `mgrid` : array of ranges to determine the dimensions of models
 """
 #
 #	vp0::Vector{Float64}
 #	vs0::Vector{Float64}
-#	ρ0::Vector{Float64}
+#	rho0::Vector{Float64}
 #	χvp::Array{Float64,2}
 #	χvs::Array{Float64,2}
-#	χρ::Array{Float64,2}
+#	χrho::Array{Float64,2}
 #	# all derived fields from previous
 #	K0::Vector{Float64}
-#	μ0::Vector{Float64}
+#	mu0::Vector{Float64}
 #	KI0::Vector{Float64}
-#	μI0::Vector{Float64}
-#	ρI0::Vector{Float64}
+#	muI0::Vector{Float64}
+#	rhoI0::Vector{Float64}
 #	"adding conditions that are to be false while construction"
-#	Seismic(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid,K0,μ0,KI0,μI0,ρI0,ref) = 
+#	Seismic(vp0,vs0,rho0,χvp,χvs,χrho,mgrid,K0,mu0,KI0,muI0,rhoI0,ref) = 
 #		any([
 #		     any(vp0.<0.0), 
 #		     any(vs0.<0.0),
-#		     any(ρ0.<0.0),
+#		     any(rho0.<0.0),
 #		     #all([all(vp0 .≠ 0.0), any(χ(χvp,vp0,-1) .< vp0[1])]), # check vp bounds
 #		     #all([all(vp0 .≠ 0.0), any(χ(χvp,vp0,-1) .> vp0[2])]), # check vp bounds
 #		     #all([all(vs0 .≠ 0.0), any(χ(χvs,vs0,-1) .< vs0[1])]), # check vs bounds
 #		     #all([all(vs0 .≠ 0.0), any(χ(χvs,vs0,-1) .> vs0[2])]), # check vs bounds
-#		     #all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .< ρ0[1])]), # check ρ bounds
-#		     #all([all(ρ0 .≠ 0.0), any(χ(χρ,ρ0,-1) .> ρ0[2])]), # check ρ bounds
+#		     #all([all(rho0 .≠ 0.0), any(χ(χrho,rho0,-1) .< rho0[1])]), # check rho bounds
+#		     #all([all(rho0 .≠ 0.0), any(χ(χrho,rho0,-1) .> rho0[2])]), # check rho bounds
 #		     size(χvp) != (length(mgrid[1]), length(mgrid[2])), # dimension check
 #		     size(χvs) != (length(mgrid[1]), length(mgrid[2])), # dimension check
-#		     size(χρ) != (length(mgrid[1]), length(mgrid[2])) # dimension check
+#		     size(χrho) != (length(mgrid[1]), length(mgrid[2])) # dimension check
 #		    ]) ? 
-#		       error("error in Seismic construction") : new(vp0,vs0,ρ0,χvp,χvs,χρ,mgrid,K0,μ0,KI0,μI0,ρI0,ref)
+#		       error("error in Seismic construction") : new(vp0,vs0,rho0,χvp,χvs,χrho,mgrid,K0,mu0,KI0,muI0,rhoI0,ref)
 #end
 #
 # check whether a seismic model is bounded
@@ -120,65 +99,69 @@ function isbounded(mod::Seismic)
 end
 
 # method to create Seismic object without using derived fields
-function Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, 
+function Seismic(vp0, vs0, rho0, χvp, χvs, χrho, 
 		 mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}})
-	mod=Seismic(vp0, vs0, ρ0, χvp, χvs, χρ, mgrid,
+	mod=Seismic(vp0, vs0, rho0, χvp, χvs, χrho, mgrid,
 	    zeros(2), zeros(2), zeros(2), zeros(2), zeros(2),
 	    Seismic_ref(zeros(8)...))
 	update_derived!(mod)
 	return mod
 end
 
+=#
+
+"""
+Just used to combine two named arrays
+"""
+function combine(a0::NamedArray, a::NamedArray)
+	a0names=names(a0)[1]
+	anames=names(a)[1]
+	# for names already in a0
+	for a0n in a0names
+		if(a0n ∈ anames)
+			@assert length(a0[a0n]) == length(a[a0n])
+			copyto!(a0[a0n], a[a0n])
+		end
+	end
+	newnames=setdiff(anames, a0names)
+
+	return vcat(a0, a[newnames])
+end
+
+
 # update the derived fields of the Seisimc model
-function update_derived!(mod::Seismic)
+function update!(mod::Medium)
 	"note that: mean(K0) ≠ 1/mean(KI0)"
 	mb=deepcopy(mod.bounds)
 
-	K = mb[:vp] .* mb[:vp] .* mb[:ρ]; 
+	K = mb[:vp] .* mb[:vp] .* mb[:rho]; 
 	KI = reverse(inv.(K),dims=1);
-	ρ = mb[:ρ]; 
-	ρI = reverse(inv.(ρ),dims=1);
-	newnames=[:K,:KI,:ρI]
+	rho = mb[:rho]; 
+	rhoI = reverse(inv.(rho),dims=1);
+	newnames=[:K,:KI,:rhoI]
 
 	if(:vs ∈ names(mb,1))
-		μ = mb[:vs] .* mb[:vs] .* mb[:ρ];
-		μI = reverse(inv.(μ),dims=1);
-		mbnew=NamedArray([K,KI,ρI,μ,μI],(vcat(newnames,[:μ,:μI]),))
+		mu = mb[:vs] .* mb[:vs] .* mb[:rho];
+		muI = reverse(inv.(mu),dims=1);
+		mbnew=NamedArray([K,KI,rhoI,mu,muI],(vcat(newnames,[:mu,:muI]),))
 	else
-		mbnew=NamedArray([K,KI,ρI],(newnames,))
+		mbnew=NamedArray([K,KI,rhoI],(newnames,))
 	end
 
-	mod.bounds=vcat(mb,mbnew)
+	mod.bounds=combine(mb,mbnew)
 
 	# update ref
-	mod.ref = NamedArray(Statistics.mean.(mod.bounds), names(mod.bounds))
+	mod.ref = NamedArray(Array(Statistics.mean.(mod.bounds)), names(mod.bounds))
 
 	return nothing
 end
 
 
-
-
-
-
-"""
-Print information about `Seismic`
-"""
-function Base.print(mod::Seismic, name::String="")
-	println("\tSeismic Model:\t",name)
-	println("\t> number of samples:\t","x\t",length(mod.mgrid[2]),"\tz\t",length(mod.mgrid[1]))
-	println("\t> sampling intervals:\t","x\t",step(mod.mgrid[2]),"\tz\t",step(mod.mgrid[1]))
-	println("\t> vp:\t","min\t",minimum(Seismic_get(mod,:vp)),"\tmax\t",maximum(Seismic_get(mod,:vp)))
-	println("\t> vp bounds:\t","min\t",mod.vp0[1],"\tmax\t",mod.vp0[2])
-	println("\t> ρ:\t","min\t",minimum(Seismic_get(mod,:ρ)),"\tmax\t",maximum(Seismic_get(mod,:ρ)))
-	println("\t> ρ bounds:\t","min\t",mod.ρ0[1],"\tmax\t",mod.ρ0[2])
-end
-
 """
 Return medium property bounds based on maximum and minimum values of the array and frac.
 The bounds cannot be less than zero
 """
-function bounds(mod::Array{Float64}, frac::Float64=0.1)
+function bounds(mod::AbstractArray, frac::Real=0.1)
 	any(mod .< 0.0) && error("model values less than zero")
 	bounds=zeros(2)
 	bound=frac*Statistics.mean(mod)
@@ -188,173 +171,34 @@ function bounds(mod::Array{Float64}, frac::Float64=0.1)
 end
 
 
-function adjust_bounds!(mod::Seismic,mod0::Seismic)
-	adjust_bounds!(mod,mod0.vp0,mod0.vs0,mod0.ρ0)
-end
+#function update!(mod::Seismic,mod0::Seismic)
+#	adjust_bounds!(mod,mod0.vp0,mod0.vs0,mod0.rho0)
+#end
 
-function adjust_bounds!(mod::Seismic,vp0::Vector{T},vs0::Vector{T},ρ0::Vector{T}) where {T<:Real}
-	copyto!(mod.vp0, Float64.(vp0))
-	copyto!(mod.vs0, Float64.(vs0))
-	copyto!(mod.ρ0, Float64.(ρ0))
-	update_derived!(mod)
+function update!(mod::Medium, fields::AbstractVector{Symbol}, bounds)
+	@assert !(bounds===nothing)
+	for name in names(mod.bounds)[1]
+		if(name ∈ fields)
+			i=findall(x->x==name, fields)[1]
+			copyto!(mod.bounds[name], Float64.(bounds[i]))
+		end
+	end
+	update!(mod)
 end
 
 """
 Adjust the bounds and hence the reference values.
 Since the reference values are adjust the χ fields should also be changed
 """
-function adjust_bounds!(mod::Seismic, frac::Float64=0.1)
-	for f in [:χvp, :χρ, :χvs]
-		f0 = Symbol((replace("$(f)", "χ" => "")),0)
-		fm = Symbol((replace("$(f)", "χ" => "")))
-		m = Seismic_get(mod, fm)
-		m0 = bounds(m, frac)
-		setfield!(mod, f0, m0)
-		setfield!(mod, f, χ(m, mean(m0), 1))
+function update!(mod::Medium, frac::Real)# 0.1
+	for name in names(mod.m)[1]
+		b = bounds(mod.m[name], frac)
+		copyto!(mod.bounds[name], Float64.(b))
 	end
-	update_derived!(mod)
+	update!(mod)
 	return mod
 end
 
-"""
-Return `Seismic` with zeros everywhere;
-this method is used for preallocation.
-
-# Arguments
-* `mgrid` : used for sizes of χ fields 
-"""
-function Seismic_zeros(mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}})
-	nz=length(mgrid[1]); nx=length(mgrid[2])
-	return Seismic(mgrid,NamedArray([zeros(nz,nx),zeros(nx,nz)], ([:vp,:ρ],)),
-		       NamedArray([fill(0.0,2),fill(0.0,2)], ([:vp,:ρ],)), 
-		       NamedArray([0.0,0.0],([:vp,:ρ],)))
-end
-
-function Base.fill!(mod::Seismic, k::Float64=0.0)
-	for m in mod.χ
-		fill!(m,k)
-	end
-	return mod
-end
-
-"""
-Return true if a `Seismic` model is just allocated with zeros.
-"""
-function Base.iszero(mod::Seismic)
-	return any((mod.vp0 .* mod.ρ0) .== 0.0) ? true : false
-end
-
-"""
-Return a similar model to the input model, used for allocation.
-"""
-function Base.similar(mod::Seismic)
-	modout=deepcopy(mod)
-	fill!(modout, 0.0)
-	return modout
-end
-
-
-"Compare if two `Seismic` models are equal"
-function Base.isequal(mod1::T, mod2::T) where {T<:Union{Seismic,Seismic_ref}}
-	fnames = fieldnames(T)
-	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
-	return all(vec)
-end
-
-"""
-Return if two `Seismic` models have same dimensions and bounds.
-"""
-function Base.isapprox(mod1::Seismic, mod2::Seismic)
-	vec=([(mod1.vp0==mod2.vp0), (mod1.vs0==mod2.vs0), (mod1.ρ0==mod2.ρ0), 
-       		(size(mod1.χvp)==size(mod2.χvp)), 
-       		(size(mod1.χvs)==size(mod2.χvs)), 
-       		(size(mod1.χρ)==size(mod2.χρ)), 
-		isequal(mod1.mgrid, mod2.mgrid),
-		])
-	return all(vec)
-end
-
-"""
-Copy for `Seismic` models. The models should have same bounds and sizes.
-Doesn't allocate any memory.
-"""
-function Base.copyto!(modo::Seismic, mod::Seismic)
-	if(isapprox(modo, mod))
-		for f in [:χvp, :χρ, :χvs]
-			modof=getfield(modo,f)
-			modf=getfield(mod,f)
-			copyto!(modof,modf)
-		end
-		return modo
-	else
-		error("attempt to copy dissimilar models")
-	end
-end
-
-function Seismic_get(mod::Seismic, attrib::Symbol)
-	# allocate
-	rout=zeros(length(mod.mgrid[1]), length(mod.mgrid[2]))
-	Seismic_get!(rout, mod, [attrib])
-	return rout
-end
-
-"""
-Get other dependent model parameters of a seismic model
-that are not present in `Seismic`.
-
-* `:ρI` : inverse of density
-* `:Zp` : P-wave impedance
-"""
-function Seismic_get!(x, mod::Seismic, attribvec::Vector{Symbol})
-	ρ=mod.χρ; χ!(ρ, mod.ref.ρ,-1) # undo it later
-	vp=mod.χvp; χ!(vp, mod.ref.vp,-1) # undo it later
-	vs=mod.χvs; χ!(vs, mod.ref.vs,-1) # undo it later
-	nznx=length(ρ)
-	(length(x)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
-	i0=0; 
-	for attrib in attribvec
-		if(attrib ≠:null)
-		if(attrib == :ρI)
-			@inbounds for i in 1:nznx; x[i0+i]=inv(ρ[i]); end
-		elseif(attrib == :ρ)
-			@inbounds for i in 1:nznx; x[i0+i]=ρ[i]; end
-		elseif(attrib == :vp)
-			@inbounds for i in 1:nznx; x[i0+i]=vp[i]; end
-		elseif(attrib == :vs)
-			@inbounds for i in 1:nznx; x[i0+i]=vs[i]; end
-		elseif(attrib == :χρI)
-			@inbounds for i in 1:nznx; x[i0+i]=χ(inv(ρ[i]),mod.ref.ρI,1); end
-		elseif(attrib == :χρ)
-			@inbounds for i in 1:nznx; x[i0+i]=χ(ρ[i],mod.ref.ρ,1); end
-		elseif(attrib == :χvp)
-			@inbounds for i in 1:nznx; x[i0+i]=χ(vp[i],mod.ref.vp,1); end
-		elseif(attrib == :χK)
-			@inbounds for i in 1:nznx; x[i0+i]=χ(vp[i]*vp[i]*ρ[i],mod.ref.K,1); end
-		elseif(attrib == :χμ)
-			@inbounds for i in 1:nznx; x[i0+i]=χ(vs[i]*vs[i]*ρ[i],mod.ref.μ,1); end
-		elseif(attrib == :χKI)
-			@inbounds for i in 1:nznx; x[i0+i]=χ(inv(vp[i]*vp[i]*ρ[i]),mod.ref.KI,1); end
-		elseif(attrib == :KI)
-			@inbounds for i in 1:nznx; x[i0+i]=inv(vp[i]*vp[i]*ρ[i]); end
-		elseif(attrib == :K)
-			@inbounds for i in 1:nznx; x[i0+i]=vp[i]*vp[i]*ρ[i]; end
-		elseif(attrib == :Zp)
-			@inbounds for i in 1:nznx; x[i0+i]=vp[i]*ρ[i]; end
-		else
-			error("invalid attrib")
-		end
-		i0+=nznx
-		end
-	end
-	χ!(ρ, mod.ref.ρ,1)
-	χ!(vp, mod.ref.vp,1)
-	χ!(vs, mod.ref.vs,1)
-	return x
-end
-
-include("reparameterize.jl")
-
-include("chainrule.jl")
 
 """
 Return dimensionless contrast model parameter using the
@@ -425,6 +269,9 @@ function χg(m::T, m0::T, flag::Int64=1) where {T<:Real}
 	end
 end
 
+include("getprop.jl")
+
+
 
 
 
@@ -446,10 +293,10 @@ In-place method to add features to the input model.
 * `rect_pert::Float64=0.1` : perturbation in a rectangle
 * `constant_pert::Float64=0.0` : constant perturbation 
 * `randn_pert::Float64=0.0` : percentage of reference values for additive random noise
-* `fields::Vector{Symbol}=[:χvp,:χρ,:χvs]` : which fields are to be modified?
+* `fields::Vector{Symbol}=[:χvp,:χrho,:χvs]` : which fields are to be modified?
 * `onlyin` : `mod` is modified only when field values are in these ranges 
 """
-function Seismic_addon!(mod::Seismic; 
+function update!(mod::Medium, fields::Vector{Symbol}; 
 		       point_loc=[0., 0.,],
 		       point_pert::Float64=0.0,
 		       ellip_loc=[0., 0.,],
@@ -460,9 +307,11 @@ function Seismic_addon!(mod::Seismic;
 		       rect_pert::Float64=0.0,
 		       constant_pert::Float64=0.0,
 		       randn_perc::Real=0.0,
-		       fields::Vector{Symbol}=[:χvp,:χρ,:χvs],
 		       onlyin::Vector{Vector{Float64}}=[[typemin(Float64), typemax(Float64)] for i in fields]
 		       )
+	for field in fields
+		@assert field ∈ [:vp,:vs,:rho]
+	end
 	rect_loc=convert.(Float64,rect_loc);
 	ellip_loc=convert.(Float64,ellip_loc);
 
@@ -494,7 +343,7 @@ function Seismic_addon!(mod::Seismic;
 
 
 	for (iff,field) in enumerate(fields)
-		m=getfield(mod, field)
+		m=mod.m[field]
 		for i in eachindex(m)
 			if(((m[i]-onlyin[iff][1])*(m[i]-onlyin[iff][2]))<0.0)
 				m[i] += temp[i]
@@ -504,16 +353,22 @@ function Seismic_addon!(mod::Seismic;
 
 	# random noise
 	for field in fields
-		f0 = Symbol((replace("$(field)", "χ" => "")),0)
-		m=getfield(mod, field)
-		m0=getfield(mod, f0)
+		m=mod.m[field]
+		m0=mod.ref[field]
 		for i in eachindex(m)
-			m[i] += randn() * randn_perc * 1e-2
+			m[i] = χ(χ(m[i],m0,1) + randn() * randn_perc * 1e-2, m0, -1)
 		end
 
 	end
-	return mod
+	return nothing
 end
+
+#end
+#=
+
+include("reparameterize.jl")
+
+include("chainrule.jl")
 
 
 """
@@ -536,7 +391,7 @@ Apply smoothing to `Seismic` using a Gaussian filter of zwidth and xwidth
 function Seismic_smooth(mod::Seismic, zperc::Real, xperc::Real=zperc;
 		 zmin::Real=mod.mgrid[1][1], zmax::Real=mod.mgrid[1][end],
 		 xmin::Real=mod.mgrid[2][1], xmax::Real=mod.mgrid[2][end],
-		 fields=[:χvp, :χρ, :χvs]
+		 fields=[:χvp, :χrho, :χvs]
 			)
 	xwidth = Float64(xperc) * 0.01 * abs(mod.mgrid[2][end]-mod.mgrid[2][1])
 	zwidth = Float64(zperc) * 0.01 * abs(mod.mgrid[1][end]-mod.mgrid[1][1])
@@ -589,7 +444,7 @@ function Seismic_trun(mod::Seismic;
 	mod_trun = Seismic_zeros([z,x])
 	adjust_bounds!(mod_trun, mod)
 
-	for f in [:χvp, :χvs, :χρ]
+	for f in [:χvp, :χvs, :χrho]
 		f0 = Symbol((replace("$(f)", "χ" => "")),0)
 		setfield!(mod_trun, f, getfield(mod, f)[izmin:izmax, ixmin:ixmax])
 		setfield!(mod_trun, f0, getfield(mod, f0)) # adjust bounds later after truncation if necessary
@@ -622,14 +477,14 @@ end
 function Seismic_pml_pad_trun!(modex::Seismic, mod::Seismic, nlayer_rand)
 	vp=mod.χvp; χ!(vp,mod.ref.vp,-1)
 	vs=mod.χvs; χ!(vs,mod.ref.vs,-1)
-	ρ=mod.χρ; χ!(ρ,mod.ref.ρ,-1)
+	rho=mod.χrho; χ!(rho,mod.ref.rho,-1)
 
-	vpex=modex.χvp; vsex=modex.χvs; ρex=modex.χρ;
+	vpex=modex.χvp; vsex=modex.χvs; rhoex=modex.χrho;
 	pml_pad_trun!(vpex,vp,mod.vp0,nlayer_rand,50.0);	
 	pml_pad_trun!(vsex,vs,[1,2],nlayer_rand,0.0);	
-	pml_pad_trun!(ρex,ρ,mod.ρ0,nlayer_rand,0.0)
-	χ!(vpex,modex.ref.vp,1); χ!(vsex,modex.ref.vs,1); χ!(ρex,modex.ref.ρ,1)
-	χ!(vp,mod.ref.vp,1); χ!(vs,mod.ref.vs,1); χ!(ρ,mod.ref.ρ,1)
+	pml_pad_trun!(rhoex,rho,mod.rho0,nlayer_rand,0.0)
+	χ!(vpex,modex.ref.vp,1); χ!(vsex,modex.ref.vs,1); χ!(rhoex,modex.ref.rho,1)
+	χ!(vp,mod.ref.vp,1); χ!(vs,mod.ref.vs,1); χ!(rho,mod.ref.rho,1)
 end
 
 function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
@@ -746,7 +601,7 @@ function interp_spray!(mod::Seismic, modi::Seismic, attrib::Symbol, Battrib::Sym
 	"loop over fields in `Seismic`"
 	Interpolation.interp_spray!(mod.χvp, modi.χvp, pa, attrib)
 	Interpolation.interp_spray!(mod.χvs, modi.χvs, pa, attrib)
-	Interpolation.interp_spray!(mod.χρ, modi.χρ,  pa, attrib)
+	Interpolation.interp_spray!(mod.χrho, modi.χrho,  pa, attrib)
 
 end
 
@@ -770,7 +625,7 @@ function save(mod::Seismic, folder; N=100)
 	adjust_bounds!(modo, mod)
 	interp_spray!(mod, modo, :interp)
 
-	for m in [:vp, :ρ, :Zp]
+	for m in [:vp, :rho, :Zp]
 		# save original gf
 		file=joinpath(folder, string("im", m, ".csv"))
 		CSV.write(file,DataFrame(hcat(repeat(z,outer=nx),
@@ -780,3 +635,7 @@ end
 	
 
 end # module
+
+
+
+	=#
