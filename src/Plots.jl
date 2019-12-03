@@ -7,7 +7,7 @@ using DSP
 #using ImageFiltering
 import GeoPhyInv.Acquisition
 import GeoPhyInv.Data
-import GeoPhyInv.Models
+import GeoPhyInv: Medium, copyto!
 
 
 @userplot Seismic
@@ -16,13 +16,13 @@ Plot the velocity and density seismic models.
 
 # Arguments
 
-* `model::Models.Seismic` : model that should be plotted
+* `model::Medium` : model that should be plotted
 
 # Keyword Arguments
 
 * `xlim::Vector{Float64}=[model.mgrid[2][1],model.mgrid[2][end]]` : minimum and maximum limits of the second dimension while plotting
 * `zlim::Vector{Float64}=[model.mgrid[1][1],model.mgrid[1][end]]` : minimum and maximum limits of the first dimension while plotting
-* `fields::Vector{Symbol}=[:vp, :ρ]` : fields that are to be plotted, see Models.Seismic_get
+* `fields::Vector{Symbol}=[:vp, :ρ]` : fields that are to be plotted
 * `contrast_flag=false` : plot only the edges of the model
 * `use_bounds=false` : adjust `clim` to the bounds in the seismic model
 
@@ -44,11 +44,9 @@ Plot the velocity and density seismic models.
 
 	layout --> (nrow,ncol)
 	for (i,iff) in enumerate(fields)
-		name=replace(string(iff), "ρ" => "rho")
-		name=replace(name, "χ" => "contrast\t")
+		name=string(iff)
 
-		f0 = Symbol((replace("$(fields[i])", "χ" => "")),0)
-		m = Models.Seismic_get(model, iff)
+		m = model[iff]
 		mx = model.mgrid[2]
 		mz = model.mgrid[1]
 		if(contrast_flag)
@@ -61,8 +59,8 @@ Plot the velocity and density seismic models.
 				m[j]=mmin+((m[j]-mmmin)*inv(mmmax-mmmin))*(mmax-mmin)
 			end
 		end
-		mmin = use_bounds ? getfield(model, f0)[1] : minimum(m)
-		mmax = use_bounds ? getfield(model, f0)[2] : maximum(m)
+		mmin = use_bounds ? model.bounds[iff][1] : minimum(m)
+		mmax = use_bounds ? model.bounds[iff][2] : maximum(m)
 		@series begin        
 			subplot := i
 			aspect_ratio := :equal

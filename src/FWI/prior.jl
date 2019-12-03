@@ -14,9 +14,9 @@ function update_prior!(pa; priori=nothing, priorm=nothing)
 			copyto!(pa.priori, pa.modi)
 		end
 	else
-		!(isapprox(priori,pa.modi)) && error("priori model has to be on igrid")
+		!(isequal(priori.mgrid,pa.modi.mgrid)) && error("priori model has to be on igrid")
 		copyto!(pa.priori, priori)
 	end
 	# update pa.mx.prior
-	Models.Seismic_get!(pa.mx.prior,pa.priori,pa.parameterization)
+	copyto!(pa.mx.prior,pa.priori,pa.parameterization)
 end

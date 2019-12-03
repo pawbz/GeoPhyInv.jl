@@ -32,8 +32,8 @@ end
 
 
 
-folder="Models"
-for t in ["Models", "param_adj"]
+folder="Media"
+for t in ["media", "param_adj"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end

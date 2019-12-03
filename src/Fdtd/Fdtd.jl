@@ -1,6 +1,6 @@
 module Fdtd
 
-import GeoPhyInv.Models
+import GeoPhyInv: Medium, copyto!, Medium_pml_pad_trun, Medium_pml_pad_trun!
 import GeoPhyInv.Interpolation
 import GeoPhyInv.Utils
 import GeoPhyInv.Acquisition
@@ -45,7 +45,7 @@ struct Vz end
 Modelling parameters common for all supersources
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
-* `gradient::Vector{Float64}=Models.Seismic_zeros(model.mgrid)` : gradient model modified only if `gmodel_flag`
+* `gradient::Vector{Float64}=Medium(model.mgrid)` : gradient model modified only if `gmodel_flag`
 * `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]`
 * `illum::Array{Float64,2}=zeros(length(model.mgrid[1]), length(model.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
@@ -65,8 +65,8 @@ mutable struct Paramc
 	jobname::Symbol
 	npw::Int64 
 	activepw::Vector{Int64}
-	exmodel::Models.Seismic
-	model::Models.Seismic
+	exmodel::Medium
+	model::Medium
 	acqgeom::Vector{Acquisition.Geom}
 	acqsrc::Vector{Acquisition.Src}
 	abs_trbl::Vector{Symbol}
@@ -105,8 +105,8 @@ mutable struct Paramc
 	δmodrr::Matrix{Float64} 
 	δmodrrvx::Matrix{Float64}
 	δmodrrvz::Matrix{Float64}
-	δmod::Vector{Float64} # perturbation vector (KI, ρI)
-	gradient::Vector{Float64}  # output gradient vector w.r.t (KI, ρI)
+	δmod::Vector{Float64} # perturbation vector (KI, rhoI)
+	gradient::Vector{Float64}  # output gradient vector w.r.t (KI, rhoI)
 	grad_modtt_stack::SharedArrays.SharedArray{Float64,2} # contains gmodtt
 	grad_modrrvx_stack::SharedArrays.SharedArray{Float64,2}
 	grad_modrrvz_stack::SharedArrays.SharedArray{Float64,2}
@@ -269,7 +269,7 @@ finite-difference modeling is performed.
 # Keyword Arguments
 
 * `npw::Int64=1` : number of independently propagating wavefields in `model`
-* `model::Models.Seismic` : seismic medium parameters 
+* `model::Medium` : seismic medium parameters 
 * `tgridmod::StepRangeLen=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
 * `tgrid::StepRangeLen=tgridmod` : output records are resampled on this time grid
 * `acqgeom::Vector{Acquisition.Geom}` :  acquisition geometry for each independently propagating wavefield
@@ -319,7 +319,7 @@ Author: Pawan Bharadwaj
 function Param(;
 	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
-	model::Models.Seismic=nothing,
+	model::Medium=nothing,
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
 	born_flag::Bool=false,
 	tgridmod::StepRangeLen=nothing,
@@ -393,8 +393,8 @@ function Param(;
 	freqmax = Utils.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
 
 	# minimum and maximum velocities
-	vpmin = minimum(broadcast(minimum,[model.vp0]))
-	vpmax = maximum(broadcast(maximum,[model.vp0]))
+	vpmin = minimum(broadcast(minimum,[model.bounds[:vp]]))
+	vpmax = maximum(broadcast(maximum,[model.bounds[:vp]]))
 	#verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
 
 
@@ -412,15 +412,15 @@ function Param(;
 	isx0, isz0=npml, npml
 
 	# extend models in the PML layers
-	exmodel = Models.Seismic_pml_pad_trun(model, nlayer_rand, npml);
+	exmodel = Medium_pml_pad_trun(model, nlayer_rand, npml);
 
 	"density values on vx and vz stagerred grids"
-	modrr=Models.Seismic_get(exmodel, :ρI)
+	modrr=copy(exmodel[:rhoI])
 	modrrvx = get_rhovxI(modrr)
 	modrrvz = get_rhovzI(modrr)
 
-	modttI = Models.Seismic_get(exmodel, :K) 
-	modtt = Models.Seismic_get(exmodel, :KI)
+	modttI = copy(exmodel[:K]) 
+	modtt = copy(exmodel[:KI])
 
 	if(born_flag)
 		(npw≠2) && error("born_flag needs npw=2")
@@ -546,7 +546,7 @@ end
 """
 update the perturbation vector using the perturbed model
 in this case, model will be treated as the background model 
-* `δmod` is [δKI, δρI]
+* `δmod` is [δKI, δrhoI]
 """
 function update_δmods!(pac::Paramc, δmod::Vector{Float64})
 	nx=pac.nx; nz=pac.nz
@@ -561,7 +561,7 @@ function update_δmods!(pac::Paramc, δmod::Vector{Float64})
 	fill!(pac.δmodrr,0.0)
 	δmodrr=view(pac.δmodrr,npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
-		# put perturbation due to ρI here
+		# put perturbation due to rhoI here
 		δmodrr[i] = δmod[nznxd+i]
 	end
 	# project δmodrr onto the vz and vx grids
@@ -576,10 +576,10 @@ Update the `δmods` when a perturbed `model_pert` is input.
 The model through which the waves are propagating 
 is assumed to be the background model.
 """
-function update_δmods!(pac::Paramc, model_pert::Models.Seismic)
+function update_δmods!(pac::Paramc, model_pert::Medium)
 	nznxd=prod(length.(pac.model.mgrid))
 	fill!(pac.δmod,0.0)
-	Models.Seismic_get!(pac.δmod, model_pert, [:KI, :ρI])
+	copyto!(pac.δmod, model_pert, [:KI, :rhoI])
 
 	for i in 1:nznxd
 		pac.δmod[i] -= pac.modtt[i] # subtracting the background model
@@ -593,15 +593,15 @@ end
 Update the `Seismic` model in `Paramc` without additional memory allocation.
 This routine is used during FWI, where medium parameters are itertively updated. 
 """
-function update_model!(pac::Paramc, model::Models.Seismic)
+function update_model!(pac::Paramc, model::Medium)
 
 	copyto!(pac.model, model)
 
-	Models.Seismic_pml_pad_trun!(pac.exmodel, pac.model, nlayer_rand)
+	Medium_pml_pad_trun!(pac.exmodel, pac.model, nlayer_rand)
 
-	Models.Seismic_get!(pac.modttI, pac.exmodel, [:K]) 
-	Models.Seismic_get!(pac.modtt, pac.exmodel, [:KI]) 
-	Models.Seismic_get!(pac.modrr, pac.exmodel, [:ρI])
+	copyto!(pac.modttI, pac.exmodel, [:K]) 
+	copyto!(pac.modtt, pac.exmodel, [:KI]) 
+	copyto!(pac.modrr, pac.exmodel, [:rhoI])
 	get_rhovxI!(pac.modrrvx, pac.modrr)
 	get_rhovzI!(pac.modrrvz, pac.modrr)
 	return nothing
@@ -745,7 +745,7 @@ This method updated the input `Fdtd.Param` after the wave propagation.
 
 * `pa.c.TDout::Vector{Data.TD}` : seismic data at receivers after modeling, for each propagating wavefield
 * `pa.c.snaps::Array{Float64,4}` : snaps with size `(nz,nx,length(tsnaps),nss)` saved at `tsnaps`
-* `pa.c.gradient::Models.Seismic` : gradient model modified only if `gmodel_flag`
+* `pa.c.gradient::Medium` : gradient model modified only if `gmodel_flag`
 * `pa.c.illum_stack::Array{Float64,2}` source energy of size `(nz,nx)` if `illum_flag`
 
 # Example

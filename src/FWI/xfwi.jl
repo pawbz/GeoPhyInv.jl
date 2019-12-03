@@ -9,7 +9,7 @@ function initialize!(pa::Param)
 	randn!(pa.mx.last_x)  # reset last_x
 
 	# use mod_initial as starting model according to parameterization
-	Models.Seismic_get!(pa.mx.x, pa.mod_initial, pa.parameterization)
+	copyto!(pa.mx.x, pa.mod_initial, pa.parameterization)
 
 	# bounds
 	Seismic_xbound!(pa.mx.lower_x, pa.mx.upper_x, pa)
@@ -25,7 +25,7 @@ function finalize!(pa::Param, xminimizer, attrib_mod)
 	F!(pa, nothing, attrib_mod)
 
 	# put minimizer into modi
-	Models.Seismic_reparameterize!(pa.modi, xminimizer, pa.parameterization) 
+	copyto!(pa.modi, xminimizer, pa.parameterization) 
 
 	# update initial model using minimizer, so that running xfwi! next time will start with updated model
 	copyto!(pa.mod_initial, pa.modi)
@@ -246,10 +246,10 @@ end
 		Harvest the Optim result to plot functional and gradient --- to be updated later
 		if(extended_trace)
 			# convert gradient vector to model
-			gmodi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
-			gmodm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)] 
-			modi = [Models.Seismic_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
-			modm = [Models.Seismic_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)]
+			gmodi = [Medium_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
+			gmodm = [Medium_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)] 
+			modi = [Medium_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
+			modm = [Medium_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)]
 			for itr=1:Optim.iterations(res)
 				# update modm and modi
 				Seismic_x!(modm[itr], modi[itr], Optim.x_trace(res)[itr], pa, -1)

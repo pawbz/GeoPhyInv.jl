@@ -6,23 +6,23 @@ Gallery of `SeisInvExpt`.
   * `=:pizza` all around sources and receivers
   * `=:downhole` sources and receivers along a drill-bit
 """
-function SeisInvExpt(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=0.0, parameterization=[:χvp, :χρ, :null])
+function SeisInvExpt(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=0.0, parameterization=[:χvp, :χrho, :null])
 
 	if(attrib==:pizza)
 		# starting model
 		model0 = Gallery.Seismic(:acou_homo2);
 		model = deepcopy(model0)
 		# add some noise to starting model
-		Models.Seismic_addon!(model0, randn_perc=0.1, fields=[:χvp,:χρ])
+		update!(model0, [:vp,:rho], randn_perc=0.1)
 
 		print(model)
 
 		# add perturbations
 		for ellip_loc in [[500.,0.], [0.,500.], [-500.,0.], [0.,-500.]]
-			Models.Seismic_addon!(model, ellip_rad=50., ellip_loc=ellip_loc, 
-				ellip_pert=0.1, fields=[:χvp,:χρ])
+			update!(model, [:vp,:rho], ellip_rad=50., ellip_loc=ellip_loc, 
+				ellip_pert=100.)
 		end
-		Models.Seismic_addon!(model, randn_perc=0.1, fields=[:χvp,:χρ])
+		update!(model, [:vp,:rho], randn_perc=0.1)
 
 		# sources, receivers
 		acqgeom=Acquisition.Geom_circ(nss=5,nr=20,rad=[900.,900.])
@@ -33,13 +33,14 @@ function SeisInvExpt(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=0
 		igrid_interp_scheme=:B2
 	elseif(attrib==:downhole)
 		gri = [range(-120.,stop=30.,step=1.0), range(-30.,stop=30.,step=1.0)]
-		model = Models.Seismic_zeros(gri)
-		Models.adjust_bounds!(model, [2500., 3500.], [2500., 3500.], [2500.,3500.])
+		model = Medium(gri)
+		update!(model, [:vp,:rho], [[2500., 3500.], [2500., 3500.]])
+		fill!(model)
 		model0=deepcopy(model)
 		print(model)
-		Models.Seismic_addon!(model, randn_perc=0.1, fields=[:χvp,:χρ])
-		Models.Seismic_addon!(model0, randn_perc=0.1, fields=[:χvp,:χρ])
-		Models.Seismic_addon!(model, ellip_rad=[2000., 5.], ellip_loc=[0.,0.],ellip_pert=0.1, ellip_α=α, fields=[:χvp],)
+		update!(model, [:vp,:rho], randn_perc=0.1)
+		update!(model0, [:vp,:rho], randn_perc=0.1)
+		update!(model, [:vp], ellip_rad=[2000., 5.], ellip_loc=[0.,0.],ellip_pert=0.1, ellip_α=α)
 
 		acqgeom=Acquisition.Geom_fixed(-75., -50., 0.0, -100., -50., 0.0, 2, 20, :vertical, :vertical)
 		acqsrc=Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=8, tmaxfrac=0.8)

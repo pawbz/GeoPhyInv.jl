@@ -64,5 +64,4 @@ export JA
 const JG=GeoPhyInv.Gallery
 export JG
 
-
 end # module

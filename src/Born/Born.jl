@@ -1,7 +1,7 @@
 module Born
 
 import GeoPhyInv.Acquisition
-import GeoPhyInv.Models
+import GeoPhyInv: Medium
 import GeoPhyInv.Data
 using SpecialFunctions
 using FFTW
@@ -13,18 +13,18 @@ end
 """
 k = wavenumber = 2pif/v0
 """
-function G0_homo_acou(x::T, z::T, k::T, ρ0::T) where {T<:AbstractFloat}
+function G0_homo_acou(x::T, z::T, k::T, rho0::T) where {T<:AbstractFloat}
 	sqrt(x*x + z*z) == 0.0 ? error("distance cannot be zero") : nothing
 	k == 0.0 ? error("wavenumber cannot be zero") : nothing
-	G0 = -0.25 * ρ0 * im * complex.(besselj0(k*sqrt(x*x + z*z)), -bessely0(k*sqrt(x*x + z*z)))
+	G0 = -0.25 * rho0 * im * complex.(besselj0(k*sqrt(x*x + z*z)), -bessely0(k*sqrt(x*x + z*z)))
 	return G0
 end
 
 
 function mod(;
 	     vp0::Float64=2000.0,
-	     ρ0::Float64=2000.0,
-	     model_pert::Models.Seismic=nothing,
+	     rho0::Float64=2000.0,
+	     model_pert::Medium=nothing,
              born_flag::Bool=false,
 	     tgridmod::StepRangeLen=nothing,
 	     tgrid::StepRangeLen = tgridmod,
@@ -48,8 +48,8 @@ function mod(;
 		δx = step(mesh_x)
 		δz = step(mesh_z)
 
-		δmodtt = Models.Seismic_get(model_pert, :KI) - (vp0 * vp0 * ρ0)^(-1)
-		δmodrr = Models.Seismic_get(model_pert, :ρI) - (ρ0)^(-1)
+		δmodtt = model_pert[:KI] - (vp0 * vp0 * rho0)^(-1)
+		δmodrr = model_pert[:rhoI] - (rho0)^(-1)
 	end
 
 	
@@ -96,8 +96,8 @@ function mod(;
 					for ix=1:nx
 						@simd for iz=1:nz
 							if(δmodtt[iz,ix] ≠ 0.0)
-								term += (G0_homo_acou(sx[is]-mesh_x[ix], sz[is]-mesh_z[iz], k, ρ0)[1] 
-									 * G0_homo_acou(rx[ir]-mesh_x[ix], rz[ir]-mesh_z[iz], k, ρ0)[1] .* ω .* ω .* δmodtt[iz,ix]) * δx * δz
+								term += (G0_homo_acou(sx[is]-mesh_x[ix], sz[is]-mesh_z[iz], k, rho0)[1] 
+									 * G0_homo_acou(rx[ir]-mesh_x[ix], rz[ir]-mesh_z[iz], k, rho0)[1] .* ω .* ω .* δmodtt[iz,ix]) * δx * δz
 								# factor due to integration
 							end
 						end
@@ -105,9 +105,9 @@ function mod(;
 
 				else
 					if(src_flag == 2)
-						term = G0_homo_acou(x, z, k, ρ0);
+						term = G0_homo_acou(x, z, k, rho0);
 					elseif(src_flag == 1)
-						dpow2[iω] = G0_homo_acou(x, z, k, ρ0) * im * abs(fnpow2grid[iω])
+						dpow2[iω] = G0_homo_acou(x, z, k, rho0) * im * abs(fnpow2grid[iω])
 					else
 						error("invalid src_flag")
 					end

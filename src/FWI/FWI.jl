@@ -20,7 +20,7 @@ using LinearAlgebra
 using Ipopt
 
 import GeoPhyInv.Interpolation
-import GeoPhyInv.Models
+import GeoPhyInv: Medium, update!, interp_spray!, chainrule!, copyto!, interp_spray!, pert_chainrule!
 import GeoPhyInv.Acquisition
 import GeoPhyInv.Data
 import GeoPhyInv.Coupling
@@ -83,19 +83,19 @@ mutable struct Param{Tmod, Tdatamisfit}
 	"acquisition geometry for adjoint propagation"
 	adjacqgeom::Acquisition.Geom
 	"Seismic model on modeling grid"
-	modm::Models.Seismic
+	modm::Medium
 	"background Seismic model"
-	modm0::Models.Seismic
+	modm0::Medium
 	"Seismic on inversion grid"
-	modi::Models.Seismic
+	modi::Medium
 	"initialize on this model"
-	mod_initial::Models.Seismic
+	mod_initial::Medium
 	"prior model on the inversion grid"
-	priori::Models.Seismic
+	priori::Medium
 	"gradient Seismic model on modeling grid"
-	gmodm::Models.Seismic
+	gmodm::Medium
 	"gradient Seismic on inversion grid"
-	gmodi::Models.Seismic
+	gmodi::Medium
 	"parameterization"
 	parameterization::Vector{Symbol}
 	"model preconditioning"
@@ -182,7 +182,7 @@ Constructor for `Param`
 * `acqgeom::Acquisition.Geom` : acquisition geometry
 * `tgrid::StepRangeLen` : modelling time grid
 * `attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}` : modelling attribute
-* `modm::Models.Seismic` : seismic model on modelling mesh 
+* `modm::Medium` : seismic model on modelling mesh 
 
 # Optional Arguments
 * `tgrid_obs::StepRangeLen` : time grid for observed data
@@ -199,11 +199,11 @@ Constructor for `Param`
 * `tlagssf_fracs=0.0` : maximum lagtime of unknown source filter
 * `tlagrf_fracs=0.0` : maximum lagtime of unknown receiver filter
 * `acqsrc_obs::Acquisition.Src=acqsrc` : source wavelets to generate *observed data*; can be different from `acqsrc`
-* `modm_obs::Models.Seismic=modm` : actual seismic model to generate *observed data*
-* `modm0::Models.Seismic=fill!(modm,0.0)` : background seismic model for Born modelling and inversion
+* `modm_obs::Medium=modm` : actual seismic model to generate *observed data*
+* `modm0::Medium=fill!(modm,0.0)` : background seismic model for Born modelling and inversion
 * `parameterization::Vector{Symbol}` : subsurface parameterization
-  * `=[:χvp, :χρ, :null]` for velocity and density inversion
-  * `=[:null, :χρ, :null]` for density-only inversion
+  * `=[:χvp, :χrho, :null]` for velocity and density inversion
+  * `=[:null, :χrho, :null]` for density-only inversion
   * `=[:χvp, :null, :null]` for velocity-only inversion
 * `verbose::Bool=false` : print level on STDOUT during inversion 
 * `attrib::Symbol=:synthetic` : an attribute to control class
@@ -216,7 +216,7 @@ function Param(
 	       acqgeom::Acquisition.Geom,
 	       tgrid::StepRangeLen,
 	       attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}, 
-	       modm::Models.Seismic;
+	       modm::Medium;
 	       # other optional 
 	       tgrid_obs::StepRangeLen=deepcopy(tgrid),
 	       rfields=[:P],
@@ -228,9 +228,9 @@ function Param(
 	       tlagssf_fracs=0.0,
 	       tlagrf_fracs=0.0,
 	       acqsrc_obs::Acquisition.Src=deepcopy(acqsrc),
-	       modm_obs::Models.Seismic=modm,
+	       modm_obs::Medium=modm,
 	       modm0=nothing,
-	       parameterization::Vector{Symbol}=[:χvp, :χρ, :null],
+	       parameterization::Vector{Symbol}=[:χvp, :χrho, :null],
 	       verbose::Bool=false,
 	       attrib::Symbol=:synthetic,
 	       nworker=nothing,
@@ -263,10 +263,10 @@ function Param(
 
 
 	# create modi according to igrid and interpolation of modm
-	modi = Models.Seismic_zeros(igrid);
+	modi = Medium(igrid, modm);
 	# update bounds
-	Models.adjust_bounds!(modi, modm)
-	Models.interp_spray!(modm, modi, :interp)
+	update!(modi,modm)
+	interp_spray!(modm, modi, :interp)
 
 	# save the initial model, as modi will be changed during the iterations
 	mod_initial=deepcopy(modi)
@@ -277,7 +277,7 @@ function Param(
 	# use default background model modm0
 	if(modm0 === nothing)
 		modm0=deepcopy(modm) # some dummy
-		fill!(modm0, 0.0)
+		fill!(modm0)
 	end
 	isequal(modm0, modm_obs) && (@warn "modm0 == modm_obs")
 
@@ -302,8 +302,8 @@ function Param(
 		tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
 
 
-	gmodm=similar(modm)
-	gmodi=similar(modi)
+	gmodm=Medium(modm.mgrid,[:χvp,:χrho])
+	gmodi=Medium(modi.mgrid,[:χvp,:χrho])
 
 	#println("added fake precon")
 	#dprecon=deepcopy(dobs)
@@ -335,7 +335,7 @@ function Param(
 
 
 	# put modm as a vector, according to parameterization in mxm.x
-	Models.Seismic_get!(mxm.x,modm,parameterization)
+	copyto!(mxm.x,modm,parameterization)
 
 	pa = Param(
 	     mx, mxm,
@@ -453,13 +453,13 @@ end
 function x_to_modm!(pa, x)
 
 	# put sparse x into modi (useless step, just for visualization)
-	Models.Seismic_reparameterize!(pa.modi, x, pa.parameterization) 
+	copyto!(pa.modi, x, pa.parameterization) 
 
 	# get x on dense grid
 	Interpolation.interp_spray!(x, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
 
 	# put dense x into modm, according to parameterization
-	Models.Seismic_reparameterize!(pa.modm,pa.mxm.x,pa.parameterization) 
+	copyto!(pa.modm,pa.mxm.x,pa.parameterization) 
 end
 
 
@@ -467,10 +467,10 @@ function δx_to_δmods!(pa, δx)
 	# get x on dense grid
 	Interpolation.interp_spray!(δx, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
 
-	# reparameterize accordingly to get [δKI, δρI]
-	Models.pert_reparameterize!(pa.paf.c.δmod, pa.mxm.x, pa.modm0, pa.parameterization)
+	# reparameterize accordingly to get [δKI, δrhoI]
+	copyto!(pa.paf.c.δmod, pa.mxm.x, pa.modm0, pa.parameterization)
 
-	# input [δKI, δρI] to the modeling engine
+	# input [δKI, δrhoI] to the modeling engine
 	Fdtd.update_δmods!(pa.paf.c, pa.paf.c.δmod)
 end
 
@@ -480,7 +480,7 @@ convert the gradient output from Fdtd to gx
 function spray_gradient!(gx,  pa, ::ModFdtd)
 
 	# apply chain rule on gmodm to get gradient w.r.t. dense x
-	Models.gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
+	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
 
 	# spray gradient w.r.t. dense x to the space of sparse x
 	Interpolation.interp_spray!(gx, pa.mxm.gx, pa.paminterp, :spray, count(pa.parameterization.≠:null))
@@ -491,7 +491,7 @@ end
 function spray_gradient!(gx, pa, ::ModFdtdBorn)
 
 	# apply chain rule on gmodm to get gradient w.r.t. dense x (note that background model is used for Born modeling here)
-	Models.gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
+	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
 
 	# spray gradient w.r.t. dense x to the space of sparse x
 	Interpolation.interp_spray!(gx, pa.mxm.gx, pa.paminterp, :spray, count(pa.parameterization.≠:null))
@@ -512,20 +512,24 @@ function Seismic_xbound!(lower_x, upper_x, pa)
 	bound1 = similar(lower_x)
 	# create a Seismic model with minimum possible values
 	modbound = deepcopy(pa.modi);
-	modbound.χvp = Models.χ(fill(modbound.vp0[1], size(modbound.χvp)), modbound.ref.vp)
-	modbound.χvs = Models.χ(fill(modbound.vs0[1], size(modbound.χvs)), modbound.ref.vs)
-	modbound.χρ = Models.χ(fill(modbound.ρ0[1], size(modbound.χρ)), modbound.ref.ρ)
+	copyto!(modbound[:vp], fill(modbound.bounds[:vp][1], size(modbound[:vp])))
+	if (:vs ∈ names(modbound.m)[1]) 
+	#	copyto!(modbound[:vs], fill(modbound.bounds[:vs][1], size(modbound[:vs])))
+	end
+	copyto!(modbound[:rho], fill(modbound.bounds[:rho][1], size(modbound[:rho])))
 
-	Models.Seismic_get!(bound1,modbound,pa.parameterization)
+	copyto!(bound1,modbound,pa.parameterization)
 
 
 	bound2=similar(upper_x)
 	# create a Seismic model with maximum possible values
-	modbound.χvp = Models.χ(fill(modbound.vp0[2], size(modbound.χvp)), modbound.ref.vp)
-	modbound.χvs = Models.χ(fill(modbound.vs0[2], size(modbound.χvs)), modbound.ref.vs)
-	modbound.χρ = Models.χ(fill(modbound.ρ0[2], size(modbound.χρ)), modbound.ref.ρ)
+	copyto!(modbound[:vp], fill(modbound.bounds[:vp][2], size(modbound[:vp])))
+	if (:vs ∈ names(modbound.m)[1]) 
+	#	copyto!(modbound[:vs], fill(modbound.bounds[:vs][2], size(modbound[:vs])))
+	end
+	copyto!(modbound[:rho], fill(modbound.bounds[:rho][2], size(modbound[:rho])))
 
-	Models.Seismic_get!(bound2,modbound,pa.parameterization)
+	copyto!(bound2,modbound,pa.parameterization)
 
 	# this sorting operation is important because 
 	lower_x[:] = min.(bound1, bound2)
@@ -537,10 +541,10 @@ end
 # gmodi, gmodm <-- gx (just for visualizing gradient)
 function visualize_gx!(gmodm, modm, gmodi, modi, gx, pa)
 	# chain rule depending on re-parameterization
-	Models.Seismic_chainrule!(gmodi, modi, gx, pa.parameterization, 1)
+	chainrule!(gmodi, modi, gx, pa.parameterization, 1)
 
 	# get gradient after interpolation (just for visualization, not exact)
-	Models.interp_spray!(gmodi, gmodm, :interp, pa=pa.paminterp)
+#	interp_spray!(gmodi, gmodm, :interp, :B2, [:χvp,:χrho], pa=pa.paminterp)
 end
 
 """

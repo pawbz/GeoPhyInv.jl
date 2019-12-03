@@ -233,7 +233,7 @@ function Fadj_map!(δy, δx, pa)
 	Fadj!(pa)
 
 	# chain rule corresponding to reparameterization
-	Models.pert_gradient_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm0, pa.parameterization)
+	pert_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm0, pa.parameterization)
 
 	# finally, adjoint of interpolation
 	Interpolation.interp_spray!(δy, 

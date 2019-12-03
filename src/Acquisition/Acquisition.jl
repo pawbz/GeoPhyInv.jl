@@ -7,7 +7,7 @@ help their construction.
 """
 module Acquisition
 
-import GeoPhyInv.Models
+import GeoPhyInv: Medium, χ
 import GeoPhyInv.Utils
 using Distributions
 using DataFrames
@@ -339,7 +339,7 @@ end
 """
 Randomly place source and receivers in a given model
 """
-function Geom_fixed(mod::Models.Seismic,
+function Geom_fixed(mod::Medium,
 	      nss::Int64=5,
 	      nr::Int64=5,
 	      ns::Vector{Int64}=ones(Int,nss))
@@ -619,14 +619,14 @@ the model has `nλ` wavelengths.
 
 # Keyword Arguments
 
-* `mod::Models.Seismic` :
+* `mod::Medium` :
 * `nλ::Int64=10` : number of wavelengths in the mod
 * `wav_func::Function=(fqdom, tgrid)->Utils.Wavelets.ricker(fqdom,tgrid)` : which wavelet to generate, see Utils.Wavelets.jl
 * `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the model, use this fraction to increase of reduce the maximum time
 """
 function Src_fixed_mod(
 		nss::Int64, ns::Int64, fields::Vector{Symbol}; 
-		mod::Models.Seismic=nothing, 
+		mod::Medium=nothing, 
 		nλ::Int64=10,
 		wav_func::Function=(fqdom, tgrid)->Utils.Wavelets.ricker(fqdom,tgrid),
 		tmaxfrac::Float64=1.0
@@ -636,7 +636,7 @@ function Src_fixed_mod(
 	# dominant wavelength using mod dimensions
 	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nλ)
 	# average P velocity
-	vavg=Models.χ([mean(mod.χvp)], mod.ref.vp, -1)[1]
+	vavg=mean(mod[:vp])
 
 	fqdom = vavg/λdom
 
@@ -648,7 +648,7 @@ function Src_fixed_mod(
 
 	# choose sampling interval to obey max freq of source wavelet
 	δmin = minimum([step(mod.mgrid[2]), step(mod.mgrid[1])])
-	vpmax = mod.vp0[2]
+	vpmax = mod.bounds[:vp][2]
 	δt=0.5*δmin/vpmax
 
 	# check if δt is reasonable

@@ -1,6 +1,6 @@
 
 model=GeoPhyInv.Gallery.Seismic(:acou_homo1)
-GeoPhyInv.Models.Seismic_addon!(model, randn_perc=0.1, fields=[:χvp,:χρ])
+update!(model, [:vp,:rho], randn_perc=0.1)
 acqgeom =GeoPhyInv.Acquisition.Geom_circ(nss=4,nr=100,rad=[990.,990.]);
 acqgeom =GeoPhyInv.Acquisition.Geom_circ(nss=4,nr=100,rad=[0.,200.]);
 acqsrc=GeoPhyInv.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=0.4)

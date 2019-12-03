@@ -9,11 +9,11 @@ wav = GeoPhyInv.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
 acqsrc = GeoPhyInv.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
 
 
-vp0=mean(GeoPhyInv.Models.χ(model.χvp,model.ref.vp,-1))
-ρ0=mean(GeoPhyInv.Models.χ(model.χρ,model.ref.ρ,-1))
+vp0=mean(model[:vp])
+rho0=mean(model[:rho])
 rec1 = GeoPhyInv.Born.mod(vp0=vp0,
             model_pert=model,
-		     ρ0=ρ0,
+		     rho0=rho0,
 			 acqgeom=acqgeom, acqsrc=acqsrc, tgridmod=tgrid, src_flag=2)
 
 
