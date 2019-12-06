@@ -269,7 +269,7 @@ end
 
 """
 Method to create `Fdtd` modeling parameters.
-The output of this method can be used as an input to `mod!`, where the actual 
+The output of this method can be used as an input to `update!`, where the actual 
 finite-difference modeling is performed.
 
 # Keyword Arguments
@@ -306,7 +306,7 @@ finite-difference modeling is performed.
 
 ```julia
 pa = GeoPhyInv.Fdtd.Param(acqgeom=acqgeom, acqsrc=acqsrc, model=model, tgridmod=tgridmod);
-GeoPhyInv.Fdtd.mod!(pa);
+GeoPhyInv.Fdtd.update!(pa);
 ```
 # Credits 
 
@@ -351,7 +351,7 @@ function Param(;
 	(length(acqsrc) ≠ npw) && error("acqsrc dimension")
 	(length(sflags) ≠ npw) && error("sflags dimension")
 	(length(rflags) ≠ npw) && error("rflags dimension")
-	(maximum(tgridmod) < maximum(acqsrc[1].tgrid)) && error("modeling time is less than source time")
+	(maximum(tgridmod) < maximum(acqsrc[1][1].tgrid)) && error("modeling time is less than source time")
 	#(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
 	#any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod) for ip=1:length(TDout)]) && error("output time > modeling time")
 
@@ -370,19 +370,18 @@ function Param(;
 
 	length(acqgeom) != npw ? error("acqgeom size") : nothing
 	length(acqsrc) != npw ? error("acqsrc size") : nothing
-	any([length(acqgeom[ip]) != getfield(acqsrc[ip],:nss) for ip=1:npw])  ? error("different supersources") : nothing
-	any([getfield(acqgeom[ip][:],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npw])  ? error("different sources") : nothing
+	all([issimilar(acqgeom[ip],acqsrc[ip]) for ip=1:npw]) ? nothing : error("geom and srcwav mismatch") 
 
 	# necessary that nss and fields should be same for all nprop
-	nss = acqgeom[1].nss;
-	sfields=[acqsrc[ipw].fields for ipw in 1:npw]
+	nss = length(acqgeom[1]);
+	sfields=[names(acqsrc[ipw][1].w)[1] for ipw in 1:npw]
 	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
 	for ipw in 1:npw
 		for (i,field) in enumerate(sfields[ipw])
 			isfields[ipw][i]=findfirst(isequal(field), [:P,:Vx,:Vz])
 		end
 	end
-	fill(nss, npw) != [getfield(acqgeom[ip],:nss) for ip=1:npw] ? error("different supersources") : nothing
+	fill(nss, npw) != [length(acqgeom[ip]) for ip=1:npw] ? error("different supersources") : nothing
 
 	# create acquisition geometry with each source shooting 
 	# at every unique receiver position
@@ -395,8 +394,8 @@ function Param(;
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
 	# find maximum and minimum frequencies in the source wavelets
-	freqmin = Utils.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:min) 
-	freqmax = Utils.findfreq(acqsrc[1].wav[1,1][:,1],acqsrc[1].tgrid,attrib=:max) 
+	freqmin = Utils.findfreq(acqsrc[1][1].w[1][:,1],acqsrc[1][1].tgrid,attrib=:min) 
+	freqmax = Utils.findfreq(acqsrc[1][1].w[1][:,1],acqsrc[1][1].tgrid,attrib=:max) 
 
 	# minimum and maximum velocities
 	vpmin = minimum(broadcast(minimum,[model.bounds[:vp]]))
@@ -471,8 +470,8 @@ function Param(;
 
 	itsnaps = [argmin(abs.(tgridmod .- tsnaps[i])) for i in 1:length(tsnaps)]
 
-	nrmat=[acqgeom[ipw].nr[iss] for ipw in 1:npw, iss in 1:acqgeom[1].nss]
-	datamat=SharedArray{Float64}(nt,maximum(nrmat),acqgeom[1].nss)
+	nrmat=[acqgeom[ipw][iss].nr for ipw in 1:npw, iss in 1:nss]
+	datamat=SharedArray{Float64}(nt,maximum(nrmat),nss)
 	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findall(!iszero, rflags))]
 
 	# default is all prpagating wavefields are active
@@ -657,7 +656,7 @@ function Paramss(iss::Int64, pac::Paramc)
 	mesh_x, mesh_z = pac.exmodel.mgrid[2], pac.exmodel.mgrid[1]
 
 	# records_output, distributed array among different procs
-	records = [zeros(nt,pac.acqgeom[ipw].nr[iss],length(irfields)) for ipw in 1:npw]
+	records = [zeros(nt,pac.acqgeom[ipw][iss].nr,length(irfields)) for ipw in 1:npw]
 
 	# gradient outputs
 	grad_modtt = zeros(nz, nx)
@@ -670,7 +669,7 @@ function Paramss(iss::Int64, pac::Paramc)
 	snaps = (pac.snaps_flag) ? zeros(nzd,nxd,length(pac.itsnaps)) : zeros(1,1,1)
 
 	# source wavelets
-	wavelets = [zeros(pac.acqgeom[ipw].ns[iss],length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
+	wavelets = [zeros(pac.acqgeom[ipw][iss].ns,length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
 	fill_wavelets!(iss, wavelets, acqsrc, sflags)
 
 	
@@ -687,38 +686,38 @@ function Paramss(iss::Int64, pac::Paramc)
 		boundary=[zeros(1,1,1) for ii in 1:5]
 	end
 	# source_spray_weights per supersource
-	ssprayw = [zeros(4,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
-	denomsI = [zeros(acqgeom[ipw].ns[iss]) for ipw in 1:npw]
-	isx1=[zeros(Int64,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
-	isx2=[zeros(Int64,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
-	isz1=[zeros(Int64,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
-	isz2=[zeros(Int64,acqgeom[ipw].ns[iss]) for ipw in 1:npw]
+	ssprayw = [zeros(4,acqgeom[ipw][iss].ns) for ipw in 1:npw]
+	denomsI = [zeros(acqgeom[ipw][iss].ns) for ipw in 1:npw]
+	isx1=[zeros(Int64,acqgeom[ipw][iss].ns) for ipw in 1:npw]
+	isx2=[zeros(Int64,acqgeom[ipw][iss].ns) for ipw in 1:npw]
+	isz1=[zeros(Int64,acqgeom[ipw][iss].ns) for ipw in 1:npw]
+	isz2=[zeros(Int64,acqgeom[ipw][iss].ns) for ipw in 1:npw]
 	for ipw=1:npw
-		for is=1:acqgeom[ipw].ns[iss]
+		for is=1:acqgeom[ipw][iss].ns
 			weights=ssprayw[ipw]
 			denom=denomsI[ipw]
 			Interpolation.get_spray_weights!(view(weights, :,is), view(denom,is), 
 				    view(isx1[ipw],is), view(isx2[ipw],is),
 				    view(isz1[ipw],is), view(isz2[ipw],is),
-			    mesh_x, mesh_z, acqgeom[ipw].sx[iss][is], acqgeom[ipw].sz[iss][is])
+				    mesh_x, mesh_z, acqgeom[ipw][iss].sx[is], acqgeom[ipw][iss].sz[is])
 		end
 	end
 
 	# receiver interpolation weights per sequential source
-	rinterpolatew = [zeros(4,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
-	denomrI = [zeros(acqgeom[ipw].nr[iss]) for ipw in 1:npw]
-	irx1=[zeros(Int64,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
-	irx2=[zeros(Int64,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
-	irz1=[zeros(Int64,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
-	irz2=[zeros(Int64,acqgeom[ipw].nr[iss]) for ipw in 1:npw]
+	rinterpolatew = [zeros(4,acqgeom[ipw][iss].nr) for ipw in 1:npw]
+	denomrI = [zeros(acqgeom[ipw][iss].nr) for ipw in 1:npw]
+	irx1=[zeros(Int64,acqgeom[ipw][iss].nr) for ipw in 1:npw]
+	irx2=[zeros(Int64,acqgeom[ipw][iss].nr) for ipw in 1:npw]
+	irz1=[zeros(Int64,acqgeom[ipw][iss].nr) for ipw in 1:npw]
+	irz2=[zeros(Int64,acqgeom[ipw][iss].nr) for ipw in 1:npw]
 	for ipw=1:npw
-		for ir=1:acqgeom[ipw].nr[iss]
+		for ir=1:acqgeom[ipw][iss].nr
 			weights=rinterpolatew[ipw]
 			denom=denomrI[ipw]
 			Interpolation.get_interpolate_weights!(view(weights, :,ir), view(denom, ir), 
 				  view(irx1[ipw],ir), view(irx2[ipw],ir),
 				  view(irz1[ipw],ir), view(irz2[ipw],ir),
-			    mesh_x, mesh_z, acqgeom[ipw].rx[iss][ir], acqgeom[ipw].rz[iss][ir])
+				  mesh_x, mesh_z, acqgeom[ipw][iss].rx[ir], acqgeom[ipw][iss].rz[ir])
 		end
 	end
 
@@ -757,7 +756,7 @@ This method updated the input `Fdtd.Param` after the wave propagation.
 # Example
 
 ```julia
-GeoPhyInv.Fdtd.mod!(pa)
+GeoPhyInv.Fdtd.update!(pa)
 ```
 # Credits 
 
@@ -765,7 +764,7 @@ Author: Pawan Bharadwaj
         (bharadwaj.pawan@gmail.com)
 
 """
-@fastmath function mod!(pa::Param=Param())
+@fastmath function update!(pa::Param=Param())
 
 	global to
 
@@ -847,7 +846,7 @@ function update_datamat!(ifield, ipw, pac::Paramc, pap::Paramp)
 	for issp in 1:length(pass)
 		iss=pass[issp].iss
 		records=pass[issp].records[ipw]
-		for ir in 1:pac.acqgeom[ipw].nr[iss]
+		for ir in 1:pac.acqgeom[ipw][iss].nr
 			for it in 1:pac.nt
 				datamat[it,ir,iss]=records[it,ir,ifield]
 			end
@@ -857,9 +856,9 @@ end
 
 function update_data!(ifield, ipw, pac::Paramc)
 	datamat=pac.datamat
-	for iss in 1:pac.acqgeom[1].nss
+	for iss in 1:length(pac.acqgeom[1])
 		data=pac.data[ipw].d[iss,ifield]
-		for ir in 1:pac.acqgeom[ipw].nr[iss]
+		for ir in 1:pac.acqgeom[ipw][iss].nr
 			for it in 1:pac.nt
 				data[it,ir]=datamat[it,ir,iss]
 			end
@@ -910,7 +909,7 @@ function mod_per_proc!(pac::Paramc, pap::Paramp)
 			boundary_force_snap_vxvz!(issp,pac,pap.ss,pap)
 		end
 
-		prog = Progress(pac.nt, dt=1, desc="\tmodeling supershot $iss/$(pac.acqgeom[1].nss) ", 
+		prog = Progress(pac.nt, dt=1, desc="\tmodeling supershot $iss/$(length(pac.acqgeom[1])) ", 
 		  		color=:white) 
 		# time_loop
 		"""
@@ -1147,4 +1146,3 @@ end
 
 include("getprop.jl")
 
-export mod!

@@ -16,7 +16,7 @@ struct Receiver_B1 end
 		pw=p[ipw]
 		recs=pass[issp].records[ipw]
 		for (ifieldr, ifield) in enumerate(pac.irfields)
-			@simd for ir = 1:pac.acqgeom[ipw].nr[iss]
+			@simd for ir = 1:pac.acqgeom[ipw][iss].nr
 				recs[it,ir,ifieldr]= 
 				(
 				pw[irz1[ipw][ir],irx1[ipw][ir],ifield]*
@@ -46,7 +46,7 @@ end
 		pw=p[ipw]
 		recs=pass[issp].records[ipw]
 		for (ifieldr, ifield) in enumerate(pac.irfields)
-			@simd for ir = 1:pac.acqgeom[ipw].nr[iss]
+			@simd for ir = 1:pac.acqgeom[ipw][iss].nr
 				recs[it,ir,ifieldr]=(pw[irz1[ipw][ir],irx1[ipw][ir],ifield])
 		end
 	end

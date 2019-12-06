@@ -75,6 +75,10 @@ end
 
 SrcWav=Array{SrcWavss,1}
 
+function Array{SrcWavss,1}(tgrid::StepRangeLen, ss::SSrcs=SSrcs(5), s::Vector{Srcs}=fill(Srcs(1),ss.n), fields=[:P])
+	return [SrcWavss(tgrid,s[i], fields) for i in 1:ss.n]
+end
+
 
 #"""
 #Allocate `SrcWav` with zeros depending on the acquisition geometry.
@@ -109,18 +113,23 @@ Uses same source wavelet, i.e., `wav` for all sources and supersources
 * `wav::Array{Float64}` : a source wavelet that is used for all sources and supersources
 * `tgrid` : time grid for the wavelet
 """
-function update!(s::SrcWavss, 
-	     fields::Vector{Symbol},
-	     w::Array{Float64},
-	     )
+function update!(s::SrcWavss, fields::Vector{Symbol}, w::Array{Float64},)
 	for f in fields
-		for is in 1:ns
+		for is in 1:s.ns
 			ww=view(s.w[f],:,is)
 			copyto!(ww,w)
 		end
 	end
-	return SrcWavss
+	return s
 end
+
+function update!(s::SrcWav, fields::Vector{Symbol}, w::Array{Float64},)
+	for ss in s
+		update!(ss,fields,w)
+	end
+	return s
+end
+
 
 
 

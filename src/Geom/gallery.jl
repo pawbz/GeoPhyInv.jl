@@ -28,6 +28,7 @@ function Array{Geomss,1}(mgrid::AbstractArray{T}, attrib::Symbol, ss::SSrcs=SSrc
 	halfx = 0.5*(mgrid[2][1]+mgrid[2][end]);	halfz = 0.5*(mgrid[1][1]+mgrid[1][end]);
 	geom=Geom(mgrid, ss, Srcs(1), r)
 	if(attrib == :xwell)
+		println(otz)
 		update!(geom, SSrcs(), [otz,otx], [ntz,otx])
 		update!(geom, Recs(), [otz,ntx], [ntz,ntx])
 	elseif(attrib == :surf)

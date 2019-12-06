@@ -10,6 +10,8 @@ function get_spray_weights!(weights::AbstractArray, denomI::AbstractArray,
 
 	ix1[1], ix2[1] = indminn(mesh_x,xval,2)
 	iz1[1], iz2[1] = indminn(mesh_z,zval,2)
+	println("qqef\t", ix1[1], ix2[1])
+	println("ee\t", iz1[1], iz2[1], zval)
 	
 	denomI[1] = ((mesh_x[ix2[1]] - mesh_x[ix1[1]])*(mesh_z[iz2[1]] - mesh_z[iz1[1]]))^(-1.e0)
 	"for iz1, ix1"

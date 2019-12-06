@@ -38,7 +38,7 @@ function findfreq(
 	ax = (abs.(cx).^2); # power spectrum in dB
 
 	if(maximum(ax) == 0.0)
-		warn("x is zero"); return 0.0
+		@warn("x is zero"); return 0.0
 	else 
 		ax /= maximum(ax);
 		ax = 10. .* log10.(ax)

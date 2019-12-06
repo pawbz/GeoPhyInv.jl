@@ -4,9 +4,10 @@ using Statistics
 model = GeoPhyInv.Seismic(:acou_homo1);
 acqgeom = Geom(model.mgrid,:xwell);
 tgrid = range(0.0,stop=2.0,length=1000)
-wav = GeoPhyInv.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
+wav = ricker(10.0, tgrid, tpeak=0.25, );
 # source wavelet for modelling
-acqsrc = GeoPhyInv.SrcWav_fixed(length(acqgeom),1,[:P],wav,tgrid);
+acqsrc = SrcWav(tgrid, SSrcs(length(acqgeom)), [Srcs(1)], [:P]);
+update!(acqsrc, [:P], wav)
 
 
 vp0=mean(model[:vp])
@@ -23,7 +24,7 @@ pa=SeisForwExpt(npw=1,model=model,
         sflags=[2], rflags=[1],
 	    tgridmod=tgrid, verbose=true );
 
-@time GeoPhyInv.Fdtd.mod!(pa);
+@time update!(pa);
 
 
 # least-squares misfit

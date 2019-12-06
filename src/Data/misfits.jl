@@ -37,11 +37,11 @@ function func_grad!(pa::P_misfit, grad=nothing)
 	tgrid = x.tgrid;
 	acq = x.acqgeom;
 	fields = x.fields;
-	nss = acq.nss;
+	nss = length(acq);
 
 
 	J = 0.0;
-	for ifield=1:length(fields), iss=1:acq.nss
+	for ifield=1:length(fields), iss=1:nss
 		xr=x.d[iss,ifield]
 		yr=y.d[iss,ifield]
 		wr=pa.w.d[iss,ifield]

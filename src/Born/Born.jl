@@ -32,12 +32,12 @@ function mod(;
 	     acqsrc::SrcWav=nothing,
 	     src_flag::Int64=2,
 		  )
-	(length(acqgeom) != getfield(acqsrc,:nss))  ? error("different supersources") : nothing
+	(length(acqgeom) != length(acqsrc))  ? error("different supersources") : nothing
 	@info "fix this"
 #	(length(acqgeom) != getfield(acqsrc,:ns))  ? error("different sources") : nothing
 
 
-	nt = (length(tgridmod) == length(acqsrc.tgrid)) ? length(tgrid) : error("acqsrc tgrid")
+	nt = (length(tgridmod) == length(acqsrc[1].tgrid)) ? length(tgrid) : error("acqsrc tgrid")
 	np2 = nextpow(2, 2*nt);	
 		
 
@@ -77,7 +77,7 @@ function mod(;
 		for is=1:acqgeom[iss].ns
 			# zero pad wavelet
 			for it in 1:nt
-				wpow2[it]=complex(acqsrc.wav[iss,ifield][it,is])
+				wpow2[it]=complex(acqsrc[iss].w[ifield][it,is])
 			end
 			FFTW.fft!(wpow2) # source wavelet in the frequency domain
 

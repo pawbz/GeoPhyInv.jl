@@ -97,12 +97,14 @@ Output `n` interpolated 2-D points between `p1` and `p2`.
 function spread(n, p1::Vector{T1}, p2::Vector{T2}, rand_flag::Bool=false) where {T1<:Real,T2<:Real}
 	@assert (length(p1)==2) && (length(p2)==2)
 
-	knots = ([p1[2],p2[2]],)
-	itp = Interpolations.interpolate(knots, [p1[1],p2[1]],  Gridded(Linear()));
-
-	xa = isequal(n,1) ? fill(p1[2],1) : (rand_flag ? 
-					Random.rand(Uniform(sort([p1[2],p2[2]])...), n) : range(p1[2],stop=p2[2],length=n))
-	return [itp(xa[i]) for i in 1:n], [xa[i] for i in 1:n]
+	if(n==1)
+		return [p1[1]], [p1[2]]
+	else
+		knots = ([1,n],)
+		itpz = Interpolations.interpolate(knots, [p1[1],p2[1]],  Gridded(Linear()));
+		itpx = Interpolations.interpolate(knots, [p1[2],p2[2]],  Gridded(Linear()));
+		return [itpz(i) for i in 1:n], [itpx(i) for i in 1:n]
+	end
 end
 
 function spread(n, p0::Vector{T1}, rad::T2, angles::Vector{T3}, rand_flag::Bool=false)  where {T1<:Real,T2<:Real,T3<:Real}  
@@ -174,10 +176,24 @@ function Base.in(geom::Geom, mgrid::AbstractVector{T}) where {T<:StepRangeLen}
 			   (((geom[iss].sz .- zmin).*(zmax .- geom[iss].sz)) .< 0.0),
 			   (((geom[iss].rx .- xmin).*(xmax .- geom[iss].rx)) .< 0.0),
 			   (((geom[iss].rz .- zmin).*(zmax .- geom[iss].rz)) .< 0.0),
+			   isnan.(geom[iss].sx),
+			   isnan.(geom[iss].sz),
+			   isnan.(geom[iss].rx),
+			   isnan.(geom[iss].rz),
 		     ) )
 	end
 	return !(any(checkvec))
 end
+
+
+function issimilar(geom::Geom, srcwav::SrcWav)
+	test=[]
+	push!(test, length(geom)==length(srcwav))
+	nss=length(geom)
+	push!(test, [geom[i].ns for i in 1:nss]==[srcwav[i].ns for i in 1:nss])
+	return all(test)
+end
+issimilar(srcwav::SrcWav, geom::Geom)=issimilar(geom, srcwav)
 
 #=
 """

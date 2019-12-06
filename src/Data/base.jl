@@ -19,15 +19,16 @@ function Base.isapprox(dat1::TD, dat2::TD)
 		isequal(dat1.acqgeom, dat2.acqgeom, :receivers), # only receivers have to be the same
        		(size(dat1.d)==size(dat2.d)), 
 		])
-	vec2=[size(dat1.d[iss,ifield])==size(dat2.d[iss,ifield]) for iss=1:dat1.acqgeom.nss, ifield=1:length(dat1.fields)]
+	vec2=[size(dat1.d[iss,ifield])==size(dat2.d[iss,ifield]) for iss=1:length(dat1.acqgeom), ifield=1:length(dat1.fields)]
 	return (all(vec) & all(vec2))
 end
 
 function Base.length(data::TD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
+	nss = length(data.acqgeom);	nt = length(data.tgrid);
 	l=0
 	for ifield = 1:length(data.fields), iss = 1:nss
-		for ir = 1:nr[iss]
+		nr=data.acqgeom[iss].nr
+		for ir = 1:nr
 			for it in 1:nt
 				l+=1
 			end
@@ -41,7 +42,7 @@ Return a vec of data object sorted in the order
 time, receivers, supersource, fields
 """
 function Base.vec(data::TD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
+	nss = length(data.acqgeom);		nt = length(data.tgrid);
 	v=Vector{Float64}()
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
@@ -56,12 +57,13 @@ Method to Devectorize data!
 No memory allocations
 """
 function Base.copyto!(dataout::TD, v::AbstractVector{Float64})
-	nr = dataout.acqgeom.nr;	nss = dataout.acqgeom.nss;	nt = length(dataout.tgrid);
+	nss = length(dataout.acqgeom);	nt = length(dataout.tgrid);
 	dout=getfield(dataout, :d)
 	i0=0
 	for iss=1:nss, ifield=1:length(dataout.fields)
 		ddout=dout[iss,ifield]
-		for ir = 1:nr[iss]
+		nr=dataout.acqgeom[iss].nr
+		for ir = 1:nr
 			for it in 1:nt
 				ddout[it,ir]=v[i0+it]
 			end
@@ -77,12 +79,13 @@ Method to vectorize data!
 No memory allocations
 """
 function Base.copyto!(v::AbstractVector{Float64}, data::TD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
+	nss = length(data.acqgeom);	nt = length(data.tgrid);
 	d=getfield(data, :d)
 	i0=0
 	for iss=1:nss, ifield=1:length(data.fields)
 		dd=d[iss,ifield]
-		for ir = 1:nr[iss]
+		nr=dataout.acqgeom[iss].nr
+		for ir = 1:nr
 			for it in 1:nt
 				v[i0+it]=dd[it,ir]
 			end
@@ -96,7 +99,7 @@ end
 Fill with randn values
 """
 function Random.randn!(data::TD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
+	nss = length(data.acqgeom);	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		Random.randn!(dd)
@@ -115,7 +118,7 @@ function Base.copyto!(dataout::TD, data::TD)
 	if(isapprox(dataout, data))
 		dout=getfield(dataout, :d)
 		din=getfield(data, :d)
-		for iss=1:data.acqgeom.nss, ifield=1:length(data.fields)
+		for iss=1:length(data.acqgeom), ifield=1:length(data.fields)
 			ddout=dout[iss,ifield]
 			ddin=din[iss,ifield]
 			copyto!(ddout,ddin)
@@ -150,8 +153,8 @@ Returns dot product of data.
 function LinearAlgebra.dot(data1::TD, data2::TD)
 	if(isapprox(data1, data2))
 		dotd = 0.0;
-		for ifield = 1:length(data1.fields), iss = 1:data1.acqgeom.nss 
-			for ir = 1:data1.acqgeom.nr[iss], it = 1:length(data1.tgrid)
+		for ifield = 1:length(data1.fields), iss = 1:length(data1.acqgeom)
+			for ir = 1:data1.acqgeom[iss].nr, it = 1:length(data1.tgrid)
 				dotd += data1.d[iss, ifield][it, ir] * data2.d[iss, ifield][it, ir]
 			end
 		end
