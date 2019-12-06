@@ -4,7 +4,7 @@ struct FGσ end
 # type for doing a SE expt
 mutable struct ParamExpt{T}
 #	paTD::Data.P_misfit #  to measure data misfit
-#	acqgeom::Acquisition.Geom # mainly positions of receivers are used from here, for the source see P
+#	acqgeom::Geom # mainly positions of receivers are used from here, for the source see P
 	σ::Matrix{T} # see Niels et al.
 	Q::Matrix{T} # Q*k/η (see Niels et al.)
 	P::Array{T,3} # pressure snapshots (B*P) from seismic modeling
@@ -30,7 +30,7 @@ mutable struct ParamExpt{T}
 end
 
 """
-some dummy ACQ, use `GeoPhyInv.Acquisition.ACQmat` later
+some dummy ACQ, use `GeoPhyInv.ACQmat` later
 """
 function testACQ(nz,nx,nr)
 

@@ -21,7 +21,7 @@ using Ipopt
 
 import GeoPhyInv.Interpolation
 import GeoPhyInv: Medium, update!, interp_spray!, chainrule!, copyto!, interp_spray!, pert_chainrule!
-import GeoPhyInv.Acquisition
+import GeoPhyInv: Geom, SrcWav
 import GeoPhyInv.Data
 import GeoPhyInv.Coupling
 import GeoPhyInv.Fdtd
@@ -56,8 +56,8 @@ FWI Parameters
 
 * `mgrid::Vector{StepRangeLen}` : modelling grid
 * `igrid::Vector{StepRangeLen}` : inversion grid
-* `acqsrc::Acquisition.Src` : base source wavelet for modelling data
-* `acqgeom::Acquisition.Geom` : acquisition geometry
+* `acqsrc::SrcWav` : base source wavelet for modelling data
+* `acqgeom::Geom` : acquisition geometry
 * `tgrid::StepRangeLen` : 
 * `attrib_mod`
 * `model_obs` : model used for generating observed data
@@ -75,13 +75,13 @@ mutable struct Param{Tmod, Tdatamisfit}
 	"forward modelling parameters for"
 	paf::Tmod
 	"base source wavelet"
-	acqsrc::Acquisition.Src
+	acqsrc::SrcWav
 	"adjoint source functions"
-	adjsrc::Acquisition.Src
+	adjsrc::SrcWav
 	"acquisition geometry"
-	acqgeom::Acquisition.Geom
+	acqgeom::Geom
 	"acquisition geometry for adjoint propagation"
-	adjacqgeom::Acquisition.Geom
+	adjacqgeom::Geom
 	"Seismic model on modeling grid"
 	modm::Medium
 	"background Seismic model"
@@ -143,7 +143,7 @@ include("xfwi.jl")
 include("xwfwi.jl")
 
 """
-Convert the data `TD` to `Src` after time reversal.
+Convert the data `TD` to `SrcWav` after time reversal.
 """
 function update_adjsrc!(adjsrc, δdat::Data.TD, adjacqgeom)
 	(adjsrc.fields != δdat.fields) && error("dissimilar fields")
@@ -168,7 +168,7 @@ value_adjsrc(s, ::Vz) = -1.0*s
 
 
 function generate_adjsrc(fields, tgrid, adjacqgeom)
-	adjsrc=Acquisition.Src_zeros(adjacqgeom, fields, tgrid)
+	adjsrc=SrcWav_zeros(adjacqgeom, fields, tgrid)
 	return adjsrc
 end
 
@@ -178,8 +178,8 @@ Constructor for `Param`
 
 # Arguments
 
-* `acqsrc::Acquisition.Src` : source time functions
-* `acqgeom::Acquisition.Geom` : acquisition geometry
+* `acqsrc::SrcWav` : source time functions
+* `acqgeom::Geom` : acquisition geometry
 * `tgrid::StepRangeLen` : modelling time grid
 * `attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}` : modelling attribute
 * `modm::Medium` : seismic model on modelling mesh 
@@ -198,7 +198,7 @@ Constructor for `Param`
 * `dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.acqgeom)` : data preconditioning, defaults to one 
 * `tlagssf_fracs=0.0` : maximum lagtime of unknown source filter
 * `tlagrf_fracs=0.0` : maximum lagtime of unknown receiver filter
-* `acqsrc_obs::Acquisition.Src=acqsrc` : source wavelets to generate *observed data*; can be different from `acqsrc`
+* `acqsrc_obs::SrcWav=acqsrc` : source wavelets to generate *observed data*; can be different from `acqsrc`
 * `modm_obs::Medium=modm` : actual seismic model to generate *observed data*
 * `modm0::Medium=fill!(modm,0.0)` : background seismic model for Born modelling and inversion
 * `parameterization::Vector{Symbol}` : subsurface parameterization
@@ -212,8 +212,8 @@ Constructor for `Param`
 * nworker : number of workers (input nothing to use all available)
 """
 function Param(
-	       acqsrc::Acquisition.Src,
-	       acqgeom::Acquisition.Geom,
+	       acqsrc::SrcWav,
+	       acqgeom::Geom,
 	       tgrid::StepRangeLen,
 	       attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}, 
 	       modm::Medium;
@@ -227,7 +227,7 @@ function Param(
 	       dprecon=nothing,
 	       tlagssf_fracs=0.0,
 	       tlagrf_fracs=0.0,
-	       acqsrc_obs::Acquisition.Src=deepcopy(acqsrc),
+	       acqsrc_obs::SrcWav=deepcopy(acqsrc),
 	       modm_obs::Medium=modm,
 	       modm0=nothing,
 	       parameterization::Vector{Symbol}=[:χvp, :χrho, :null],
@@ -341,7 +341,7 @@ function Param(
 	     mx, mxm,
 	     paf,
 	     deepcopy(acqsrc), 
-	     Acquisition.Src_zeros(adjacqgeom, rfields, tgrid),
+	     SrcWav_zeros(adjacqgeom, rfields, tgrid),
 	     deepcopy(acqgeom), 
 	     adjacqgeom,
 	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,
@@ -554,7 +554,7 @@ be propagated from the receiver positions.
 The number of supersources will remain the same.
 All the recievers will be fired as simultaneous sources.
 """
-function AdjGeom(geomin::Acquisition.Geom)
+function AdjGeom(geomin::Geom)
 	geomout = deepcopy(geomin);
 	geomout.sx = geomin.rx; geomout.sz = geomin.rz;
 	geomout.ns = geomin.nr; 

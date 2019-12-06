@@ -78,7 +78,7 @@ for all supersources.
 function TD_urpos(d::Array{Float64}, 
 		   fields::Vector{Symbol}, 
 		   tgrid::StepRangeLen, 
-		   acq::Acquisition.Geom,
+		   acq::Geom,
 		   nur::Int64,
 		   urpos::Tuple{Array{Float64,1},Array{Float64,1}
 		  }

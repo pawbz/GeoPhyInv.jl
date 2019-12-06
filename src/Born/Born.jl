@@ -1,6 +1,6 @@
 module Born
 
-import GeoPhyInv.Acquisition
+import GeoPhyInv: Geom, SrcWav
 import GeoPhyInv: Medium
 import GeoPhyInv.Data
 using SpecialFunctions
@@ -28,12 +28,13 @@ function mod(;
              born_flag::Bool=false,
 	     tgridmod::StepRangeLen=nothing,
 	     tgrid::StepRangeLen = tgridmod,
-	     acqgeom::Acquisition.Geom=nothing,
-	     acqsrc::Acquisition.Src=nothing,
+	     acqgeom::Geom=nothing,
+	     acqsrc::SrcWav=nothing,
 	     src_flag::Int64=2,
 		  )
-	(getfield(acqgeom,:nss) != getfield(acqsrc,:nss))  ? error("different supersources") : nothing
-	(getfield(acqgeom,:ns) != getfield(acqsrc,:ns))  ? error("different sources") : nothing
+	(length(acqgeom) != getfield(acqsrc,:nss))  ? error("different supersources") : nothing
+	@info "fix this"
+#	(length(acqgeom) != getfield(acqsrc,:ns))  ? error("different sources") : nothing
 
 
 	nt = (length(tgridmod) == length(acqsrc.tgrid)) ? length(tgrid) : error("acqsrc tgrid")
@@ -55,27 +56,25 @@ function mod(;
 	
 	fnpow2grid = DSP.fftfreq(np2,inv(step(tgridmod)));
 
-	nss = acqgeom.nss
-	nr = acqgeom.nr
-	ns = acqgeom.ns
+	nss = length(acqgeom)
 	data = Data.TD(
-	      [zeros(nt,nr[iss]) for iss=1:nss, ifield=1:1],
+		       [zeros(nt,acqgeom[iss].nr) for iss=1:nss, ifield=1:1],
 	      [:P],
 	      tgridmod,acqgeom)
 
 	for ifield = 1:length(data.fields), iss = 1:nss
-		sx = acqgeom.sx[iss][:]
-		rx = acqgeom.rx[iss][:]
-		sz = acqgeom.sz[iss][:]
-		rz = acqgeom.rz[iss][:]
+		sx = acqgeom[iss].sx
+		rx = acqgeom[iss].rx
+		sz = acqgeom[iss].sz
+		rz = acqgeom[iss].rz
 
-		for ir = 1:nr[iss]
+		for ir = 1:acqgeom[iss].nr
 
 		dtemp=zeros(nt)
 		dpow2all=complex.(zeros(np2), zeros(np2));
 		wpow2=complex.(zeros(np2), zeros(np2)); 
 		
-		for is=1:acqgeom.ns[iss]
+		for is=1:acqgeom[iss].ns
 			# zero pad wavelet
 			for it in 1:nt
 				wpow2[it]=complex(acqsrc.wav[iss,ifield][it,is])

@@ -6,25 +6,41 @@ include("Utils/Utils.jl")
 include("Operators.jl")
 include("Smooth.jl")
 include("IO.jl")
-include("Media/Media.jl")
-include("Acquisition/Acquisition.jl")
+include("Media/medium.jl")
+include("SrcWav/wavelets.jl")
+export ricker, ormsby 
+
+# need to define supersource, source and receiver structs and export them
+struct Srcs
+	n::Int
+end
+Srcs()=Srcs(0)
+struct SSrcs
+	n::Int
+end
+SSrcs()=SSrcs(0)
+struct Recs
+	n::Int
+end
+Recs()=Recs(0)
+export Srcs, Recs, SSrcs
+
+include("SrcWav/srcwav.jl")
+export SrcWav
+include("Geom/geom.jl")
+export Geom, Geomss
 include("Coupling.jl")
 include("Data/Data.jl")
 include("Born/Born.jl")
-include("Fdtd/Fdtd.jl")
-include("FWI/FWI.jl")
+include("Fdtd/fdtd.jl")
+export SeisForwExpt 
+include("FWI/fwi.jl")
 include("Poisson/Poisson.jl")
 include("Gallery/Gallery.jl")
 include("Plots.jl")
 
 # export the Expt for Seismic Forward Modelling
-const SeisForwExpt=GeoPhyInv.Fdtd.Param
-export SeisForwExpt
-mod!(a::SeisForwExpt)=GeoPhyInv.Fdtd.mod!(a)
 
-# export the Expt for Seismic Inversion
-const SeisInvExpt=GeoPhyInv.FWI.Param
-export SeisInvExpt
 export fit!
 
 # export the Expt for Poisson
@@ -57,9 +73,6 @@ export JF
 
 const JD=GeoPhyInv.Data
 export JD
-
-const JA=GeoPhyInv.Acquisition
-export JA
 
 const JG=GeoPhyInv.Gallery
 export JG

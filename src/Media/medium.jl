@@ -21,8 +21,13 @@ mutable struct Medium
 	ref::NamedArray{Float64,1,Array{Float64,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 end
 
+function NamedArrays.names(mod::Medium)
+	return names(mod.m)
+end
+	
 
 include("base.jl")
+include("gallery.jl")
 
 
 #=

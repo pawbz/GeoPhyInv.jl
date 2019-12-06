@@ -1,5 +1,10 @@
 ```@meta
-EditURL = "https://github.com/TRAVIS_REPO_SLUG/blob/master/"
+EditURL = "@__REPO_ROOT_URL__/"
+```
+
+```@example gradient_accuracy
+using GeoPhyInv
+using Test
 ```
 
 Can perform inversion of synthetic scenarios.
@@ -13,16 +18,16 @@ in various geological scenarios using different acquisition parameters.
 
 ```@example gradient_accuracy
 model = J.Gallery.Seismic(:acou_homo2);
-J.Models.Seismic_addon!(model,randn_perc=1, fields=[:χvp,:χρ])
+update!(model, [:vp,:rho], randn_perc=1)
 
 model0 = J.Gallery.Seismic(:acou_homo2);
-J.Models.Seismic_addon!(model0, randn_perc=1, fields=[:χvp,:χρ])
+update!(model0, [:vp,:rho], randn_perc=1)
 
 acqgeom=J.Acquisition.Geom_fixed(model,1,10)
 acqsrc=J.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=1.0)
 tgrid=acqsrc.tgrid
 
-parameterization=[:χvp, :χρ, :null]
+parameterization=[:χvp, :χrho, :null]
 
 mgrid=model.mgrid
 
@@ -45,9 +50,9 @@ mgrid=model.mgrid
 				     parameterization=parameterization,   verbose=false,
 				     nworker=nothing)
 
-		result=JF.xfwi!(pa, JF.Migr(), attrib_mod)
+		result=JF.migr!(pa, attrib_mod)
 
-		result_parallel=JF.xfwi!(pa_parallel, JF.Migr(), attrib_mod)
+		result_parallel=JF.migr!(pa_parallel, attrib_mod)
 
 		@test result[2] ≈ result_parallel[2]
 	end
@@ -63,13 +68,13 @@ end
 			     parameterization=parameterization,   verbose=false)
 
 
-	JF.xfwi!(pa, JF.LS(), JF.ModFdtdBorn(),  bounded_flag=true, solver=:ipopt,
+	JF.fit!(pa, JF.LS(), JF.ModFdtdBorn(),  bounded_flag=true, solver=:ipopt,
 			ipopt_options=[["max_iter", 0],["derivative_test", "first-order"]])
 
-	result=JF.xfwi!(pa, JF.Migr(), JF.ModFdtdBorn())
+	result=JF.migr!(pa, JF.ModFdtdBorn())
 
 	pa_fd=deepcopy(pa);
-	result_fd=JF.xfwi!(pa_fd, JF.Migr_fd(), JF.ModFdtdBorn())
+	result_fd=JF.migr_fd!(pa_fd,  JF.ModFdtdBorn())
 
 	f=Misfits.error_squared_euclidean!(nothing, result[2], result_fd[2], nothing, norm_flag=true)
 
@@ -83,14 +88,14 @@ end
 			     igrid=broadcast(x->range(x[1],stop=x[end],step=350.),mgrid),
 			     parameterization=parameterization,   verbose=false)
 
-	JF.xfwi!(pa, JF.LS(), JF.ModFdtd(),  bounded_flag=true, solver=:ipopt,
+	JF.fit!(pa, JF.LS(), JF.ModFdtd(),  bounded_flag=true, solver=:ipopt,
 			ipopt_options=[["max_iter", 0],["derivative_test", "first-order"]])
 
 
-	result=JF.xfwi!(pa, JF.Migr(), JF.ModFdtd())
+	result=JF.migr!(pa, JF.ModFdtd())
 
 	pa_fd=deepcopy(pa);
-	result_fd=JF.xfwi!(pa_fd, JF.Migr_fd(), JF.ModFdtd())
+	result_fd=JF.migr_fd!(pa_fd, JF.ModFdtd())
 
 	f=Misfits.error_squared_euclidean!(nothing, result[2], result_fd[2], nothing, norm_flag=true)
 

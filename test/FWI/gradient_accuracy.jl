@@ -1,3 +1,5 @@
+using GeoPhyInv
+using Test
 
 # Can perform inversion of synthetic scenarios.
 # First, the seismic data are modeled as in the forward problem. Then the

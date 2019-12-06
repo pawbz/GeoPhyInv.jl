@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "https://github.com/TRAVIS_REPO_SLUG/blob/master/"
+EditURL = "@__REPO_ROOT_URL__/"
 ```
 
 We aim to save the snapshots, at given time steps in `SeisForwExpt`.
@@ -16,7 +16,7 @@ using Plots
 
 ```@example create_snaps
 model=GIPh.Gallery.Seismic(:acou_homo1); # load a simple homogeneous acoustic model from the gallery
-GIPh.Models.Seismic_addon!(model, randn_perc=0.01); # add some random noise to the model
+update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise to the model
 acqgeom=GIPh.Gallery.Geom(model.mgrid,:xwell); # load a simple acquisition geometry using `mgrid` of the seismic model
 tgrid = range(0.0,stop=2.0,length=2000) # generate a time grid
 wav = GIPh.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,); # ricker wavelet

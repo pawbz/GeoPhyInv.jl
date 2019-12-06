@@ -1,9 +1,8 @@
-module Fdtd
 
 import GeoPhyInv: Medium, copyto!, Medium_pml_pad_trun, Medium_pml_pad_trun!
 import GeoPhyInv.Interpolation
 import GeoPhyInv.Utils
-import GeoPhyInv.Acquisition
+import GeoPhyInv: Geom, SrcWav
 import GeoPhyInv.Data
 using ProgressMeter
 using TimerOutputs
@@ -67,8 +66,8 @@ mutable struct Paramc
 	activepw::Vector{Int64}
 	exmodel::Medium
 	model::Medium
-	acqgeom::Vector{Acquisition.Geom}
-	acqsrc::Vector{Acquisition.Src}
+	acqgeom::Vector{Geom}
+	acqsrc::Vector{SrcWav}
 	abs_trbl::Vector{Symbol}
 	sfields::Vector{Vector{Symbol}}
 	isfields::Vector{Vector{Int64}}
@@ -172,14 +171,21 @@ mutable struct Paramp
 	born_svalue_stack::Matrix{Float64} 
 end
 
-mutable struct Param
+abstract type SeisForwExpt end
+
+mutable struct Param <: SeisForwExpt
 	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
 	p::DistributedArrays.DArray{Paramp,1,Paramp} # distributed parameters among workers
 	c::Paramc # common parameters
 end
 
-Base.print(pa::Param)=nothing
-Base.show(pa::Param)=nothing
+Base.show(io::Base.IO, pa::Param)=nothing
+Base.show(io::Base.IO, pa::Paramp)=nothing
+Base.show(io::Base.IO, pa::Paramc)=nothing
+Base.show(io::Base.IO, pa::Paramss)=nothing
+
+SeisForwExpt(;args...)=Param(;args...)
+
 
 function initialize!(pap::Paramp)
 	reset_per_ss!(pap)
@@ -272,8 +278,8 @@ finite-difference modeling is performed.
 * `model::Medium` : seismic medium parameters 
 * `tgridmod::StepRangeLen=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
 * `tgrid::StepRangeLen=tgridmod` : output records are resampled on this time grid
-* `acqgeom::Vector{Acquisition.Geom}` :  acquisition geometry for each independently propagating wavefield
-* `acqsrc::Vector{Acquisition.Src}` : source acquisition parameters for each independently propagating wavefield
+* `acqgeom::Vector{Geom}` :  acquisition geometry for each independently propagating wavefield
+* `acqsrc::Vector{SrcWav}` : source acquisition parameters for each independently propagating wavefield
 * `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
   * `=[0]` inactive sources
   * `=[1]` sources with injection rate
@@ -323,8 +329,8 @@ function Param(;
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
 	born_flag::Bool=false,
 	tgridmod::StepRangeLen=nothing,
-	acqgeom::Vector{Acquisition.Geom}=nothing,
-	acqsrc::Array{Acquisition.Src}=nothing,
+	acqgeom::Vector{Geom}=nothing,
+	acqsrc::Array{SrcWav}=nothing,
 	sflags::Vector{Int64}=fill(2,npw), 
 	rflags::Vector{Int64}=fill(1,npw),
 	rfields::Vector{Symbol}=[:P], 
@@ -359,13 +365,13 @@ function Param(;
 	# check dimension of model
 
 	# check if all sources are receivers are inside model
-	any(.![Acquisition.Geom_check(acqgeom[ip], model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
+	any(.![(acqgeom[ip] ∈ model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
 
 
 	length(acqgeom) != npw ? error("acqgeom size") : nothing
 	length(acqsrc) != npw ? error("acqsrc size") : nothing
-	any([getfield(acqgeom[ip],:nss) != getfield(acqsrc[ip],:nss) for ip=1:npw])  ? error("different supersources") : nothing
-	any([getfield(acqgeom[ip],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npw])  ? error("different sources") : nothing
+	any([length(acqgeom[ip]) != getfield(acqsrc[ip],:nss) for ip=1:npw])  ? error("different supersources") : nothing
+	any([getfield(acqgeom[ip][:],:ns) != getfield(acqsrc[ip],:ns) for ip=1:npw])  ? error("different sources") : nothing
 
 	# necessary that nss and fields should be same for all nprop
 	nss = acqgeom[1].nss;
@@ -607,7 +613,7 @@ function update_model!(pac::Paramc, model::Medium)
 	return nothing
 end 
 
-function update_acqsrc!(pa::Param, acqsrc::Vector{Acquisition.Src}, sflags=nothing)
+function update_acqsrc!(pa::Param, acqsrc::Vector{SrcWav}, sflags=nothing)
 	# update acqsrc in pa.c
 	(length(acqsrc) ≠ pa.c.npw) && error("cannot update")
 	for i in 1:length(acqsrc)
@@ -1142,4 +1148,3 @@ end
 include("getprop.jl")
 
 export mod!
-end # module

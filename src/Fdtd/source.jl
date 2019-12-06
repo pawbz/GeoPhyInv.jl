@@ -1,5 +1,5 @@
 
-function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc::Array{Acquisition.Src}, sflags::Vector{Int64})
+function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc::Array{SrcWav}, sflags::Vector{Int64})
 
 	npw = size(wavelets,1)
 	nt = size(wavelets,2)

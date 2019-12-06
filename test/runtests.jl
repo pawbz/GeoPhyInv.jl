@@ -33,7 +33,7 @@ end
 
 
 folder="Media"
-for t in ["media", "param_adj"]
+for t in ["convert", "param_adj", "doc"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end

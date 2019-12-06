@@ -13,7 +13,7 @@ function SeisForwExpt(attrib::Symbol)
 	tgrid=range(0.0,stop=2.0,length=1000)
 	wav=GeoPhyInv.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25, );
 	# source wavelet for modelling
-	acqsrc=GeoPhyInv.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
+	acqsrc=GeoPhyInv.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
 
 	vp0=mean(GeoPhyInv.Models.χ(model.χvp,model.ref.vp,-1))
 	ρ0=mean(GeoPhyInv.Models.χ(model.χρ,model.ref.ρ,-1))

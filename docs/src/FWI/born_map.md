@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "https://github.com/TRAVIS_REPO_SLUG/blob/master/"
+EditURL = "@__REPO_ROOT_URL__/"
 ```
 
 he linearized forward modeling operator `F`, such that

@@ -1,6 +1,10 @@
-module Wavelets
 
+using DSP
+using Misfits
+using LinearAlgebra
+using Test
 using FFTW
+using AxisArrays
 using Distributions
 
 """
@@ -157,4 +161,64 @@ function apply_rand_phase(wav)
 	wav=FFTW.irfft(W,nt)
 end
 
-end # module
+"""
+Return a ricker wavelet for a given input `Medium`.
+
+# Arguments
+* `mod::Medium` : Medium
+* `nλ::Int64=10` : number of wavelengths (P-wave) in the medium
+* `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the medium, 
+use this fraction to increase of reduce the maximum time
+
+# Keyword Arguments
+* all the keywords arguments of the `ricker` method can be used.
+"""
+function ricker(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0; args... )
+	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac)
+	wav=ricker(fqdom, tgrid; args...)
+	return wav
+end
+
+"""
+Same as ricker, but return ormsby...
+"""
+function ormsby(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0; args... )
+	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac)
+	wav=ormsby(fqdom, tgrid; args...)
+	return wav
+end
+
+"""
+Return dominant source frequency, and its temporal grid for a finite-difference simulation, for given number of wavelengths `nλ` in the medium.
+The model has `nλ` wavelengths, and the maximum modeling time is determined by `tmaxfrac`.
+"""
+function get_fqdom_tgrid( mod::Medium, nλ::Int, tmaxfrac::Real)
+
+	x=mod.mgrid[2]; z=mod.mgrid[1]
+	# dominant wavelength using mod dimensions
+	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nλ)
+	# average P velocity
+	vavg=mean(mod[:vp])
+
+	fqdom = vavg/λdom
+
+	# maximum distance the wave travels
+	d = sqrt((x[1]-x[end]).^2+(z[1]-z[end]).^2)
+	
+	# use two-way maximum distance to get tmax
+	tmax=2.0*d*inv(vavg)*tmaxfrac
+
+	# choose sampling interval to obey max freq of source wavelet
+	δmin = minimum([step(mod.mgrid[2]), step(mod.mgrid[1])])
+	vpmax = mod.bounds[:vp][2]
+	δt=0.5*δmin/vpmax
+
+	# check if δt is reasonable
+	#(δt > 0.1/fqdom) : error("decrease spatial sampling or nλ")
+
+	tgrid=range(0.0, stop=tmax, step=δt)
+
+	return fqdom, tgrid
+end
+
+

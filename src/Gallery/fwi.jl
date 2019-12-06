@@ -25,9 +25,9 @@ function SeisInvExpt(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=0
 		update!(model, [:vp,:rho], randn_perc=0.1)
 
 		# sources, receivers
-		acqgeom=Acquisition.Geom_circ(nss=5,nr=20,rad=[900.,900.])
+		acqgeom=Geom_circ(nss=5,nr=20,rad=[900.,900.])
 
-		acqsrc=Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=3)
+		acqsrc=Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=3)
 		tgrid=acqsrc.tgrid 
 		igrid=broadcast(x->range(x[1],stop=x[end],step=50.),model.mgrid)
 		igrid_interp_scheme=:B2
@@ -42,8 +42,8 @@ function SeisInvExpt(attrib::Symbol; born_flag=false, rfields=[:Vx,:Vz,:P], α=0
 		update!(model0, [:vp,:rho], randn_perc=0.1)
 		update!(model, [:vp], ellip_rad=[2000., 5.], ellip_loc=[0.,0.],ellip_pert=0.1, ellip_α=α)
 
-		acqgeom=Acquisition.Geom_fixed(-75., -50., 0.0, -100., -50., 0.0, 2, 20, :vertical, :vertical)
-		acqsrc=Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=8, tmaxfrac=0.8)
+		acqgeom=Geom_fixed(-75., -50., 0.0, -100., -50., 0.0, 2, 20, :vertical, :vertical)
+		acqsrc=Src_fixed_mod(acqgeom.nss,1,[:P],mod=model,nλ=8, tmaxfrac=0.8)
 		tgrid=acqsrc.tgrid 
 		igrid=[range(-40.,stop=30.,length=100), range(-30.,length=1,step=60.)]
 		igrid_interp_scheme=:B2

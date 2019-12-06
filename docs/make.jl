@@ -9,6 +9,7 @@ makedocs(
 		  prettyurls = get(ENV, "CI", nothing) == "true"),
    sitename = "Toolbox for Geophysical Inversion",
    pages = ["Home" => "index.md",
+	    "Medium" => "Media/doc.md",
 	    "Geom" => "Geom/gallery.md",
 	    "SeisForwExpt" => Any[
 				  "Introduction" => "Fdtd/intro.md",

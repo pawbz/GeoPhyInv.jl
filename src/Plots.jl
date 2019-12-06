@@ -5,7 +5,6 @@ using RecipesBase
 using FFTW
 using DSP
 #using ImageFiltering
-import GeoPhyInv.Acquisition
 import GeoPhyInv.Data
 import GeoPhyInv: Medium, copyto!
 
@@ -115,10 +114,11 @@ end
 #	close(fout)
 #end
 
+#=
 @userplot Geom
 
 """
-Plot acquisition geometry `Acquisition.Geom` on
+Plot acquisition geometry `Geom` on
 and model grid.
 
 `attrib::Symbol=:unique` : default; plots unique source and receiver positions
@@ -128,14 +128,14 @@ and model grid.
 	geom=p.args[1]
 	if(ssvec===nothing)
 		if(:r ∈ fields)
-			urpos = Acquisition.Geom_get([geom],:urpos)
+			urpos = Geom_get([geom],:urpos)
 			rx=urpos[2]
 			rz=urpos[1]
 		else
 			b=nothing
 		end
 		if(:s ∈ fields)
-			uspos = Acquisition.Geom_get([geom],:uspos)
+			uspos = Geom_get([geom],:uspos)
 			sx=uspos[2]
 			sz=uspos[1]
 		else
@@ -183,6 +183,7 @@ and model grid.
 
 
 end
+=#
 	
 
 @userplot Spectrum
@@ -215,7 +216,7 @@ Plot the source wavelet used for acquisition.
 
 # Arguments
 
-* `acqsrc::Acquisition.Src` : source acquisition parameters
+* `acqsrc::Src` : source acquisition parameters
 """
 @recipe function psrc(p::Src)
 	acqsrc=p.args[1]

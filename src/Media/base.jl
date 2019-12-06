@@ -1,3 +1,4 @@
+
 """
 Initialize an model with zeros, given mgrid and names.
 """
@@ -67,14 +68,14 @@ end
 """
 Print information about `Seismic`
 """
-function Base.print(mod::Medium, name::String="")
-	println("\tSeismic Medium:\t",name)
-	println("\t> number of samples:\t","x\t",length(mod.mgrid[2]),"\tz\t",length(mod.mgrid[1]))
-	println("\t> sampling intervals:\t","x\t",step(mod.mgrid[2]),"\tz\t",step(mod.mgrid[1]))
-	println("\t> vp:\t","min\t",minimum(mod[:vp]),"\tmax\t",maximum(mod[:vp]))
-	println("\t> vp bounds:\t","min\t",mod.bounds[:vp][1],"\tmax\t",mod.bounds[:vp][2])
-	println("\t> rho:\t","min\t",minimum(mod[:rho]),"\tmax\t",maximum(mod[:rho]))
-	println("\t> rho bounds:\t","min\t",mod.bounds[:rho][1],"\tmax\t",mod.bounds[:rho][2])
+function Base.show(io::Base.IO, mod::Medium)
+	println(io, "> Medium")
+	println(io, "> number of samples:\t","x\t",length(mod.mgrid[2]),"\tz\t",length(mod.mgrid[1]))
+	println(io, "> sampling intervals:\t","x\t",step(mod.mgrid[2]),"\tz\t",step(mod.mgrid[1]))
+	println(io, "> vp:\t","min\t",minimum(mod[:vp]),"\tmax\t",maximum(mod[:vp]))
+	println(io, "> rho:\t","min\t",minimum(mod[:rho]),"\tmax\t",maximum(mod[:rho]))
+	println(io, "> Bounds:")
+	println(io, mod.bounds)
 end
 
 """

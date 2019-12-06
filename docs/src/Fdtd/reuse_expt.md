@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "https://github.com/TRAVIS_REPO_SLUG/blob/master/"
+EditURL = "@__REPO_ROOT_URL__/"
 ```
 
 This tutorial first creates a variable `pa`, i.e. allocates
@@ -32,18 +32,19 @@ mgrid = [zgrid, xgrid]
 ### Allocate a `Seismic` model, and adjust bounds
 
 ```@example reuse_expt
-vp0 = [1500., 3500.] # bounds for vp
-vs0 = [2000., 2500.] # dummy
-ρ0 = [1500., 3500.] # density bounds
-model=GIPh.Models.Seismic_zeros(mgrid)
-GIPh.Models.adjust_bounds!(model,vp0,vs0,ρ0)
+vpb = [1500., 3500.] # bounds for vp
+rhob = [1500., 3500.] # density bounds
+
+model=Medium(mgrid)
+update!(model, [:vp,:rho], [vpb,rhob])
+fill!(model)
 @info "a seismic model is created"
 ```
 
 ### Add some noise to the model (optional)
 
 ```@example reuse_expt
-GIPh.Models.Seismic_addon!(model, randn_perc=0.01); # add some random noise
+update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise
 ```
 
 ### A surface acquisition geometry
@@ -102,8 +103,8 @@ create new seismic model
 
 ```@example reuse_expt
 model_new=J.Gallery.Seismic(:acou_homo1) # prepare another model
-J.Models.Seismic_addon!(model_new, randn_perc=0.01)
-J.Models.Seismic_addon!(model_new, constant_pert=0.03) # perturb the model
+update!(model_new, [:vp,:rho], randn_perc=0.01)
+update!(model_new, [:vp,:rho], constant_pert=0.03) # perturb the model
 p2=JP.seismic(model_new) # plot new model
 JP.geom!(acqgeom)
 plot(p2)
