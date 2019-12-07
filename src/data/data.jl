@@ -1,3 +1,11 @@
+
+
+
+
+
+
+#=
+
 """
 This module defines the data types related to seismic data:
 * `TD` : time domain representation
@@ -5,7 +13,6 @@ This module defines the data types related to seismic data:
 It also provides methods that apply source and receiver filters onto 
 seismic data.
 """
-module Data
 
 using Misfits
 using LinearAlgebra
@@ -28,20 +35,31 @@ Time domain representation of Seismic Data.
 * `acqgeom::Geom` : acquisition geometry used to generate the data
 """
 mutable struct TD
-	d::Matrix{Matrix{Float64}}
-	fields::Vector{Symbol}
 	tgrid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
-	acqgeom::Geom
+	d::NamedArrays.NamedArray{Array{Float64,2},1,Array{Array{Float64,2},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
+	nr::Int64
 	"adding conditions that are to be false while construction"
-	TD(d, fields, tgrid, acqgeom) = 
-		any([
-		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
-		  length(fields) == 0,
-		  broadcast(size,d) != [(length(tgrid),acqgeom[iss].nr) for iss=1:length(acqgeom), ifield=1:length(fields)]
-		  ]) ? 
-		error("error in TD construction") : new(d, fields, tgrid, acqgeom)
-
+	#TD(d, fields, tgrid, acqgeom) = 
+#		any([
+#		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
+#		  length(fields) == 0,
+#		  broadcast(size,d) != [(length(tgrid),acqgeom[iss].nr) for iss=1:length(acqgeom), ifield=1:length(fields)]
+#		  ]) ? 
+#		error("error in TD construction") : new(d, fields, tgrid, acqgeom)
 end
+
+"""
+Initialize TD with zeros
+"""
+function Base.zero(::Type{TD}, tgrid, r::Recs=Recs(1), fields=[:P])
+	nt=length(tgrid); nf=length(fields)
+	return TD(tgrid,NamedArray([zeros(nt,r.n) for i in fields], (fields,)), r.n)
+end
+TD(tgrid,  r::Recs=Recs(1), fields=[:P])=zero(TD, tgrid, s, fields)
+
+
+
+Data=Array{NamedD,1}
 
 
 """
@@ -145,36 +163,6 @@ end
 
 
 
-"""
-Time reverse the records of each receiver in `TD` 
-
-# Arguments
-
-* `data::TD` : input data that is modified
-"""
-function TD_tr!(data::TD)
-	data.d = copy([reverse(data.d[i,j],dims=1) for i in 1:length(data.acqgeom), j in 1:length(data.fields)]);
-end
-
-
-function addnoise!(dataN::TD, data::TD, SNR)
-
-	σx=Statistics.var(data)
-
-	σxN=sqrt(σx^2*inv(10^(SNR/10.)))
-	
-	# factor to be multiplied to each scalar
-	α=sqrt(σxN)
-	for ifield = 1:length(data.fields), iss = 1:length(data.acqgeom)
-		for ir = 1:data.acqgeom[iss].nr, it = 1:length(data.tgrid)
-
-			dataN.d[iss, ifield][it, ir] = dataN.d[iss, ifield][it, ir] + α*Random.randn()
-		end
-	end
-end
-
-
-
 # include rest of the files
 for file in ["base", "statistics", "processing", "misfits", "weights"]   
 	fn=joinpath(@__DIR__, string(file,".jl"))
@@ -221,3 +209,4 @@ end
 
 
 end # module
+	=#

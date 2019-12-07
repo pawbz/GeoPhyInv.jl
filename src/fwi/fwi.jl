@@ -1,38 +1,18 @@
 """
-This module defines a type called `Param` that is to be constructed 
+This module defines a type called `SeisInvExpt` that is to be constructed 
 before performing 
 and kind of inversion.
 The following functionality is currently added in this module:
 * a simple RTM
 * full-waveform inversion
 * source and receiver filter inversion
-Once a `Param` object is constructed, the following routines update certain fields
-of the `Param` after performing the inversion.
-* `xfwi!` : updates the initial subsurface models in `Param` using its observed data
-* `wfwi!` : updates the source and receiver filters in `Param` using its observed data
+Once a `SeisInvExpt` object is constructed, the following routines update certain fields
+of the `SeisInvExpt` after performing the inversion.
+* `xfwi!` : updates the initial subsurface models in `SeisInvExpt` using its observed data
+* `wfwi!` : updates the source and receiver filters in `SeisInvExpt` using its observed data
 """
-module FWI
-
-using Misfits
-using TimerOutputs
-using LinearMaps
-using LinearAlgebra
-using Ipopt
-
-import GeoPhyInv.Interpolation
-import GeoPhyInv: Medium, update!, interp_spray!, chainrule!, copyto!, interp_spray!, pert_chainrule!
-import GeoPhyInv: Geom, SrcWav
-import GeoPhyInv.Data
-import GeoPhyInv.Coupling
-import GeoPhyInv.Fdtd
-using Optim, LineSearches
-using DistributedArrays
-using Calculus
-using Random
 
 include("X.jl")
-
-global const to = TimerOutput(); # create a timer object
 
 # modeling types
 struct ModFdtd end
@@ -41,13 +21,6 @@ struct ModFdtdBorn end
 
 struct ModFdtdHBorn end
 
-# fields
-struct P end
-struct Vx end
-struct Vz end
-
-# exports
-export fit!
 
 """
 FWI Parameters
@@ -68,7 +41,7 @@ FWI Parameters
 
 TODO: add an extra attribute for coupling functions inversion and modelling
 """
-mutable struct Param{Tmod, Tdatamisfit}
+mutable struct SeisInvExpt{Tmod, Tdatamisfit}
 	"model inversion variable"
 	mx::X{Float64,1}
 	mxm::X{Float64,1}
@@ -101,16 +74,16 @@ mutable struct Param{Tmod, Tdatamisfit}
 	"model preconditioning"
 	mprecon::AbstractArray{Float64,2}
 	"compute data misfit"
-	paTD::Tdatamisfit
+	paTD::VNamedD_misfit
 	paminterp::Interpolation.Kernel_2D{Float64}
 	verbose::Bool
 	"synthetic or field inversion"
 	attrib::Symbol
 end
 
-Base.print(pa::Param)=nothing
-Base.show(pa::Param)=nothing
-Base.display(pa::Param)=nothing
+Base.print(pa::SeisInvExpt)=nothing
+Base.show(pa::SeisInvExpt)=nothing
+Base.display(pa::SeisInvExpt)=nothing
 
 # add data inverse covariance matrix here later
 struct LS end # just cls inversion
@@ -143,9 +116,9 @@ include("xfwi.jl")
 include("xwfwi.jl")
 
 """
-Convert the data `TD` to `SrcWav` after time reversal.
+Convert the data `Data` to `SrcWav` after time reversal.
 """
-function update_adjsrc!(adjsrc, δdat::Data.TD, adjacqgeom)
+function update_adjsrc!(adjsrc, δdat::Data, adjacqgeom)
 	(adjsrc.fields != δdat.fields) && error("dissimilar fields")
 	nt=length(δdat.tgrid)
 	for i in 1:adjacqgeom.nss
@@ -174,7 +147,7 @@ end
 
 
 """
-Constructor for `Param`
+Constructor for `SeisInvExpt`
 
 # Arguments
 
@@ -211,7 +184,7 @@ Constructor for `Param`
   * `=:field` field data inversion
 * nworker : number of workers (input nothing to use all available)
 """
-function Param(
+function SeisInvExpt(
 	       acqsrc::SrcWav,
 	       acqgeom::Geom,
 	       tgrid::StepRangeLen,
@@ -223,7 +196,7 @@ function Param(
 	       igrid=nothing,
 	       igrid_interp_scheme::Symbol=:B2,
 	       mprecon_factor::Float64=1.0,
-	       dobs::Data.TD=Data.TD_zeros(rfields,tgrid_obs,acqgeom),
+	       dobs::Data=Data(tgrid_obs, acqgeom, rfields),
 	       dprecon=nothing,
 	       tlagssf_fracs=0.0,
 	       tlagrf_fracs=0.0,
@@ -294,7 +267,7 @@ function Param(
 	# generating forward and adjoint modelling engines
 	# to generate modelled data, border values, etc.
 	# most of the parameters given to this are dummy
-	paf=Fdtd.Param(npw=2, model=modm, born_flag=true,
+	paf=SeisForwExpt(npw=2, model=modm, born_flag=true,
 		acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], 
 		rfields=rfields,
 		sflags=[3, 2], rflags=[1, 1],
@@ -326,7 +299,7 @@ function Param(
 		Random.randn!(dobs) # dummy dobs, update later
 	end
 
-	paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,acqgeom),dobs,w=dprecon);
+	paTD=VNamedD_misfit(Data(tgrid,acqgeom,rfields),dobs,w=dprecon);
 
 	paminterp=Interpolation.Kernel([modi.mgrid[2], modi.mgrid[1]], [modm.mgrid[2], modm.mgrid[1]], igrid_interp_scheme)
 
@@ -337,7 +310,7 @@ function Param(
 	# put modm as a vector, according to parameterization in mxm.x
 	copyto!(mxm.x,modm,parameterization)
 
-	pa = Param(
+	pa = SeisInvExpt(
 	     mx, mxm,
 	     paf,
 	     deepcopy(acqsrc), 
@@ -376,10 +349,10 @@ function Param(
 end
 
 """
-update the *synthetic* observed data in `Param`
+update the *synthetic* observed data in `SeisInvExpt`
 * allocated memory, don't use in inner loops
 """
-function update_observed_data!(pa::Param, modm_obs, attrib_mod=ModFdtd())
+function update_observed_data!(pa::SeisInvExpt, modm_obs, attrib_mod=ModFdtd())
 	# save modm of pa to put it back later
 	modm_copy=deepcopy(pa.modm)
 
@@ -403,19 +376,19 @@ end
 
 
 """
-Return the number of inversion variables for FWI corresponding to `Param`.
+Return the number of inversion variables for FWI corresponding to `SeisInvExpt`.
 This number of inversion variables depend on the size of inversion mesh.
 """
-function xfwi_ninv(pa::Param)
+function xfwi_ninv(pa::SeisInvExpt)
 	length(pa.mx.x)
 end
 
 """
 Return the number of inversion variables for source and receiver filter inversion 
-corresponding to `Param`.
+corresponding to `SeisInvExpt`.
 This number depends on the maximum lagtimes of the filters. 
 """
-function wfwi_ninv(pa::Param)
+function wfwi_ninv(pa::SeisInvExpt)
 	return  pa.paTD.coup.tgridssf.nx
 end
 
@@ -572,7 +545,7 @@ end
 """
 Return functional and gradient of the LS objective 
 """
-function func_grad_Coupling!(storage, x::Vector{Float64},pa::Param)
+function func_grad_Coupling!(storage, x::Vector{Float64},pa::SeisInvExpt)
 
 	pa.verbose ? println("computing gradient...") : nothing
 
@@ -594,7 +567,7 @@ end
 Convert coupling functions to x and vice versa
 """
 function Coupling_x!(x::Vector{Float64}, 
-		   pa::Param, 
+		   pa::SeisInvExpt, 
 		   flag::Int64)
 	if(flag ==1) # convert w to x
 		iss=1 # take only first source
@@ -632,4 +605,3 @@ end
 
 
 
-end # module

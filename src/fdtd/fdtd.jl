@@ -1,27 +1,6 @@
 
-import GeoPhyInv: Medium, copyto!, Medium_pml_pad_trun, Medium_pml_pad_trun!
-import GeoPhyInv.Interpolation
-import GeoPhyInv.Utils
-import GeoPhyInv: Geom, SrcWav
-import GeoPhyInv.Data
-using ProgressMeter
-using TimerOutputs
-using Distributed
-using DistributedArrays
-using SharedArrays
-using LinearAlgebra
-using AxisArrays
-using Printf
-
-
-global const to = TimerOutput(); # create a timer object
 global const npml = 50
 global const nlayer_rand = 0
-
-# struct related to fields
-struct P end
-struct Vx end
-struct Vz end
 
 # 
 #As forward modeling method, the 
@@ -124,7 +103,7 @@ mutable struct Paramc
 	isx0::Int64
 	isz0::Int64
 	datamat::SharedArrays.SharedArray{Float64,3}
-	data::Vector{Data.TD}
+	data::Vector{Data}
 	verbose::Bool
 end 
 
@@ -472,7 +451,7 @@ function Param(;
 
 	nrmat=[acqgeom[ipw][iss].nr for ipw in 1:npw, iss in 1:nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),nss)
-	data=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findall(!iszero, rflags))]
+	data=[Data(tgridmod,acqgeom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
 
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
@@ -737,6 +716,7 @@ include("rho_projection.jl")
 include("gradient.jl")
 include("born.jl")
 include("boundary.jl")
+include("gallery.jl")
 
 
 """

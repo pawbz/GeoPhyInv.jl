@@ -1,83 +1,15 @@
 
-using NamedArrays
-using OrderedCollections
+SrcWav=Array{NamedD,1}
 
-"""
-Data type for the source related parameters during acquisiton.
-
-# Fields
-* `nss::Int64` : number of supersources
-* `ns::Array{Int64}` : number of sources for each supersource
-* `fields::Vector{Symbol}` : number of fields
-* `wav::Array{Float64}` : wavelets in time domain
-* `tgrid` : time grid 
-"""
-mutable struct SrcWavss
-	tgrid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
-	w::NamedArrays.NamedArray{Array{Float64,2},1,Array{Array{Float64,2},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
-	ns::Int64
-	#SrcWav(nss, ns, fields, wav, tgrid) = 
-	#	any([
-	#	  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
-	#	  length(fields) == 0,
-	#	  broadcast(size,wav) ≠ [(length(tgrid),ns[iss]) for iss=1:nss, ifield=1:length(fields)]
-	#	  ]) ? 
-	#	error("error in SrcWav construction") : new(nss, ns, fields, wav, tgrid)
+function issimilar(geom::Geom, srcwav::SrcWav)
+	test=[]
+	push!(test, length(geom)==length(srcwav))
+	nss=length(geom)
+	push!(test, [geom[i].ns for i in 1:nss]==[srcwav[i].ns for i in 1:nss])
+	return all(test)
 end
+issimilar(srcwav::SrcWav, geom::Geom)=issimilar(geom, srcwav)
 
-"""
-Initialize an model with zeros, given mgrid and names.
-"""
-function Base.zero(::Type{SrcWavss}, tgrid, s::Srcs=Srcs(1), fields=[:P])
-	nt=length(tgrid); nf=length(fields)
-	return SrcWavss(tgrid,NamedArray([zeros(nt,s.n) for i in fields], (fields,)),
-			s.n)
-end
-SrcWavss(tgrid, s::Srcs=Srcs(1), fields=[:P])=zero(SrcWavss, tgrid, s, fields)
-
-"""
-Print information about `SrcWav`
-"""
-function Base.show(io::Base.IO, src::SrcWavss)
-	println(io,"\tSource")
-#	println(io,"\t> number of supersources:\t",src.nss)
-#	println(io,"\t> sources per supersource:\t","min\t",minimum(src.ns[:]), "\tmax\t", maximum(src.ns[:]))
-	
-#	freqmin, freqmax, freqpeak = freqs(src)
-#	println(io,"\t> frequency:\t","min\t",freqmin, "\tmax\t",freqmax,"\tpeak\t",freqpeak)
-#	println(io,"\t> time:\t","min\t",src.tgrid[1], "\tmax\t", src.tgrid[end])
-#	println(io,"\t> samples:\t",length(src.tgrid))
-end
-
-
-
-#function Base.isapprox(src1::SrcWavss, src2::SrcWavss)
-#	vec=([(src1.nss==src2.nss), (src1.fields==src2.fields), (src1.ns==src2.ns), 
-#       		(isequal(src1.tgrid, src2.tgrid)),
-#		])
-#	return all(vec)
-#end
-
-function Base.copyto!(srco::SrcWavss, src::SrcWavss)
-	@assert (srco.ns==src.n) && (srco.tgrid==src.tgrid)
-	for i in 1:length(srco.w)
-		copyto!(srco.w[i], src.w[i])
-	end
-end
-
-
-function LinearAlgebra.rmul!(src::SrcWavss, x::Number)
-	for i in 1:length(src.w)
-		rmul!(src.w[i], x)
-	end
-end
-
-
-SrcWav=Array{SrcWavss,1}
-
-function Array{SrcWavss,1}(tgrid::StepRangeLen, ss::SSrcs=SSrcs(5), s::Vector{Srcs}=fill(Srcs(1),ss.n), fields=[:P])
-	return [SrcWavss(tgrid,s[i], fields) for i in 1:ss.n]
-end
 
 
 #"""
@@ -113,22 +45,6 @@ Uses same source wavelet, i.e., `wav` for all sources and supersources
 * `wav::Array{Float64}` : a source wavelet that is used for all sources and supersources
 * `tgrid` : time grid for the wavelet
 """
-function update!(s::SrcWavss, fields::Vector{Symbol}, w::Array{Float64},)
-	for f in fields
-		for is in 1:s.ns
-			ww=view(s.w[f],:,is)
-			copyto!(ww,w)
-		end
-	end
-	return s
-end
-
-function update!(s::SrcWav, fields::Vector{Symbol}, w::Array{Float64},)
-	for ss in s
-		update!(ss,fields,w)
-	end
-	return s
-end
 
 
 
@@ -151,7 +67,7 @@ the model has `nλ` wavelengths.
 * `wav_func::Function=(fqdom, tgrid)->Utils.Wavelets.ricker(fqdom,tgrid)` : which wavelet to generate, see Utils.Wavelets.jl
 * `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the model, use this fraction to increase of reduce the maximum time
 """
-function update!(s::SrcWavss, 
+function update!(s::Datat, 
 		fields::Vector{Symbol},
 		mod::Medium, 
 		nλ::Int64,

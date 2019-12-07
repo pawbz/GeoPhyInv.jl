@@ -38,7 +38,7 @@ function Src(attrib::Symbol, nss::Int64=1)
 end
 
 
-for file in ["fwi.jl", "fdtd.jl"]   
+for file in ["fwi.jl"]   
 	fn=joinpath(@__DIR__, file)
 	include(fn)
 	#Revise.track(@__MODULE__,fn)
