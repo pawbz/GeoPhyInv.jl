@@ -18,7 +18,7 @@ Gallery of `Seismic` models.
 * `attrib=:seismic_marmousi2_downhole` : boxed marmousi2 for downhole seismic experiments  
 
 """
-function Seismic(attrib::Symbol, δ::Real=0.0; verbose=false)
+function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 	bfrac=0.1; 
 	δ=Float64(δ)
 	if((attrib == :acou_homo1))

@@ -37,7 +37,7 @@ function mod(;
 #	(length(acqgeom) != getfield(acqsrc,:ns))  ? error("different sources") : nothing
 
 
-	nt = (length(tgridmod) == length(acqsrc[1].tgrid)) ? length(tgrid) : error("acqsrc tgrid")
+	nt = (length(tgridmod) == length(acqsrc[1].grid)) ? length(tgrid) : error("acqsrc tgrid")
 	np2 = nextpow(2, 2*nt);	
 		
 
@@ -57,12 +57,9 @@ function mod(;
 	fnpow2grid = DSP.fftfreq(np2,inv(step(tgridmod)));
 
 	nss = length(acqgeom)
-	data = Data.TD(
-		       [zeros(nt,acqgeom[iss].nr) for iss=1:nss, ifield=1:1],
-	      [:P],
-	      tgridmod,acqgeom)
+	data=Data(tgridmod, acqgeom, [:P])
 
-	for ifield = 1:length(data.fields), iss = 1:nss
+	for iss in 1:nss, ifield in 1:length(data[iss].d)
 		sx = acqgeom[iss].sx
 		rx = acqgeom[iss].rx
 		sz = acqgeom[iss].sz
@@ -77,7 +74,7 @@ function mod(;
 		for is=1:acqgeom[iss].ns
 			# zero pad wavelet
 			for it in 1:nt
-				wpow2[it]=complex(acqsrc[iss].w[ifield][it,is])
+				wpow2[it]=complex(acqsrc[iss].d[ifield][it,is])
 			end
 			FFTW.fft!(wpow2) # source wavelet in the frequency domain
 
@@ -127,7 +124,7 @@ function mod(;
 
 		# truncate
 		for it in 1:nt
-			data.d[iss,ifield][it,ir] = real(dpow2all[it])
+			data[iss].d[ifield][it,ir] = real(dpow2all[it])
 		end
 		end
 	end

@@ -39,7 +39,7 @@ Modelling parameters common for all supersources
 
 
 """
-mutable struct Paramc
+mutable struct Fdtdc
 	jobname::Symbol
 	npw::Int64 
 	activepw::Vector{Int64}
@@ -110,7 +110,7 @@ end
 """
 Modelling parameters per every supersource for each worker
 """
-mutable struct Paramss
+mutable struct Fdtdss
 	iss::Int64
 	wavelets::Matrix{Matrix{Float64}}
 	ssprayw::Vector{Matrix{Float64}}
@@ -133,11 +133,11 @@ mutable struct Paramss
 end
 
 """
-Parameters per every worker, not necessarily for every supersource.
+Fdtdeters per every worker, not necessarily for every supersource.
 Note that a single worker can take care of multiple supersources.
 """
-mutable struct Paramp
-	ss::Vector{Paramss}
+mutable struct Fdtdp
+	ss::Vector{Fdtdss}
 	p::Vector{Array{Float64,3}}
 	pp::Vector{Array{Float64,3}}
 	ppp::Vector{Array{Float64,3}}
@@ -150,23 +150,22 @@ mutable struct Paramp
 	born_svalue_stack::Matrix{Float64} 
 end
 
-abstract type SeisForwExpt end
 
-mutable struct Param <: SeisForwExpt
+mutable struct Fdtd <: SeisForwExpt
 	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
-	p::DistributedArrays.DArray{Paramp,1,Paramp} # distributed parameters among workers
-	c::Paramc # common parameters
+	p::DistributedArrays.DArray{Fdtdp,1,Fdtdp} # distributed parameters among workers
+	c::Fdtdc # common parameters
 end
 
-Base.show(io::Base.IO, pa::Param)=nothing
-Base.show(io::Base.IO, pa::Paramp)=nothing
-Base.show(io::Base.IO, pa::Paramc)=nothing
-Base.show(io::Base.IO, pa::Paramss)=nothing
+Base.show(io::Base.IO, pa::Fdtd)=nothing
+Base.show(io::Base.IO, pa::Fdtdp)=nothing
+Base.show(io::Base.IO, pa::Fdtdc)=nothing
+Base.show(io::Base.IO, pa::Fdtdss)=nothing
 
-SeisForwExpt(;args...)=Param(;args...)
+SeisForwExpt(;args...)=Fdtd(;args...)
 
 
-function initialize!(pap::Paramp)
+function initialize!(pap::Fdtdp)
 	reset_per_ss!(pap)
 	for issp in 1:length(pap.ss)
 		pass=pap.ss[issp]
@@ -217,7 +216,7 @@ function initialize_boundary!(pa)
 	end
 end
 
-function initialize!(pac::Paramc)
+function initialize!(pac::Fdtdc)
 	fill!(pac.gradient,0.0)
 	fill!(pac.grad_modtt_stack,0.0)
 	fill!(pac.grad_modrrvx_stack,0.0)
@@ -230,7 +229,7 @@ function initialize!(pac::Paramc)
 	fill!(pac.datamat,0.0)
 end
 
-function reset_per_ss!(pap::Paramp)
+function reset_per_ss!(pap::Fdtdp)
 	for ipw in 1:length(pap.p)
 		fill!(pap.born_svalue_stack,0.0)
 		fill!(pap.p[ipw],0.0)
@@ -284,7 +283,7 @@ finite-difference modeling is performed.
 # Example
 
 ```julia
-pa = GeoPhyInv.Fdtd.Param(acqgeom=acqgeom, acqsrc=acqsrc, model=model, tgridmod=tgridmod);
+pa = GeoPhyInv.Fdtd.Fdtd(acqgeom=acqgeom, acqsrc=acqsrc, model=model, tgridmod=tgridmod);
 GeoPhyInv.Fdtd.update!(pa);
 ```
 # Credits 
@@ -301,7 +300,7 @@ Author: Pawan Bharadwaj
 * efficient parrallelization using distributed arrays: Sept 2017
 * optimized memory allocation: Oct 2017
 """
-function Param(;
+function Fdtd(;
 	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
 	model::Medium=nothing,
@@ -330,7 +329,7 @@ function Param(;
 	(length(acqsrc) ≠ npw) && error("acqsrc dimension")
 	(length(sflags) ≠ npw) && error("sflags dimension")
 	(length(rflags) ≠ npw) && error("rflags dimension")
-	(maximum(tgridmod) < maximum(acqsrc[1][1].tgrid)) && error("modeling time is less than source time")
+	(maximum(tgridmod) < maximum(acqsrc[1][1].grid)) && error("modeling time is less than source time")
 	#(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
 	#any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod) for ip=1:length(TDout)]) && error("output time > modeling time")
 
@@ -353,7 +352,7 @@ function Param(;
 
 	# necessary that nss and fields should be same for all nprop
 	nss = length(acqgeom[1]);
-	sfields=[names(acqsrc[ipw][1].w)[1] for ipw in 1:npw]
+	sfields=[names(acqsrc[ipw][1].d)[1] for ipw in 1:npw]
 	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
 	for ipw in 1:npw
 		for (i,field) in enumerate(sfields[ipw])
@@ -373,8 +372,8 @@ function Param(;
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
 	# find maximum and minimum frequencies in the source wavelets
-	freqmin = Utils.findfreq(acqsrc[1][1].w[1][:,1],acqsrc[1][1].tgrid,attrib=:min) 
-	freqmax = Utils.findfreq(acqsrc[1][1].w[1][:,1],acqsrc[1][1].tgrid,attrib=:max) 
+	freqmin = Utils.findfreq(acqsrc[1][1].d[1][:,1],acqsrc[1][1].grid,attrib=:min) 
+	freqmax = Utils.findfreq(acqsrc[1][1].d[1][:,1],acqsrc[1][1].grid,attrib=:max) 
 
 	# minimum and maximum velocities
 	vpmin = minimum(broadcast(minimum,[model.bounds[:vp]]))
@@ -455,7 +454,7 @@ function Param(;
 
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
-	pac=Paramc(jobname,npw,activepw,
+	pac=Fdtdc(jobname,npw,activepw,
 	    exmodel,model,
 	    acqgeom,acqsrc,abs_trbl,sfields,isfields,sflags,
 	    irfields,rflags,δt,δxI,δzI,
@@ -489,10 +488,10 @@ function Param(;
 		sschunks[ib]=ssi[ib]+1:ssi[ib+1]
 	end
 
-	# a distributed array of Paramp --- note that the parameters for each super source are efficiently distributed here
-	papa=ddata(T=Paramp, init=I->Paramp(sschunks[I...][1],pac), pids=work);
+	# a distributed array of Fdtdp --- note that the parameters for each super source are efficiently distributed here
+	papa=ddata(T=Fdtdp, init=I->Fdtdp(sschunks[I...][1],pac), pids=work);
 
-	return Param(sschunks, papa, pac)
+	return Fdtd(sschunks, papa, pac)
 end
 
 """
@@ -500,7 +499,7 @@ Create modeling parameters for each worker.
 Each worker performs the modeling of supersources in `sschunks`.
 The parameters common to all workers are stored in `pac`.
 """
-function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
+function Fdtdp(sschunks::UnitRange{Int64},pac::Fdtdc)
 	nx=pac.nx; nz=pac.nz; npw=pac.npw
 
 	born_svalue_stack = zeros(nz, nx)
@@ -518,9 +517,9 @@ function Paramp(sschunks::UnitRange{Int64},pac::Paramc)
 	memory_dp_dx=[zeros(nz,nx) for ipw in 1:npw]
 	memory_dp_dz=[zeros(nz,nx) for ipw in 1:npw]
 	
-	ss=[Paramss(iss, pac) for (issp,iss) in enumerate(sschunks)]
+	ss=[Fdtdss(iss, pac) for (issp,iss) in enumerate(sschunks)]
 
-	pap=Paramp(ss,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz,
+	pap=Fdtdp(ss,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz,
 	    born_svalue_stack)
 
 	return pap
@@ -532,7 +531,7 @@ update the perturbation vector using the perturbed model
 in this case, model will be treated as the background model 
 * `δmod` is [δKI, δrhoI]
 """
-function update_δmods!(pac::Paramc, δmod::Vector{Float64})
+function update_δmods!(pac::Fdtdc, δmod::Vector{Float64})
 	nx=pac.nx; nz=pac.nz
 	nznxd=prod(length.(pac.model.mgrid))
 	copyto!(pac.δmod, δmod)
@@ -560,7 +559,7 @@ Update the `δmods` when a perturbed `model_pert` is input.
 The model through which the waves are propagating 
 is assumed to be the background model.
 """
-function update_δmods!(pac::Paramc, model_pert::Medium)
+function update_δmods!(pac::Fdtdc, model_pert::Medium)
 	nznxd=prod(length.(pac.model.mgrid))
 	fill!(pac.δmod,0.0)
 	copyto!(pac.δmod, model_pert, [:KI, :rhoI])
@@ -574,10 +573,10 @@ function update_δmods!(pac::Paramc, model_pert::Medium)
 end
 
 """
-Update the `Seismic` model in `Paramc` without additional memory allocation.
+Update the `Seismic` model in `Fdtdc` without additional memory allocation.
 This routine is used during FWI, where medium parameters are itertively updated. 
 """
-function update_model!(pac::Paramc, model::Medium)
+function update_model!(pac::Fdtdc, model::Medium)
 
 	copyto!(pac.model, model)
 
@@ -591,7 +590,7 @@ function update_model!(pac::Paramc, model::Medium)
 	return nothing
 end 
 
-function update_acqsrc!(pa::Param, acqsrc::Vector{SrcWav}, sflags=nothing)
+function update_acqsrc!(pa::Fdtd, acqsrc::Vector{SrcWav}, sflags=nothing)
 	# update acqsrc in pa.c
 	(length(acqsrc) ≠ pa.c.npw) && error("cannot update")
 	for i in 1:length(acqsrc)
@@ -621,7 +620,7 @@ end
 Create modeling parameters for each supersource. 
 Every worker models one or more supersources.
 """
-function Paramss(iss::Int64, pac::Paramc)
+function Fdtdss(iss::Int64, pac::Fdtdc)
 
 	irfields=pac.irfields
 	isfields=pac.isfields
@@ -701,7 +700,7 @@ function Paramss(iss::Int64, pac::Paramc)
 	end
 
 
-	pass=Paramss(iss,wavelets,ssprayw,records,rinterpolatew,
+	pass=Fdtdss(iss,wavelets,ssprayw,records,rinterpolatew,
 	      isx1,isx2,isz1,isz2,irx1,irx2,irz1,irz2,boundary,snaps,illum, 
 	      grad_modtt,grad_modrrvx,grad_modrrvz)
 
@@ -720,11 +719,11 @@ include("gallery.jl")
 
 
 """
-This method updated the input `Fdtd.Param` after the wave propagation.
+This method updated the input `Fdtd.Fdtd` after the wave propagation.
 
 # Arguments
 
-* `pa::Param` : modelling parameters
+* `pa::Fdtd` : modelling parameters
 
 # Useful fields in `pa` that are modified by the method
 
@@ -744,7 +743,7 @@ Author: Pawan Bharadwaj
         (bharadwaj.pawan@gmail.com)
 
 """
-@fastmath function update!(pa::Param=Param())
+@fastmath function update!(pa::Fdtd=Fdtd())
 
 	global to
 
@@ -820,7 +819,7 @@ Author: Pawan Bharadwaj
 	return nothing
 end
 
-function update_datamat!(ifield, ipw, pac::Paramc, pap::Paramp)
+function update_datamat!(ifield, ipw, pac::Fdtdc, pap::Fdtdp)
 	datamat=pac.datamat
         pass=pap.ss
 	for issp in 1:length(pass)
@@ -834,10 +833,10 @@ function update_datamat!(ifield, ipw, pac::Paramc, pap::Paramp)
         end
 end
 
-function update_data!(ifield, ipw, pac::Paramc)
+function update_data!(ifield, ipw, pac::Fdtdc)
 	datamat=pac.datamat
 	for iss in 1:length(pac.acqgeom[1])
-		data=pac.data[ipw].d[iss,ifield]
+		data=pac.data[ipw][iss].d[ifield]
 		for ir in 1:pac.acqgeom[ipw][iss].nr
 			for it in 1:pac.nt
 				data[it,ir]=datamat[it,ir,iss]
@@ -862,7 +861,7 @@ end
 	#return [Data.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
 	#		       tgridmod, acqgeom[1]) for iprop in 1:npw]
 
-function stack_illums!(pac::Paramc, pap::Paramp)
+function stack_illums!(pac::Fdtdc, pap::Fdtdp)
 	nx, nz=pac.nx, pac.nz
 	illums=pac.illum_stack
 	pass=pap.ss
@@ -876,7 +875,7 @@ end
 
 
 # modelling for each processor
-function mod_per_proc!(pac::Paramc, pap::Paramp) 
+function mod_per_proc!(pac::Fdtdc, pap::Fdtdp) 
 	# source_loop
 	for issp in 1:length(pap.ss)
 		reset_per_ss!(pap)
@@ -950,7 +949,7 @@ end # mod_per_shot
 
 
 # Need illumination to estimate the approximate diagonal of Hessian
-@inbounds @fastmath function compute_illum!(issp::Int64, pass::Vector{Paramss}, pap::Paramp)
+@inbounds @fastmath function compute_illum!(issp::Int64, pass::Vector{Fdtdss}, pap::Fdtdp)
 	# saving illumination to be used as preconditioner 
 	p=pap.p
 	illum=pass[issp].illum
@@ -961,7 +960,7 @@ end # mod_per_shot
 end
 
 
-@fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::Paramc,pass::Vector{Paramss},pap::Paramp)
+@fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::Fdtdc,pass::Vector{Fdtdss},pap::Fdtdp)
 	isx0=pac.isx0
 	isz0=pac.isz0
 	p=pap.p

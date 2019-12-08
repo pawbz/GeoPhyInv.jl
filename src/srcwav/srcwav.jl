@@ -1,14 +1,21 @@
 
-SrcWav=Array{NamedD,1}
+SrcWav=Array{NamedD{Srcs},1}
+function Array{NamedD{Srcs},1}(grid::StepRangeLen, geom::Geom, fields::Vector{Symbol}) 
+	return [NamedD(grid,Srcs(geom[i].ns),fields) for i in 1:length(geom)]
+end
+
+
+
 
 function issimilar(geom::Geom, srcwav::SrcWav)
 	test=[]
 	push!(test, length(geom)==length(srcwav))
 	nss=length(geom)
-	push!(test, [geom[i].ns for i in 1:nss]==[srcwav[i].ns for i in 1:nss])
+	push!(test, [geom[i].ns for i in 1:nss]==[srcwav[i][:n] for i in 1:nss])
 	return all(test)
 end
 issimilar(srcwav::SrcWav, geom::Geom)=issimilar(geom, srcwav)
+
 
 
 

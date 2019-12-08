@@ -61,10 +61,10 @@ function Geomss(mgrid::AbstractArray{T}, s::Srcs, r::Recs) where {T<:StepRangeLe
 		    Random.rand(Uniform(xmin,xmax),r.n), Random.rand(Uniform(zmin,zmax),r.n), s.n, r.n)
 end
 
-function Array{Geomss,1}(mgrid::Vector{StepRangeLen}, ss::SSrcs, s::Vector{Srcs}, r::Vector{Recs})
+function Array{Geomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Vector{Srcs}, r::Vector{Recs}) where {T<:StepRangeLen}   
 	return [Geomss(mgrid,s[i],r[i]) for i in 1:ss.n]
 end
-function Array{Geomss,1}(mgrid::Vector{StepRangeLen}, ss::SSrcs, s::Srcs, r::Recs)  
+function Array{Geomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Srcs, r::Recs)  where {T<:StepRangeLen}   
 	return Array{Geomss,1}(mgrid, ss, fill(s,ss.n), fill(r,ss.n))
 end
 

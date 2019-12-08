@@ -10,23 +10,24 @@ using Test
 # This task is necessary to test the performance of the inversion algorithm
 # in various geological scenarios using different acquisition parameters.
 
-model = J.Gallery.Seismic(:acou_homo2);
+model = Medium(:acou_homo2);
 update!(model, [:vp,:rho], randn_perc=1)
 
-model0 = J.Gallery.Seismic(:acou_homo2);
+model0 = Medium(:acou_homo2);
 update!(model0, [:vp,:rho], randn_perc=1)
 
-acqgeom=J.Acquisition.Geom_fixed(model,1,10)
-acqsrc=J.Acquisition.Src_fixed_mod(acqgeom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=1.0)
-tgrid=acqsrc.tgrid
+acqgeom=Geom(model.mgrid, :surf)
+wav, tgrid=ricker(model, 3, 1.0)
+acqsrc=SrcWav(tgrid,acqgeom,[:P])
+update!(acqsrc,[:P], wav)
 
 parameterization=[:χvp, :χrho, :null]
 
 mgrid=model.mgrid
 
 @testset "test parallel implementation during gradient" begin
-	for attrib_mod in [JF.ModFdtd(), JF.ModFdtdBorn()]
-		pa=JF.Param(acqsrc, acqgeom, tgrid, attrib_mod, model0, 
+	for attrib_mod in [GeoPhyInv.ModFdtd(), GeoPhyInv.ModFdtdBorn()]
+		pa=SeisInvExpt(acqsrc, acqgeom, tgrid, attrib_mod, model0, 
 				     modm_obs=model,  
 				     modm0=model0,
 				     igrid_interp_scheme=:B2,    
@@ -35,7 +36,7 @@ mgrid=model.mgrid
 				     nworker=1)
 
 
-		pa_parallel=JF.Param(acqsrc, acqgeom, tgrid, attrib_mod, model0, 
+		pa_parallel=SeisInvExpt(acqsrc, acqgeom, tgrid, attrib_mod, model0, 
 				     modm_obs=model,  
 				     modm0=model0,
 				     igrid_interp_scheme=:B2,    
@@ -43,13 +44,16 @@ mgrid=model.mgrid
 				     parameterization=parameterization,   verbose=false,
 				     nworker=nothing)
 
-		result=JF.migr!(pa, attrib_mod)
+		result=GeoPhyInv.migr!(pa, attrib_mod)
 
-		result_parallel=JF.migr!(pa_parallel, attrib_mod)
+		result_parallel=GeoPhyInv.migr!(pa_parallel, attrib_mod)
 
 		@test result[2] ≈ result_parallel[2]
 	end
 end
+
+
+wefwefwef
 
 @testset "Testing Born Modeling and its gradient" begin
 

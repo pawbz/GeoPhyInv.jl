@@ -5,7 +5,7 @@ Return snaps stored in `SeisForwExpt` after using `mod!`.
 
 * `iss::Int64=1` : supersource index
 """
-function Base.getindex(pa::Param, s::Symbol, iss::Int=1)
+function Base.getindex(pa::Fdtd, s::Symbol, iss::Int=1)
 	@assert iss≤pa.c.acqgeom[1].nss
 	@assert s in [:snaps]
 	if(s==:snaps)

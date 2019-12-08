@@ -8,36 +8,50 @@ using Random
 """
 Type for storing NamedD 
 """
-mutable struct NamedD
+mutable struct NamedD{T<:Union{Srcs,Recs}}
 	grid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
 	d::NamedArrays.NamedArray{Array{Float64,2},1,Array{Array{Float64,2},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
-	n::Int64
-	NamedD(grid,d,n)=any([(size(dd)≠(length(grid),n)) for dd in d]) ? error("NamedD construction") : new(grid,d,n)
+	sr::T
+#	NamedD{T}(grid,d,sr)=any([(size(dd)≠(length(grid),sr.n)) for dd in d]) ? error("NamedD construction") : new(grid,d,sr)
 end
-Base.getindex(d::NamedD,s::Symbol)=getindex(d.d,s)
+
+"""
+Simplify getting properties 
+"""
+function Base.getindex(obj::NamedD, sym::Symbol)
+	if(sym ∈ [:nr, :ns, :n])
+		return obj.sr.n
+	else
+		return Base.getindex(obj.d, sym)
+	end
+end
+
+
 
 """
 Initialize with zeros, given grid and names.
 """
 function Base.zero(::Type{NamedD}, grid::StepRangeLen, s::Union{Srcs,Recs}, fields::Vector{Symbol})
 	nt=length(grid); nf=length(fields)
-	return NamedD(grid,NamedArray([zeros(nt,s.n) for i in fields], (fields,)),s.n)
+	return NamedD(grid,NamedArray([zeros(nt,s.n) for i in fields], (fields,)),s)
 end
 NamedD(grid, s::Union{Srcs,Recs}, fields::Vector{Symbol})=zero(NamedD, grid, s, fields)
 
-VNamedD=Array{NamedD,1}
+VNamedD=Union{Array{NamedD{Recs},1},Array{NamedD{Srcs},1}}
 
-function Array{NamedD,1}(grid::StepRangeLen, ss::SSrcs, sr::Vector{T}, fields::Vector{Symbol}) where {T<:Union{Srcs,Recs}}
-	return [NamedD(tgrid,sr[i],fields) for i in 1:ss.n]
+
+function Array{NamedD{Recs},1}(grid::StepRangeLen, ss::SSrcs, sr::Vector{Recs}, fields::Vector{Symbol}) 
+	return [NamedD(grid,sr[i],fields) for i in 1:ss.n]
+end
+function Array{NamedD{Srcs},1}(grid::StepRangeLen, ss::SSrcs, sr::Vector{Srcs}, fields::Vector{Symbol})
+	return [NamedD(grid,sr[i],fields) for i in 1:ss.n]
 end
 
-function Array{NamedD,1}(tgrid::StepRangeLen, ss::SSrcs, sr::Union{Srcs,Recs}, fields::Vector{Symbol})
-	return [NamedD(tgrid,sr,fields) for i in 1:ss.n]
+function Array{NamedD{Srcs},1}(grid::StepRangeLen, ss::SSrcs, sr::Srcs, fields::Vector{Symbol})
+	return [NamedD(grid,sr,fields) for i in 1:ss.n]
 end
-
-
-function Array{NamedD,1}(tgrid::StepRangeLen, geom::Geom, fields::Vector{Symbol}) 
-	return [NamedD(tgrid,Recs(geom[i].nr),fields) for i in 1:length(geom)]
+function Array{NamedD{Recs},1}(grid::StepRangeLen, ss::SSrcs, sr::Recs, fields::Vector{Symbol})
+	return [NamedD(grid,sr,fields) for i in 1:ss.n]
 end
 
 
@@ -81,7 +95,7 @@ function update!(d::NamedD, fields::Vector{Symbol}, w::Array{Float64},)
 	@assert length(w)==length(d.grid)
 	@inbounds for f in fields
 		@assert f ∈ names(d.d)[1]
-		@inbounds for i in 1:d.n
+		@inbounds for i in 1:d[:n]
 			for it in 1:length(d.grid)
 				d.d[f][it,i]=w[it]
 			end
@@ -148,7 +162,7 @@ No memory allocations
 function Base.copyto!(d::NamedD, v::AbstractVector{Float64}, i0=1)
 #	@assert length(d)==length(v)
 	for dd in d.d
-		for i in 1:d.n
+		for i in 1:d[:n]
 			for it in 1:length(d.grid)
 				dd[it,i]=v[i0]
 				i0+=1
@@ -169,7 +183,7 @@ end
 
 function Base.copyto!(v::AbstractVector{Float64}, d::NamedD,i0=1)
 	for dd in d.d
-		for i in 1:d.n
+		for i in 1:d[:n]
 			for it in 1:length(d.grid)
 				v[i0]=dd[it,i]
 				i0+=1

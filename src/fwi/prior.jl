@@ -1,6 +1,6 @@
 
 """
-Update prior in `Param` either using modm or modi
+Update prior in `FWI` either using modm or modi
 
 * `priori` : prior model on inversion grid
 """

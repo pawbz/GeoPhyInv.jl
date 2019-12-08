@@ -176,7 +176,7 @@ use this fraction to increase of reduce the maximum time
 function ricker(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0; args... )
 	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac)
 	wav=ricker(fqdom, tgrid; args...)
-	return wav
+	return wav, tgrid
 end
 
 """
@@ -185,7 +185,7 @@ Same as ricker, but return ormsby...
 function ormsby(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0; args... )
 	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac)
 	wav=ormsby(fqdom, tgrid; args...)
-	return wav
+	return wav, tgrid
 end
 
 """

@@ -1,7 +1,7 @@
 """
 Update pa.w
 """
-function wfwi!(pa::Param; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., 
+function wfwi!(pa::FWI; store_trace::Bool=true, extended_trace::Bool=false, time_limit=Float64=2.0*60., 
 	       f_tol::Float64=1e-8, g_tol::Float64=1e-8, x_tol::Float64=1e-8)
 
 	# convert initial model to the inversion variable
@@ -46,11 +46,11 @@ end # wfwi
 
 #=
 
-function xwfwi!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothing, roundtrip_tol=1e-6,
+function xwfwi!(pa; max_roundtrips=100, max_reroundtrips=10, FWIAM_func=nothing, roundtrip_tol=1e-6,
 		     optim_tols=[1e-6, 1e-6])
 
-	if(ParamAM_func===nothing)
-		ParamAM_func=x->ParamAM(x, optim_tols=optim_tols,name="FWI with Source Wavelet Estimation",
+	if(FWIAM_func===nothing)
+		FWIAM_func=x->FWIAM(x, optim_tols=optim_tols,name="FWI with Source Wavelet Estimation",
 				    roundtrip_tol=roundtrip_tol, max_roundtrips=max_roundtrips,
 				    max_reroundtrips=max_reroundtrips,
 				    min_roundtrips=10,
@@ -63,7 +63,7 @@ function xwfwi!(pa; max_roundtrips=100, max_reroundtrips=10, ParamAM_func=nothin
 	# create alternating minimization parameters
 	f1=x->FWI.wfwi!(pa, extended_trace=false)
 	f2=x->FWI.xfwi!(pa, extended_trace=false)
-	paam=ParamAM_func([f1, f2])
+	paam=FWIAM_func([f1, f2])
 
 	# do inversion
 	go(paam)

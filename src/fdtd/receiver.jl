@@ -4,7 +4,7 @@ struct Receiver_B1 end
 
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp, ::Receiver_B1)
+@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac::Fdtdc, pass::Vector{Fdtdss}, pap::Fdtdp, ::Receiver_B1)
 	p=pap.p
 	rinterpolatew=pass[issp].rinterpolatew
 	irx1=pass[issp].irx1
@@ -36,7 +36,7 @@ end
 
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp, ::Receiver_B0)
+@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac::Fdtdc, pass::Vector{Fdtdss}, pap::Fdtdp, ::Receiver_B0)
 	p=pap.p
 	rinterpolatew=pass[issp].rinterpolatew
 	irx1=pass[issp].irx1

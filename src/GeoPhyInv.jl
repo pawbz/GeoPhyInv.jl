@@ -59,11 +59,10 @@ include("database/core.jl")
 
 include("srcwav/srcwav.jl")
 export SrcWav
-SrcWav=Array{NamedD,1}
 
 include("Coupling.jl")
-Data=Array{NamedD,1}
-
+include("data/core.jl")
+export Data
 
 
 # Pressure and velocity fields (used for multiple dispatch)
@@ -72,6 +71,9 @@ struct Vx end
 struct Vz end
 
 
+abstract type SeisForwExpt end
+
+abstract type SeisInvExpt end
 
 #include("Data/Data.jl")
 include("Born/Born.jl")

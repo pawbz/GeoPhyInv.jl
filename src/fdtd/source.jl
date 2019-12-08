@@ -3,11 +3,11 @@ function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc:
 
 	npw = size(wavelets,1)
 	nt = size(wavelets,2)
-	δt = step(acqsrc[1][1].tgrid)
+	δt = step(acqsrc[1][1].grid)
 	for ipw=1:npw
 		ns, snfield = size(wavelets[ipw,1]) # ns may vary with ipw
 		for ifield=1:snfield, is=1:ns
-			snt = length(acqsrc[ipw][1].tgrid)
+			snt = length(acqsrc[ipw][1].grid)
 			if(sflags[ipw] == 0)
 				# nothing # just put zeros, no sources added
 				for it=1:nt
@@ -16,14 +16,14 @@ function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc:
 			elseif(sflags[ipw] == 1)
 				"ϕ[t] = s[t]"
 				for it=1:snt
-					source_term = acqsrc[ipw][iss].w[ifield][it,is]
+					source_term = acqsrc[ipw][iss].d[ifield][it,is]
 					wavelets[ipw,it][is,ifield] = source_term
 				end
 			elseif(sflags[ipw] == -1)
 				"source sink for 1"
 				"ϕ[t] = -s[t]"
 				for it=2:snt
-					source_term = acqsrc[ipw][iss].w[ifield][it,is]
+					source_term = acqsrc[ipw][iss].d[ifield][it,is]
 					wavelets[ipw,nt-it+2][is,ifield] = -1.0*source_term
 				end
 			elseif(sflags[ipw] == 2)
@@ -31,13 +31,13 @@ function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc:
 				source_term_stack = 0.0;
 				if(ifield == 1)
 					for it=1:snt-1
-						source_term_stack += (acqsrc[ipw][iss].w[ifield][it,is] .* δt)
+						source_term_stack += (acqsrc[ipw][iss].d[ifield][it,is] .* δt)
 						wavelets[ipw,it+1][is,ifield] = source_term_stack
 					end
 				else
 					for it=2:snt-1
-						source_term_stack += (((acqsrc[ipw][iss].w[ifield][it,is] .* δt) +
-						   (acqsrc[ipw][iss].w[ifield][it-1,is] .* δt)) * 0.5)
+						source_term_stack += (((acqsrc[ipw][iss].d[ifield][it,is] .* δt) +
+						   (acqsrc[ipw][iss].d[ifield][it-1,is] .* δt)) * 0.5)
 						wavelets[ipw,it+1][is,ifield] = source_term_stack
 					end
 
@@ -51,7 +51,7 @@ function fill_wavelets!(iss::Int64, wavelets::Array{Array{Float64,2},2}, acqsrc:
 				# as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
 				source_term_stack = 0.0;
 				for it=1:snt-1
-					source_term_stack += (acqsrc[ipw][iss].w[ifield][it,is] .* δt)
+					source_term_stack += (acqsrc[ipw][iss].d[ifield][it,is] .* δt)
 					wavelets[ipw,nt-it+1][is,ifield] = -1.0 * source_term_stack
 				end
 				if(nt > snt)
@@ -67,7 +67,7 @@ struct Source_B1 end
 struct Source_B0 end
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp, ::Source_B1)
+@inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac::Fdtdc, pass::Vector{Fdtdss}, pap::Fdtdp, ::Source_B1)
 	# aliases
 	p=pap.p;
 	wavelets=pass[issp].wavelets
@@ -115,7 +115,7 @@ end
 
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp, ::Source_B0)
+@inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac::Fdtdc, pass::Vector{Fdtdss}, pap::Fdtdp, ::Source_B0)
 	# aliases
 	p=pap.p;
 	wavelets=pass[issp].wavelets

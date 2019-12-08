@@ -1,6 +1,6 @@
 
 
-function add_born_sources!(issp::Int64, pac::Paramc, pass::Vector{Paramss}, pap::Paramp)
+function add_born_sources!(issp::Int64, pac::Fdtdc, pass::Vector{Fdtdss}, pap::Fdtdp)
 
 	δx24I=pac.δx24I; δz24I=pac.δz24I; 
 	δxI=pac.δxI; δzI=pac.δzI; 
