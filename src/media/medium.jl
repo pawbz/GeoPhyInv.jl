@@ -1,18 +1,6 @@
 #module Media
 
-using DataFrames
-using NamedArrays
-using OrderedCollections
-using CSV
-using Statistics
-using LinearAlgebra
-using Distributions
-using Random
-using ImageFiltering
-import GeoPhyInv.Smooth
-import GeoPhyInv.Interpolation
 
-export update!, Medium
 
 mutable struct Medium
 	mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}}

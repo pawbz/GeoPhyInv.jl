@@ -35,11 +35,11 @@ fill!(model)
 update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise
 
 # ### A surface acquisition geometry
-acqgeom=GeoPhyInv.Gallery.Geom(model.mgrid,:surf, nss=3, nr=30);
+geom=GeoPhyInv.Gallery.Geom(model.mgrid,:surf, nss=3, nr=30);
 
 # ### Plot the model and source, receivers
 p1=JP.seismic(model) 
-JP.geom!(acqgeom)
+JP.geom!(geom)
 plot(p1)
 
 # ### Generate a temporal grid
@@ -49,14 +49,14 @@ tgrid = range(0.0,stop=2.0,length=1000)
 wav = GeoPhyInv.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,);
 
 # ### Distribute the same source wavelet to all the supsersources 
-acqsrc=GeoPhyInv.Acquisition.Src_fixed(acqgeom.nss,1,[:P],wav,tgrid);
+srcwav=GeoPhyInv.Acquisition.Src_fixed(geom.nss,1,[:P],wav,tgrid);
 
 # create `Fdtd.Param` object to prepare forward modelling
 # * npw corresponds to the number of independently propagating wavefields (1 in most cases)
 # Once the `Param` object is created, do the modelling "without any memory allocations" using `mod!`
 
 pa=SeisForwExpt(npw=1,model=model,
-	acqgeom=[acqgeom], acqsrc=[acqsrc],
+	geom=[geom], srcwav=[srcwav],
 	sflags=[2], rflags=[1],
 	tgridmod=tgrid, verbose=true);
 
@@ -72,7 +72,7 @@ model_new=J.Gallery.Seismic(:acou_homo1) # prepare another model
 update!(model_new, [:vp,:rho], randn_perc=0.01)
 update!(model_new, [:vp,:rho], constant_pert=0.03) # perturb the model
 p2=JP.seismic(model_new) # plot new model 
-JP.geom!(acqgeom)
+JP.geom!(geom)
 plot(p2)
 
 

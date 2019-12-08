@@ -1,5 +1,5 @@
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function compute_gradient!(issp::Int64, pac::Fdtdc, pass::Vector{Fdtdss}, pap::Fdtdp)
+@inbounds @fastmath function compute_gradient!(issp::Int64, pac::PFdtdc, pass::Vector{PFdtdss}, pap::PFdtdp)
 	# aliases
 	p=pap.p
 	pp=pap.pp
@@ -52,7 +52,7 @@ end
 	end
 end
 
-@inbounds @fastmath function scale_gradient!(issp::Int64,pass::Vector{Fdtdss},δ)
+@inbounds @fastmath function scale_gradient!(issp::Int64,pass::Vector{PFdtdss},δ)
 	grad_modtt=pass[issp].grad_modtt
 	grad_modrrvx=pass[issp].grad_modrrvx
 	grad_modrrvz=pass[issp].grad_modrrvz
@@ -67,13 +67,13 @@ end
 
 
 
-function grad_modrr!(pac::Fdtdc)
+function grad_modrr!(pac::PFdtdc)
 	grad_modrr_sprayrr!(pac.grad_modrr_stack,pac.grad_modrrvx_stack,pac.grad_modrrvz_stack)
 	grad_modrr_sprayrrvx!(pac.grad_modrr_stack,pac.grad_modrrvx_stack)
 	grad_modrr_sprayrrvz!(pac.grad_modrr_stack,pac.grad_modrrvz_stack)
 end
 
-function stack_grads!(pac::Fdtdc, pap::Fdtdp)
+function stack_grads!(pac::PFdtdc, pap::PFdtdp)
 	# theses are SharedArrays
 	gmodtt=pac.grad_modtt_stack
 	gmodrrvx=pac.grad_modrrvx_stack
@@ -95,7 +95,7 @@ function stack_grads!(pac::Fdtdc, pap::Fdtdp)
 	end
 end
 
-function update_gradient!(pac::Fdtdc)
+function update_gradient!(pac::PFdtdc)
 	nx, nz=pac.nx, pac.nz
 	nznxd = prod(length.(pac.model.mgrid))
 

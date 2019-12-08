@@ -52,8 +52,8 @@ p=randn(nz,nx,nt)
 # ### Acquisition
 # Now, we will generate an acquisition geometry and allocate a projection matrix `ACQ`.
 
-acqgeom=GIPh.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.]);
-ACQ=GIPh.Acquisition.ACQmat(acqgeom,mgrid);
+geom=GIPh.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.]);
+ACQ=GIPh.Acquisition.ACQmat(geom,mgrid);
 @info "ACQ will be used to project ψ onto receivers."
 
 # ### Generate `PoissonExpt` and then applying `mod!`

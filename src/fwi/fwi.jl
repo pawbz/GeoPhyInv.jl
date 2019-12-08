@@ -1,25 +1,32 @@
 """
-This module defines a type called `FWI` that is to be constructed 
+This module defines a type called `PFWI` that is to be constructed 
 before performing 
 and kind of inversion.
 The following functionality is currently added in this module:
 * a simple RTM
 * full-waveform inversion
 * source and receiver filter inversion
-Once a `FWI` object is constructed, the following routines update certain fields
-of the `FWI` after performing the inversion.
-* `xfwi!` : updates the initial subsurface models in `FWI` using its observed data
-* `wfwi!` : updates the source and receiver filters in `FWI` using its observed data
+Once a `PFWI` object is constructed, the following routines update certain fields
+of the `PFWI` after performing the inversion.
+* `xfwi!` : updates the initial subsurface models in `PFWI` using its observed data
+* `wfwi!` : updates the source and receiver filters in `PFWI` using its observed data
 """
 
 include("X.jl")
 
-# modeling types
-struct ModFdtd end
 
-struct ModFdtdBorn end
+# add data inverse covariance matrix here later
+struct LS end # just cls inversion
 
-struct ModFdtdHBorn end
+struct LS_prior # cls inversion including prior 
+	# add data inverse covariance matrix here later, instead of just Float64
+	pdgls::Float64
+	# pdgls
+	pmgls::Misfits.P_gls{Float64}
+end
+LS_prior(α1::Float64, Q::LinearMap)=LS_prior(α1, Misfits.P_gls(Q))
+struct Migr end
+struct Migr_FD end
 
 
 
@@ -27,14 +34,14 @@ struct ModFdtdHBorn end
 global const fwi_to = TimerOutput();
 
 """
-FWI Parameters
+PFWI Parameters
 
 # Fields
 
 * `mgrid::Vector{StepRangeLen}` : modelling grid
 * `igrid::Vector{StepRangeLen}` : inversion grid
-* `acqsrc::SrcWav` : base source wavelet for modelling data
-* `acqgeom::Geom` : acquisition geometry
+* `srcwav::SrcWav` : base source wavelet for modelling data
+* `geom::Geom` : acquisition geometry
 * `tgrid::StepRangeLen` : 
 * `attrib_mod`
 * `model_obs` : model used for generating observed data
@@ -45,20 +52,21 @@ FWI Parameters
 
 TODO: add an extra attribute for coupling functions inversion and modelling
 """
-mutable struct FWI{Tmod<:SeisForwExpt, Tdatamisfit}  <: SeisInvExpt
+mutable struct PFWI{Tmod, Tdatamisfit, Tinv}
+	attrib_inv::Tinv
 	"model inversion variable"
 	mx::X{Float64,1}
 	mxm::X{Float64,1}
 	"forward modelling parameters for"
 	paf::Tmod
 	"base source wavelet"
-	acqsrc::SrcWav
+	srcwav::SrcWav
 	"adjoint source functions"
 	adjsrc::SrcWav
 	"acquisition geometry"
-	acqgeom::Geom
+	geom::Geom
 	"acquisition geometry for adjoint propagation"
-	adjacqgeom::Geom
+	adjgeom::Geom
 	"Seismic model on modeling grid"
 	modm::Medium
 	"background Seismic model"
@@ -86,19 +94,8 @@ mutable struct FWI{Tmod<:SeisForwExpt, Tdatamisfit}  <: SeisInvExpt
 end
 
 
-Base.show(io::Base.IO, pa::FWI)=nothing
-SeisInvExpt(args1...;args2...)=FWI(args1...;args2...) # change this when you have more inversion experiments 
-
-# add data inverse covariance matrix here later
-struct LS end # just cls inversion
-
-struct LS_prior # cls inversion including prior 
-	# add data inverse covariance matrix here later, instead of just Float64
-	pdgls::Float64
-	# pdgls
-	pmgls::Misfits.P_gls{Float64}
-end
-LS_prior(α1::Float64, Q::LinearMap)=LS_prior(α1, Misfits.P_gls(Q))
+Base.show(io::Base.IO, pa::PFWI)=nothing
+SeisInvExpt(m1::Union{Fdtd, FdtdBorn},m2::Union{LS,LS_prior,Migr,Migr_FD};args1...)=PFWI(m1,m2;args1...) # change this when you have more inversion experiments 
 
 """
 this method constructs prior term with Q=α*I
@@ -122,8 +119,8 @@ include("xwfwi.jl")
 """
 Convert the data `Data` to `SrcWav` after time reversal.
 """
-function update_adjsrc!(adjsrc, δdat::Data, adjacqgeom)
-	for i in 1:length(adjacqgeom)
+function update_adjsrc!(adjsrc, δdat::Data, adjgeom)
+	for i in 1:length(adjgeom)
 		for field in names(δdat[i].d)[1]
 			wav=adjsrc[i].d[field] 
 			dat=δdat[i].d[field]
@@ -143,26 +140,29 @@ value_adjsrc(s, ::Vx) = -1.0*s # see adj tests
 value_adjsrc(s, ::Vz) = -1.0*s
 
 
-function generate_adjsrc(fields, tgrid, adjacqgeom)
-	adjsrc=SrcWav(tgrid,adjacqgeom,fields)
+function generate_adjsrc(fields, tgrid, adjgeom)
+	adjsrc=SrcWav(tgrid,adjgeom,fields)
 	return adjsrc
 end
 
 
 """
-Constructor for `FWI`
+Constructor for `PFWI`
 
 # Arguments
 
-* `acqsrc::SrcWav` : source time functions
-* `acqgeom::Geom` : acquisition geometry
+* `attrib_mod::Union{Fdtd, FdtdBorn}` : modelling attribute
+* `attrib_inv::Union{LS,LS_prior,Migr,Migr_FD} : inversion attribute
+
+
+# Keyword Arguments
+* `srcwav::SrcWav` : source time functions
+* `geom::Geom` : acquisition geometry
 * `tgrid::StepRangeLen` : modelling time grid
-* `attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}` : modelling attribute
 * `modm::Medium` : seismic model on modelling mesh 
 
-# Optional Arguments
+# Optional Keyword Arguments 
 * `tgrid_obs::StepRangeLen` : time grid for observed data
-
 * `igrid::Vector{StepRangeLen}=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
 * `igrid_interp_scheme` : interpolation scheme
   * `=:B1` linear 
@@ -171,10 +171,10 @@ Constructor for `FWI`
   * `=1` means the preconditioning is switched off
   * `>1` means the preconditioning is switched on, larger the mprecon_factor, stronger the applied preconditioner becomes
 * `dobs::Data.TD` : observed data
-* `dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.acqgeom)` : data preconditioning, defaults to one 
+* `dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.geom)` : data preconditioning, defaults to one 
 * `tlagssf_fracs=0.0` : maximum lagtime of unknown source filter
 * `tlagrf_fracs=0.0` : maximum lagtime of unknown receiver filter
-* `acqsrc_obs::SrcWav=acqsrc` : source wavelets to generate *observed data*; can be different from `acqsrc`
+* `srcwav_obs::SrcWav=srcwav` : source wavelets to generate *observed data*; can be different from `srcwav`
 * `modm_obs::Medium=modm` : actual seismic model to generate *observed data*
 * `modm0::Medium=fill!(modm,0.0)` : background seismic model for Born modelling and inversion
 * `parameterization::Vector{Symbol}` : subsurface parameterization
@@ -187,30 +187,31 @@ Constructor for `FWI`
   * `=:field` field data inversion
 * nworker : number of workers (input nothing to use all available)
 """
-function FWI(
-	       acqsrc::SrcWav,
-	       acqgeom::Geom,
-	       tgrid::StepRangeLen,
-	       attrib_mod::Union{ModFdtd, ModFdtdBorn, ModFdtdHBorn}, 
-	       modm::Medium;
-	       # other optional 
-	       tgrid_obs::StepRangeLen=deepcopy(tgrid),
-	       rfields=[:P],
-	       igrid=nothing,
-	       igrid_interp_scheme::Symbol=:B2,
-	       mprecon_factor::Float64=1.0,
-	       dobs::Data=Data(tgrid_obs, acqgeom, rfields),
-	       dprecon=nothing,
-	       tlagssf_fracs=0.0,
-	       tlagrf_fracs=0.0,
-	       acqsrc_obs::SrcWav=deepcopy(acqsrc),
-	       modm_obs::Medium=modm,
-	       modm0=nothing,
-	       parameterization::Vector{Symbol}=[:χvp, :χrho, :null],
-	       verbose::Bool=false,
-	       attrib::Symbol=:synthetic,
-	       nworker=nothing,
-	       )
+function PFWI(
+	      attrib_mod::Union{Fdtd, FdtdBorn}, 
+	      attrib_inv::Union{LS,LS_prior,Migr,Migr_FD};
+	      srcwav::SrcWav=nothing,
+	      geom::Geom=nothing,
+	      tgrid::StepRangeLen=nothing,
+	      modm::Medium,
+	      # other optional 
+	      tgrid_obs::StepRangeLen=deepcopy(tgrid),
+	      rfields=[:P],
+	      igrid=nothing,
+	      igrid_interp_scheme::Symbol=:B2,
+	      mprecon_factor::Float64=1.0,
+	      _FD::Data=Data(tgrid_obs, geom, rfields),
+	      dprecon=nothing,
+	      tlagssf_fracs=0.0,
+	      tlagrf_fracs=0.0,
+	      srcwav_obs::SrcWav=deepcopy(srcwav),
+	      modm_obs::Medium=modm,
+	      modm0=nothing,
+	      parameterization::Vector{Symbol}=[:χvp, :χrho, :null],
+	      verbose::Bool=false,
+	      attrib::Symbol=:synthetic,
+	      nworker=nothing,
+	      )
 
 	# make a copy of initial model
 	modm=deepcopy(modm)
@@ -261,18 +262,18 @@ function FWI(
 		isequal(modm, modm_obs) && error("initial model same as actual model, zero misfit?")
 	end
 
-	# acqgeom geometry for adjoint propagation
-	adjacqgeom = AdjGeom(acqgeom)
+	# geom geometry for adjoint propagation
+	adjgeom = AdjGeom(geom)
 
 	# generate adjoint sources
-	adjsrc=generate_adjsrc(rfields, tgrid, adjacqgeom)
+	adjsrc=generate_adjsrc(rfields, tgrid, adjgeom)
 
 
 	# generating forward and adjoint modelling engines
 	# to generate modelled data, border values, etc.
 	# most of the parameters given to this are dummy
-	paf=SeisForwExpt(npw=2, model=modm, born_flag=true,
-		acqgeom=[acqgeom, adjacqgeom], acqsrc=[acqsrc, adjsrc], 
+	paf=SeisForwExpt(attrib_mod,npw=2, model=modm,
+		geom=[geom, adjgeom], srcwav=[srcwav, adjsrc], 
 		rfields=rfields,
 		sflags=[3, 2], rflags=[1, 1],
 		backprop_flag=1, 
@@ -293,17 +294,17 @@ function FWI(
 	end
 	
 	# create Parameters for data misfit
-	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, rfields, acqgeom)
+	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, rfields, geom)
 	# choose the data misfit
 	#	(iszero(tlagssf_fracs)) 
  	# tlagssf_fracs==[0.0] | tlagssf_fracs=[0.0])
-	# paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,acqgeom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
+	# paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,geom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
 	if(iszero(dobs))
 		Random.randn!(dobs) # dummy dobs, update later
 	end
 
-	paTD=VNamedD_misfit(Data(tgrid,acqgeom,rfields),dobs,w=dprecon);
+	paTD=VNamedD_misfit(Data(tgrid,geom,rfields),dobs,w=dprecon);
 
 	paminterp=Interpolation.Kernel([modi.mgrid[2], modi.mgrid[1]], [modm.mgrid[2], modm.mgrid[1]], igrid_interp_scheme)
 
@@ -314,13 +315,14 @@ function FWI(
 	# put modm as a vector, according to parameterization in mxm.x
 	copyto!(mxm.x,modm,parameterization)
 
-	pa = FWI(
+	pa = PFWI(
+		  attrib_inv,
 	     mx, mxm,
 	     paf,
-	     deepcopy(acqsrc), 
-	     SrcWav(tgrid,adjacqgeom, rfields),
-	     deepcopy(acqgeom), 
-	     adjacqgeom,
+	     deepcopy(srcwav), 
+	     SrcWav(tgrid,adjgeom, rfields),
+	     deepcopy(geom), 
+	     adjgeom,
 	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,
 	     priori,
 	     gmodm,gmodi,
@@ -332,13 +334,13 @@ function FWI(
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic))
-		update_observed_data!(pa, modm_obs, attrib_mod)
+		update_observed_data!(pa, modm_obs)
 	end
 
 	iszero(dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
 
 	# generate modelled data
-	F!(pa, nothing, attrib_mod)
+	F!(pa, nothing)
 
 #	build_mprecon!(pa, Array(pa.paf.c.illum_stack), mprecon_factor)
 	pa.paf.c.illum_flag=false # switch off illum flag for speed
@@ -353,10 +355,10 @@ function FWI(
 end
 
 """
-update the *synthetic* observed data in `FWI`
+update the *synthetic* observed data in `PFWI`
 * allocated memory, don't use in inner loops
 """
-function update_observed_data!(pa::FWI, modm_obs, attrib_mod=ModFdtd())
+function update_observed_data!(pa::PFWI, modm_obs)
 	# save modm of pa to put it back later
 	modm_copy=deepcopy(pa.modm)
 
@@ -364,9 +366,9 @@ function update_observed_data!(pa::FWI, modm_obs, attrib_mod=ModFdtd())
 	copyto!(pa.modm, modm_obs)
 
 	# update models in the forward engine and do modelling
-	# ModFdtdBorn: modm0 will be used as a background model for Born modelling and modm will be perturbed model
-	# ModFdtd: modm will be *the* model
-	F!(pa, nothing, attrib_mod)
+	# FdtdBorn: modm0 will be used as a background model for Born modelling and modm will be perturbed model
+	# Fdtd: modm will be *the* model
+	F!(pa, nothing)
 
 	# get observed data
 	copyto!(pa.paTD.y, pa.paTD.x)
@@ -380,19 +382,19 @@ end
 
 
 """
-Return the number of inversion variables for FWI corresponding to `FWI`.
+Return the number of inversion variables for PFWI corresponding to `PFWI`.
 This number of inversion variables depend on the size of inversion mesh.
 """
-function xfwi_ninv(pa::FWI)
+function xfwi_ninv(pa::PFWI)
 	length(pa.mx.x)
 end
 
 """
 Return the number of inversion variables for source and receiver filter inversion 
-corresponding to `FWI`.
+corresponding to `PFWI`.
 This number depends on the maximum lagtimes of the filters. 
 """
-function wfwi_ninv(pa::FWI)
+function wfwi_ninv(pa::PFWI)
 	return  pa.paTD.coup.tgridssf.nx
 end
 
@@ -454,7 +456,7 @@ end
 """
 convert the gradient output from Fdtd to gx
 """
-function spray_gradient!(gx,  pa, ::ModFdtd)
+function spray_gradient!(gx,  pa::PFWI{Fdtd,T1,T2}) where {T1,T2}
 
 	# apply chain rule on gmodm to get gradient w.r.t. dense x
 	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
@@ -465,7 +467,7 @@ function spray_gradient!(gx,  pa, ::ModFdtd)
 	# visualize gmodi here?
 	# visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)
 end
-function spray_gradient!(gx, pa, ::ModFdtdBorn)
+function spray_gradient!(gx, pa::PFWI{FdtdBorn,T1,T2}) where {T1,T2}   
 
 	# apply chain rule on gmodm to get gradient w.r.t. dense x (note that background model is used for Born modeling here)
 	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
@@ -551,7 +553,7 @@ end
 """
 Return functional and gradient of the LS objective 
 """
-function func_grad_Coupling!(storage, x::Vector{Float64},pa::FWI)
+function func_grad_Coupling!(storage, x::Vector{Float64},pa::PFWI)
 
 	pa.verbose ? println("computing gradient...") : nothing
 
@@ -573,7 +575,7 @@ end
 Convert coupling functions to x and vice versa
 """
 function Coupling_x!(x::Vector{Float64}, 
-		   pa::FWI, 
+		   pa::PFWI, 
 		   flag::Int64)
 	if(flag ==1) # convert w to x
 		iss=1 # take only first source
@@ -584,7 +586,7 @@ function Coupling_x!(x::Vector{Float64},
 			end
 		end
 	elseif(flag == -1) # convert x to w
-		for iss=1:pa.paTD.y.acqgeom.nss, ifield=1:length(pa.paTD.y.fields)
+		for iss=1:pa.paTD.y.geom.nss, ifield=1:length(pa.paTD.y.fields)
 			w=pa.paTD.coup.ssf[iss,ifield]
 			for i in eachindex(x)
 				w[i]=x[i]

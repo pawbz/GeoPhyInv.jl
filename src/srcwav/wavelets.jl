@@ -1,12 +1,4 @@
 
-using DSP
-using Misfits
-using LinearAlgebra
-using Test
-using FFTW
-using AxisArrays
-using Distributions
-
 """
 Generate a Ricker Wavelet. Reference:
 Frequencies of the Ricker wavelet, Yanghua Wang, GEOPHYSICS, VOL. 80, NO. 2

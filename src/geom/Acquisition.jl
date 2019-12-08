@@ -99,13 +99,13 @@ either sources or receivers on the boundary of
 
 # Arguments
 
-* `acqgeom::Geom` : input geometry
+* `geom::Geom` : input geometry
 * `mgridi` : grid to determine the boundary
 * `attrib::Symbol` : decide return
   * `=:srcborder` sources on boundary (useful for back propagation)
   * `=:recborder` receivers on boundary
 """
-function Geom_boundary(acqgeom::Geom,
+function Geom_boundary(geom::Geom,
 	      mgrid
 	      attrib::Symbol
 	     )
@@ -115,15 +115,15 @@ function Geom_boundary(acqgeom::Geom,
 	end
 	"change the position of receivers to the boundary"
 	if(attrib == :recborder)
-		nr = nb; 		sx = acqgeom.sx;
-		sz = acqgeom.sz;		ns = acqgeom.ns;
-		nss = acqgeom.nss;
+		nr = nb; 		sx = geom.sx;
+		sz = geom.sz;		ns = geom.ns;
+		nss = geom.nss;
 		return Geom(sx, sz, fill(bx,nss), fill(bz,nss), nss, ns, fill(nr,nss))
 	"change the position of source (not supersources) to the boundary for back propagation"
 	elseif(attrib == :srcborder)
-		ns = nb;		rx = acqgeom.rx;
-		rz = acqgeom.rz;		nr = acqgeom.nr;
-		nss = acqgeom.nss;
+		ns = nb;		rx = geom.rx;
+		rz = geom.rz;		nr = geom.nr;
+		nss = geom.nss;
 		return Geom(fill(bx,nss), fill(bz,nss), rx, rz, nss, fill(ns,nss), nr)
 	else
 		error("invalid attrib")

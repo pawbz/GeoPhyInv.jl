@@ -1,3 +1,11 @@
+# modeling types in this module
+struct Fdtd end
+
+struct FdtdBorn end
+
+
+
+
 
 global const npml = 50
 global const nlayer_rand = 0
@@ -24,10 +32,10 @@ Modelling parameters common for all supersources
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
 * `gradient::Vector{Float64}=Medium(model.mgrid)` : gradient model modified only if `gmodel_flag`
-* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,acqgeom[ip]) for ip in 1:length(findn(rflags))]`
+* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,geom[ip]) for ip in 1:length(findn(rflags))]`
 * `illum::Array{Float64,2}=zeros(length(model.mgrid[1]), length(model.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
-* `snaps::Array{Float64,4}=zeros(length(model.mgrid[1]),length(model.mgrid[2]),length(tsnaps),acqgeom[1].nss)` :snapshots saved at `tsnaps`
+* `snaps::Array{Float64,4}=zeros(length(model.mgrid[1]),length(model.mgrid[2]),length(tsnaps),geom[1].nss)` :snapshots saved at `tsnaps`
 
 # Return (in order)
 
@@ -39,14 +47,15 @@ Modelling parameters common for all supersources
 
 
 """
-mutable struct Fdtdc
+mutable struct PFdtdc{T}
 	jobname::Symbol
+	attrib_mod::T
 	npw::Int64 
 	activepw::Vector{Int64}
 	exmodel::Medium
 	model::Medium
-	acqgeom::Vector{Geom}
-	acqsrc::Vector{SrcWav}
+	geom::Vector{Geom}
+	srcwav::Vector{SrcWav}
 	abs_trbl::Vector{Symbol}
 	sfields::Vector{Vector{Symbol}}
 	isfields::Vector{Vector{Int64}}
@@ -94,7 +103,6 @@ mutable struct Fdtdc
 	backprop_flag::Int64
 	snaps_flag::Bool
 	itsnaps::Vector{Int64}
-	born_flag::Bool
 	gmodel_flag::Bool
 	ibx0::Int64
 	ibz0::Int64
@@ -110,7 +118,7 @@ end
 """
 Modelling parameters per every supersource for each worker
 """
-mutable struct Fdtdss
+mutable struct PFdtdss
 	iss::Int64
 	wavelets::Matrix{Matrix{Float64}}
 	ssprayw::Vector{Matrix{Float64}}
@@ -133,11 +141,11 @@ mutable struct Fdtdss
 end
 
 """
-Fdtdeters per every worker, not necessarily for every supersource.
+PFdtdeters per every worker, not necessarily for every supersource.
 Note that a single worker can take care of multiple supersources.
 """
-mutable struct Fdtdp
-	ss::Vector{Fdtdss}
+mutable struct PFdtdp
+	ss::Vector{PFdtdss}
 	p::Vector{Array{Float64,3}}
 	pp::Vector{Array{Float64,3}}
 	ppp::Vector{Array{Float64,3}}
@@ -151,21 +159,21 @@ mutable struct Fdtdp
 end
 
 
-mutable struct Fdtd <: SeisForwExpt
+mutable struct PFdtd{T}
 	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
-	p::DistributedArrays.DArray{Fdtdp,1,Fdtdp} # distributed parameters among workers
-	c::Fdtdc # common parameters
+	p::DistributedArrays.DArray{PFdtdp,1,PFdtdp} # distributed parameters among workers
+	c::PFdtdc{T} # common parameters
 end
 
-Base.show(io::Base.IO, pa::Fdtd)=nothing
-Base.show(io::Base.IO, pa::Fdtdp)=nothing
-Base.show(io::Base.IO, pa::Fdtdc)=nothing
-Base.show(io::Base.IO, pa::Fdtdss)=nothing
+Base.show(io::Base.IO, pa::PFdtd)=nothing
+Base.show(io::Base.IO, pa::PFdtdp)=nothing
+Base.show(io::Base.IO, pa::PFdtdc)=nothing
+Base.show(io::Base.IO, pa::PFdtdss)=nothing
 
-SeisForwExpt(;args...)=Fdtd(;args...)
+SeisForwExpt(attrib_mod::Union{Fdtd,FdtdBorn},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
 
 
-function initialize!(pap::Fdtdp)
+function initialize!(pap::PFdtdp)
 	reset_per_ss!(pap)
 	for issp in 1:length(pap.ss)
 		pass=pap.ss[issp]
@@ -216,7 +224,7 @@ function initialize_boundary!(pa)
 	end
 end
 
-function initialize!(pac::Fdtdc)
+function initialize!(pac::PFdtdc)
 	fill!(pac.gradient,0.0)
 	fill!(pac.grad_modtt_stack,0.0)
 	fill!(pac.grad_modrrvx_stack,0.0)
@@ -229,7 +237,7 @@ function initialize!(pac::Fdtdc)
 	fill!(pac.datamat,0.0)
 end
 
-function reset_per_ss!(pap::Fdtdp)
+function reset_per_ss!(pap::PFdtdp)
 	for ipw in 1:length(pap.p)
 		fill!(pap.born_svalue_stack,0.0)
 		fill!(pap.p[ipw],0.0)
@@ -246,18 +254,20 @@ end
 
 
 """
-Method to create `Fdtd` modeling parameters.
+Method to create `PFdtd` modeling parameters.
 The output of this method can be used as an input to `update!`, where the actual 
 finite-difference modeling is performed.
 
 # Keyword Arguments
 
+* `attrib_mod` : do only Born modeling or full wavefield modelling (to be updated soon)
+* `jobname::String` : name
 * `npw::Int64=1` : number of independently propagating wavefields in `model`
 * `model::Medium` : seismic medium parameters 
 * `tgridmod::StepRangeLen=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
 * `tgrid::StepRangeLen=tgridmod` : output records are resampled on this time grid
-* `acqgeom::Vector{Geom}` :  acquisition geometry for each independently propagating wavefield
-* `acqsrc::Vector{SrcWav}` : source acquisition parameters for each independently propagating wavefield
+* `geom::Vector{Geom}` :  acquisition geometry for each independently propagating wavefield
+* `srcwav::Vector{SrcWav}` : source acquisition parameters for each independently propagating wavefield
 * `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
   * `=[0]` inactive sources
   * `=[1]` sources with injection rate
@@ -273,7 +283,6 @@ finite-difference modeling is performed.
 * `abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left]` : use absorbing PML boundary conditions or not
   * `=[:top, :bottom]` apply PML conditions only at the top and bottom of the model 
   * `=[:bottom, :right, :left]` top is reflecting
-* `born_flag::Bool=false` : do only Born modeling instead of full wavefield modelling (to be updated soon)
 * `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
 * `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
 * `tsnaps::Vector{Float64}=fill(0.5*(tgridmod[end]+tgridmod[1]),1)` : store snaps at these modelling times
@@ -283,8 +292,8 @@ finite-difference modeling is performed.
 # Example
 
 ```julia
-pa = GeoPhyInv.Fdtd.Fdtd(acqgeom=acqgeom, acqsrc=acqsrc, model=model, tgridmod=tgridmod);
-GeoPhyInv.Fdtd.update!(pa);
+pa = GeoPhyInv.PFdtd.PFdtd(geom=geom, srcwav=srcwav, model=model, tgridmod=tgridmod);
+GeoPhyInv.PFdtd.update!(pa);
 ```
 # Credits 
 
@@ -300,15 +309,14 @@ Author: Pawan Bharadwaj
 * efficient parrallelization using distributed arrays: Sept 2017
 * optimized memory allocation: Oct 2017
 """
-function Fdtd(;
+function PFdtd(attrib_mod;
 	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
 	model::Medium=nothing,
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
-	born_flag::Bool=false,
 	tgridmod::StepRangeLen=nothing,
-	acqgeom::Vector{Geom}=nothing,
-	acqsrc::Array{SrcWav}=nothing,
+	geom::Vector{Geom}=nothing,
+	srcwav::Array{SrcWav}=nothing,
 	sflags::Vector{Int64}=fill(2,npw), 
 	rflags::Vector{Int64}=fill(1,npw),
 	rfields::Vector{Symbol}=[:P], 
@@ -325,11 +333,11 @@ function Fdtd(;
 
 	# check sizes and errors based on input
 	#(length(TDout) ≠ length(findn(rflags))) && error("TDout dimension")
-	(length(acqgeom) ≠ npw) && error("acqgeom dimension")
-	(length(acqsrc) ≠ npw) && error("acqsrc dimension")
+	(length(geom) ≠ npw) && error("geom dimension")
+	(length(srcwav) ≠ npw) && error("srcwav dimension")
 	(length(sflags) ≠ npw) && error("sflags dimension")
 	(length(rflags) ≠ npw) && error("rflags dimension")
-	(maximum(tgridmod) < maximum(acqsrc[1][1].grid)) && error("modeling time is less than source time")
+	(maximum(tgridmod) < maximum(srcwav[1][1].grid)) && error("modeling time is less than source time")
 	#(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
 	#any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod) for ip=1:length(TDout)]) && error("output time > modeling time")
 
@@ -343,23 +351,23 @@ function Fdtd(;
 	# check dimension of model
 
 	# check if all sources are receivers are inside model
-	any(.![(acqgeom[ip] ∈ model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
+	any(.![(geom[ip] ∈ model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
 
 
-	length(acqgeom) != npw ? error("acqgeom size") : nothing
-	length(acqsrc) != npw ? error("acqsrc size") : nothing
-	all([issimilar(acqgeom[ip],acqsrc[ip]) for ip=1:npw]) ? nothing : error("geom and srcwav mismatch") 
+	length(geom) != npw ? error("geom size") : nothing
+	length(srcwav) != npw ? error("srcwav size") : nothing
+	all([issimilar(geom[ip],srcwav[ip]) for ip=1:npw]) ? nothing : error("geom and srcwav mismatch") 
 
 	# necessary that nss and fields should be same for all nprop
-	nss = length(acqgeom[1]);
-	sfields=[names(acqsrc[ipw][1].d)[1] for ipw in 1:npw]
+	nss = length(geom[1]);
+	sfields=[names(srcwav[ipw][1].d)[1] for ipw in 1:npw]
 	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
 	for ipw in 1:npw
 		for (i,field) in enumerate(sfields[ipw])
 			isfields[ipw][i]=findfirst(isequal(field), [:P,:Vx,:Vz])
 		end
 	end
-	fill(nss, npw) != [length(acqgeom[ip]) for ip=1:npw] ? error("different supersources") : nothing
+	fill(nss, npw) != [length(geom[ip]) for ip=1:npw] ? error("different supersources") : nothing
 
 	# create acquisition geometry with each source shooting 
 	# at every unique receiver position
@@ -372,8 +380,8 @@ function Fdtd(;
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
 	# find maximum and minimum frequencies in the source wavelets
-	freqmin = Utils.findfreq(acqsrc[1][1].d[1][:,1],acqsrc[1][1].grid,attrib=:min) 
-	freqmax = Utils.findfreq(acqsrc[1][1].d[1][:,1],acqsrc[1][1].grid,attrib=:max) 
+	freqmin = Utils.findfreq(srcwav[1][1].d[1][:,1],srcwav[1][1].grid,attrib=:min) 
+	freqmax = Utils.findfreq(srcwav[1][1].d[1][:,1],srcwav[1][1].grid,attrib=:max) 
 
 	# minimum and maximum velocities
 	vpmin = minimum(broadcast(minimum,[model.bounds[:vp]]))
@@ -405,8 +413,8 @@ function Fdtd(;
 	modttI = copy(exmodel[:K]) 
 	modtt = copy(exmodel[:KI])
 
-	if(born_flag)
-		(npw≠2) && error("born_flag needs npw=2")
+	if(typeof(attrib_mod)==FdtdBorn)
+		(npw≠2) && error("born modeling needs npw=2")
 	end
 
 	#create some aliases
@@ -448,15 +456,15 @@ function Fdtd(;
 
 	itsnaps = [argmin(abs.(tgridmod .- tsnaps[i])) for i in 1:length(tsnaps)]
 
-	nrmat=[acqgeom[ipw][iss].nr for ipw in 1:npw, iss in 1:nss]
+	nrmat=[geom[ipw][iss].nr for ipw in 1:npw, iss in 1:nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),nss)
-	data=[Data(tgridmod,acqgeom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
+	data=[Data(tgridmod,geom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
 
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
-	pac=Fdtdc(jobname,npw,activepw,
+	pac=PFdtdc(jobname,attrib_mod,npw,activepw,
 	    exmodel,model,
-	    acqgeom,acqsrc,abs_trbl,sfields,isfields,sflags,
+	    geom,srcwav,abs_trbl,sfields,isfields,sflags,
 	    irfields,rflags,δt,δxI,δzI,
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modtt, modttI,modrr,modrrvx,modrrvz,
@@ -469,7 +477,7 @@ function Fdtd(;
 	    illum_flag,illum_stack,
 	    backprop_flag,
 	    snaps_flag,
-	    itsnaps,born_flag,
+	    itsnaps,
 	    gmodel_flag,
 	    ibx0,ibz0,ibx1,ibz1,
 	    isx0,isz0,
@@ -488,10 +496,10 @@ function Fdtd(;
 		sschunks[ib]=ssi[ib]+1:ssi[ib+1]
 	end
 
-	# a distributed array of Fdtdp --- note that the parameters for each super source are efficiently distributed here
-	papa=ddata(T=Fdtdp, init=I->Fdtdp(sschunks[I...][1],pac), pids=work);
+	# a distributed array of PFdtdp --- note that the parameters for each super source are efficiently distributed here
+	papa=ddata(T=PFdtdp, init=I->PFdtdp(sschunks[I...][1],pac), pids=work);
 
-	return Fdtd(sschunks, papa, pac)
+	return PFdtd(sschunks, papa, pac)
 end
 
 """
@@ -499,7 +507,7 @@ Create modeling parameters for each worker.
 Each worker performs the modeling of supersources in `sschunks`.
 The parameters common to all workers are stored in `pac`.
 """
-function Fdtdp(sschunks::UnitRange{Int64},pac::Fdtdc)
+function PFdtdp(sschunks::UnitRange{Int64},pac::PFdtdc)
 	nx=pac.nx; nz=pac.nz; npw=pac.npw
 
 	born_svalue_stack = zeros(nz, nx)
@@ -517,9 +525,9 @@ function Fdtdp(sschunks::UnitRange{Int64},pac::Fdtdc)
 	memory_dp_dx=[zeros(nz,nx) for ipw in 1:npw]
 	memory_dp_dz=[zeros(nz,nx) for ipw in 1:npw]
 	
-	ss=[Fdtdss(iss, pac) for (issp,iss) in enumerate(sschunks)]
+	ss=[PFdtdss(iss, pac) for (issp,iss) in enumerate(sschunks)]
 
-	pap=Fdtdp(ss,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz,
+	pap=PFdtdp(ss,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz,
 	    born_svalue_stack)
 
 	return pap
@@ -531,7 +539,7 @@ update the perturbation vector using the perturbed model
 in this case, model will be treated as the background model 
 * `δmod` is [δKI, δrhoI]
 """
-function update_δmods!(pac::Fdtdc, δmod::Vector{Float64})
+function update_δmods!(pac::PFdtdc, δmod::Vector{Float64})
 	nx=pac.nx; nz=pac.nz
 	nznxd=prod(length.(pac.model.mgrid))
 	copyto!(pac.δmod, δmod)
@@ -559,7 +567,7 @@ Update the `δmods` when a perturbed `model_pert` is input.
 The model through which the waves are propagating 
 is assumed to be the background model.
 """
-function update_δmods!(pac::Fdtdc, model_pert::Medium)
+function update_δmods!(pac::PFdtdc, model_pert::Medium)
 	nznxd=prod(length.(pac.model.mgrid))
 	fill!(pac.δmod,0.0)
 	copyto!(pac.δmod, model_pert, [:KI, :rhoI])
@@ -573,10 +581,10 @@ function update_δmods!(pac::Fdtdc, model_pert::Medium)
 end
 
 """
-Update the `Seismic` model in `Fdtdc` without additional memory allocation.
+Update the `Seismic` model in `PFdtdc` without additional memory allocation.
 This routine is used during FWI, where medium parameters are itertively updated. 
 """
-function update_model!(pac::Fdtdc, model::Medium)
+function update_model!(pac::PFdtdc, model::Medium)
 
 	copyto!(pac.model, model)
 
@@ -590,11 +598,11 @@ function update_model!(pac::Fdtdc, model::Medium)
 	return nothing
 end 
 
-function update_acqsrc!(pa::Fdtd, acqsrc::Vector{SrcWav}, sflags=nothing)
-	# update acqsrc in pa.c
-	(length(acqsrc) ≠ pa.c.npw) && error("cannot update")
-	for i in 1:length(acqsrc)
-		copyto!(pa.c.acqsrc[i], acqsrc[i])
+function update_srcwav!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags=nothing)
+	# update srcwav in pa.c
+	(length(srcwav) ≠ pa.c.npw) && error("cannot update")
+	for i in 1:length(srcwav)
+		copyto!(pa.c.srcwav[i], srcwav[i])
 	end
 	if(!(sflags===nothing))
 		copyto!(pa.c.sflags, sflags)
@@ -609,7 +617,7 @@ function update_acqsrc!(pa::Fdtd, acqsrc::Vector{SrcWav}, sflags=nothing)
 					iss=pap.ss[is].iss
 					wavelets=pap.ss[is].wavelets
 					fill!.(wavelets, 0.0)
-					fill_wavelets!(iss, wavelets, pa.c.acqsrc, pa.c.sflags)
+					fill_wavelets!(iss, wavelets, pa.c.srcwav, pa.c.sflags)
 				end
 			end
 		end
@@ -620,7 +628,7 @@ end
 Create modeling parameters for each supersource. 
 Every worker models one or more supersources.
 """
-function Fdtdss(iss::Int64, pac::Fdtdc)
+function PFdtdss(iss::Int64, pac::PFdtdc)
 
 	irfields=pac.irfields
 	isfields=pac.isfields
@@ -628,13 +636,13 @@ function Fdtdss(iss::Int64, pac::Fdtdc)
 	nt=pac.nt
 	nx=pac.nx; nz=pac.nz
 	nzd,nxd=length.(pac.model.mgrid)
-	acqgeom=pac.acqgeom
-	acqsrc=pac.acqsrc
+	geom=pac.geom
+	srcwav=pac.srcwav
 	sflags=pac.sflags
 	mesh_x, mesh_z = pac.exmodel.mgrid[2], pac.exmodel.mgrid[1]
 
 	# records_output, distributed array among different procs
-	records = [zeros(nt,pac.acqgeom[ipw][iss].nr,length(irfields)) for ipw in 1:npw]
+	records = [zeros(nt,pac.geom[ipw][iss].nr,length(irfields)) for ipw in 1:npw]
 
 	# gradient outputs
 	grad_modtt = zeros(nz, nx)
@@ -647,8 +655,8 @@ function Fdtdss(iss::Int64, pac::Fdtdc)
 	snaps = (pac.snaps_flag) ? zeros(nzd,nxd,length(pac.itsnaps)) : zeros(1,1,1)
 
 	# source wavelets
-	wavelets = [zeros(pac.acqgeom[ipw][iss].ns,length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
-	fill_wavelets!(iss, wavelets, acqsrc, sflags)
+	wavelets = [zeros(pac.geom[ipw][iss].ns,length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
+	fill_wavelets!(iss, wavelets, srcwav, sflags)
 
 	
 
@@ -664,43 +672,43 @@ function Fdtdss(iss::Int64, pac::Fdtdc)
 		boundary=[zeros(1,1,1) for ii in 1:5]
 	end
 	# source_spray_weights per supersource
-	ssprayw = [zeros(4,acqgeom[ipw][iss].ns) for ipw in 1:npw]
-	denomsI = [zeros(acqgeom[ipw][iss].ns) for ipw in 1:npw]
-	isx1=[zeros(Int64,acqgeom[ipw][iss].ns) for ipw in 1:npw]
-	isx2=[zeros(Int64,acqgeom[ipw][iss].ns) for ipw in 1:npw]
-	isz1=[zeros(Int64,acqgeom[ipw][iss].ns) for ipw in 1:npw]
-	isz2=[zeros(Int64,acqgeom[ipw][iss].ns) for ipw in 1:npw]
+	ssprayw = [zeros(4,geom[ipw][iss].ns) for ipw in 1:npw]
+	denomsI = [zeros(geom[ipw][iss].ns) for ipw in 1:npw]
+	isx1=[zeros(Int64,geom[ipw][iss].ns) for ipw in 1:npw]
+	isx2=[zeros(Int64,geom[ipw][iss].ns) for ipw in 1:npw]
+	isz1=[zeros(Int64,geom[ipw][iss].ns) for ipw in 1:npw]
+	isz2=[zeros(Int64,geom[ipw][iss].ns) for ipw in 1:npw]
 	for ipw=1:npw
-		for is=1:acqgeom[ipw][iss].ns
+		for is=1:geom[ipw][iss].ns
 			weights=ssprayw[ipw]
 			denom=denomsI[ipw]
 			Interpolation.get_spray_weights!(view(weights, :,is), view(denom,is), 
 				    view(isx1[ipw],is), view(isx2[ipw],is),
 				    view(isz1[ipw],is), view(isz2[ipw],is),
-				    mesh_x, mesh_z, acqgeom[ipw][iss].sx[is], acqgeom[ipw][iss].sz[is])
+				    mesh_x, mesh_z, geom[ipw][iss].sx[is], geom[ipw][iss].sz[is])
 		end
 	end
 
 	# receiver interpolation weights per sequential source
-	rinterpolatew = [zeros(4,acqgeom[ipw][iss].nr) for ipw in 1:npw]
-	denomrI = [zeros(acqgeom[ipw][iss].nr) for ipw in 1:npw]
-	irx1=[zeros(Int64,acqgeom[ipw][iss].nr) for ipw in 1:npw]
-	irx2=[zeros(Int64,acqgeom[ipw][iss].nr) for ipw in 1:npw]
-	irz1=[zeros(Int64,acqgeom[ipw][iss].nr) for ipw in 1:npw]
-	irz2=[zeros(Int64,acqgeom[ipw][iss].nr) for ipw in 1:npw]
+	rinterpolatew = [zeros(4,geom[ipw][iss].nr) for ipw in 1:npw]
+	denomrI = [zeros(geom[ipw][iss].nr) for ipw in 1:npw]
+	irx1=[zeros(Int64,geom[ipw][iss].nr) for ipw in 1:npw]
+	irx2=[zeros(Int64,geom[ipw][iss].nr) for ipw in 1:npw]
+	irz1=[zeros(Int64,geom[ipw][iss].nr) for ipw in 1:npw]
+	irz2=[zeros(Int64,geom[ipw][iss].nr) for ipw in 1:npw]
 	for ipw=1:npw
-		for ir=1:acqgeom[ipw][iss].nr
+		for ir=1:geom[ipw][iss].nr
 			weights=rinterpolatew[ipw]
 			denom=denomrI[ipw]
 			Interpolation.get_interpolate_weights!(view(weights, :,ir), view(denom, ir), 
 				  view(irx1[ipw],ir), view(irx2[ipw],ir),
 				  view(irz1[ipw],ir), view(irz2[ipw],ir),
-				  mesh_x, mesh_z, acqgeom[ipw][iss].rx[ir], acqgeom[ipw][iss].rz[ir])
+				  mesh_x, mesh_z, geom[ipw][iss].rx[ir], geom[ipw][iss].rz[ir])
 		end
 	end
 
 
-	pass=Fdtdss(iss,wavelets,ssprayw,records,rinterpolatew,
+	pass=PFdtdss(iss,wavelets,ssprayw,records,rinterpolatew,
 	      isx1,isx2,isz1,isz2,irx1,irx2,irz1,irz2,boundary,snaps,illum, 
 	      grad_modtt,grad_modrrvx,grad_modrrvz)
 
@@ -719,11 +727,11 @@ include("gallery.jl")
 
 
 """
-This method updated the input `Fdtd.Fdtd` after the wave propagation.
+This method updated the input `PFdtd.PFdtd` after the wave propagation.
 
 # Arguments
 
-* `pa::Fdtd` : modelling parameters
+* `pa::PFdtd` : modelling parameters
 
 # Useful fields in `pa` that are modified by the method
 
@@ -735,7 +743,7 @@ This method updated the input `Fdtd.Fdtd` after the wave propagation.
 # Example
 
 ```julia
-GeoPhyInv.Fdtd.update!(pa)
+GeoPhyInv.PFdtd.update!(pa)
 ```
 # Credits 
 
@@ -743,7 +751,7 @@ Author: Pawan Bharadwaj
         (bharadwaj.pawan@gmail.com)
 
 """
-@fastmath function update!(pa::Fdtd=Fdtd())
+@fastmath function update!(pa::PFdtd=PFdtd())
 
 	global to
 
@@ -819,13 +827,13 @@ Author: Pawan Bharadwaj
 	return nothing
 end
 
-function update_datamat!(ifield, ipw, pac::Fdtdc, pap::Fdtdp)
+function update_datamat!(ifield, ipw, pac::PFdtdc, pap::PFdtdp)
 	datamat=pac.datamat
         pass=pap.ss
 	for issp in 1:length(pass)
 		iss=pass[issp].iss
 		records=pass[issp].records[ipw]
-		for ir in 1:pac.acqgeom[ipw][iss].nr
+		for ir in 1:pac.geom[ipw][iss].nr
 			for it in 1:pac.nt
 				datamat[it,ir,iss]=records[it,ir,ifield]
 			end
@@ -833,11 +841,11 @@ function update_datamat!(ifield, ipw, pac::Fdtdc, pap::Fdtdp)
         end
 end
 
-function update_data!(ifield, ipw, pac::Fdtdc)
+function update_data!(ifield, ipw, pac::PFdtdc)
 	datamat=pac.datamat
-	for iss in 1:length(pac.acqgeom[1])
+	for iss in 1:length(pac.geom[1])
 		data=pac.data[ipw][iss].d[ifield]
-		for ir in 1:pac.acqgeom[ipw][iss].nr
+		for ir in 1:pac.geom[ipw][iss].nr
 			for it in 1:pac.nt
 				data[it,ir]=datamat[it,ir,iss]
 			end
@@ -851,17 +859,17 @@ end
 #	for iprop in 1:pac.npw
 #		if(pac.rflags[iprop] ≠ 0)
 #			ipropout += 1
-##			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, acqgeom[iprop],
-##				acqgeom_urpos[1].nr[1],
-##				(acqgeom_urpos[1].rz[1], acqgeom_urpos[1].rx[1])
+##			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, geom[iprop],
+##				geom_urpos[1].nr[1],
+##				(geom_urpos[1].rz[1], geom_urpos[1].rx[1])
 ##				)) 
 #		end
 #	end
 	# return without resampling for testing
 	#return [Data.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
-	#		       tgridmod, acqgeom[1]) for iprop in 1:npw]
+	#		       tgridmod, geom[1]) for iprop in 1:npw]
 
-function stack_illums!(pac::Fdtdc, pap::Fdtdp)
+function stack_illums!(pac::PFdtdc, pap::PFdtdp)
 	nx, nz=pac.nx, pac.nz
 	illums=pac.illum_stack
 	pass=pap.ss
@@ -875,7 +883,7 @@ end
 
 
 # modelling for each processor
-function mod_per_proc!(pac::Fdtdc, pap::Fdtdp) 
+function mod_per_proc!(pac::PFdtdc, pap::PFdtdp) 
 	# source_loop
 	for issp in 1:length(pap.ss)
 		reset_per_ss!(pap)
@@ -888,7 +896,7 @@ function mod_per_proc!(pac::Fdtdc, pap::Fdtdp)
 			boundary_force_snap_vxvz!(issp,pac,pap.ss,pap)
 		end
 
-		prog = Progress(pac.nt, dt=1, desc="\tmodeling supershot $iss/$(length(pac.acqgeom[1])) ", 
+		prog = Progress(pac.nt, dt=1, desc="\tmodeling supershot $iss/$(length(pac.geom[1])) ", 
 		  		color=:white) 
 		# time_loop
 		"""
@@ -905,7 +913,10 @@ function mod_per_proc!(pac::Fdtdc, pap::Fdtdp)
 	 
 			add_source!(it, issp, iss, pac, pap.ss, pap, Source_B1())
 
-			(pac.born_flag) && add_born_sources!(issp, pac, pap.ss, pap)
+			# no born flag for adjoint modelling
+			if(!pac.gmodel_flag)
+				(typeof(pac.attrib_mod)==FdtdBorn) && add_born_sources!(issp, pac, pap.ss, pap)
+			end
 
 			# record boundaries after time reversal already
 			(pac.backprop_flag==1) && boundary_save!(pac.nt-it+1,issp,pac,pap.ss,pap)
@@ -949,7 +960,7 @@ end # mod_per_shot
 
 
 # Need illumination to estimate the approximate diagonal of Hessian
-@inbounds @fastmath function compute_illum!(issp::Int64, pass::Vector{Fdtdss}, pap::Fdtdp)
+@inbounds @fastmath function compute_illum!(issp::Int64, pass::Vector{PFdtdss}, pap::PFdtdp)
 	# saving illumination to be used as preconditioner 
 	p=pap.p
 	illum=pass[issp].illum
@@ -960,7 +971,7 @@ end # mod_per_shot
 end
 
 
-@fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::Fdtdc,pass::Vector{Fdtdss},pap::Fdtdp)
+@fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::PFdtdc,pass::Vector{PFdtdss},pap::PFdtdp)
 	isx0=pac.isx0
 	isz0=pac.isz0
 	p=pap.p

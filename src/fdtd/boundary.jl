@@ -1,13 +1,13 @@
 
 
-@inbounds @fastmath function boundary_force_snap_p!(issp::Int64,pac::Fdtdc,pass::Vector{Fdtdss},pap::Fdtdp)
+@inbounds @fastmath function boundary_force_snap_p!(issp::Int64,pac::PFdtdc,pass::Vector{PFdtdss},pap::PFdtdp)
 	p=pap.p
 	boundary=pass[issp].boundary[5]
 	ps=view(p[1],:,:,1)
 	bs=view(boundary,:,:,1)
 	copyto!(ps,bs)
 end
-@inbounds @fastmath function boundary_force_snap_vxvz!(issp::Int64,pac::Fdtdc,pass::Vector{Fdtdss},pap::Fdtdp)
+@inbounds @fastmath function boundary_force_snap_vxvz!(issp::Int64,pac::PFdtdc,pass::Vector{PFdtdss},pap::PFdtdp)
 	# initial conditions from boundary for first propagating field only
 	p=pap.p
 	pw=p[1]
@@ -19,7 +19,7 @@ end
 	bs=view(boundary,:,:,3)
 	copyto!(ps,bs)
 end
-@fastmath @inbounds function boundary_force!(it::Int64,issp::Int64,pac::Fdtdc,pass::Vector{Fdtdss},pap::Fdtdp)
+@fastmath @inbounds function boundary_force!(it::Int64,issp::Int64,pac::PFdtdc,pass::Vector{PFdtdss},pap::PFdtdp)
 	boundary=pass[issp].boundary
 	p=pap.p
 	ibx0=pac.ibx0; ibz0=pac.ibz0; ibx1=pac.ibx1; ibz1=pac.ibz1
@@ -62,7 +62,7 @@ end
 end
 
 
-@inbounds @fastmath function boundary_save_snap_p!(issp::Int64,pac::Fdtdc,pass::Vector{Fdtdss},pap::Fdtdp)
+@inbounds @fastmath function boundary_save_snap_p!(issp::Int64,pac::PFdtdc,pass::Vector{PFdtdss},pap::PFdtdp)
 	p=pap.p
 	pw=p[1]
 	boundary=pass[issp].boundary[5]
@@ -70,7 +70,7 @@ end
 	bs=view(boundary,:,:,1)
 	copyto!(bs, ps)
 end
-@inbounds @fastmath function boundary_save_snap_vxvz!(issp::Int64,pac::Fdtdc,pass::Vector{Fdtdss},pap::Fdtdp)
+@inbounds @fastmath function boundary_save_snap_vxvz!(issp::Int64,pac::PFdtdc,pass::Vector{PFdtdss},pap::PFdtdp)
 	p=pap.p
 	pw=p[1]
 	boundary=pass[issp].boundary[5]
@@ -85,7 +85,7 @@ end
 	copyto!(bs, ps)
 	rmul!(bs,-1.)
 end
-@fastmath @inbounds function boundary_save!(it::Int64,issp::Int64,pac::Fdtdc,pass::Vector{Fdtdss},pap::Fdtdp)
+@fastmath @inbounds function boundary_save!(it::Int64,issp::Int64,pac::PFdtdc,pass::Vector{PFdtdss},pap::PFdtdp)
 	boundary=pass[issp].boundary
 	p=pap.p
 	ibx0=pac.ibx0; ibz0=pac.ibz0; ibx1=pac.ibx1; ibz1=pac.ibz1

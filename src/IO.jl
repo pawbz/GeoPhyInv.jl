@@ -303,8 +303,8 @@ end
 
 #function TD(d::Data.TD, attrib=:su)
 #	
-#	nrecords = sum(d.acqgeom.nr)
-#	nss = d.acqgeom.nss
+#	nrecords = sum(d.geom.nr)
+#	nss = d.geom.nss
 #
 #	# create a data matrix of first field
 #	dp = hcat(d.d[collect(1:nss),1][:,:]...);
@@ -313,7 +313,7 @@ end
 #	h_segy = [InitSegyHeader() for irec in 1:nrecords]
 #	irec = 0
 #	for iss=1:nss
-#		for ir=1:d.acqgeom.nr[iss]
+#		for ir=1:d.geom.nr[iss]
 #			irec += 1
 #			h_segy[irec].ns = length(d.tgrid)
 #			h_segy[irec].dt = step(d.tgrid)*1000000 

@@ -15,12 +15,12 @@ function run_literate(names, folder)
 	end
 end
 
-run_literate(["doc"], "Media")
+run_literate(["doc"], "media")
 
-run_literate(["gallery"], "Geom")
+run_literate(["gallery"], "geom")
 
 run_literate(["forw", "test_born"], "Poisson")
 
-run_literate(["gradient_accuracy","born_map"], "FWI")
+run_literate(["gradient_accuracy","born_map"], "fwi")
 
-run_literate(["create_snaps","reuse_expt"], "Fdtd")
+run_literate(["create_snaps","reuse_expt"], "fdtd")

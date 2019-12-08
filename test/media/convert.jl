@@ -6,10 +6,10 @@ using Test
 
 # some mem tests
 mod=randn(1000); mod0=2.0 #src
-@btime GIPh.χ!(mod,mod0,1) #src
-@btime GIPh.χ!(mod,mod0,-1) #src
-@btime GIPh.χg!(mod,mod0,1) #src
-@btime GIPh.χg!(mod,mod0,-1) #src
+@btime GeoPhyInv.χ!(mod,mod0,1) #src
+@btime GeoPhyInv.χ!(mod,mod0,-1) #src
+@btime GeoPhyInv.χg!(mod,mod0,1) #src
+@btime GeoPhyInv.χg!(mod,mod0,-1) #src
 
 
 
@@ -59,8 +59,8 @@ gmodel = Medium(model.mgrid, [:χvp,:χrho]);
 for fields in [[:χKI,:χrhoI,:null], [:χKI,:null,:null], [:χvp,:χrho,:null] , [:null,:χrho,:null], [:χvp,:null,:null]]
 	G=randn(nznx*count(fields.≠:null));
 	g=zeros(nznx*count(fields.≠:null));
-	@time GIPh.chainrule!(gmodel, model, G, fields,1);
-	@time GIPh.chainrule!(gmodel, model, g, fields, -1);
+	@time GeoPhyInv.chainrule!(gmodel, model, G, fields,1);
+	@time GeoPhyInv.chainrule!(gmodel, model, g, fields, -1);
 	@test G ≈ g
 end
 

@@ -28,16 +28,16 @@ function mod(;
              born_flag::Bool=false,
 	     tgridmod::StepRangeLen=nothing,
 	     tgrid::StepRangeLen = tgridmod,
-	     acqgeom::Geom=nothing,
-	     acqsrc::SrcWav=nothing,
+	     geom::Geom=nothing,
+	     srcwav::SrcWav=nothing,
 	     src_flag::Int64=2,
 		  )
-	(length(acqgeom) != length(acqsrc))  ? error("different supersources") : nothing
+	(length(geom) != length(srcwav))  ? error("different supersources") : nothing
 	@info "fix this"
-#	(length(acqgeom) != getfield(acqsrc,:ns))  ? error("different sources") : nothing
+#	(length(geom) != getfield(srcwav,:ns))  ? error("different sources") : nothing
 
 
-	nt = (length(tgridmod) == length(acqsrc[1].grid)) ? length(tgrid) : error("acqsrc tgrid")
+	nt = (length(tgridmod) == length(srcwav[1].grid)) ? length(tgrid) : error("srcwav tgrid")
 	np2 = nextpow(2, 2*nt);	
 		
 
@@ -56,25 +56,25 @@ function mod(;
 	
 	fnpow2grid = DSP.fftfreq(np2,inv(step(tgridmod)));
 
-	nss = length(acqgeom)
-	data=Data(tgridmod, acqgeom, [:P])
+	nss = length(geom)
+	data=Data(tgridmod, geom, [:P])
 
 	for iss in 1:nss, ifield in 1:length(data[iss].d)
-		sx = acqgeom[iss].sx
-		rx = acqgeom[iss].rx
-		sz = acqgeom[iss].sz
-		rz = acqgeom[iss].rz
+		sx = geom[iss].sx
+		rx = geom[iss].rx
+		sz = geom[iss].sz
+		rz = geom[iss].rz
 
-		for ir = 1:acqgeom[iss].nr
+		for ir = 1:geom[iss].nr
 
 		dtemp=zeros(nt)
 		dpow2all=complex.(zeros(np2), zeros(np2));
 		wpow2=complex.(zeros(np2), zeros(np2)); 
 		
-		for is=1:acqgeom[iss].ns
+		for is=1:geom[iss].ns
 			# zero pad wavelet
 			for it in 1:nt
-				wpow2[it]=complex(acqsrc[iss].d[ifield][it,is])
+				wpow2[it]=complex(srcwav[iss].d[ifield][it,is])
 			end
 			FFTW.fft!(wpow2) # source wavelet in the frequency domain
 

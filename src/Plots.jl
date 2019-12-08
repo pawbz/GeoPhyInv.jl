@@ -216,13 +216,13 @@ Plot the source wavelet used for acquisition.
 
 # Arguments
 
-* `acqsrc::Src` : source acquisition parameters
+* `srcwav::Src` : source acquisition parameters
 """
 @recipe function psrc(p::Src)
-	acqsrc=p.args[1]
-	tgrid=acqsrc.tgrid
+	srcwav=p.args[1]
+	tgrid=srcwav.tgrid
 
-	wav=acqsrc.wav[1,1]
+	wav=srcwav.wav[1,1]
 	layout := (2,1)
 	@series begin        
 		subplot := 1
@@ -270,9 +270,9 @@ Plot time-domain data of type `Data.TD`
 	    #bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
 	   
 	dat=p.args[1]
-	any(ssvec .> dat.acqgeom.nss) && error("invalid ssvec")
+	any(ssvec .> dat.geom.nss) && error("invalid ssvec")
 	ns = length(ssvec);
-	nr = maximum(dat.acqgeom.nr);
+	nr = maximum(dat.geom.nr);
 	dd=getfield(dat,fieldnames(typeof(dat))[1])
 	fieldvec = findall(in(fields),dat.fields)
 	if(tr_flag)

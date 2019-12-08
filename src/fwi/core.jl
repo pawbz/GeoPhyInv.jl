@@ -3,13 +3,13 @@
 Return functional and gradient of the LS objective 
 * `last_x::Vector{Float64}` : buffer is only updated when x!=last_x, and modified such that last_x=x
 """
-function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::FWI, attrib_mod)
+function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::PFWI)
 	global fwi_to
 
 	if(!isequal(x, last_x))
 		copyto!(last_x, x)
 		# do forward modelling, apply F x
-		@timeit fwi_to "F!" F!(pa, x, attrib_mod)
+		@timeit fwi_to "F!" F!(pa, x)
 	end
 
 	# compute misfit 
@@ -17,7 +17,7 @@ function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::FWI, attrib_mod)
 	return f
 end
 
-function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::FWI, attrib_mod)
+function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::PFWI)
 	global fwi_to
 	reset_timer!(fwi_to)
 
@@ -25,38 +25,38 @@ function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::FWI, at
 	if(!isequal(x, last_x))
 		copyto!(last_x, x)
 		# do forward modelling, apply F x 
-		@timeit fwi_to "F!" F!(pa, x, attrib_mod)
+		@timeit fwi_to "F!" F!(pa, x)
 	end
 
 	# compute functional and get ∇_d J (adjoint sources)
 	f = func_grad!(pa.paTD, :dJx);
 
 	# update adjoint sources after time reversal
-	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
+	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjgeom)
 
 	# do adjoint modelling here with adjoint sources Fᵀ F P x
 	@timeit fwi_to "Fadj!" Fadj!(pa)	
 
 	# adjoint of interpolation
-        spray_gradient!(storage,  pa, attrib_mod)
+	spray_gradient!(storage,  pa)
 
 	return storage
 end 
 
 
 
-function ζfunc(x, last_x, pa::FWI, ::LS, attrib_mod)
-	return func(x, last_x, pa, attrib_mod)
+function ζfunc(x, last_x, pa::PFWI{T1,T2,LS}) where {T1,T2}
+	return func(x, last_x, pa)
 end
 
 
-function ζgrad!(storage, x, last_x, pa::FWI, ::LS, attrib_mod)
-	return grad!(storage, x, last_x, pa, attrib_mod)
+function ζgrad!(storage, x, last_x, pa::PFWI{T1,T2,LS})  where {T1,T2} 
+	return grad!(storage, x, last_x, pa)
 end
 
 
-function ζfunc(x, last_x, pa::FWI, obj::LS_prior, attrib_mod)
-	f1=func(x, last_x, pa, attrib_mod)
+function ζfunc(x, last_x, pa::PFWI{T1,T2,LS_prior})  where {T1,T2} 
+	f1=func(x, last_x, pa)
 
 	# calculate the generalized least-squares error
 	# note: change the inverse model covariance matrix `pmgls.Q` accordingly
@@ -65,9 +65,9 @@ function ζfunc(x, last_x, pa::FWI, obj::LS_prior, attrib_mod)
 	return f1*obj.pdgls+f2
 end
 
-function ζgrad!(storage, x, last_x, pa::FWI, obj::LS_prior, attrib_mod)
+function ζgrad!(storage, x, last_x, pa::PFWI{T1,T2,LS_prior}) where {T1,T2}  
 	g1=pa.mx.gm[1]
-	grad!(g1, x, last_x, pa, attrib_mod)
+	grad!(g1, x, last_x, pa)
 
 	g2=pa.mx.gm[2]
 	Misfits.func_grad!(g2, x, pa.mx.prior, obj.pmgls)
@@ -92,10 +92,10 @@ and boundary values for adjoint calculation.
 # Arguments
 
 * `x::Vector{Float64}` : inversion variable
-* `pa::FWI` : parameters that are constant during the inversion 
+* `pa::PFWI` : parameters that are constant during the inversion 
 * if x is absent, using `pa.modm` for modeling
 """
-function F!(pa::FWI, x, ::ModFdtd)
+function F!(pa::PFWI{Fdtd,T1,T2}, x) where {T1,T2}
 
 	# switch off born scattering
 	pa.paf.c.born_flag=false
@@ -115,7 +115,7 @@ function F!(pa::FWI, x, ::ModFdtd)
 	pa.paf.c.illum_flag=false
 	pa.paf.c.sflags=[2, 0]
 	pa.paf.c.rflags=[1, 0] # record only after first scattering
-	update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
+	update_srcwav!(pa.paf,[pa.srcwav,pa.adjsrc])
 	pa.paf.c.backprop_flag=1
 	pa.paf.c.gmodel_flag=false
 
@@ -130,7 +130,7 @@ end
 """
 Born modeling with `modm` as the perturbed model and `modm0` as the background model.
 """
-function F!(pa::FWI, x, ::ModFdtdBorn)
+function F!(pa::PFWI{FdtdBorn,T1,T2}, x) where {T1,T2}
 
 	# update background model in the forward engine 
 	update_model!(pa.paf.c, pa.modm0)
@@ -141,10 +141,10 @@ function F!(pa::FWI, x, ::ModFdtdBorn)
 	# update perturbed models in the forward engine
 	update_δmods!(pa.paf.c, pa.modm)
 
-	Fbornmod!(pa::FWI)
+	Fbornmod!(pa::PFWI)
 end
 
-function Fbornmod!(pa::FWI) 
+function Fbornmod!(pa::PFWI) 
 
 	# switch on born scattering
 	pa.paf.c.born_flag=true
@@ -155,7 +155,7 @@ function Fbornmod!(pa::FWI)
 	pa.paf.c.rflags=[0, 1] # record only after first scattering
 
 	# source wavelets (for second wavefield, they are dummy)
-	update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
+	update_srcwav!(pa.paf,[pa.srcwav,pa.adjsrc])
 
 	# actually, should record only when background field is changed
 	pa.paf.c.backprop_flag=1 # store boundary values for gradient later
@@ -174,7 +174,7 @@ end
 """
 Perform adjoint modelling in `paf` using adjoint sources `adjsrc`.
 """
-function Fadj!(pa::FWI)
+function Fadj!(pa::PFWI)
 
 	# need to explicitly turn off the born flag for adjoint modelling
 	pa.paf.c.born_flag=false
@@ -193,7 +193,7 @@ function Fadj!(pa::FWI)
 	pa.paf.c.backprop_flag=-1
 
 	# update source wavelets in paf using adjoint sources
-	update_acqsrc!(pa.paf,[pa.acqsrc,pa.adjsrc])
+	update_srcwav!(pa.paf,[pa.srcwav,pa.adjsrc])
 
 	# no need to record data during adjoint propagation
 	pa.paf.c.rflags=[0,0]
@@ -228,7 +228,7 @@ function Fadj_map!(δy, δx, pa)
 	copyto!(pa.paTD.dJx, δx)
 
 	# adjoint sources
-	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjacqgeom)
+	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjgeom)
 
 	# adjoint simulation
 	Fadj!(pa)

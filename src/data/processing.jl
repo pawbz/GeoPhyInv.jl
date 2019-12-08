@@ -20,7 +20,7 @@ function TD_normalize(data::TD, attrib::Symbol=:recrms)
 	return datan
 end
 function TD_normalize!(data::TD, attrib::Symbol=:recrms)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
+	nr = data.geom.nr;	nss = data.geom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		scs=vecnorm(dd,2)
@@ -54,7 +54,7 @@ function TD_filter!(data::TD; fmin=nothing, fmax=nothing)
 	designmethod = Butterworth(4);
 	filtsource = Bandpass(fmin, fmax; fs=fs);
 
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
+	nr = data.geom.nr;	nss = data.geom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		scs=vecnorm(dd,2)
@@ -119,7 +119,7 @@ function TDcoup!(
 	       w::Coupling.TD,
 	       attrib::Symbol
 	       )
-	nr = r.acqgeom.nr;	nss = r.acqgeom.nss;	nt = length(r.tgrid);
+	nr = r.geom.nr;	nss = r.geom.nss;	nt = length(r.tgrid);
 	fields = (w.fields == r.fields == s.fields) ? w.fields : error("different fields")
 	sv=zeros(length(s.tgrid))
 	rv=zeros(length(r.tgrid))

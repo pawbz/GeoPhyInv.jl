@@ -1,13 +1,4 @@
 
-using Distributions
-using DataFrames
-using Random
-using LinearAlgebra
-using SparseArrays
-using CSV
-using Interpolations
-import GeoPhyInv: update!
-
 
 
 """
@@ -187,15 +178,15 @@ end
 
 #=
 """
-Return a sparse ACQ matrix, for a given acqgeom
+Return a sparse ACQ matrix, for a given geom
 data=ACQ*snapshot
 """
-function ACQmat(acqgeom::Geom,mgrid,iss=1)
+function ACQmat(geom::Geom,mgrid,iss=1)
 	nz,nx=length.(mgrid)
-	ACQ=spzeros(acqgeom.nr[iss],prod(length.(mgrid)))
-	for ir = 1:acqgeom.nr[iss]
-		irx=argmin(abs.(mgrid[2].-acqgeom.rx[iss][ir]))
-		irz=argmin(abs.(mgrid[1].-acqgeom.rz[iss][ir]))
+	ACQ=spzeros(geom.nr[iss],prod(length.(mgrid)))
+	for ir = 1:geom.nr[iss]
+		irx=argmin(abs.(mgrid[2].-geom.rx[iss][ir]))
+		irz=argmin(abs.(mgrid[1].-geom.rz[iss][ir]))
 		ACQ[ir,irz+(irx-1)*nz]=1.0
 	end
 	return ACQ

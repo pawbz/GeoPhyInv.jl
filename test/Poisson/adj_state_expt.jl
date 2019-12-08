@@ -62,8 +62,8 @@ using Calculus
 
 # Generate the configuration for the Poisson experiment, using the arrays above.
 
-acqgeom=J.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.])
-ACQ=J.Acquisition.ACQmat(acqgeom,mgrid)
+geom=J.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.])
+ACQ=J.Acquisition.ACQmat(geom,mgrid)
 paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
 
 #src # J.Poisson.updateLP!(paE, paE.Q)

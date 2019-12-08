@@ -27,7 +27,7 @@ Time-domain source and receiver filters.
 * `fields::Vector{Symbol}` :  number of recorded components at receivers
 * `tgridssf` : a  time grid for source filters with both positive and negative lags
 * `tgridrf` : a  time grid for receiver filters with both positive and negative lags
-* `acqgeom::Geom` : acquisition geometry
+* `geom::Geom` : acquisition geometry
 """
 mutable struct TD
 	ssf::Array{Array{Float64,1},2}
@@ -37,14 +37,14 @@ mutable struct TD
 	tgridrf::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
 	ssflags::Vector{Int}
 	rflags::Vector{Int}
-	acqgeom::Geom
-	TD(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, acqgeom) = 
+	geom::Geom
+	TD(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, geom) = 
 		any([
 		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
 		  length(fields) == 0,
-		  broadcast(size,ssf) != [(length(tgridssf),) for iss=1:acqgeom.nss, ifield=1:length(fields)]
+		  broadcast(size,ssf) != [(length(tgridssf),) for iss=1:geom.nss, ifield=1:length(fields)]
 		  ]) ? 
-		error("error in TD construction") : new(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, acqgeom)
+		error("error in TD construction") : new(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, geom)
 
 end 
 
@@ -58,7 +58,7 @@ Initialize coupling filters `TD` with  delta functions.
 * `tlagrf_fracs::Vector{Real}` : +ve and -ve fractions for receiver filter
 * `δt:Float64` : sampling interval in time
 * `fields::Vector{Symbol}` : number of components
-* `acqgeom::Geom` : acquisition geometry
+* `geom::Geom` : acquisition geometry
 
 # Return
 
@@ -69,7 +69,7 @@ function TD_delta(
 			   tlagssf_fracs,
 			   tlagrf_fracs,
 		  fields::Vector{Symbol},
-		  acqgeom::Geom
+		  geom::Geom
 		 )
 	δt=tgriddata.δx
 	tot_t=abs(tgriddata[end]-tgriddata[1])
@@ -87,11 +87,11 @@ function TD_delta(
 	# number of unique receivers (implement in future)
 	# one receiver filter for each unique receiver
 
-	ssf=[spiss for iss=1:acqgeom.nss, ifield=1:length(fields)]
+	ssf=[spiss for iss=1:geom.nss, ifield=1:length(fields)]
 
 	return TD(ssf,
-	   [repeat(spir, outer=[1,acqgeom.nr[iss]]) for iss=1:acqgeom.nss, ifield=1:length(fields)],
-	   fields,tgridssf,tgridrf,ssflags,rflags,deepcopy(acqgeom))
+	   [repeat(spir, outer=[1,geom.nr[iss]]) for iss=1:geom.nss, ifield=1:length(fields)],
+	   fields,tgridssf,tgridrf,ssflags,rflags,deepcopy(geom))
 
 end
 

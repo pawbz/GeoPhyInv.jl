@@ -90,22 +90,22 @@ end
 function VNamedD_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 
 	if(coup===nothing)
-		 coup=Coupling.VNamedD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.acqgeom)
+		 coup=Coupling.VNamedD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.geom)
 	end
 
 
 	paconvssf=[FBD.P_conv(ssize=[coup.tgridssf.nx], 
-			dsize=[length(y.tgrid),y.acqgeom.nr[iss]], 
-			gsize=[length(y.tgrid),y.acqgeom.nr[iss]], 
+			dsize=[length(y.tgrid),y.geom.nr[iss]], 
+			gsize=[length(y.tgrid),y.geom.nr[iss]], 
 		      slags=coup.ssflags, 
 		      dlags=[length(y.tgrid)-1, 0], 
-		      glags=[length(y.tgrid)-1, 0]) for iss in 1:y.acqgeom.nss]
+		      glags=[length(y.tgrid)-1, 0]) for iss in 1:y.geom.nss]
 
 	dJssf=deepcopy(coup.ssf)
 
 	pacls=VNamedD_misfit(VNamedD_zeros(y), y; w=w)
 
-	!(isequal(x.acqgeom, y.acqgeom)) && error("observed and modelled data should have same acqgeom")
+	!(isequal(x.geom, y.geom)) && error("observed and modelled data should have same geom")
 	!(isequal(x.fields, y.fields)) && error("observed and modelled data should have same fields")
 
 	xr=VNamedD_zeros(y)
@@ -121,10 +121,10 @@ function VNamedD_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 
 	if(func_attrib==:cls)
 		pacse=[FBD.VNamedD_misfit_xcorr(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
-		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.geom.nss, ifield=1:length(y.fields)]
 	elseif(func_attrib==:xcorrcls)
-		pacse=[FBD.VNamedD_misfit_xcorr(length(y.tgrid), y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
-		func=[(dJx,x)->FBD.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		pacse=[FBD.VNamedD_misfit_xcorr(length(y.tgrid), y.geom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.geom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->FBD.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.geom.nss, ifield=1:length(y.fields)]
 	end
 
 	pa=VNamedD_misfit(x,y,w,xr,xrc,dJxr,dJxrc,
@@ -137,7 +137,7 @@ end
 function func_grad!(pa::VNamedD_misfit_ssf, grad=nothing)
 
 	tgrid = pa.x.tgrid;
-	acq = pa.x.acqgeom;
+	acq = pa.x.geom;
 	fields = pa.x.fields;
 	nss = acq.nss;
 

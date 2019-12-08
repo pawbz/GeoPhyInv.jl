@@ -4,7 +4,7 @@
 Update inversion variable with the initial model.
 At the same time, update the lower and upper bounds on the inversion variable.
 """
-function initialize!(pa::FWI)
+function initialize!(pa::PFWI)
 
 	randn!(pa.mx.last_x)  # reset last_x
 
@@ -17,12 +17,12 @@ function initialize!(pa::FWI)
 end
 
 # finalize xfwi or wfwi on pa
-function finalize!(pa::FWI, xminimizer, attrib_mod)
+function finalize!(pa::PFWI, xminimizer)
 	# update modm
 	x_to_modm!(pa, xminimizer)
 
 	# update calculated data using the minimizer
-	F!(pa, nothing, attrib_mod)
+	F!(pa, nothing)
 
 	# put minimizer into modi
 	copyto!(pa.modi, xminimizer, pa.parameterization) 
@@ -41,7 +41,7 @@ The gradiet is computed using the adjoint state method.
 
 # Arguments
 
-* `pa::FWI` : inversion object (updated inside method)
+* `pa::PFWI` : inversion object (updated inside method)
 * `obj::Union{LS,LS_prior}` : which objective function?
   * `=LS()`
   * `=LS_prior([1.0, 0.5])`
@@ -54,11 +54,11 @@ The gradiet is computed using the adjoint state method.
 
 # Outputs
 
-* updated `modm` in the input `FWI`
+* updated `modm` in the input `PFWI`
 * returns the result of optimization as an Optim.jl object
   * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
 """
-function fit!(pa::FWI, obj::Union{LS,LS_prior}, attrib_mod; 
+function update!(pa::PFWI{T1,T2,T3};
 	   optim_scheme=LBFGS(),
 	   optim_options=Optim.Options(show_trace=true,
 	   store_trace=true, 
@@ -69,7 +69,7 @@ function fit!(pa::FWI, obj::Union{LS,LS_prior}, attrib_mod;
 	   g_tol=1e-8, 
 	   x_tol=1e-5, ),
 	   bounded_flag=false, solver=nothing, 
-	   ipopt_options=[["max_iter", 5]])
+	   ipopt_options=[["max_iter", 5]]) where {T1,T2,T3<:Union{LS,LS_prior}}
 
 	global fwi_to
 	reset_timer!(fwi_to)
@@ -79,8 +79,8 @@ function fit!(pa::FWI, obj::Union{LS,LS_prior}, attrib_mod;
 
 	initialize!(pa)
 
-	f(x) = ζfunc(x, pa.mx.last_x,  pa, obj, attrib_mod)
-	g!(storage, x) = ζgrad!(storage, x, pa.mx.last_x, pa, obj, attrib_mod)
+	f(x) = ζfunc(x, pa.mx.last_x,  pa)
+	g!(storage, x) = ζgrad!(storage, x, pa.mx.last_x, pa)
 	if(!bounded_flag)
 		"""
 		Unbounded LBFGS inversion, only for testing
@@ -94,12 +94,12 @@ function fit!(pa::FWI, obj::Union{LS,LS_prior}, attrib_mod;
 		"""
 		if (solver == :ipopt)
 			function eval_f(x)
-			    return ζfunc(x, pa.mx.last_x,  pa, obj, attrib_mod)
+				return ζfunc(x, pa.mx.last_x,  pa)
 			end
 
 
 			function eval_grad_f(x, grad_f)
-			    ζgrad!(grad_f, x, pa.mx.last_x, pa, obj, attrib_mod)
+				ζgrad!(grad_f, x, pa.mx.last_x, pa)
 			end
 
 
@@ -146,9 +146,9 @@ function fit!(pa::FWI, obj::Union{LS,LS_prior}, attrib_mod;
 
 	# finalize optimization, using the optimizer... 
 	if solver == :ipopt
-		finalize!(pa, prob.x, attrib_mod)
+		finalize!(pa, prob.x)
 	else
-		finalize!(pa, Optim.minimizer(res), attrib_mod)
+		finalize!(pa, Optim.minimizer(res))
 	end
 
 
@@ -159,7 +159,7 @@ end
 """
 Return gradient at the first iteration, i.e., a migration image
 """
-function migr!(pa::FWI, attrib_mod)
+function update!(pa::PFWI{T1,T2,Migr}) where {T1,T2}
 
 	global fwi_to
 	reset_timer!(fwi_to)
@@ -168,7 +168,7 @@ function migr!(pa::FWI, attrib_mod)
 
 	g1=pa.mx.gm[1]
 	@timeit_debug fwi_to "xfwi!" begin
-		grad!(g1, pa.mx.x, pa.mx.last_x,  pa, attrib_mod)
+		grad!(g1, pa.mx.x, pa.mx.last_x,  pa)
 	end
 	println(fwi_to)
 
@@ -183,7 +183,7 @@ end
 Return gradient at the first iteration, i.e., a migration image, without using
 adjoint state method.
 """
-function migr_fd!(pa::FWI, attrib_mod)
+function update!(pa::PFWI{T1,T2,Migr_FD}) where {T1,T2}   
 	global fwi_to
 	reset_timer!(fwi_to)
 
@@ -192,7 +192,7 @@ function migr_fd!(pa::FWI, attrib_mod)
 
 	println("> number of functional evaluations:\t", xfwi_ninv(pa)) 
 
-	f(x) = ζfunc(x, pa.mx.last_x,  pa, LS(), attrib_mod)
+	f(x) = ζfunc(x, pa.mx.last_x,  pa)
 
 	gx = Calculus.gradient(f,pa.mx.x) # allocating new gradient vector here
 	

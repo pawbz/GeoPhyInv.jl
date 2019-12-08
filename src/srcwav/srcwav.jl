@@ -22,9 +22,9 @@ issimilar(srcwav::SrcWav, geom::Geom)=issimilar(geom, srcwav)
 #"""
 #Allocate `SrcWav` with zeros depending on the acquisition geometry.
 #"""
-#function SrcWav_zeros(acqgeom::Geom,  fields::Vector{Symbol}, tgrid::StepRangeLen)
-#	wavsrc = [zeros(length(tgrid),acqgeom.ns[iss]) for iss=1:acqgeom.nss, ifield=1:length(fields)] 
-#	return SrcWav(acqgeom.nss, acqgeom.ns, fields, wavsrc, deepcopy(tgrid))
+#function SrcWav_zeros(geom::Geom,  fields::Vector{Symbol}, tgrid::StepRangeLen)
+#	wavsrc = [zeros(length(tgrid),geom.ns[iss]) for iss=1:geom.nss, ifield=1:length(fields)] 
+#	return SrcWav(geom.nss, geom.ns, fields, wavsrc, deepcopy(tgrid))
 #end
 
 

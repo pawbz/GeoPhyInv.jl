@@ -16,6 +16,30 @@ function initialize(fp)
 	include(fp)
 end
 
+folder="media"
+for t in ["convert", "param_adj", "doc"]
+	fp = joinpath(folder, string(t, ".jl"))
+	initialize(fp)
+end
+
+folder="fdtd"
+for t in ["accuracy", "backprop", "rho_projection", "create_snaps"]
+	fp = joinpath(folder, string(t, ".jl"))
+	initialize(fp)
+end
+
+folder="fwi"
+for t in ["gradient_accuracy", "born_map"]
+	fp = joinpath(folder, string(t, ".jl"))
+	initialize(fp)
+end
+
+
+
+
+
+332424fwef
+
 
 folder="Poisson"
 for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx", "forw", "test_born"]
@@ -31,37 +55,3 @@ for t in ["interp_tests"]
 end
 
 
-
-folder="Media"
-for t in ["convert", "param_adj", "doc"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
-
-
-
-folder="Fdtd"
-for t in ["accuracy", "backprop", "rho_projection", "create_snaps"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
-
-folder="FWI"
-for t in ["gradient_accuracy", "born_map"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
-
-
-
-
-
-
-
-#tests = ["Fdtd_accuracy", "Fdtd_backprop", 
-#	 # "Poisson_testscript_RandomEigenfns", 
-#	"Models", "Data", "FWI_grad_test"]
-#
-#println("Running tests:")
-#
-#end

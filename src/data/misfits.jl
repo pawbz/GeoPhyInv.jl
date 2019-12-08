@@ -9,12 +9,12 @@ end
 function P_misfit(x, y; w=nothing)
 
 	if(w===nothing) 
-		w=Data.TD_ones(y.fields,y.tgrid,y.acqgeom)
+		w=Data.TD_ones(y.fields,y.tgrid,y.geom)
 	end
 	!(isapprox(w,y)) && error("weights have to be similar to y")
 	!(isapprox(x,y)) && error("cannot measure LS misfit b/w dissimilar data")
 
-	!(isequal(x.acqgeom, y.acqgeom)) && error("observed and modelled data should have same acqgeom")
+	!(isequal(x.geom, y.geom)) && error("observed and modelled data should have same geom")
 	!(isequal(x.fields, y.fields)) && error("observed and modelled data should have same fields")
 
 	dJx=TD_zeros(x)
@@ -35,7 +35,7 @@ function func_grad!(pa::P_misfit, grad=nothing)
 	y=pa.y
 	x=pa.x
 	tgrid = x.tgrid;
-	acq = x.acqgeom;
+	acq = x.geom;
 	fields = x.fields;
 	nss = length(acq);
 
@@ -95,22 +95,22 @@ end
 function P_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 
 	if(coup===nothing)
-		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.acqgeom)
+		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.geom)
 	end
 
 
 	paconvssf=[FBD.P_conv(ssize=[coup.tgridssf.nx], 
-			dsize=[length(y.tgrid),y.acqgeom.nr[iss]], 
-			gsize=[length(y.tgrid),y.acqgeom.nr[iss]], 
+			dsize=[length(y.tgrid),y.geom.nr[iss]], 
+			gsize=[length(y.tgrid),y.geom.nr[iss]], 
 		      slags=coup.ssflags, 
 		      dlags=[length(y.tgrid)-1, 0], 
-		      glags=[length(y.tgrid)-1, 0]) for iss in 1:y.acqgeom.nss]
+		      glags=[length(y.tgrid)-1, 0]) for iss in 1:y.geom.nss]
 
 	dJssf=deepcopy(coup.ssf)
 
 	pacls=P_misfit(TD_zeros(y), y; w=w)
 
-	!(isequal(x.acqgeom, y.acqgeom)) && error("observed and modelled data should have same acqgeom")
+	!(isequal(x.geom, y.geom)) && error("observed and modelled data should have same geom")
 	!(isequal(x.fields, y.fields)) && error("observed and modelled data should have same fields")
 
 	xr=TD_zeros(y)
@@ -126,10 +126,10 @@ function P_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 
 	if(func_attrib==:cls)
 		pacse=[FBD.P_misfit_xcorr(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
-		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.geom.nss, ifield=1:length(y.fields)]
 	elseif(func_attrib==:xcorrcls)
-		pacse=[FBD.P_misfit_xcorr(length(y.tgrid), y.acqgeom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
-		func=[(dJx,x)->FBD.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.acqgeom.nss, ifield=1:length(y.fields)]
+		pacse=[FBD.P_misfit_xcorr(length(y.tgrid), y.geom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.geom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->FBD.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.geom.nss, ifield=1:length(y.fields)]
 	end
 
 	pa=P_misfit(x,y,w,xr,xrc,dJxr,dJxrc,
@@ -142,7 +142,7 @@ end
 function func_grad!(pa::P_misfit_ssf, grad=nothing)
 
 	tgrid = pa.x.tgrid;
-	acq = pa.x.acqgeom;
+	acq = pa.x.geom;
 	fields = pa.x.fields;
 	nss = acq.nss;
 

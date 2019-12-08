@@ -17,7 +17,7 @@ for parameterization in [[:χKI, :χrhoI, :null],[:χKI, :null, :null],[:χvp, :
 
 	δxout2=randn(size(δxout1));
 	δx2=zero(δx1)
-	pert_chainrule!(δx2, δxout2, model, parameterization)
+	GeoPhyInv.pert_chainrule!(δx2, δxout2, model, parameterization)
 
 	@test LinearAlgebra.dot(δxout2,δxout1) ≈ LinearAlgebra.dot(δx1,δx2)
 end

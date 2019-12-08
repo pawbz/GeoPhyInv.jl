@@ -31,20 +31,20 @@ Time domain representation of Seismic Data.
 * `d::Array{Array{Float64,2},2}` : data 
 * `fields::Vector{Symbol}` : components recorded at each receiver
 * `tgrid` : grid to represent time
-* `acqgeom::Geom` : acquisition geometry used to generate the data
+* `geom::Geom` : acquisition geometry used to generate the data
 """
 mutable struct TD
 	tgrid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
 	d::NamedArrays.NamedArray{Array{Float64,2},1,Array{Array{Float64,2},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 	nr::Int64
 	"adding conditions that are to be false while construction"
-	#TD(d, fields, tgrid, acqgeom) = 
+	#TD(d, fields, tgrid, geom) = 
 #		any([
 #		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
 #		  length(fields) == 0,
-#		  broadcast(size,d) != [(length(tgrid),acqgeom[iss].nr) for iss=1:length(acqgeom), ifield=1:length(fields)]
+#		  broadcast(size,d) != [(length(tgrid),geom[iss].nr) for iss=1:length(geom), ifield=1:length(fields)]
 #		  ]) ? 
-#		error("error in TD construction") : new(d, fields, tgrid, acqgeom)
+#		error("error in TD construction") : new(d, fields, tgrid, geom)
 end
 
 """
@@ -76,17 +76,17 @@ Method to resample data in time.
 function interp(data::TD,
 		tgrid::StepRangeLen
 		)
-	nss = length(data.acqgeom)
-	nr = data.acqgeom.nr
+	nss = length(data.geom)
+	nr = data.geom.nr
 	dataout = TD(
-		     [zeros(length(tgrid),data.acqgeom[iss].nr) for iss=1:nss, ifield=1:length(data.fields)],
-	      data.fields,tgrid,data.acqgeom)
+		     [zeros(length(tgrid),data.geom[iss].nr) for iss=1:nss, ifield=1:length(data.fields)],
+	      data.fields,tgrid,data.geom)
 	interp_spray!(data, dataout)
 	return dataout
 end
 
 function taper!(data::TD, perc=0.0; bperc=perc,eperc=perc)
-	nr = data.acqgeom.nr;	nss = length(data.acqgeom); nt = length(data.tgrid);
+	nr = data.geom.nr;	nss = length(data.geom); nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		Utils.taper!(dd,bperc=bperc,eperc=eperc)
@@ -106,8 +106,8 @@ Can reduce allocations =========
 """
 function interp_spray!(data::TD, dataout::TD, attrib=:interp, Battrib=:B1; pa=nothing)
 	# check if datasets are similar
-	nss = length(data.acqgeom)
-	nr = data.acqgeom.nr
+	nss = length(data.geom)
+	nr = data.geom.nr
 	xin=data.tgrid
 	xout=dataout.tgrid
 	if(pa===nothing)
@@ -133,31 +133,31 @@ Method used to preallocate `TD` with zeros.
 
 * `fields::Vector{Symbol}` : number of components
 * `tgrid` : time domain grid
-* `acqgeom::Geom` : acquisition geometry
+* `geom::Geom` : acquisition geometry
 
 # Return
 
 * data with zeros as `TD`
 """
-function TD_zeros(fields::Vector{Symbol}, tgrid::StepRangeLen, acqgeom::Geom)
-	return TD([zeros(length(tgrid),acqgeom[iss].nr) for iss=1:length(acqgeom), ifield=1:length(fields)],fields,
-	   deepcopy(tgrid),deepcopy(acqgeom)) 
+function TD_zeros(fields::Vector{Symbol}, tgrid::StepRangeLen, geom::Geom)
+	return TD([zeros(length(tgrid),geom[iss].nr) for iss=1:length(geom), ifield=1:length(fields)],fields,
+	   deepcopy(tgrid),deepcopy(geom)) 
 end
 function Base.fill!(data::TD, k::Float64)
-	for iss=1:length(data.acqgeom), ifield=1:length(data.fields)
+	for iss=1:length(data.geom), ifield=1:length(data.fields)
 		fill!(data.d[iss,ifield],k) 
 	end
 end
 function TD_zeros(d::TD)
-	return TD([zeros(length(d.tgrid),d.acqgeom[iss].nr) for iss=1:length(d.acqgeom), ifield=1:length(d.fields)],d.fields,
-	   deepcopy(d.tgrid),deepcopy(d.acqgeom)) 
+	return TD([zeros(length(d.tgrid),d.geom[iss].nr) for iss=1:length(d.geom), ifield=1:length(d.fields)],d.fields,
+	   deepcopy(d.tgrid),deepcopy(d.geom)) 
 end
 
 
 "Same as `TD_zeros`, except for returning ones"
-function TD_ones(fields::Vector{Symbol}, tgrid::StepRangeLen, acqgeom::Geom) 
-	return TD([ones(length(tgrid),acqgeom[iss].nr) for iss=1:length(acqgeom), ifield=1:length(fields)],
-	   fields,deepcopy(tgrid),deepcopy(acqgeom)) 
+function TD_ones(fields::Vector{Symbol}, tgrid::StepRangeLen, geom::Geom) 
+	return TD([ones(length(tgrid),geom[iss].nr) for iss=1:length(geom), ifield=1:length(fields)],
+	   fields,deepcopy(tgrid),deepcopy(geom)) 
 end
 
 
@@ -187,7 +187,7 @@ end
 
 
 function DDecon!(dataout::TD, data::TD, paD)
-	nr = data.acqgeom.nr;	nss = data.acqgeom.nss;	nt = length(data.tgrid);
+	nr = data.geom.nr;	nss = data.geom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		ddo=dataout.d[iss, ifield]
