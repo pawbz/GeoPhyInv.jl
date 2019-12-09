@@ -49,11 +49,11 @@ snaps=paE[:snaps,2]; # second supersource
 # We can now plot snapshots using these commands:
 
 p=[]
-Gadfly.set_default_plot_size(20cm, 5cm)
+#Gadfly.set_default_plot_size(20cm, 5cm)
 for ii in 1:3
-	push!(p, spy(snaps[:,:,ii], Guide.xlabel("x"), Guide.ylabel("z")))
+#	push!(p, spy(snaps[:,:,ii], Guide.xlabel("x"), Guide.ylabel("z")))
 end
-hstack(p...)
+#hstack(p...)
 
 
 

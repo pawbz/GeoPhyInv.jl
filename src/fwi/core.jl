@@ -109,7 +109,7 @@ function F!(pa::PFWI{Fdtd,T1,T2}, x) where {T1,T2}
 	end
 
 	# update model in the forward engine
-	update_model!(pa.paf.c, pa.modm)
+	update!(pa.paf.c, pa.modm)
 
 	pa.paf.c.activepw=[1,]
 	pa.paf.c.illum_flag=false
@@ -133,7 +133,7 @@ Born modeling with `modm` as the perturbed model and `modm0` as the background m
 function F!(pa::PFWI{FdtdBorn,T1,T2}, x) where {T1,T2}
 
 	# update background model in the forward engine 
-	update_model!(pa.paf.c, pa.modm0)
+	update!(pa.paf.c, pa.modm0)
 	if(!(x===nothing))
 		# project x, which lives in modi, on to model space (modm)
 		x_to_modm!(pa, x)

@@ -579,7 +579,10 @@ end
 Update the `Seismic` model in `PFdtdc` without additional memory allocation.
 This routine is used during FWI, where medium parameters are itertively updated. 
 """
-function update_model!(pac::PFdtdc, model::Medium)
+function update!(pa::PFdtd, model::Medium)
+	return update!(pa.c, model)
+end
+function update!(pac::PFdtdc, model::Medium)
 
 	copyto!(pac.model, model)
 
@@ -746,7 +749,7 @@ Author: Pawan Bharadwaj
         (bharadwaj.pawan@gmail.com)
 
 """
-@fastmath function update!(pa::PFdtd=PFdtd())
+@fastmath function update!(pa::PFdtd)
 
 	global to
 

@@ -120,7 +120,7 @@ This routine can be used during FWI,
 where medium parameters are itertively updated in the same `Fdtd.Param` object
 
 ```@example reuse_expt
-J.Fdtd.update_model!(pa.c, model_new)
+update!(pa, model_new)
 ```
 
 run modelling now and plot data again

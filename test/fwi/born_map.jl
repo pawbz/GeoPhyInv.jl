@@ -1,4 +1,6 @@
 
+using Test
+
 # he linearized forward modeling operator `F`, such that
 # `Fx` can be computed without explicitly storing the operator matrix (
 #  see `LinearMaps.jl`);

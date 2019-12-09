@@ -1,14 +1,121 @@
-module Plots
+@recipe function heatmap(mod::Medium, field=:vp)
+	mx = mod.mgrid[2]
+	mz = mod.mgrid[1]
+	xlabel --> "x"
+	ylabel --> "z"
+	color --> :pu_or
+	xlim --> (mx[1], mx[end])
+	zlim --> (mz[1], mz[end])
+	title --> string(field)
+	clim --> (mod.bounds[field][1], mod.bounds[field][2])
+	yflip := true
+	mx, mz, mod[field]
+end
 
-using StatsBase
-using RecipesBase
-using FFTW
-using DSP
-#using ImageFiltering
-import GeoPhyInv.Data
-import GeoPhyInv: Medium, copyto!
+@recipe function scatter(ageom::AGeom, ::SSrcs)
+	sx = vcat([ag.sx for ag in ageom]...)
+	sz = vcat([ag.sz for ag in ageom]...)
+	legend --> false
+	markersize --> 7
+	markercolor := :red
+	markershape := :xcross
+	sx, sz
+end
+
+@recipe function scatter(ageom::AGeom, ::Recs)
+	rx = vcat([ag.rx for ag in ageom]...)
+	rz = vcat([ag.rz for ag in ageom]...)
+	markersize --> 7
+	legend --> false
+	markercolor := :blue
+	markershape := :utriangle
+	rx, rz
+end
+
+@recipe function heatmap(dat::NamedD, field::Symbol=:P, wclip_perc=0.0, bclip_perc=0.0)
+
+	#wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
+	#bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
+	   
+	dp=dat.d[field]
+	dz = dat.grid
+	dx = 1:size(dp,2)
+	dmin=minimum(dp)
+	dmax=maximum(dp)
+	dmin=dmin+bclip_perc*inv(100)*abs(dmin)
+	dmax=dmax-wclip_perc*inv(100)*abs(dmax)
+	legend --> true
+	xlabel --> "channel index"
+	ylabel --> "time"
+	color --> :grays
+	clim --> (dmin, dmax)
+	yflip := true
+	dx, dz, dp
+end
 
 
+
+
+#=
+Plot time-domain data of type `Data.TD`
+
+# Arguments
+* `td::Vector{Data.TD}` : time-domain data to be compared
+
+# Keyword Arguments
+* `ssvec::Vector{Vector{Int64}}=fill([1], length(td))` : supersource vector to be plotted
+* `fields::Vector{Int64}=[1]` : field vector to be plotted
+* `tr_flag::Bool=false` : plot time-reversed data when true
+* `attrib::Symbol=:wav` : specify type of plot
+"""
+
+	if(ssvec===nothing)
+		if(:r ∈ fields)
+			urpos = AGeom_get([ageom],:urpos)
+			rx=urpos[2]
+			rz=urpos[1]
+		else
+			b=nothing
+		end
+		if(:s ∈ fields)
+			uspos = AGeom_get([ageom],:uspos)
+			sx=uspos[2]
+			sz=uspos[1]
+		else
+			a=nothing
+		end
+	else
+		if(:r ∈ fields)
+			rxpos = [ageom.rx[iss] for iss in ssvec]
+			rzpos = [ageom.rz[iss] for iss in ssvec]
+			rx=vcat(rxpos...); rz=vcat(rzpos...)
+		else
+			b=nothing
+		end
+		if(:s ∈ fields)
+			sxpos = [ageom.sx[iss] for iss in ssvec]
+			szpos = [ageom.sz[iss] for iss in ssvec]
+			sx=vcat(sxpos...); sz=vcat(szpos...)
+		else
+			a=nothing
+		end
+	end
+
+	if(:r ∈ fields)
+		@series begin        
+		end
+	end
+	if(:s ∈ fields)
+		@series begin        
+		end
+	end
+
+
+end
+=#
+
+
+#=
 @userplot Seismic
 """
 Plot the velocity and density seismic models.
@@ -113,77 +220,6 @@ end
 #	write(fout,lines)
 #	close(fout)
 #end
-
-#=
-@userplot AGeom
-
-"""
-Plot acquisition ageometry `AGeom` on
-and model grid.
-
-`attrib::Symbol=:unique` : default; plots unique source and receiver positions
-`ssvec::Vector{Int64}` : plot source and receivers of only these supersources
-"""
-@recipe function fageom(p::AGeom; ssvec=nothing, fields=[:s, :r])
-	ageom=p.args[1]
-	if(ssvec===nothing)
-		if(:r ∈ fields)
-			urpos = AGeom_get([ageom],:urpos)
-			rx=urpos[2]
-			rz=urpos[1]
-		else
-			b=nothing
-		end
-		if(:s ∈ fields)
-			uspos = AGeom_get([ageom],:uspos)
-			sx=uspos[2]
-			sz=uspos[1]
-		else
-			a=nothing
-		end
-	else
-		if(:r ∈ fields)
-			rxpos = [ageom.rx[iss] for iss in ssvec]
-			rzpos = [ageom.rz[iss] for iss in ssvec]
-			rx=vcat(rxpos...); rz=vcat(rzpos...)
-		else
-			b=nothing
-		end
-		if(:s ∈ fields)
-			sxpos = [ageom.sx[iss] for iss in ssvec]
-			szpos = [ageom.sz[iss] for iss in ssvec]
-			sx=vcat(sxpos...); sz=vcat(szpos...)
-		else
-			a=nothing
-		end
-	end
-
-	if(:r ∈ fields)
-		@series begin        
-			subplot --> 1
-			markersize --> 7
-			legend --> false
-			seriestype := :scatter
-			markercolor := :blue
-			markershape := :utriangle
-			rx, rz
-		end
-	end
-	if(:s ∈ fields)
-		@series begin        
-			subplot --> 1
-			legend --> false
-			markersize --> 7
-			markercolor := :red
-			markershape := :xcross
-			seriestype := :scatter
-			sx, sz
-		end
-	end
-
-
-end
-=#
 	
 
 @userplot Spectrum
@@ -244,66 +280,6 @@ Plot the source wavelet used for acquisition.
 	end
 
 end
-
-@userplot TD
-"""
-Plot time-domain data of type `Data.TD`
-
-# Arguments
-* `td::Vector{Data.TD}` : time-domain data to be compared
-
-# Keyword Arguments
-* `ssvec::Vector{Vector{Int64}}=fill([1], length(td))` : supersource vector to be plotted
-* `fields::Vector{Int64}=[1]` : field vector to be plotted
-* `tr_flag::Bool=false` : plot time-reversed data when true
-* `attrib::Symbol=:wav` : specify type of plot
-"""
-@recipe function ptd(p::TD;
-	    fields=[:P],
-            tr_flag=false, 
-            ssvec=[1],
-	    wclip_perc=0.0,
-	    bclip_perc=0.0,
-	    )
-
-	    #wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
-	    #bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
-	   
-	dat=p.args[1]
-	any(ssvec .> dat.ageom.nss) && error("invalid ssvec")
-	ns = length(ssvec);
-	nr = maximum(dat.ageom.nr);
-	dd=getfield(dat,fieldnames(typeof(dat))[1])
-	fieldvec = findall(in(fields),dat.fields)
-	if(tr_flag)
-		dp = hcat(dd[ssvec,fieldvec][end:-1:1,:]...);
-		dz = dat.tgrid
-		dx = 1:size(dp,2)
-	else
-		dp = hcat(dd[ssvec,fieldvec][:,:]...);
-		dz = dat.tgrid[end:-1:1]
-		dx = 1:size(dp,2)
-	end
-
-	dmin=minimum(dp)
-	dmax=maximum(dp)
-	offset=abs(dmax-dmin)
-	dmin=dmin+bclip_perc*inv(100)*offset
-	dmax=dmax-wclip_perc*inv(100)*offset
-	@series begin        
-		subplot := 1
-		aspect_ratio --> length(dz)/length(dx)
-		seriestype := :heatmap
-		legend --> true
-		xlabel --> "receiver index"
-		ylabel --> "time [s]"
-		color --> :grays
-		clim --> (dmin, dmax)
-		yflip := true
-		dx, dz, dp
-	end
-end
-
 
 
 #=
@@ -367,3 +343,5 @@ end
 =#
 
 end # module
+
+=#

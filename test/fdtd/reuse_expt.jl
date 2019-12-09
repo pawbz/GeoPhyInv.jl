@@ -80,7 +80,7 @@ plot(p2)
 # This routine can be used during FWI, 
 # where medium parameters are itertively updated in the same `Fdtd.Param` object
 
-J.Fdtd.update_model!(pa.c, model_new)
+update!(pa, model_new)
 
 
 

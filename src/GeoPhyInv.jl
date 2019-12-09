@@ -26,9 +26,11 @@ using ImageFiltering
 using NamedArrays
 using DSP
 using Test
-using FFTW
 using AxisArrays
 using Distributions
+using StatsBase
+using RecipesBase
+using FFTW
 
 
 
@@ -90,7 +92,7 @@ include("fdtd/fdtd.jl")
 include("fwi/fwi.jl")
 
 include("Poisson/Poisson.jl")
-include("Plots.jl")
+include("plots.jl")
 
 # export stuff from GeoPhyInv
 export Data
