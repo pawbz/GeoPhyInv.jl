@@ -1,4 +1,6 @@
 
+global const marmousi_folder=joinpath(@__DIR__, "marmousi2")
+
 """
 Gallery of `Seismic` models.
 

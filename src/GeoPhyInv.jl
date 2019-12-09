@@ -90,7 +90,6 @@ include("fdtd/fdtd.jl")
 include("fwi/fwi.jl")
 
 include("Poisson/Poisson.jl")
-#include("gallery/Gallery.jl")
 include("Plots.jl")
 
 # export stuff from GeoPhyInv

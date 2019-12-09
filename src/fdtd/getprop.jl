@@ -7,7 +7,7 @@ Return snaps stored in `SeisForwExpt` after using `mod!`.
 """
 function Base.getindex(pa::PFdtd, s::Symbol, iss::Int=1)
 	@assert iss≤length(pa.c.ageom[1])
-	@assert s in [:snaps]
+	@assert s in [:snaps,:data, :ageom, :srcwav]
 	if(s==:snaps)
 		nzd,nxd=length.(pa.c.model.mgrid)
 		snaps_all=zeros(nzd,nxd,length(pa.c.itsnaps))
@@ -23,7 +23,26 @@ function Base.getindex(pa::PFdtd, s::Symbol, iss::Int=1)
 			end
 		end
 		return snaps_all
+	elseif(s==:data)
+		(iss==0) ?  (return pa.c.data[1]) :  (return pa.c.data[1][iss])
+	elseif(s==:ageom)
+		return pa.c.ageom
+	elseif(s==:srcwav)
+		return pa.c.srcwav
 	end
 end
+
+function Base.show(io::Base.IO, pa::PFdtd)
+	println(typeof(pa), "")
+	println("pa[:snaps]")
+	println("pa[:data] : modeled data after running `update!`")
+	println("pa[:ageom]")
+	println("pa[:srcwav]")
+end
+
+Base.show(io::Base.IO, pa::PFdtdp)=nothing
+Base.show(io::Base.IO, pa::PFdtdc)=nothing
+Base.show(io::Base.IO, pa::PFdtdss)=nothing
+
 
 

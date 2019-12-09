@@ -165,11 +165,6 @@ mutable struct PFdtd{T}
 	c::PFdtdc{T} # common parameters
 end
 
-Base.show(io::Base.IO, pa::PFdtd)=nothing
-Base.show(io::Base.IO, pa::PFdtdp)=nothing
-Base.show(io::Base.IO, pa::PFdtdc)=nothing
-Base.show(io::Base.IO, pa::PFdtdss)=nothing
-
 SeisForwExpt(attrib_mod::Union{Fdtd,FdtdBorn},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
 
 
