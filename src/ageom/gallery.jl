@@ -28,7 +28,6 @@ function Array{AGeomss,1}(mgrid::AbstractArray{T}, attrib::Symbol, ss::SSrcs=SSr
 	halfx = 0.5*(mgrid[2][1]+mgrid[2][end]);	halfz = 0.5*(mgrid[1][1]+mgrid[1][end]);
 	ageom=AGeom(mgrid, ss, Srcs(1), r)
 	if(attrib == :xwell)
-		println(otz)
 		update!(ageom, SSrcs(), [otz,otx], [ntz,otx])
 		update!(ageom, Recs(), [otz,ntx], [ntz,ntx])
 	elseif(attrib == :surf)

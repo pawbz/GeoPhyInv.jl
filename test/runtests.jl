@@ -7,6 +7,7 @@ using Test
 using Misfits
 using BenchmarkTools
 using Profile
+using LinearMaps
 
 
 function initialize(fp)

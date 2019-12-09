@@ -10,7 +10,7 @@ makedocs(
    sitename = "Toolbox for Geophysical Inversion",
    pages = ["Home" => "index.md",
 	    "Medium" => "media/doc.md",
-	    "AGeom" => "geom/doc.md",
+	    "AGeom" => "ageom/doc.md",
 	    "SrcWav" => "srcwav/doc.md",
 	    "Data" => "data/doc.md",
 	    "SeisForwExpt" => Any[
