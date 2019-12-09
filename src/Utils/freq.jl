@@ -33,7 +33,7 @@ function findfreq(
 		  ) where {ND}
 
 	cx=rfft(x,[1]);
-	fgrid=DSP.rfftfreq(length(tgrid),inv(step(tgrid))) # corresponding fgrid
+	fgrid=FFTW.rfftfreq(length(tgrid),inv(step(tgrid))) # corresponding fgrid
 
 	ax = (abs.(cx).^2); # power spectrum in dB
 

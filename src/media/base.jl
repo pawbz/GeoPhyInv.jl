@@ -17,8 +17,32 @@ Medium(mgrid, m::Medium)=zero(Medium, mgrid, names(m.m)[1])
 Return true if a `Seismic` model is just allocated with zeros.
 """
 function Base.iszero(mod::Medium)
+	if (any(broadcast(iszero,mod.bounds)) && any(broadcast(iszero,mod.ref)))
+		return true
+	else
+		for field in [:vp,:rho,:vs]
+			if(field ∈ names(mod.m)[1])
+				if(any(iszero.(mod[field])))
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+
+"""
+Return true if a `Seismic` model is just allocated with zeros.
+"""
+function Base.isassigned(mod::Medium, fields=[:vp,:rho,:vs])
+	for field in fields
+		@assert field ∈ [:vp, :rho, :vs]
+	end
+
 	return any(broadcast(iszero,mod.bounds)) && any(broadcast(iszero,mod.ref))
 end
+
 
 
 """
