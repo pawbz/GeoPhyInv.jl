@@ -71,7 +71,7 @@ struct Source_B0 end
 	# aliases
 	p=pap.p;
 	wavelets=pass[issp].wavelets
-	geom=pac.geom
+	ageom=pac.ageom
 	isx1=pass[issp].isx1
 	isx2=pass[issp].isx2
 	isz1=pass[issp].isz1
@@ -88,7 +88,7 @@ struct Source_B0 end
 	if(pac.sflags[ipw] ≠ 0) # only if sflags is non-zero
 		pw=p[ipw]	
 		for (iff, ifield) in enumerate(isfields)
-		@simd for is = 1:geom[ipw][iss].ns
+		@simd for is = 1:ageom[ipw][iss].ns
 			"""
 			use wavelets at [it], i.e., sum of source terms
 			until [it-1]
@@ -119,7 +119,7 @@ end
 	# aliases
 	p=pap.p;
 	wavelets=pass[issp].wavelets
-	geom=pac.geom
+	ageom=pac.ageom
 	isx1=pass[issp].isx1
 	isz1=pass[issp].isz1
 	ssprayw=pass[issp].ssprayw
@@ -133,7 +133,7 @@ end
 	if(pac.sflags[ipw] ≠ 0) # only if sflags is non-zero
 		pw=p[ipw]
 		for (iff, ifield) in enumerate(isfields)
-		@simd for is = 1:geom[ipw].ns[iss]
+		@simd for is = 1:ageom[ipw].ns[iss]
 			"""
 			use wavelets at [it], i.e., sum of source terms
 			until [it-1]

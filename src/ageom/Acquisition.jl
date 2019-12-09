@@ -1,6 +1,6 @@
 """
 This module defines the following data types:
-* `Geom` : acquisition geometry, i.e., positions of supersources, sources and receivers
+* `AGeom` : acquisition ageometry, i.e., positions of supersources, sources and receivers
 * `Src` : source related acquisition parameters, e.g., source wavelet
 It also provides methods that either does operations on these data type or 
 help their construction.
@@ -16,26 +16,26 @@ using LinearAlgebra
 using SparseArrays
 using CSV
 """
-Return some derived fields of `Geom`
+Return some derived fields of `AGeom`
 
 # Arguments 
 
-* `acq::Vector{Geom}` : a vector of `Geom`
+* `acq::Vector{AGeom}` : a vector of `AGeom`
 * `attrib::Symbol` : attribute to determine the return object 
   * `=:nus` number of unique source positions in acquisition
   * `=:nur` number of unique receiver positions in acquisition
   * `=:uspos` a tuple of x and z positions of all the unique sources
   * `=:urpos` a tuple of x and z position of all the unique receivers
-  * `=:geomurpos` a `Geom` vector as if all the unique receiver positions are used for each supersource
-  * `=:geomuspos` a `Geom` vector as if all the unique source positions are used for each supersource
+  * `=:ageomurpos` a `AGeom` vector as if all the unique receiver positions are used for each supersource
+  * `=:ageomuspos` a `AGeom` vector as if all the unique source positions are used for each supersource
 """
-function Geom_get(acq::Vector{Geom}, attrib::Symbol)
-	ngeom = length(acq)
-	sposx = Geom_getvec(acq,:sx);	sposz = Geom_getvec(acq,:sz)
+function AGeom_get(acq::Vector{AGeom}, attrib::Symbol)
+	nageom = length(acq)
+	sposx = AGeom_getvec(acq,:sx);	sposz = AGeom_getvec(acq,:sz)
 	isequal(length(sposx), length(sposz)) ? 
 		spos = [[sposz[is],sposx[is]] for is in 1:length(sposx)] : error("input acq corrupt")
 
-	rposx = Geom_getvec(acq,:rx);	rposz = Geom_getvec(acq,:rz)
+	rposx = AGeom_getvec(acq,:rx);	rposz = AGeom_getvec(acq,:rz)
 	isequal(length(rposx), length(rposz)) ? 
 		rpos = [[rposz[ir],rposx[ir]] for ir in 1:length(rposx)] : error("input acq corrupt")
 
@@ -53,17 +53,17 @@ function Geom_get(acq::Vector{Geom}, attrib::Symbol)
 		return uspost
 	elseif(attrib == :urpos)
 		return urpost
-	elseif(attrib == :geomurpos)
-		return [Geom(acq[igeom].sx, acq[igeom].sz, 
-	       fill(urpost[2],acq[igeom].nss), 
-	       fill(urpost[1],acq[igeom].nss), acq[igeom].nss, acq[igeom].ns, 
-	       fill(nur,acq[igeom].nss)) for igeom=1:ngeom]
-	elseif(attrib == :geomuspos)
-		return [Geom(fill(uspost[2],acq[igeom].nss), 
-	       fill(uspost[1],acq[igeom].nss),
-	       acq[igeom].rx, acq[igeom].rz, 
-	       acq[igeom].nss, fill(nus,acq[igeom].nss),
-	       acq[igeom].nr) for igeom=1:ngeom]
+	elseif(attrib == :ageomurpos)
+		return [AGeom(acq[iageom].sx, acq[iageom].sz, 
+	       fill(urpost[2],acq[iageom].nss), 
+	       fill(urpost[1],acq[iageom].nss), acq[iageom].nss, acq[iageom].ns, 
+	       fill(nur,acq[iageom].nss)) for iageom=1:nageom]
+	elseif(attrib == :ageomuspos)
+		return [AGeom(fill(uspost[2],acq[iageom].nss), 
+	       fill(uspost[1],acq[iageom].nss),
+	       acq[iageom].rx, acq[iageom].rz, 
+	       acq[iageom].nss, fill(nus,acq[iageom].nss),
+	       acq[iageom].nr) for iageom=1:nageom]
 	else
 		error("invalid attrib")
 	end
@@ -75,7 +75,7 @@ Returns an array Int indices of the dimension of number of supersources
 with `true` at indices, if the waves due to that particular source are 
 recorded.
 """
-function Geom_find(acq::Geom; rpos::Array{Float64,1}=nothing, rpos0::Array{Float64,1}=nothing)
+function AGeom_find(acq::AGeom; rpos::Array{Float64,1}=nothing, rpos0::Array{Float64,1}=nothing)
 	rpos==nothing ? error("need rpos") : nothing
 	sson = Array{Vector{Int64}}(undef,acq.nss);
 	for iss = 1:acq.nss
@@ -93,19 +93,19 @@ end
 
 #=
 """
-Modify input `Geom` such that the output `Geom` has
+Modify input `AGeom` such that the output `AGeom` has
 either sources or receivers on the boundary of 
 `mgrid`.
 
 # Arguments
 
-* `geom::Geom` : input geometry
+* `ageom::AGeom` : input ageometry
 * `mgridi` : grid to determine the boundary
 * `attrib::Symbol` : decide return
   * `=:srcborder` sources on boundary (useful for back propagation)
   * `=:recborder` receivers on boundary
 """
-function Geom_boundary(geom::Geom,
+function AGeom_boundary(ageom::AGeom,
 	      mgrid
 	      attrib::Symbol
 	     )
@@ -115,16 +115,16 @@ function Geom_boundary(geom::Geom,
 	end
 	"change the position of receivers to the boundary"
 	if(attrib == :recborder)
-		nr = nb; 		sx = geom.sx;
-		sz = geom.sz;		ns = geom.ns;
-		nss = geom.nss;
-		return Geom(sx, sz, fill(bx,nss), fill(bz,nss), nss, ns, fill(nr,nss))
+		nr = nb; 		sx = ageom.sx;
+		sz = ageom.sz;		ns = ageom.ns;
+		nss = ageom.nss;
+		return AGeom(sx, sz, fill(bx,nss), fill(bz,nss), nss, ns, fill(nr,nss))
 	"change the position of source (not supersources) to the boundary for back propagation"
 	elseif(attrib == :srcborder)
-		ns = nb;		rx = geom.rx;
-		rz = geom.rz;		nr = geom.nr;
-		nss = geom.nss;
-		return Geom(fill(bx,nss), fill(bz,nss), rx, rz, nss, fill(ns,nss), nr)
+		ns = nb;		rx = ageom.rx;
+		rz = ageom.rz;		nr = ageom.nr;
+		nss = ageom.nss;
+		return AGeom(fill(bx,nss), fill(bz,nss), rx, rz, nss, fill(ns,nss), nr)
 	else
 		error("invalid attrib")
 	end
@@ -132,13 +132,13 @@ end
 =#
 
 """
-Check if the input acquisition geometry is fixed spread.
+Check if the input acquisition ageometry is fixed spread.
 """
-function Geom_isfixed(geom::Geom)
+function AGeom_isfixed(ageom::AGeom)
 	isfixed=false
 	# can have different source positions, but also different number of sources? 
 	for field in [:rx, :rz, :nr, :ns]
-		f=getfield(geom, field)
+		f=getfield(ageom, field)
 		if(all(f .== f[1:1]))
 			isfixed=true
 		else
@@ -166,7 +166,7 @@ end
 A fixed spread acquisition has same set of sources and 
 receivers for each supersource.
 This method constructs a 
-fixed spread acquisition geometry using either a
+fixed spread acquisition ageometry using either a
 horizontal or vertical array of supersources/ receivers.
 Current implementation has only one source for every supersource.
 
@@ -193,9 +193,9 @@ Current implementation has only one source for every supersource.
   `=[false, true]` : randomly place receivers for regularly spaced supersources 
 
 # Return
-* a fixed spread acquisition geometry `Geom`
+* a fixed spread acquisition ageometry `AGeom`
 """
-function Geom_fixed(
+function AGeom_fixed(
 	      ssmin::Real,
 	      ssmax::Real,
 	      ss0::Real,
@@ -253,13 +253,13 @@ function Geom_fixed(
 			sszall[iss][is]=ssz[iss]+z
 		end
 	end
-	return Geom(ssxall, sszall, rxall, rzall, nss, ns, fill(nr,nss))
+	return AGeom(ssxall, sszall, rxall, rzall, nss, ns, fill(nr,nss))
 end
 
 """
 Circular acquisition. The sources and receivers can also be placed on a circle of radius
 `rad`. The origin of the circle is at `loc`. 
-This geometry is unrealistic, but useful for testing.
+This ageometry is unrealistic, but useful for testing.
 Receivers are placed such that the limits 
 of the angular offset are given by `θlim`
 
@@ -274,9 +274,9 @@ of the angular offset are given by `θlim`
 
 # Return
 
-* a circular acquisition geometry `Geom`
+* a circular acquisition ageometry `AGeom`
 """
-function Geom_circ(;
+function AGeom_circ(;
 		   nss::Int64=10,
 		   nr::Int64=10,
 		   loc::Vector=[0.,0.],
@@ -311,10 +311,10 @@ function Geom_circ(;
 		rx[iss] = rxxa[angles]
 		rz[iss] = rzza[angles]
 	end
-	geom =  Geom(sx, sz, rx, rz, nss, ns, nr)
+	ageom =  AGeom(sx, sz, rx, rz, nss, ns, nr)
 
-	print(geom, "circular acquisition geometry")
-	return geom
+	print(ageom, "circular acquisition ageometry")
+	return ageom
 end
 
 function circ_coord(z, x, n, rad)

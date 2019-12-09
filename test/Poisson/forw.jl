@@ -50,10 +50,12 @@ p=randn(nz,nx,nt)
 
 
 # ### Acquisition
-# Now, we will generate an acquisition geometry and allocate a projection matrix `ACQ`.
+# Now, we will generate an acquisition ageometry and allocate a projection matrix `ACQ`.
 
-geom=GIPh.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.]);
-ACQ=GIPh.Acquisition.ACQmat(geom,mgrid);
+ageom=AGeom(mgrid, SSrcs(1), Srcs(1), Recs(30))
+update!(ageom, SSrcs(), [0,0], 5, [0,2π])
+update!(ageom, Recs(), [0,0], 5, [0,2π])
+ACQ=GeoPhyInv.ACQmat(ageom,mgrid);
 @info "ACQ will be used to project ψ onto receivers."
 
 # ### Generate `PoissonExpt` and then applying `mod!`
@@ -63,7 +65,7 @@ ACQ=GIPh.Acquisition.ACQmat(geom,mgrid);
 # * finally, records ``ψ`` at the receiver locations to generate data.
 
 paE=PoissonExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ)
-mod!(paE)
+GeoPhyInv.mod!(paE)
 
 # ### Extracting data from `Expt`
 data=paE[:data]

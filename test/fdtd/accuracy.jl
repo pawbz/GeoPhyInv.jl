@@ -2,10 +2,10 @@
 using Statistics
 
 model = Medium(:acou_homo1);
-geom = Geom(model.mgrid,:xwell);
+ageom = AGeom(model.mgrid,:xwell);
 tgrid = range(0.0,stop=2.0,length=1000)
 wav = ricker(10.0, tgrid, tpeak=0.25, );
-srcwav = SrcWav(tgrid, geom, [:P])
+srcwav = SrcWav(tgrid, ageom, [:P])
 update!(srcwav, [:P], wav)
 
 
@@ -14,12 +14,12 @@ rho0=mean(model[:rho])
 rec1 = GeoPhyInv.Born.mod(vp0=vp0,
             model_pert=model,
 		     rho0=rho0,
-			 geom=geom, srcwav=srcwav, tgridmod=tgrid, src_flag=2)
+			 ageom=ageom, srcwav=srcwav, tgridmod=tgrid, src_flag=2)
 
 
 
 pa=SeisForwExpt(Fdtd(),npw=1,model=model,
-    geom=[geom], srcwav=[srcwav],
+    ageom=[ageom], srcwav=[srcwav],
         sflags=[2], rflags=[1],
 	    tgridmod=tgrid, verbose=true );
 

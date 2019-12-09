@@ -1,5 +1,5 @@
 using Distributed
-addprocs(5)
+#addprocs(5)
 
 using LinearAlgebra
 using GeoPhyInv
@@ -35,21 +35,14 @@ for t in ["gradient_accuracy", "born_map"]
 end
 
 
-
-
-
-332424fwef
-
-
-folder="Poisson"
-for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx", "forw", "test_born"]
+folder="Interpolation"
+for t in ["interp_tests"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end
 
-
-folder="Interpolation"
-for t in ["interp_tests"]
+folder="Poisson"
+for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx", "forw", "test_born"]
 	fp = joinpath(folder, string(t, ".jl"))
 	initialize(fp)
 end

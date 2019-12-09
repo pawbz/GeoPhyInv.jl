@@ -10,10 +10,10 @@
 for scenario in [:downhole, :pizza]
 	println("@@@@@@@@@@@@TESTING ", scenario)
 	for rfields in [[:P], [:Vx], [:Vz]]
-		pa=JG.SeisInvExpt(scenario, born_flag=true, rfields=rfields)
+		pa=SeisInvExpt(FdtdBorn(), LS(), scenario, rfields=rfields)
 
 
-		F=JF.operator_Born(pa);
+		F=LinearMap(pa);
 
 		x1=randn(size(F,2)) 
 		x2=randn(size(F,2)) 

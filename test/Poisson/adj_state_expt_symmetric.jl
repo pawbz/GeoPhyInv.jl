@@ -70,9 +70,9 @@ fill!(σ, 1.0)
 
 # Generate the configuration for the Poisson experiment, using the arrays above.
 
-geom=J.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.])
+ageom=J.Acquisition.AGeom_circ(nss=1,nr=30,rad=[5.,5.])
 #ACQ=sprandn(200,441,0.9)
-ACQ=J.Acquisition.ACQmat(geom,mgrid)
+ACQ=J.Acquisition.ACQmat(ageom,mgrid)
 paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
 #paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs,)
 

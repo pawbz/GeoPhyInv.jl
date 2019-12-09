@@ -66,11 +66,11 @@ end
 Recs()=Recs(0)
 
 
-include("geom/geom.jl")
+include("ageom/core.jl")
 
 include("database/core.jl")
 
-include("srcwav/srcwav.jl")
+include("srcwav/core.jl")
 
 include("Coupling.jl")
 include("data/core.jl")
@@ -99,8 +99,8 @@ export SrcWav
 export update!, Medium
 export ricker, ormsby 
 export Srcs, Recs, SSrcs
-export Geom, Geomss
-export update!, SeisForwExpt, SeisInvExpt, Fdtd, FdtdBorn, LS, LS_prior
+export AGeom, AGeomss
+export update!, SeisForwExpt, SeisInvExpt, Fdtd, FdtdBorn, LS, LS_prior, Migr, Migr_FD
 
 # export the Expt for Poisson
 const PoissonExpt=GeoPhyInv.Poisson.ParamExpt

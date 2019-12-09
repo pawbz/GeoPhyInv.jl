@@ -2,6 +2,7 @@ using GeoPhyInv
 using BenchmarkTools
 using LinearAlgebra
 using Test
+GInterp=GeoPhyInv.Interpolation
 
 
 function dptest(nx,nz,mx,mz,Battrib)

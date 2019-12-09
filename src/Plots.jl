@@ -115,27 +115,27 @@ end
 #end
 
 #=
-@userplot Geom
+@userplot AGeom
 
 """
-Plot acquisition geometry `Geom` on
+Plot acquisition ageometry `AGeom` on
 and model grid.
 
 `attrib::Symbol=:unique` : default; plots unique source and receiver positions
 `ssvec::Vector{Int64}` : plot source and receivers of only these supersources
 """
-@recipe function fgeom(p::Geom; ssvec=nothing, fields=[:s, :r])
-	geom=p.args[1]
+@recipe function fageom(p::AGeom; ssvec=nothing, fields=[:s, :r])
+	ageom=p.args[1]
 	if(ssvec===nothing)
 		if(:r ∈ fields)
-			urpos = Geom_get([geom],:urpos)
+			urpos = AGeom_get([ageom],:urpos)
 			rx=urpos[2]
 			rz=urpos[1]
 		else
 			b=nothing
 		end
 		if(:s ∈ fields)
-			uspos = Geom_get([geom],:uspos)
+			uspos = AGeom_get([ageom],:uspos)
 			sx=uspos[2]
 			sz=uspos[1]
 		else
@@ -143,15 +143,15 @@ and model grid.
 		end
 	else
 		if(:r ∈ fields)
-			rxpos = [geom.rx[iss] for iss in ssvec]
-			rzpos = [geom.rz[iss] for iss in ssvec]
+			rxpos = [ageom.rx[iss] for iss in ssvec]
+			rzpos = [ageom.rz[iss] for iss in ssvec]
 			rx=vcat(rxpos...); rz=vcat(rzpos...)
 		else
 			b=nothing
 		end
 		if(:s ∈ fields)
-			sxpos = [geom.sx[iss] for iss in ssvec]
-			szpos = [geom.sz[iss] for iss in ssvec]
+			sxpos = [ageom.sx[iss] for iss in ssvec]
+			szpos = [ageom.sz[iss] for iss in ssvec]
 			sx=vcat(sxpos...); sz=vcat(szpos...)
 		else
 			a=nothing
@@ -270,9 +270,9 @@ Plot time-domain data of type `Data.TD`
 	    #bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
 	   
 	dat=p.args[1]
-	any(ssvec .> dat.geom.nss) && error("invalid ssvec")
+	any(ssvec .> dat.ageom.nss) && error("invalid ssvec")
 	ns = length(ssvec);
-	nr = maximum(dat.geom.nr);
+	nr = maximum(dat.ageom.nr);
 	dd=getfield(dat,fieldnames(typeof(dat))[1])
 	fieldvec = findall(in(fields),dat.fields)
 	if(tr_flag)

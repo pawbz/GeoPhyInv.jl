@@ -9,6 +9,7 @@ using Test
 using ForwardDiff
 using Calculus
 #include("core.jl")
+J=GeoPhyInv
 
 
 nx=5

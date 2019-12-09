@@ -1,30 +1,30 @@
 
 SrcWav=Array{NamedD{Srcs},1}
-function Array{NamedD{Srcs},1}(grid::StepRangeLen, geom::Geom, fields::Vector{Symbol}) 
-	return [NamedD(grid,Srcs(geom[i].ns),fields) for i in 1:length(geom)]
+function Array{NamedD{Srcs},1}(grid::StepRangeLen, ageom::AGeom, fields::Vector{Symbol}) 
+	return [NamedD(grid,Srcs(ageom[i].ns),fields) for i in 1:length(ageom)]
 end
 
 
 
 
-function issimilar(geom::Geom, srcwav::SrcWav)
+function issimilar(ageom::AGeom, srcwav::SrcWav)
 	test=[]
-	push!(test, length(geom)==length(srcwav))
-	nss=length(geom)
-	push!(test, [geom[i].ns for i in 1:nss]==[srcwav[i][:n] for i in 1:nss])
+	push!(test, length(ageom)==length(srcwav))
+	nss=length(ageom)
+	push!(test, [ageom[i].ns for i in 1:nss]==[srcwav[i][:n] for i in 1:nss])
 	return all(test)
 end
-issimilar(srcwav::SrcWav, geom::Geom)=issimilar(geom, srcwav)
+issimilar(srcwav::SrcWav, ageom::AGeom)=issimilar(ageom, srcwav)
 
 
 
 
 #"""
-#Allocate `SrcWav` with zeros depending on the acquisition geometry.
+#Allocate `SrcWav` with zeros depending on the acquisition ageometry.
 #"""
-#function SrcWav_zeros(geom::Geom,  fields::Vector{Symbol}, tgrid::StepRangeLen)
-#	wavsrc = [zeros(length(tgrid),geom.ns[iss]) for iss=1:geom.nss, ifield=1:length(fields)] 
-#	return SrcWav(geom.nss, geom.ns, fields, wavsrc, deepcopy(tgrid))
+#function SrcWav_zeros(ageom::AGeom,  fields::Vector{Symbol}, tgrid::StepRangeLen)
+#	wavsrc = [zeros(length(tgrid),ageom.ns[iss]) for iss=1:ageom.nss, ifield=1:length(fields)] 
+#	return SrcWav(ageom.nss, ageom.ns, fields, wavsrc, deepcopy(tgrid))
 #end
 
 
@@ -153,12 +153,12 @@ end
 Pad `SrcWav` 
 tgrids should be same in all SrcWav
 """
-function SrcWav_uspos(src::Vector{SrcWav}, acq::Vector{Geom})
+function SrcWav_uspos(src::Vector{SrcWav}, acq::Vector{AGeom})
 	np = length(src) == length(acq) ? length(src) : error("unequal sizez")
 
 	# unique source positions
-	nus=Geom_get(acq,:nus) 
-	uspos=Geom_get(acq,:uspos)
+	nus=AGeom_get(acq,:nus) 
+	uspos=AGeom_get(acq,:uspos)
 	# all zeros for all unique positions
 	wavout = [[zeros(src[ip].length(tgrid),nus) for iss=1:src[ip].nss, ifield=1:length(src[ip].fields)] for ip=1:np]
 	# fill source wavelets when necessary

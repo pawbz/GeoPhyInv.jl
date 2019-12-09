@@ -128,7 +128,7 @@ function issimilar(dat1::VNamedD, dat2::VNamedD)
 end
 
 function Base.length(data::NamedD)
-	return length(data.grid)*data.n*length(names(data.d)[1])
+	return length(data.grid)*data[:n]*length(names(data.d)[1])
 end
 
 """
@@ -290,7 +290,7 @@ end
 
 function Base.reverse!(data::NamedD)
 	for dd in data.d
-		for i in 1:data.n
+		for i in 1:data[:n]
 			dv=view(dd,:,i)
 			reverse!(dv)
 		end

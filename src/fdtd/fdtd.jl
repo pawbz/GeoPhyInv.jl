@@ -32,10 +32,10 @@ Modelling parameters common for all supersources
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
 * `gradient::Vector{Float64}=Medium(model.mgrid)` : gradient model modified only if `gmodel_flag`
-* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,geom[ip]) for ip in 1:length(findn(rflags))]`
+* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
 * `illum::Array{Float64,2}=zeros(length(model.mgrid[1]), length(model.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
-* `snaps::Array{Float64,4}=zeros(length(model.mgrid[1]),length(model.mgrid[2]),length(tsnaps),geom[1].nss)` :snapshots saved at `tsnaps`
+* `snaps::Array{Float64,4}=zeros(length(model.mgrid[1]),length(model.mgrid[2]),length(tsnaps),ageom[1].nss)` :snapshots saved at `tsnaps`
 
 # Return (in order)
 
@@ -54,7 +54,7 @@ mutable struct PFdtdc{T}
 	activepw::Vector{Int64}
 	exmodel::Medium
 	model::Medium
-	geom::Vector{Geom}
+	ageom::Vector{AGeom}
 	srcwav::Vector{SrcWav}
 	abs_trbl::Vector{Symbol}
 	sfields::Vector{Vector{Symbol}}
@@ -266,7 +266,7 @@ finite-difference modeling is performed.
 * `model::Medium` : seismic medium parameters 
 * `tgridmod::StepRangeLen=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
 * `tgrid::StepRangeLen=tgridmod` : output records are resampled on this time grid
-* `geom::Vector{Geom}` :  acquisition geometry for each independently propagating wavefield
+* `ageom::Vector{AGeom}` :  acquisition ageometry for each independently propagating wavefield
 * `srcwav::Vector{SrcWav}` : source acquisition parameters for each independently propagating wavefield
 * `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
   * `=[0]` inactive sources
@@ -292,7 +292,7 @@ finite-difference modeling is performed.
 # Example
 
 ```julia
-pa = GeoPhyInv.PFdtd.PFdtd(geom=geom, srcwav=srcwav, model=model, tgridmod=tgridmod);
+pa = GeoPhyInv.PFdtd.PFdtd(ageom=ageom, srcwav=srcwav, model=model, tgridmod=tgridmod);
 GeoPhyInv.PFdtd.update!(pa);
 ```
 # Credits 
@@ -315,7 +315,7 @@ function PFdtd(attrib_mod;
 	model::Medium=nothing,
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
 	tgridmod::StepRangeLen=nothing,
-	geom::Vector{Geom}=nothing,
+	ageom::Vector{AGeom}=nothing,
 	srcwav::Array{SrcWav}=nothing,
 	sflags::Vector{Int64}=fill(2,npw), 
 	rflags::Vector{Int64}=fill(1,npw),
@@ -333,7 +333,7 @@ function PFdtd(attrib_mod;
 
 	# check sizes and errors based on input
 	#(length(TDout) ≠ length(findn(rflags))) && error("TDout dimension")
-	(length(geom) ≠ npw) && error("geom dimension")
+	(length(ageom) ≠ npw) && error("ageom dimension")
 	(length(srcwav) ≠ npw) && error("srcwav dimension")
 	(length(sflags) ≠ npw) && error("sflags dimension")
 	(length(rflags) ≠ npw) && error("rflags dimension")
@@ -351,15 +351,15 @@ function PFdtd(attrib_mod;
 	# check dimension of model
 
 	# check if all sources are receivers are inside model
-	any(.![(geom[ip] ∈ model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
+	any(.![(ageom[ip] ∈ model.mgrid) for ip=1:npw]) ? error("sources or receivers not inside model") : nothing
 
 
-	length(geom) != npw ? error("geom size") : nothing
+	length(ageom) != npw ? error("ageom size") : nothing
 	length(srcwav) != npw ? error("srcwav size") : nothing
-	all([issimilar(geom[ip],srcwav[ip]) for ip=1:npw]) ? nothing : error("geom and srcwav mismatch") 
+	all([issimilar(ageom[ip],srcwav[ip]) for ip=1:npw]) ? nothing : error("ageom and srcwav mismatch") 
 
 	# necessary that nss and fields should be same for all nprop
-	nss = length(geom[1]);
+	nss = length(ageom[1]);
 	sfields=[names(srcwav[ipw][1].d)[1] for ipw in 1:npw]
 	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
 	for ipw in 1:npw
@@ -367,9 +367,9 @@ function PFdtd(attrib_mod;
 			isfields[ipw][i]=findfirst(isequal(field), [:P,:Vx,:Vz])
 		end
 	end
-	fill(nss, npw) != [length(geom[ip]) for ip=1:npw] ? error("different supersources") : nothing
+	fill(nss, npw) != [length(ageom[ip]) for ip=1:npw] ? error("different supersources") : nothing
 
-	# create acquisition geometry with each source shooting 
+	# create acquisition ageometry with each source shooting 
 	# at every unique receiver position
 	irfields = Array{Int}(undef,length(rfields))
 	for (i,field) in enumerate(rfields)
@@ -456,15 +456,15 @@ function PFdtd(attrib_mod;
 
 	itsnaps = [argmin(abs.(tgridmod .- tsnaps[i])) for i in 1:length(tsnaps)]
 
-	nrmat=[geom[ipw][iss].nr for ipw in 1:npw, iss in 1:nss]
+	nrmat=[ageom[ipw][iss].nr for ipw in 1:npw, iss in 1:nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),nss)
-	data=[Data(tgridmod,geom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
+	data=[Data(tgridmod,ageom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
 
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
 	pac=PFdtdc(jobname,attrib_mod,npw,activepw,
 	    exmodel,model,
-	    geom,srcwav,abs_trbl,sfields,isfields,sflags,
+	    ageom,srcwav,abs_trbl,sfields,isfields,sflags,
 	    irfields,rflags,δt,δxI,δzI,
             nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
 	    modtt, modttI,modrr,modrrvx,modrrvz,
@@ -636,13 +636,13 @@ function PFdtdss(iss::Int64, pac::PFdtdc)
 	nt=pac.nt
 	nx=pac.nx; nz=pac.nz
 	nzd,nxd=length.(pac.model.mgrid)
-	geom=pac.geom
+	ageom=pac.ageom
 	srcwav=pac.srcwav
 	sflags=pac.sflags
 	mesh_x, mesh_z = pac.exmodel.mgrid[2], pac.exmodel.mgrid[1]
 
 	# records_output, distributed array among different procs
-	records = [zeros(nt,pac.geom[ipw][iss].nr,length(irfields)) for ipw in 1:npw]
+	records = [zeros(nt,pac.ageom[ipw][iss].nr,length(irfields)) for ipw in 1:npw]
 
 	# gradient outputs
 	grad_modtt = zeros(nz, nx)
@@ -655,7 +655,7 @@ function PFdtdss(iss::Int64, pac::PFdtdc)
 	snaps = (pac.snaps_flag) ? zeros(nzd,nxd,length(pac.itsnaps)) : zeros(1,1,1)
 
 	# source wavelets
-	wavelets = [zeros(pac.geom[ipw][iss].ns,length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
+	wavelets = [zeros(pac.ageom[ipw][iss].ns,length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
 	fill_wavelets!(iss, wavelets, srcwav, sflags)
 
 	
@@ -672,38 +672,38 @@ function PFdtdss(iss::Int64, pac::PFdtdc)
 		boundary=[zeros(1,1,1) for ii in 1:5]
 	end
 	# source_spray_weights per supersource
-	ssprayw = [zeros(4,geom[ipw][iss].ns) for ipw in 1:npw]
-	denomsI = [zeros(geom[ipw][iss].ns) for ipw in 1:npw]
-	isx1=[zeros(Int64,geom[ipw][iss].ns) for ipw in 1:npw]
-	isx2=[zeros(Int64,geom[ipw][iss].ns) for ipw in 1:npw]
-	isz1=[zeros(Int64,geom[ipw][iss].ns) for ipw in 1:npw]
-	isz2=[zeros(Int64,geom[ipw][iss].ns) for ipw in 1:npw]
+	ssprayw = [zeros(4,ageom[ipw][iss].ns) for ipw in 1:npw]
+	denomsI = [zeros(ageom[ipw][iss].ns) for ipw in 1:npw]
+	isx1=[zeros(Int64,ageom[ipw][iss].ns) for ipw in 1:npw]
+	isx2=[zeros(Int64,ageom[ipw][iss].ns) for ipw in 1:npw]
+	isz1=[zeros(Int64,ageom[ipw][iss].ns) for ipw in 1:npw]
+	isz2=[zeros(Int64,ageom[ipw][iss].ns) for ipw in 1:npw]
 	for ipw=1:npw
-		for is=1:geom[ipw][iss].ns
+		for is=1:ageom[ipw][iss].ns
 			weights=ssprayw[ipw]
 			denom=denomsI[ipw]
 			Interpolation.get_spray_weights!(view(weights, :,is), view(denom,is), 
 				    view(isx1[ipw],is), view(isx2[ipw],is),
 				    view(isz1[ipw],is), view(isz2[ipw],is),
-				    mesh_x, mesh_z, geom[ipw][iss].sx[is], geom[ipw][iss].sz[is])
+				    mesh_x, mesh_z, ageom[ipw][iss].sx[is], ageom[ipw][iss].sz[is])
 		end
 	end
 
 	# receiver interpolation weights per sequential source
-	rinterpolatew = [zeros(4,geom[ipw][iss].nr) for ipw in 1:npw]
-	denomrI = [zeros(geom[ipw][iss].nr) for ipw in 1:npw]
-	irx1=[zeros(Int64,geom[ipw][iss].nr) for ipw in 1:npw]
-	irx2=[zeros(Int64,geom[ipw][iss].nr) for ipw in 1:npw]
-	irz1=[zeros(Int64,geom[ipw][iss].nr) for ipw in 1:npw]
-	irz2=[zeros(Int64,geom[ipw][iss].nr) for ipw in 1:npw]
+	rinterpolatew = [zeros(4,ageom[ipw][iss].nr) for ipw in 1:npw]
+	denomrI = [zeros(ageom[ipw][iss].nr) for ipw in 1:npw]
+	irx1=[zeros(Int64,ageom[ipw][iss].nr) for ipw in 1:npw]
+	irx2=[zeros(Int64,ageom[ipw][iss].nr) for ipw in 1:npw]
+	irz1=[zeros(Int64,ageom[ipw][iss].nr) for ipw in 1:npw]
+	irz2=[zeros(Int64,ageom[ipw][iss].nr) for ipw in 1:npw]
 	for ipw=1:npw
-		for ir=1:geom[ipw][iss].nr
+		for ir=1:ageom[ipw][iss].nr
 			weights=rinterpolatew[ipw]
 			denom=denomrI[ipw]
 			Interpolation.get_interpolate_weights!(view(weights, :,ir), view(denom, ir), 
 				  view(irx1[ipw],ir), view(irx2[ipw],ir),
 				  view(irz1[ipw],ir), view(irz2[ipw],ir),
-				  mesh_x, mesh_z, geom[ipw][iss].rx[ir], geom[ipw][iss].rz[ir])
+				  mesh_x, mesh_z, ageom[ipw][iss].rx[ir], ageom[ipw][iss].rz[ir])
 		end
 	end
 
@@ -833,7 +833,7 @@ function update_datamat!(ifield, ipw, pac::PFdtdc, pap::PFdtdp)
 	for issp in 1:length(pass)
 		iss=pass[issp].iss
 		records=pass[issp].records[ipw]
-		for ir in 1:pac.geom[ipw][iss].nr
+		for ir in 1:pac.ageom[ipw][iss].nr
 			for it in 1:pac.nt
 				datamat[it,ir,iss]=records[it,ir,ifield]
 			end
@@ -843,9 +843,9 @@ end
 
 function update_data!(ifield, ipw, pac::PFdtdc)
 	datamat=pac.datamat
-	for iss in 1:length(pac.geom[1])
+	for iss in 1:length(pac.ageom[1])
 		data=pac.data[ipw][iss].d[ifield]
-		for ir in 1:pac.geom[ipw][iss].nr
+		for ir in 1:pac.ageom[ipw][iss].nr
 			for it in 1:pac.nt
 				data[it,ir]=datamat[it,ir,iss]
 			end
@@ -859,15 +859,15 @@ end
 #	for iprop in 1:pac.npw
 #		if(pac.rflags[iprop] ≠ 0)
 #			ipropout += 1
-##			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, geom[iprop],
-##				geom_urpos[1].nr[1],
-##				(geom_urpos[1].rz[1], geom_urpos[1].rx[1])
+##			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, ageom[iprop],
+##				ageom_urpos[1].nr[1],
+##				(ageom_urpos[1].rz[1], ageom_urpos[1].rx[1])
 ##				)) 
 #		end
 #	end
 	# return without resampling for testing
 	#return [Data.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
-	#		       tgridmod, geom[1]) for iprop in 1:npw]
+	#		       tgridmod, ageom[1]) for iprop in 1:npw]
 
 function stack_illums!(pac::PFdtdc, pap::PFdtdp)
 	nx, nz=pac.nx, pac.nz
@@ -896,7 +896,7 @@ function mod_per_proc!(pac::PFdtdc, pap::PFdtdp)
 			boundary_force_snap_vxvz!(issp,pac,pap.ss,pap)
 		end
 
-		prog = Progress(pac.nt, dt=1, desc="\tmodeling supershot $iss/$(length(pac.geom[1])) ", 
+		prog = Progress(pac.nt, dt=1, desc="\tmodeling supershot $iss/$(length(pac.ageom[1])) ", 
 		  		color=:white) 
 		# time_loop
 		"""

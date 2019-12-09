@@ -4,7 +4,7 @@ struct FGσ end
 # type for doing a SE expt
 mutable struct ParamExpt{T}
 #	paTD::Data.P_misfit #  to measure data misfit
-#	geom::Geom # mainly positions of receivers are used from here, for the source see P
+#	ageom::AGeom # mainly positions of receivers are used from here, for the source see P
 	σ::Matrix{T} # see Niels et al.
 	Q::Matrix{T} # Q*k/η (see Niels et al.)
 	P::Array{T,3} # pressure snapshots (B*P) from seismic modeling
@@ -62,9 +62,9 @@ function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=no
 
 	Q= k .* Qv ./ η # combine all these
 
-#	dobs=Data.TD_zeros([:P],tgrid,geom)
+#	dobs=Data.TD_zeros([:P],tgrid,ageom)
 	#Random.randn!(dobs) # dummy dobs, update later
-#	paTD=Data.P_misfit(Data.TD_zeros([:P],tgrid,geom),dobs);
+#	paTD=Data.P_misfit(Data.TD_zeros([:P],tgrid,ageom),dobs);
 
 	paQ=Param(mgrid, Q)
 	paσ=Param(mgrid, σ)
@@ -80,7 +80,7 @@ function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=no
 	data_misfit=randn(size(ACQ,1))
 
 	pa=ParamExpt(#paTD, 
-	      #geom, 
+	      #ageom, 
 	      σ, Q, snaps,  LP, #
 	      data,
 	      data_obs,
@@ -115,12 +115,12 @@ end
 function record!(data::Data.TD, snaps, mgrid)
 	ifield=1;
 	iss=1;
-	nr=data.geom.nr
+	nr=data.ageom.nr
 	dat=data.d[iss,ifield]
 	for ir = 1:nr[iss]
 		din=view(dat,:,ir)
-		irx=argmin(abs.(mgrid[2].-data.geom.rx[iss][ir]))
-		irz=argmin(abs.(mgrid[1].-data.geom.rz[iss][ir]))
+		irx=argmin(abs.(mgrid[2].-data.ageom.rx[iss][ir]))
+		irz=argmin(abs.(mgrid[1].-data.ageom.rz[iss][ir]))
 		for it in 1:length(data.tgrid)
 			din[it]=snaps[irz,irx,it]
 		end

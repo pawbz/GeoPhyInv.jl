@@ -4,17 +4,19 @@
 
 using GeoPhyInv
 using Statistics
-using Plots
+using Gadfly
 
 # ### Setting up the variables necessary to create the `Expt`
 
 
-model=GIPh.Gallery.Seismic(:acou_homo1); # load a simple homogeneous acoustic model from the gallery
-update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise to the model
-geom=GIPh.Gallery.Geom(model.mgrid,:xwell); # load a simple acquisition geometry using `mgrid` of the seismic model
+model=Medium(:acou_homo1); # load a simple homogeneous acoustic model from the gallery
+update!(model, [:vp,:rho], randn_perc=0.1); # add some random noise to the model
+ageom=AGeom(model.mgrid,:xwell, SSrcs(2)); # load a simple acquisition ageometry using `mgrid` of the seismic model
 tgrid = range(0.0,stop=2.0,length=2000) # generate a time grid
-wav = GIPh.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,); # ricker wavelet
-srcwav=GIPh.Acquisition.Src_fixed(geom.nss,1,[:P],wav,tgrid); # distribute the same source wavelet to all the supsersources
+wav = ricker(10.0, tgrid, tpeak=0.25,); # ricker wavelet
+
+srcwav = SrcWav(tgrid, ageom, [:P])
+update!(srcwav, [:P], wav)
 @info "We are ready for the modeling."
 
 # ### Final step
@@ -22,7 +24,7 @@ srcwav=GIPh.Acquisition.Src_fixed(geom.nss,1,[:P],wav,tgrid); # distribute the s
 # One can plot the model, source and receivers using these commands:
 # `using Plots;`
 # `p1=JP.seismic(model);`
-# `JP.geom!(geom);`
+# `JP.ageom!(ageom);`
 # `plot(p1);`
 # Now we have all the required variables to create `SeisForwExpt` object and 
 # prepare the forward modelling.
@@ -31,13 +33,13 @@ srcwav=GIPh.Acquisition.Src_fixed(geom.nss,1,[:P],wav,tgrid); # distribute the s
 # Once the `Expt` object is created, do the modelling "without approximately any 
 # memory allocations" using `mod!`
 
-paE=SeisForwExpt(model=model,
-	geom=[geom], srcwav=[srcwav],
+paE=SeisForwExpt(Fdtd(),model=model,
+	ageom=[ageom], srcwav=[srcwav],
 	snaps_flag=true,
 	tsnaps=[0.3, 0.4, 0.5],
 	tgridmod=tgrid, verbose=true);
 
-@time mod!(paE);
+@time update!(paE);
 
 # ### Extracting snaps from `Expt`
 snaps=paE[:snaps,1]; # extracting snaps of the first supersource
@@ -45,8 +47,14 @@ snaps=paE[:snaps,2]; # second supersource
 @info string("The dimensions of the snaps are (nz,nx,nt)=", size(snaps))
 
 # We can now plot snapshots using these commands:
-p1=[heatmap(snaps[:,:,ii]) for ii in 1:3];
-plot(p1..., layout=(1,3), aspect_ratio=:equal)
+
+p=[]
+Gadfly.set_default_plot_size(20cm, 5cm)
+for ii in 1:3
+	push!(p, spy(snaps[:,:,ii], Guide.xlabel("x"), Guide.ylabel("z")))
+end
+hstack(p...)
+
 
 
 

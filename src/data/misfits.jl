@@ -9,12 +9,12 @@ end
 function P_misfit(x, y; w=nothing)
 
 	if(w===nothing) 
-		w=Data.TD_ones(y.fields,y.tgrid,y.geom)
+		w=Data.TD_ones(y.fields,y.tgrid,y.ageom)
 	end
 	!(isapprox(w,y)) && error("weights have to be similar to y")
 	!(isapprox(x,y)) && error("cannot measure LS misfit b/w dissimilar data")
 
-	!(isequal(x.geom, y.geom)) && error("observed and modelled data should have same geom")
+	!(isequal(x.ageom, y.ageom)) && error("observed and modelled data should have same ageom")
 	!(isequal(x.fields, y.fields)) && error("observed and modelled data should have same fields")
 
 	dJx=TD_zeros(x)
@@ -35,7 +35,7 @@ function func_grad!(pa::P_misfit, grad=nothing)
 	y=pa.y
 	x=pa.x
 	tgrid = x.tgrid;
-	acq = x.geom;
+	acq = x.ageom;
 	fields = x.fields;
 	nss = length(acq);
 
@@ -65,7 +65,7 @@ end
 """
 Calculate the distance between the observed data `y` and the calculated data `x`.
 The time grid of the observed data can be different from that of the modelled data.
-The acqistion geometry of both the data sets should be the same.
+The acqistion ageometry of both the data sets should be the same.
 
 If `J` is the distance, the gradient of the misfit w.r.t to the calculated data is returned as `dJx`
 * `w` used for data preconditioning
@@ -95,22 +95,22 @@ end
 function P_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 
 	if(coup===nothing)
-		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.geom)
+		 coup=Coupling.TD_delta(y.tgrid,[0.1,0.1],[0.0, 0.0], [:P], y.ageom)
 	end
 
 
 	paconvssf=[FBD.P_conv(ssize=[coup.tgridssf.nx], 
-			dsize=[length(y.tgrid),y.geom.nr[iss]], 
-			gsize=[length(y.tgrid),y.geom.nr[iss]], 
+			dsize=[length(y.tgrid),y.ageom.nr[iss]], 
+			gsize=[length(y.tgrid),y.ageom.nr[iss]], 
 		      slags=coup.ssflags, 
 		      dlags=[length(y.tgrid)-1, 0], 
-		      glags=[length(y.tgrid)-1, 0]) for iss in 1:y.geom.nss]
+		      glags=[length(y.tgrid)-1, 0]) for iss in 1:y.ageom.nss]
 
 	dJssf=deepcopy(coup.ssf)
 
 	pacls=P_misfit(TD_zeros(y), y; w=w)
 
-	!(isequal(x.geom, y.geom)) && error("observed and modelled data should have same geom")
+	!(isequal(x.ageom, y.ageom)) && error("observed and modelled data should have same ageom")
 	!(isequal(x.fields, y.fields)) && error("observed and modelled data should have same fields")
 
 	xr=TD_zeros(y)
@@ -126,10 +126,10 @@ function P_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 
 	if(func_attrib==:cls)
 		pacse=[FBD.P_misfit_xcorr(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
-		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.geom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.ageom.nss, ifield=1:length(y.fields)]
 	elseif(func_attrib==:xcorrcls)
-		pacse=[FBD.P_misfit_xcorr(length(y.tgrid), y.geom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.geom.nss, ifield=1:length(y.fields)]
-		func=[(dJx,x)->FBD.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.geom.nss, ifield=1:length(y.fields)]
+		pacse=[FBD.P_misfit_xcorr(length(y.tgrid), y.ageom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.ageom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->FBD.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.ageom.nss, ifield=1:length(y.fields)]
 	end
 
 	pa=P_misfit(x,y,w,xr,xrc,dJxr,dJxrc,
@@ -142,7 +142,7 @@ end
 function func_grad!(pa::P_misfit_ssf, grad=nothing)
 
 	tgrid = pa.x.tgrid;
-	acq = pa.x.geom;
+	acq = pa.x.ageom;
 	fields = pa.x.fields;
 	nss = acq.nss;
 

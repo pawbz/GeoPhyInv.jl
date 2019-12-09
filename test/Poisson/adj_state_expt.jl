@@ -12,6 +12,8 @@
 # ```
 # We start with the dimensions and spatial grids are allocated as follows.
 
+
+
 nx=21
 nz=21
 nt=4
@@ -62,25 +64,27 @@ using Calculus
 
 # Generate the configuration for the Poisson experiment, using the arrays above.
 
-geom=J.Acquisition.Geom_circ(nss=1,nr=30,rad=[5.,5.])
-ACQ=J.Acquisition.ACQmat(geom,mgrid)
-paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
+ageom=AGeom(mgrid, SSrcs(1), Srcs(1), Recs(30))
+update!(ageom, SSrcs(), [0,0], 5, [0,2π])
+update!(ageom, Recs(), [0,0], 5, [0,2π])
+ACQ=GeoPhyInv.ACQmat(ageom,mgrid)
+paE=GeoPhyInv.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
 
-#src # J.Poisson.updateLP!(paE, paE.Q)
+#src # GeoPhyInv.Poisson.updateLP!(paE, paE.Q)
 
 # Calculate the data misfit.
 
-@time f=J.Poisson.func(σ,paE)
+@time f=GeoPhyInv.Poisson.func(σ,paE)
 
 # Compute the gradient with finite-difference approximation.
 
-f = x->J.Poisson.func(x, paE);
+f = x->GeoPhyInv.Poisson.func(x, paE);
 gcalc = Calculus.gradient(f);
 g_fd=reshape(gcalc(vec(σ)),nz,nx);
 
 # Compute the gradient using adjoint state method.
 
-@time mod!(paE,σ,J.Poisson.FGσ())
+@time GeoPhyInv.Poisson.mod!(paE,σ,GeoPhyInv.Poisson.FGσ())
 g=paE.g;
 
 # Check gradient accuracy.

@@ -17,7 +17,7 @@ using Misfits
 using LinearAlgebra
 using Statistics
 import GeoPhyInv.Interpolation
-import GeoPhyInv: Geom
+import GeoPhyInv: AGeom
 import GeoPhyInv.Utils
 import GeoPhyInv.Coupling
 using DSP
@@ -31,20 +31,20 @@ Time domain representation of Seismic Data.
 * `d::Array{Array{Float64,2},2}` : data 
 * `fields::Vector{Symbol}` : components recorded at each receiver
 * `tgrid` : grid to represent time
-* `geom::Geom` : acquisition geometry used to generate the data
+* `ageom::AGeom` : acquisition ageometry used to generate the data
 """
 mutable struct TD
 	tgrid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
 	d::NamedArrays.NamedArray{Array{Float64,2},1,Array{Array{Float64,2},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 	nr::Int64
 	"adding conditions that are to be false while construction"
-	#TD(d, fields, tgrid, geom) = 
+	#TD(d, fields, tgrid, ageom) = 
 #		any([
 #		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
 #		  length(fields) == 0,
-#		  broadcast(size,d) != [(length(tgrid),geom[iss].nr) for iss=1:length(geom), ifield=1:length(fields)]
+#		  broadcast(size,d) != [(length(tgrid),ageom[iss].nr) for iss=1:length(ageom), ifield=1:length(fields)]
 #		  ]) ? 
-#		error("error in TD construction") : new(d, fields, tgrid, geom)
+#		error("error in TD construction") : new(d, fields, tgrid, ageom)
 end
 
 """
@@ -76,17 +76,17 @@ Method to resample data in time.
 function interp(data::TD,
 		tgrid::StepRangeLen
 		)
-	nss = length(data.geom)
-	nr = data.geom.nr
+	nss = length(data.ageom)
+	nr = data.ageom.nr
 	dataout = TD(
-		     [zeros(length(tgrid),data.geom[iss].nr) for iss=1:nss, ifield=1:length(data.fields)],
-	      data.fields,tgrid,data.geom)
+		     [zeros(length(tgrid),data.ageom[iss].nr) for iss=1:nss, ifield=1:length(data.fields)],
+	      data.fields,tgrid,data.ageom)
 	interp_spray!(data, dataout)
 	return dataout
 end
 
 function taper!(data::TD, perc=0.0; bperc=perc,eperc=perc)
-	nr = data.geom.nr;	nss = length(data.geom); nt = length(data.tgrid);
+	nr = data.ageom.nr;	nss = length(data.ageom); nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		Utils.taper!(dd,bperc=bperc,eperc=eperc)
@@ -106,8 +106,8 @@ Can reduce allocations =========
 """
 function interp_spray!(data::TD, dataout::TD, attrib=:interp, Battrib=:B1; pa=nothing)
 	# check if datasets are similar
-	nss = length(data.geom)
-	nr = data.geom.nr
+	nss = length(data.ageom)
+	nr = data.ageom.nr
 	xin=data.tgrid
 	xout=dataout.tgrid
 	if(pa===nothing)
@@ -133,31 +133,31 @@ Method used to preallocate `TD` with zeros.
 
 * `fields::Vector{Symbol}` : number of components
 * `tgrid` : time domain grid
-* `geom::Geom` : acquisition geometry
+* `ageom::AGeom` : acquisition ageometry
 
 # Return
 
 * data with zeros as `TD`
 """
-function TD_zeros(fields::Vector{Symbol}, tgrid::StepRangeLen, geom::Geom)
-	return TD([zeros(length(tgrid),geom[iss].nr) for iss=1:length(geom), ifield=1:length(fields)],fields,
-	   deepcopy(tgrid),deepcopy(geom)) 
+function TD_zeros(fields::Vector{Symbol}, tgrid::StepRangeLen, ageom::AGeom)
+	return TD([zeros(length(tgrid),ageom[iss].nr) for iss=1:length(ageom), ifield=1:length(fields)],fields,
+	   deepcopy(tgrid),deepcopy(ageom)) 
 end
 function Base.fill!(data::TD, k::Float64)
-	for iss=1:length(data.geom), ifield=1:length(data.fields)
+	for iss=1:length(data.ageom), ifield=1:length(data.fields)
 		fill!(data.d[iss,ifield],k) 
 	end
 end
 function TD_zeros(d::TD)
-	return TD([zeros(length(d.tgrid),d.geom[iss].nr) for iss=1:length(d.geom), ifield=1:length(d.fields)],d.fields,
-	   deepcopy(d.tgrid),deepcopy(d.geom)) 
+	return TD([zeros(length(d.tgrid),d.ageom[iss].nr) for iss=1:length(d.ageom), ifield=1:length(d.fields)],d.fields,
+	   deepcopy(d.tgrid),deepcopy(d.ageom)) 
 end
 
 
 "Same as `TD_zeros`, except for returning ones"
-function TD_ones(fields::Vector{Symbol}, tgrid::StepRangeLen, geom::Geom) 
-	return TD([ones(length(tgrid),geom[iss].nr) for iss=1:length(geom), ifield=1:length(fields)],
-	   fields,deepcopy(tgrid),deepcopy(geom)) 
+function TD_ones(fields::Vector{Symbol}, tgrid::StepRangeLen, ageom::AGeom) 
+	return TD([ones(length(tgrid),ageom[iss].nr) for iss=1:length(ageom), ifield=1:length(fields)],
+	   fields,deepcopy(tgrid),deepcopy(ageom)) 
 end
 
 
@@ -187,7 +187,7 @@ end
 
 
 function DDecon!(dataout::TD, data::TD, paD)
-	nr = data.geom.nr;	nss = data.geom.nss;	nt = length(data.tgrid);
+	nr = data.ageom.nr;	nss = data.ageom.nss;	nt = length(data.tgrid);
 	for ifield = 1:length(data.fields), iss = 1:nss
 		dd=data.d[iss, ifield]
 		ddo=dataout.d[iss, ifield]

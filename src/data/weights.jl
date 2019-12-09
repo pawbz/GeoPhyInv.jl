@@ -31,10 +31,10 @@ function TD_weight!(
 	tmaxI = maximum(inv.(abs.(tvecexp)))
 	nt = length(dw.tgrid)
 	fields=dw.fields
-	nss=dw.geom.nss
-	rx=dw.geom.rx; rz=dw.geom.rz
-	sx=dw.geom.sx; sz=dw.geom.sz
-	nr=dw.geom.nr; ns=dw.geom.ns
+	nss=dw.ageom.nss
+	rx=dw.ageom.rx; rz=dw.ageom.rz
+	sx=dw.ageom.sx; sz=dw.ageom.sz
+	nr=dw.ageom.nr; ns=dw.ageom.ns
 
 	itlim = sort(broadcast(indmin,[abs.(dw.tgrid-tlim[i]) for i in 1:2]))
 	twin=zeros(nt)

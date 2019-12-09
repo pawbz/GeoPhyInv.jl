@@ -6,7 +6,7 @@ Return snaps stored in `SeisForwExpt` after using `mod!`.
 * `iss::Int64=1` : supersource index
 """
 function Base.getindex(pa::PFdtd, s::Symbol, iss::Int=1)
-	@assert iss≤pa.c.geom[1].nss
+	@assert iss≤length(pa.c.ageom[1])
 	@assert s in [:snaps]
 	if(s==:snaps)
 		nzd,nxd=length.(pa.c.model.mgrid)

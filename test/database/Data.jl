@@ -11,9 +11,9 @@ fields=[:P]
 tgrid1=range(0., stop=1., length=5);
 tgrid2=range(0., stop=1., length=10);
 
-geom=GeoPhyInv.Acquisition.Geom_fixed(10,10,10,10,10,10,10,10)
+ageom=GeoPhyInv.Acquisition.AGeom_fixed(10,10,10,10,10,10,10,10)
 
-x=GeoPhyInv.Data.TD_ones(fields,tgrid1,geom)
+x=GeoPhyInv.Data.TD_ones(fields,tgrid1,ageom)
 
 
 yvec=randn(length(x))
@@ -30,7 +30,7 @@ end
 
 
 @testset "simple LS error: x and y same time grid" begin
-	y=GeoPhyInv.Data.TD_ones(fields,tgrid1,geom)
+	y=GeoPhyInv.Data.TD_ones(fields,tgrid1,ageom)
 
 	randn!(x)
 	randn!(y)
@@ -56,7 +56,7 @@ rrrrrr
 
 
 # loop over same time grid and different time grid (interp_flag on/off)
-for y in [GeoPhyInv.Data.TD_ones(fields,tgrid2,geom), GeoPhyInv.Data.TD_ones(fields,tgrid1,geom)]
+for y in [GeoPhyInv.Data.TD_ones(fields,tgrid2,ageom), GeoPhyInv.Data.TD_ones(fields,tgrid1,ageom)]
 	println("#########################################")
 
 
@@ -65,7 +65,7 @@ for y in [GeoPhyInv.Data.TD_ones(fields,tgrid2,geom), GeoPhyInv.Data.TD_ones(fie
 	randn!(x.d[1,1])
 
 	for func_attrib in [:cls]
-		coup=GeoPhyInv.Coupling.TD_delta(y.tgrid, [0.1,0.1], 0.0,  x.fields, x.geom)
+		coup=GeoPhyInv.Coupling.TD_delta(y.tgrid, [0.1,0.1], 0.0,  x.fields, x.ageom)
 		randn!(coup.ssf[1,1])
 		pa=GeoPhyInv.Data.P_misfit(x,y, func_attrib=func_attrib, coup=coup);
 

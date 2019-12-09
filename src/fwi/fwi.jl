@@ -41,7 +41,7 @@ PFWI Parameters
 * `mgrid::Vector{StepRangeLen}` : modelling grid
 * `igrid::Vector{StepRangeLen}` : inversion grid
 * `srcwav::SrcWav` : base source wavelet for modelling data
-* `geom::Geom` : acquisition geometry
+* `ageom::AGeom` : acquisition ageometry
 * `tgrid::StepRangeLen` : 
 * `attrib_mod`
 * `model_obs` : model used for generating observed data
@@ -58,15 +58,15 @@ mutable struct PFWI{Tmod, Tdatamisfit, Tinv}
 	mx::X{Float64,1}
 	mxm::X{Float64,1}
 	"forward modelling parameters for"
-	paf::Tmod
+	paf::PFdtd{Tmod}
 	"base source wavelet"
 	srcwav::SrcWav
 	"adjoint source functions"
 	adjsrc::SrcWav
-	"acquisition geometry"
-	geom::Geom
-	"acquisition geometry for adjoint propagation"
-	adjgeom::Geom
+	"acquisition ageometry"
+	ageom::AGeom
+	"acquisition ageometry for adjoint propagation"
+	adjageom::AGeom
 	"Seismic model on modeling grid"
 	modm::Medium
 	"background Seismic model"
@@ -115,12 +115,13 @@ include("core.jl")
 include("prior.jl")
 include("xfwi.jl")
 include("xwfwi.jl")
+include("gallery.jl")
 
 """
 Convert the data `Data` to `SrcWav` after time reversal.
 """
-function update_adjsrc!(adjsrc, δdat::Data, adjgeom)
-	for i in 1:length(adjgeom)
+function update_adjsrc!(adjsrc, δdat::Data, adjageom)
+	for i in 1:length(adjageom)
 		for field in names(δdat[i].d)[1]
 			wav=adjsrc[i].d[field] 
 			dat=δdat[i].d[field]
@@ -140,8 +141,8 @@ value_adjsrc(s, ::Vx) = -1.0*s # see adj tests
 value_adjsrc(s, ::Vz) = -1.0*s
 
 
-function generate_adjsrc(fields, tgrid, adjgeom)
-	adjsrc=SrcWav(tgrid,adjgeom,fields)
+function generate_adjsrc(fields, tgrid, adjageom)
+	adjsrc=SrcWav(tgrid,adjageom,fields)
 	return adjsrc
 end
 
@@ -157,7 +158,7 @@ Constructor for `PFWI`
 
 # Keyword Arguments
 * `srcwav::SrcWav` : source time functions
-* `geom::Geom` : acquisition geometry
+* `ageom::AGeom` : acquisition ageometry
 * `tgrid::StepRangeLen` : modelling time grid
 * `modm::Medium` : seismic model on modelling mesh 
 
@@ -171,7 +172,7 @@ Constructor for `PFWI`
   * `=1` means the preconditioning is switched off
   * `>1` means the preconditioning is switched on, larger the mprecon_factor, stronger the applied preconditioner becomes
 * `dobs::Data.TD` : observed data
-* `dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.geom)` : data preconditioning, defaults to one 
+* `dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.ageom)` : data preconditioning, defaults to one 
 * `tlagssf_fracs=0.0` : maximum lagtime of unknown source filter
 * `tlagrf_fracs=0.0` : maximum lagtime of unknown receiver filter
 * `srcwav_obs::SrcWav=srcwav` : source wavelets to generate *observed data*; can be different from `srcwav`
@@ -191,16 +192,16 @@ function PFWI(
 	      attrib_mod::Union{Fdtd, FdtdBorn}, 
 	      attrib_inv::Union{LS,LS_prior,Migr,Migr_FD};
 	      srcwav::SrcWav=nothing,
-	      geom::Geom=nothing,
+	      ageom::AGeom=nothing,
 	      tgrid::StepRangeLen=nothing,
-	      modm::Medium,
+	      modm::Medium=nothing,
 	      # other optional 
 	      tgrid_obs::StepRangeLen=deepcopy(tgrid),
 	      rfields=[:P],
 	      igrid=nothing,
 	      igrid_interp_scheme::Symbol=:B2,
 	      mprecon_factor::Float64=1.0,
-	      _FD::Data=Data(tgrid_obs, geom, rfields),
+	      dobs::Data=Data(tgrid_obs, ageom, rfields),
 	      dprecon=nothing,
 	      tlagssf_fracs=0.0,
 	      tlagrf_fracs=0.0,
@@ -262,18 +263,18 @@ function PFWI(
 		isequal(modm, modm_obs) && error("initial model same as actual model, zero misfit?")
 	end
 
-	# geom geometry for adjoint propagation
-	adjgeom = AdjGeom(geom)
+	# ageom ageometry for adjoint propagation
+	adjageom = AdjAGeom(ageom)
 
 	# generate adjoint sources
-	adjsrc=generate_adjsrc(rfields, tgrid, adjgeom)
+	adjsrc=generate_adjsrc(rfields, tgrid, adjageom)
 
 
 	# generating forward and adjoint modelling engines
 	# to generate modelled data, border values, etc.
 	# most of the parameters given to this are dummy
 	paf=SeisForwExpt(attrib_mod,npw=2, model=modm,
-		geom=[geom, adjgeom], srcwav=[srcwav, adjsrc], 
+		ageom=[ageom, adjageom], srcwav=[srcwav, adjsrc], 
 		rfields=rfields,
 		sflags=[3, 2], rflags=[1, 1],
 		backprop_flag=1, 
@@ -294,17 +295,17 @@ function PFWI(
 	end
 	
 	# create Parameters for data misfit
-	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, rfields, geom)
+	#coup=Coupling.TD_delta(dobs.tgrid, tlagssf_fracs, tlagrf_fracs, rfields, ageom)
 	# choose the data misfit
 	#	(iszero(tlagssf_fracs)) 
  	# tlagssf_fracs==[0.0] | tlagssf_fracs=[0.0])
-	# paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,geom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
+	# paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,ageom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
 	if(iszero(dobs))
 		Random.randn!(dobs) # dummy dobs, update later
 	end
 
-	paTD=VNamedD_misfit(Data(tgrid,geom,rfields),dobs,w=dprecon);
+	paTD=VNamedD_misfit(Data(tgrid,ageom,rfields),dobs,w=dprecon);
 
 	paminterp=Interpolation.Kernel([modi.mgrid[2], modi.mgrid[1]], [modm.mgrid[2], modm.mgrid[1]], igrid_interp_scheme)
 
@@ -320,9 +321,9 @@ function PFWI(
 	     mx, mxm,
 	     paf,
 	     deepcopy(srcwav), 
-	     SrcWav(tgrid,adjgeom, rfields),
-	     deepcopy(geom), 
-	     adjgeom,
+	     SrcWav(tgrid,adjageom, rfields),
+	     deepcopy(ageom), 
+	     adjageom,
 	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,
 	     priori,
 	     gmodm,gmodi,
@@ -527,26 +528,26 @@ function visualize_gx!(gmodm, modm, gmodi, modi, gx, pa)
 end
 
 """
-Modify the input acquisition geometry 
+Modify the input acquisition ageometry 
 such that the adjoint source time functions can 
 be propagated from the receiver positions.
 The number of supersources will remain the same.
 All the recievers will be fired as simultaneous sources.
 """
-function AdjGeom(geomin::Geom)
-	geomout = deepcopy(geomin);
-	for i in 1:length(geomin)
-		geomout[i].sx = geomin[i].rx; geomout[i].sz = geomin[i].rz;
-		geomout[i].ns = geomin[i].nr; 
+function AdjAGeom(ageomin::AGeom)
+	ageomout = deepcopy(ageomin);
+	for i in 1:length(ageomin)
+		ageomout[i].sx = ageomin[i].rx; ageomout[i].sz = ageomin[i].rz;
+		ageomout[i].ns = ageomin[i].nr; 
 
-	#	geomout.rx = geomin.sx; geomout.rz = geomin.sz;
-	#	geomout.nr = geomin.ns; 
+	#	ageomout.rx = ageomin.sx; ageomout.rz = ageomin.sz;
+	#	ageomout.nr = ageomin.ns; 
 
-		geomout[i].rx = geomin[i].rx; geomout[i].rz = geomin[i].rz;
-		geomout[i].nr = geomin[i].nr; 
+		ageomout[i].rx = ageomin[i].rx; ageomout[i].rz = ageomin[i].rz;
+		ageomout[i].nr = ageomin[i].nr; 
 	end
 
-	return geomout
+	return ageomout
 end
 
 
@@ -586,7 +587,7 @@ function Coupling_x!(x::Vector{Float64},
 			end
 		end
 	elseif(flag == -1) # convert x to w
-		for iss=1:pa.paTD.y.geom.nss, ifield=1:length(pa.paTD.y.fields)
+		for iss=1:pa.paTD.y.ageom.nss, ifield=1:length(pa.paTD.y.fields)
 			w=pa.paTD.coup.ssf[iss,ifield]
 			for i in eachindex(x)
 				w[i]=x[i]

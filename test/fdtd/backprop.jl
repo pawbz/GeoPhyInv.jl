@@ -1,39 +1,43 @@
 
-model=GeoPhyInv.Gallery.Seismic(:acou_homo1)
+model=Medium(:acou_homo1)
 update!(model, [:vp,:rho], randn_perc=0.1)
-geom =GeoPhyInv.Acquisition.Geom_circ(nss=4,nr=100,rad=[990.,990.]);
-geom =GeoPhyInv.Acquisition.Geom_circ(nss=4,nr=100,rad=[0.,200.]);
-srcwav=GeoPhyInv.Acquisition.Src_fixed_mod(geom.nss,1,[:P],mod=model, nλ=3, tmaxfrac=0.4)
+ageom=AGeom(model.mgrid, SSrcs(4), Srcs(1), Recs(100))
+update!(ageom, SSrcs(),[0,0],990.0,[0, 2π])
+update!(ageom, Recs(),[0,0],990.0,[0, 2π])
+
+wav, tgrid=ricker(model, 3, 0.4)
+srcwav = SrcWav(tgrid, ageom, [:P])
+update!(srcwav, [:P], wav)
 
 for sflags in [[1,-1],[2,-2]]
-	pa=GeoPhyInv.Fdtd.Param(born_flag=false,npw=1, tgridmod=srcwav.tgrid,
+	pa=SeisForwExpt(Fdtd(),npw=1, tgridmod=tgrid,
 	#	abs_trbl=[:null],
 		gmodel_flag=false,
 		sflags=[sflags[1]],
 		snaps_flag=true,
 		verbose=true,
 		backprop_flag=1,
-		illum_flag=true,geom=[geom], srcwav=[srcwav],
+		illum_flag=true,ageom=[ageom], srcwav=[srcwav],
 		model=model);
 
-	GeoPhyInv.Fdtd.mod!(pa);
+	update!(pa);
 	rec1=deepcopy(pa.c.data[1])
 
 	# change source flag and update wavelets in pa
 	pa.c.sflags=[sflags[2]];
-	GeoPhyInv.Fdtd.update_srcwav!(pa,[srcwav])
+	GeoPhyInv.update_srcwav!(pa,[srcwav])
 	pa.c.backprop_flag=-1 # do backpropagation
 
-	GeoPhyInv.Fdtd.mod!(pa);
+	update!(pa)
 	rec2=deepcopy(pa.c.data[1])
 
 	# time reverse
-	GeoPhyInv.Data.TD_tr!(rec2);
+	reverse!(rec2);
 
 	# compare results
 	# least-squares misfit
-	paerr=GeoPhyInv.Data.P_misfit(rec1, rec2)
-	err = GeoPhyInv.Data.func_grad!(paerr)
+	paerr=GeoPhyInv.VNamedD_misfit(rec1, rec2)
+	err = GeoPhyInv.func_grad!(paerr)
 
 	# normalized error
 	error = err[1]./paerr.ynorm

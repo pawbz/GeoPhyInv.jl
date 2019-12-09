@@ -15,7 +15,7 @@ before applying the time-domain filter data type  described in this module:
 """
 module Coupling
 
-import GeoPhyInv: Geom
+import GeoPhyInv: AGeom
 
 """
 Time-domain source and receiver filters.
@@ -27,7 +27,7 @@ Time-domain source and receiver filters.
 * `fields::Vector{Symbol}` :  number of recorded components at receivers
 * `tgridssf` : a  time grid for source filters with both positive and negative lags
 * `tgridrf` : a  time grid for receiver filters with both positive and negative lags
-* `geom::Geom` : acquisition geometry
+* `ageom::AGeom` : acquisition ageometry
 """
 mutable struct TD
 	ssf::Array{Array{Float64,1},2}
@@ -37,14 +37,14 @@ mutable struct TD
 	tgridrf::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
 	ssflags::Vector{Int}
 	rflags::Vector{Int}
-	geom::Geom
-	TD(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, geom) = 
+	ageom::AGeom
+	TD(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, ageom) = 
 		any([
 		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
 		  length(fields) == 0,
-		  broadcast(size,ssf) != [(length(tgridssf),) for iss=1:geom.nss, ifield=1:length(fields)]
+		  broadcast(size,ssf) != [(length(tgridssf),) for iss=1:ageom.nss, ifield=1:length(fields)]
 		  ]) ? 
-		error("error in TD construction") : new(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, geom)
+		error("error in TD construction") : new(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, ageom)
 
 end 
 
@@ -58,7 +58,7 @@ Initialize coupling filters `TD` with  delta functions.
 * `tlagrf_fracs::Vector{Real}` : +ve and -ve fractions for receiver filter
 * `δt:Float64` : sampling interval in time
 * `fields::Vector{Symbol}` : number of components
-* `geom::Geom` : acquisition geometry
+* `ageom::AGeom` : acquisition ageometry
 
 # Return
 
@@ -69,7 +69,7 @@ function TD_delta(
 			   tlagssf_fracs,
 			   tlagrf_fracs,
 		  fields::Vector{Symbol},
-		  geom::Geom
+		  ageom::AGeom
 		 )
 	δt=tgriddata.δx
 	tot_t=abs(tgriddata[end]-tgriddata[1])
@@ -87,11 +87,11 @@ function TD_delta(
 	# number of unique receivers (implement in future)
 	# one receiver filter for each unique receiver
 
-	ssf=[spiss for iss=1:geom.nss, ifield=1:length(fields)]
+	ssf=[spiss for iss=1:ageom.nss, ifield=1:length(fields)]
 
 	return TD(ssf,
-	   [repeat(spir, outer=[1,geom.nr[iss]]) for iss=1:geom.nss, ifield=1:length(fields)],
-	   fields,tgridssf,tgridrf,ssflags,rflags,deepcopy(geom))
+	   [repeat(spir, outer=[1,ageom.nr[iss]]) for iss=1:ageom.nss, ifield=1:length(fields)],
+	   fields,tgridssf,tgridrf,ssflags,rflags,deepcopy(ageom))
 
 end
 

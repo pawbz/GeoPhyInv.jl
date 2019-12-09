@@ -19,7 +19,7 @@ recording waves.
 * `ns::Vector{Int64,1}` : number of sources for every supersource
 * `nr::Vector{Int64,1}` : number of receivers for every supersource 
 """
-mutable struct Geomss
+mutable struct AGeomss
 	sx::Vector{Float64}
 	sz::Vector{Float64}
 	rx::Vector{Float64}
@@ -27,44 +27,44 @@ mutable struct Geomss
 	ns::Int64 # change to +ve only integer later
 	nr::Int64 # change to +ve only integer later
 	"adding conditions that are to be false while construction"
-	Geomss(sx, sz, rx, rz, ns, nr) = 
+	AGeomss(sx, sz, rx, rz, ns, nr) = 
 		any([
                   length(sx) != ns,
                   length(sz) != ns,
                   length(rx) != nr,
                   length(rz) != nr,
 		  ]) ? 
-		error("Geomss construct") : new(sx, sz, rx, rz, ns, nr)
+		error("AGeomss construct") : new(sx, sz, rx, rz, ns, nr)
 end # type
 
-Geom=Array{Geomss,1}
+AGeom=Array{AGeomss,1}
  
 
 """
 Randomly place a given number of source and receivers in a `mgrid`.
 """
-function Geomss(mgrid::AbstractArray{T}, s::Srcs, r::Recs) where {T<:StepRangeLen}
+function AGeomss(mgrid::AbstractArray{T}, s::Srcs, r::Recs) where {T<:StepRangeLen}
 	xmin=mgrid[2][1]
 	xmax=mgrid[2][end]
 	zmin=mgrid[1][1]
 	zmax=mgrid[1][end]
-	return Geomss(Random.rand(Uniform(xmin,xmax),s.n), Random.rand(Uniform(zmin,zmax),s.n),
+	return AGeomss(Random.rand(Uniform(xmin,xmax),s.n), Random.rand(Uniform(zmin,zmax),s.n),
 		    Random.rand(Uniform(xmin,xmax),r.n), Random.rand(Uniform(zmin,zmax),r.n), s.n, r.n)
 end
 
-function Array{Geomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Vector{Srcs}, r::Vector{Recs}) where {T<:StepRangeLen}   
-	return [Geomss(mgrid,s[i],r[i]) for i in 1:ss.n]
+function Array{AGeomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Vector{Srcs}, r::Vector{Recs}) where {T<:StepRangeLen}   
+	return [AGeomss(mgrid,s[i],r[i]) for i in 1:ss.n]
 end
-function Array{Geomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Srcs, r::Recs)  where {T<:StepRangeLen}   
-	return Array{Geomss,1}(mgrid, ss, fill(s,ss.n), fill(r,ss.n))
+function Array{AGeomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Srcs, r::Recs)  where {T<:StepRangeLen}   
+	return Array{AGeomss,1}(mgrid, ss, fill(s,ss.n), fill(r,ss.n))
 end
 
-"Compare if two `Geom` variables are equal"
-function Base.isequal(geom1::Geomss, geom2::Geomss, attrib=:all)
+"Compare if two `AGeom` variables are equal"
+function Base.isequal(ageom1::AGeomss, ageom2::AGeomss, attrib=:all)
 	srcfnames = [:sx, :sz, :ns]
 	recfnames = [:rx, :rz, :nr]
-	srcvec=[(isequal(getfield(geom1, name),getfield(geom2, name))) for name in srcfnames]
-	recvec=[(isequal(getfield(geom1, name),getfield(geom2, name))) for name in recfnames]
+	srcvec=[(isequal(getfield(ageom1, name),getfield(ageom2, name))) for name in srcfnames]
+	recvec=[(isequal(getfield(ageom1, name),getfield(ageom2, name))) for name in recfnames]
 	if(attrib == :sources)
 		return all(srcvec)
 	elseif(attrib == :receivers)
@@ -73,12 +73,12 @@ function Base.isequal(geom1::Geomss, geom2::Geomss, attrib=:all)
 		return all(vcat(srcvec, recvec))
 	end
 end
-function Base.isequal(geom1::Geom, geom2::Geom, attrib=:all)
-	return (length(geom1)==length(geom2)) ? all([isequal(geom1[iss],geom2[iss]) for iss in 1:length(geom1)]) : false
+function Base.isequal(ageom1::AGeom, ageom2::AGeom, attrib=:all)
+	return (length(ageom1)==length(ageom2)) ? all([isequal(ageom1[iss],ageom2[iss]) for iss in 1:length(ageom1)]) : false
 end
 
-function Base.show(io::Base.IO, geomss::Geomss)
-	print(io, "\t> acquisition with ",geomss.ns," source(s) and ",geomss.nr, " receiver(s)")
+function Base.show(io::Base.IO, ageomss::AGeomss)
+	print(io, "\t> acquisition with ",ageomss.ns," source(s) and ",ageomss.nr, " receiver(s)")
 end
 
 """
@@ -110,167 +110,165 @@ end
 """
 Update source positions
 """
-function update!(geomss::Geomss, ::Srcs, args...) where {T<:Real}
-	z,x=spread(geomss.ns,args...)
-	copyto!(geomss.sx,x)
-	copyto!(geomss.sz,z)
-	return geomss
+function update!(ageomss::AGeomss, ::Srcs, args...) where {T<:Real}
+	z,x=spread(ageomss.ns,args...)
+	copyto!(ageomss.sx,x)
+	copyto!(ageomss.sz,z)
+	return ageomss
 end
 
 """
 Update receiver positions
 """
-function update!(geomss::Geomss, ::Recs, args...)
-	z,x=spread(geomss.nr,args...)
-	copyto!(geomss.rx,x)
-	copyto!(geomss.rz,z)
-	return geomss
+function update!(ageomss::AGeomss, ::Recs, args...)
+	z,x=spread(ageomss.nr,args...)
+	copyto!(ageomss.rx,x)
+	copyto!(ageomss.rz,z)
+	return ageomss
 end
 
 """
 Update supersource positions
 """
-function update!(geom::Geom, ::SSrcs, args...)
-	z,x=spread(length(geom), args...)
-	for iss in 1:length(geom)
-		update!(geom[iss], Srcs(), [z[iss],x[iss]], [z[iss],x[iss]])    
+function update!(ageom::AGeom, ::SSrcs, args...)
+	z,x=spread(length(ageom), args...)
+	for iss in 1:length(ageom)
+		update!(ageom[iss], Srcs(), [z[iss],x[iss]], [z[iss],x[iss]])    
 	end
-	return geom
+	return ageom
 end
 
 """
 Update receiver positions in all supersources
 """
-function update!(geom::Geom, ::Recs, args...)
-	for iss in 1:length(geom)
-		update!(geom[iss], Recs(), args...)
+function update!(ageom::AGeom, ::Recs, args...)
+	for iss in 1:length(ageom)
+		update!(ageom[iss], Recs(), args...)
 	end
-	return geom
+	return ageom
 end
 
 
 """
-Check if all the sources and receivers in `Geom` are within the model 
+Check if all the sources and receivers in `AGeom` are within the model 
 
 # Return
 
 * `true` if all the positions within the model, `false` otherwise
 """
-function Base.in(geom::Geom, mgrid::AbstractVector{T}) where {T<:StepRangeLen}     
+function Base.in(ageom::AGeom, mgrid::AbstractVector{T}) where {T<:StepRangeLen}     
 	xmin, zmin, xmax, zmax = mgrid[2][1], mgrid[1][1], mgrid[2][end], mgrid[1][end]
-	checkvec=fill(false, length(geom))
-	for iss=1:length(geom)
+	checkvec=fill(false, length(ageom))
+	for iss=1:length(ageom)
 		checkvec[iss] = any(
 		      vcat(
-			   (((geom[iss].sx .- xmin).*(xmax .- geom[iss].sx)) .< 0.0),
-			   (((geom[iss].sz .- zmin).*(zmax .- geom[iss].sz)) .< 0.0),
-			   (((geom[iss].rx .- xmin).*(xmax .- geom[iss].rx)) .< 0.0),
-			   (((geom[iss].rz .- zmin).*(zmax .- geom[iss].rz)) .< 0.0),
-			   isnan.(geom[iss].sx),
-			   isnan.(geom[iss].sz),
-			   isnan.(geom[iss].rx),
-			   isnan.(geom[iss].rz),
+			   (((ageom[iss].sx .- xmin).*(xmax .- ageom[iss].sx)) .< 0.0),
+			   (((ageom[iss].sz .- zmin).*(zmax .- ageom[iss].sz)) .< 0.0),
+			   (((ageom[iss].rx .- xmin).*(xmax .- ageom[iss].rx)) .< 0.0),
+			   (((ageom[iss].rz .- zmin).*(zmax .- ageom[iss].rz)) .< 0.0),
+			   isnan.(ageom[iss].sx),
+			   isnan.(ageom[iss].sz),
+			   isnan.(ageom[iss].rx),
+			   isnan.(ageom[iss].rz),
 		     ) )
 	end
 	return !(any(checkvec))
 end
 
 
-#=
 """
-Return a sparse ACQ matrix, for a given geom
+Return a sparse ACQ matrix, for a given ageom
 data=ACQ*snapshot
 """
-function ACQmat(geom::Geom,mgrid,iss=1)
+function ACQmat(ageom::AGeom,mgrid,iss=1)
 	nz,nx=length.(mgrid)
-	ACQ=spzeros(geom.nr[iss],prod(length.(mgrid)))
-	for ir = 1:geom.nr[iss]
-		irx=argmin(abs.(mgrid[2].-geom.rx[iss][ir]))
-		irz=argmin(abs.(mgrid[1].-geom.rz[iss][ir]))
+	ACQ=spzeros(ageom[iss].nr,prod(length.(mgrid)))
+	for ir = 1:ageom[iss].nr
+		irx=argmin(abs.(mgrid[2].-ageom[iss].rx[ir]))
+		irz=argmin(abs.(mgrid[1].-ageom[iss].rz[ir]))
 		ACQ[ir,irz+(irx-1)*nz]=1.0
 	end
 	return ACQ
 end
 
-=#
 include("gallery.jl")
 
 #=
 
 """
-Advance either source or receiver array in an acquisition geometry in horizontal or vertical directions.
+Advance either source or receiver array in an acquisition ageometry in horizontal or vertical directions.
 
 # Arguments
-* `geom::Geom` : acquisition geometry that is updated
+* `ageom::AGeom` : acquisition ageometry that is updated
 * `advances::Vector{Float64}=[[0.,0.], [0.,0.,]]` : source and receiver advancements
 """
-function Geom_advance(geom::Geom, advances::Vector{Vector{Float64}}=[[0.,0.], [0.,0.]]) 
-	geom_out=deepcopy(geom)
-	for iss=1:geom.nss
-		geom_out.sx[iss][:] .+= advances[1][2]
-		geom_out.sz[iss][:] .+= advances[1][1]
-		geom_out.rx[iss][:] .+= advances[2][2]
-		geom_out.rz[iss][:] .+= advances[2][1]
+function AGeom_advance(ageom::AGeom, advances::Vector{Vector{Float64}}=[[0.,0.], [0.,0.]]) 
+	ageom_out=deepcopy(ageom)
+	for iss=1:ageom.nss
+		ageom_out.sx[iss][:] .+= advances[1][2]
+		ageom_out.sz[iss][:] .+= advances[1][1]
+		ageom_out.rx[iss][:] .+= advances[2][2]
+		ageom_out.rz[iss][:] .+= advances[2][1]
 	end
-	return geom_out
+	return ageom_out
 end
 
 """
 return a vector of the order 
 """
-function Geom_getvec(geom::Vector{Geom}, field::Symbol)
-	np = length(geom);
-	vect = [getfield(geom[ip],field) for ip=1:np]
+function AGeom_getvec(ageom::Vector{AGeom}, field::Symbol)
+	np = length(ageom);
+	vect = [getfield(ageom[ip],field) for ip=1:np]
 	return vec(vcat(vcat(vect...)...))
 end
 
 
-function save(geom, folder)
+function save(ageom, folder)
 	!(isdir(folder)) && error("invalid directory")
-	for iss in 1:geom.nss
+	for iss in 1:ageom.nss
 		file=joinpath(folder, string("s", iss, ".csv"))
-		CSV.write(file,DataFrame(hcat(geom.sx[iss], geom.sz[iss])))
+		CSV.write(file,DataFrame(hcat(ageom.sx[iss], ageom.sz[iss])))
 		file=joinpath(folder, string("r", iss, ".csv"))
-		CSV.write(file,DataFrame(hcat(geom.rx[iss], geom.rz[iss])))
+		CSV.write(file,DataFrame(hcat(ageom.rx[iss], ageom.rz[iss])))
 	end
 end
 
 
 """
-Appends the input a vector of acquisition geometries.
-"Merge" `Geom` objects in `geomv` to `geom1`.
+Appends the input a vector of acquisition ageometries.
+"Merge" `AGeom` objects in `ageomv` to `ageom1`.
 Typically you have one acquisition, 
 you change it and want to create the macro acquisition
 where the supersources of both acquisitions are appended.
 """
-function Geom_add!(geom1::Geom, geomv::Vector{Geom})
-	for igeom=1:length(geomv)
-		append!(geom1.sx, geomv[igeom].sx)
-		append!(geom1.sz, geomv[igeom].sz)
-		append!(geom1.rx, geomv[igeom].rx)
-		append!(geom1.rz, geomv[igeom].rz)
-		append!(geom1.ns, geomv[igeom].ns)
-		append!(geom1.nr, geomv[igeom].nr)
-		geom1.nss += geomv[igeom].nss
+function AGeom_add!(ageom1::AGeom, ageomv::Vector{AGeom})
+	for iageom=1:length(ageomv)
+		append!(ageom1.sx, ageomv[iageom].sx)
+		append!(ageom1.sz, ageomv[iageom].sz)
+		append!(ageom1.rx, ageomv[iageom].rx)
+		append!(ageom1.rz, ageomv[iageom].rz)
+		append!(ageom1.ns, ageomv[iageom].ns)
+		append!(ageom1.nr, ageomv[iageom].nr)
+		ageom1.nss += ageomv[iageom].nss
 	end
-	return geom1
+	return ageom1
 end
 
 
 """
 Adds input positions as either sources or receivers of every supershot.
 """
-function Geom_add!(geom::Geom, zpos::Vector{Float64}, xpos::Vector{Float64}, attrib::Symbol)
+function AGeom_add!(ageom::AGeom, zpos::Vector{Float64}, xpos::Vector{Float64}, attrib::Symbol)
 	length(xpos) == length(zpos) ? nothing : error("same length vectors needed")
-	for iss=1:geom.nss
+	for iss=1:ageom.nss
 		if(attrib == :receivers)
-			geom.rx[iss] = vcat(geom.rx[iss][:], xpos)
-			geom.rz[iss] = vcat(geom.rz[iss][:], zpos)
-			geom.nr[iss] += length(xpos)
+			ageom.rx[iss] = vcat(ageom.rx[iss][:], xpos)
+			ageom.rz[iss] = vcat(ageom.rz[iss][:], zpos)
+			ageom.nr[iss] += length(xpos)
 		elseif(attrib == :sources)
-			geom.sx[iss] = vcat(geom.sx[iss][:], xpos)
-			geom.sz[iss] = vcat(geom.sz[iss][:], zpos)
-			geom.ns[iss] += length(xpos)
+			ageom.sx[iss] = vcat(ageom.sx[iss][:], xpos)
+			ageom.sz[iss] = vcat(ageom.sz[iss][:], zpos)
+			ageom.ns[iss] += length(xpos)
 		end
 	end
 end
@@ -282,7 +280,7 @@ end
 A fixed spread acquisition has same set of sources and 
 receivers for each supersource.
 This method constructs a 
-fixed spread acquisition geometry using either a
+fixed spread acquisition ageometry using either a
 horizontal or vertical array of supersources/ receivers.
 Current implementation has only one source for every supersource.
 
@@ -309,9 +307,9 @@ Current implementation has only one source for every supersource.
   `=[false, true]` : randomly place receivers for regularly spaced supersources 
 
 # Return
-* a fixed spread acquisition geometry `Geom`
+* a fixed spread acquisition ageometry `AGeom`
 """
-function Geom_fixed(
+function AGeom_fixed(
 	      ssmin::Real,
 	      ssmax::Real,
 	      ss0::Real,
@@ -369,7 +367,7 @@ function Geom_fixed(
 			sszall[iss][is]=ssz[iss]+z
 		end
 	end
-	return Geom(ssxall, sszall, rxall, rzall, nss, ns, fill(nr,nss))
+	return AGeom(ssxall, sszall, rxall, rzall, nss, ns, fill(nr,nss))
 end
 
 

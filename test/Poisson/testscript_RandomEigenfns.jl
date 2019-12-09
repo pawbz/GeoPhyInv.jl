@@ -70,8 +70,8 @@ for i = 1 : ntst
     println("Solving Poisson equation, testrun number:",i,"\t", size(sigma))
 
     global pa
-    pa=J.Poisson.Param(nx,nz, sigma)
-    psi=reshape(J.Poisson.applyinvA(src,pa),nz,nx)
+    pa=GeoPhyInv.Poisson.Param(nx,nz, sigma)
+    psi=reshape(GeoPhyInv.Poisson.applyinvA(src,pa),nz,nx)
 
    #psi,Ac = Poisson.solve(src,sigma,1)
 

@@ -85,7 +85,7 @@ function update!(pa::PFWI{T1,T2,T3};
 		"""
 		Unbounded LBFGS inversion, only for testing
 		"""
-		@timeit fwi_to "xfwi!" begin
+		@timeit_debug fwi_to "xfwi!" begin
 			res = optimize(f, g!, pa.mx.x, optim_scheme, optim_options)
 		end
 	else
@@ -125,11 +125,11 @@ function update!(pa::PFWI{T1,T2,T3};
 
 			prob.x = pa.mx.x
 			    
-			@timeit fwi_to "xfwi!" begin
+			@timeit_debug fwi_to "xfwi!" begin
 				res = solveProblem(prob)
 			end
 		else
-			@timeit fwi_to "xfwi!" begin
+			@timeit_debug fwi_to "xfwi!" begin
 				res = optimize(f, g!, pa.mx.lower_x, pa.mx.upper_x,pa.mx.x, Fminbox(optim_scheme), optim_options)
 			end
                 end

@@ -70,7 +70,7 @@ Return a `LinearMap` object to perform linearized modeling and its transpose.
 * `pa::PoissonExpt` 
 * `σ0::Array` 
 """
-function operator_Born(pa::ParamExpt, σ0)
+function LinearMaps.LinearMap(pa::ParamExpt, σ0)
 	@assert length(σ0)==prod(length.(pa.mgrid))
 	fw=(y,x)->Fborn_map!(y, x, pa, σ0)
 	bk=(y,x)->Fadj_map!(y, x, pa, σ0)

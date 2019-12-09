@@ -9,7 +9,7 @@ function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::PFWI)
 	if(!isequal(x, last_x))
 		copyto!(last_x, x)
 		# do forward modelling, apply F x
-		@timeit fwi_to "F!" F!(pa, x)
+		@timeit_debug fwi_to "F!" F!(pa, x)
 	end
 
 	# compute misfit 
@@ -25,17 +25,17 @@ function grad!(storage, x::Vector{Float64}, last_x::Vector{Float64}, pa::PFWI)
 	if(!isequal(x, last_x))
 		copyto!(last_x, x)
 		# do forward modelling, apply F x 
-		@timeit fwi_to "F!" F!(pa, x)
+		@timeit_debug fwi_to "F!" F!(pa, x)
 	end
 
 	# compute functional and get ∇_d J (adjoint sources)
 	f = func_grad!(pa.paTD, :dJx);
 
 	# update adjoint sources after time reversal
-	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjgeom)
+	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjageom)
 
 	# do adjoint modelling here with adjoint sources Fᵀ F P x
-	@timeit fwi_to "Fadj!" Fadj!(pa)	
+	@timeit_debug fwi_to "Fadj!" Fadj!(pa)	
 
 	# adjoint of interpolation
 	spray_gradient!(storage,  pa)
@@ -45,12 +45,12 @@ end
 
 
 
-function ζfunc(x, last_x, pa::PFWI{T1,T2,LS}) where {T1,T2}
+function ζfunc(x, last_x, pa::PFWI{T1,T2,T3}) where {T1,T2,T3<:Union{LS,Migr,Migr_FD}}
 	return func(x, last_x, pa)
 end
 
 
-function ζgrad!(storage, x, last_x, pa::PFWI{T1,T2,LS})  where {T1,T2} 
+function ζgrad!(storage, x, last_x, pa::PFWI{T1,T2,T3})  where {T1,T2,T3<:Union{LS,Migr,Migr_FD}} 
 	return grad!(storage, x, last_x, pa)
 end
 
@@ -98,7 +98,7 @@ and boundary values for adjoint calculation.
 function F!(pa::PFWI{Fdtd,T1,T2}, x) where {T1,T2}
 
 	# switch off born scattering
-	pa.paf.c.born_flag=false
+	#pa.paf.c.born_flag=false
 
 	# initialize boundary, as we will record them now
 	initialize_boundary!(pa.paf)
@@ -144,10 +144,10 @@ function F!(pa::PFWI{FdtdBorn,T1,T2}, x) where {T1,T2}
 	Fbornmod!(pa::PFWI)
 end
 
-function Fbornmod!(pa::PFWI) 
+function Fbornmod!(pa::PFWI{FdtdBorn,T1,T2}) where {T1,T2} 
 
 	# switch on born scattering
-	pa.paf.c.born_flag=true
+	#pa.paf.c.born_flag=true
 
 	pa.paf.c.activepw=[1,2] # two wavefields are active
 	pa.paf.c.illum_flag=false 
@@ -167,7 +167,7 @@ function Fbornmod!(pa::PFWI)
 	copyto!(pa.paTD.x,dcal)
 
 	# switch off born scattering once done
-	pa.paf.c.born_flag=false
+	#pa.paf.c.born_flag=false
 end
 
 
@@ -177,7 +177,7 @@ Perform adjoint modelling in `paf` using adjoint sources `adjsrc`.
 function Fadj!(pa::PFWI)
 
 	# need to explicitly turn off the born flag for adjoint modelling
-	pa.paf.c.born_flag=false
+	#pa.paf.c.born_flag=false
 
 	# require gradient, switch on the flag
 	pa.paf.c.gmodel_flag=true
@@ -208,12 +208,12 @@ function Fadj!(pa::PFWI)
 end
 
 
-function operator_Born(pa)
+function LinearMaps.LinearMap(pa::PFWI{FdtdBorn,T2,T3}) where {T2,T3}
 	fw=(y,x)->Fborn_map!(y, x, pa)
 	bk=(y,x)->Fadj_map!(y, x, pa)
 
 	return LinearMap(fw, bk, 
-		  length(pa.paTD.dJx),  # length of output
+		sum(length.(pa.paTD.dJx)),  # length of output
 		  xfwi_ninv(pa), # length of input
 		  ismutating=true)
 end
@@ -228,7 +228,7 @@ function Fadj_map!(δy, δx, pa)
 	copyto!(pa.paTD.dJx, δx)
 
 	# adjoint sources
-	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjgeom)
+	update_adjsrc!(pa.adjsrc, pa.paTD.dJx, pa.adjageom)
 
 	# adjoint simulation
 	Fadj!(pa)

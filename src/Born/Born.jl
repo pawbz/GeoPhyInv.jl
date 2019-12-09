@@ -1,6 +1,6 @@
 module Born
 
-import GeoPhyInv: Geom, SrcWav
+import GeoPhyInv: AGeom, SrcWav
 import GeoPhyInv: Medium
 import GeoPhyInv.Data
 using SpecialFunctions
@@ -28,13 +28,13 @@ function mod(;
              born_flag::Bool=false,
 	     tgridmod::StepRangeLen=nothing,
 	     tgrid::StepRangeLen = tgridmod,
-	     geom::Geom=nothing,
+	     ageom::AGeom=nothing,
 	     srcwav::SrcWav=nothing,
 	     src_flag::Int64=2,
 		  )
-	(length(geom) != length(srcwav))  ? error("different supersources") : nothing
+	(length(ageom) != length(srcwav))  ? error("different supersources") : nothing
 	@info "fix this"
-#	(length(geom) != getfield(srcwav,:ns))  ? error("different sources") : nothing
+#	(length(ageom) != getfield(srcwav,:ns))  ? error("different sources") : nothing
 
 
 	nt = (length(tgridmod) == length(srcwav[1].grid)) ? length(tgrid) : error("srcwav tgrid")
@@ -56,22 +56,22 @@ function mod(;
 	
 	fnpow2grid = DSP.fftfreq(np2,inv(step(tgridmod)));
 
-	nss = length(geom)
-	data=Data(tgridmod, geom, [:P])
+	nss = length(ageom)
+	data=Data(tgridmod, ageom, [:P])
 
 	for iss in 1:nss, ifield in 1:length(data[iss].d)
-		sx = geom[iss].sx
-		rx = geom[iss].rx
-		sz = geom[iss].sz
-		rz = geom[iss].rz
+		sx = ageom[iss].sx
+		rx = ageom[iss].rx
+		sz = ageom[iss].sz
+		rz = ageom[iss].rz
 
-		for ir = 1:geom[iss].nr
+		for ir = 1:ageom[iss].nr
 
 		dtemp=zeros(nt)
 		dpow2all=complex.(zeros(np2), zeros(np2));
 		wpow2=complex.(zeros(np2), zeros(np2)); 
 		
-		for is=1:geom[iss].ns
+		for is=1:ageom[iss].ns
 			# zero pad wavelet
 			for it in 1:nt
 				wpow2[it]=complex(srcwav[iss].d[ifield][it,is])

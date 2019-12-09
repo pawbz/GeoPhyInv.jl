@@ -13,7 +13,7 @@ Q=randn(nz,nx)
 
 function func_test(x)
 	x=reshape(x,nz,nx)
-	paA=J.Poisson.Param(nx,nz,x)	
+	paA=GeoPhyInv.Poisson.Param(nx,nz,x)	
 
 	global p
 	psi=(paA.A*p)
@@ -27,7 +27,7 @@ end
 function grad_test(x)
 	global nznx, nz, nx,p
 	x=reshape(x,nz,nx)
-	paA=J.Poisson.Param(nx,nz,x)	
+	paA=GeoPhyInv.Poisson.Param(nx,nz,x)	
 
 	psi=paA.A*p
 

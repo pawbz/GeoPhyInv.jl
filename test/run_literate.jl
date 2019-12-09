@@ -17,7 +17,7 @@ end
 
 run_literate(["doc"], "media")
 
-run_literate(["gallery"], "geom")
+run_literate(["gallery"], "ageom")
 
 run_literate(["forw", "test_born"], "Poisson")
 
