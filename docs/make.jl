@@ -9,20 +9,20 @@ makedocs(
 		  prettyurls = get(ENV, "CI", nothing) == "true"),
    sitename = "Toolbox for Geophysical Inversion",
    pages = ["Home" => "index.md",
-	    "Medium" => "media/doc.md",
-	    "AGeom" => "ageom/doc.md",
-	    "SrcWav" => "srcwav/doc.md",
-	    "Data" => "data/doc.md",
-	    "SeisForwExpt" => Any[
-				  "Introduction" => "Fdtd/intro.md",
-				  "Basic usage" => "Fdtd/reuse_expt.md",
-				  "Generate snaps" => "Fdtd/create_snaps.md",
-				  ],
-	    "PoissonExpt" => Any[
-				  "Introduction" => "Poisson/intro.md",
-				 "Record data" => "Poisson/forw.md",
-				 "Born map" => "Poisson/test_born.md",
-				 ],
+#	    "Medium" => "media/doc.md"
+#	    "AGeom" => "ageom/doc.md",
+#	    "SrcWav" => "srcwav/doc.md",
+#	    "Data" => "data/doc.md",
+#	    "SeisForwExpt" => Any[
+#				  "Introduction" => "fdtd/intro.md",
+#				  "Basic usage" => "fdtd/reuse_expt.md",
+#				  "Generate snaps" => "fdtd/create_snaps.md",
+#				  ],
+#	    "PoissonExpt" => Any[
+#				  "Introduction" => "Poisson/intro.md",
+#				 "Record data" => "Poisson/forw.md",
+#				 "Born map" => "Poisson/test_born.md",
+#				 ],
 #	    "SeisInvExpt" => Any[]
 	    ]
 #	    "Seismic Born Modeling" => "FWI/born_map.md",

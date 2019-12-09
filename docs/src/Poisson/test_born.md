@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "@__REPO_ROOT_URL__/"
+EditURL = "<unknown>/Poisson/test_born.jl"
 ```
 
 The linearized forward modeling operator `F` and its adjoint (aka Migration operator)
@@ -65,8 +65,8 @@ ACQ=sprandn(nr,nz*nx,0.6); # choose a random acquisition operator
 
 ```@example test_born
 paE=PoissonExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
-F=operator_Born(paE, σ); # extract the linearized forward operator from `Expt`
-GIPh.Utils.test_linearmap(F) # finally do some tests on the linearmap
+F=LinearMap(paE, σ); # extract the linearized forward operator from `Expt`
+GeoPhyInv.Utils.test_linearmap(F) # finally do some tests on the linearmap
 ```
 
 ### Usage

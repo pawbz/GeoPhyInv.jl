@@ -17,7 +17,11 @@ end
 
 run_literate(["doc"], "media")
 
-run_literate(["gallery"], "ageom")
+run_literate(["gallery", "doc"], "ageom")
+
+run_literate(["doc"], "srcwav")
+
+run_literate(["doc"], "data")
 
 run_literate(["forw", "test_born"], "Poisson")
 

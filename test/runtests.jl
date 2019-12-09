@@ -23,6 +23,24 @@ for t in ["convert", "param_adj", "doc"]
 	initialize(fp)
 end
 
+folder="ageom"
+for t in ["doc", "gallery"]
+	fp = joinpath(folder, string(t, ".jl"))
+	initialize(fp)
+end
+
+folder="srcwav"
+for t in ["doc"]
+	fp = joinpath(folder, string(t, ".jl"))
+	initialize(fp)
+end
+
+folder="data"
+for t in ["doc"]
+	fp = joinpath(folder, string(t, ".jl"))
+	initialize(fp)
+end
+
 folder="fdtd"
 for t in ["accuracy", "backprop", "rho_projection", "create_snaps"]
 	fp = joinpath(folder, string(t, ".jl"))
