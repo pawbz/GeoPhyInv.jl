@@ -1,4 +1,7 @@
 
+using GeoPhyInv
+using Test
+
 #AGeom in mgrid
 
 # To construct a variable to type `Medium`, the first step is to create a 2-D grid

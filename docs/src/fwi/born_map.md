@@ -4,6 +4,7 @@ EditURL = "<unknown>/fwi/born_map.jl"
 
 ```@example born_map
 using Test
+using GeoPhyInv
 ```
 
 he linearized forward modeling operator `F`, such that

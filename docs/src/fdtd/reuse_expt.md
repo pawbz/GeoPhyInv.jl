@@ -18,6 +18,7 @@ algorithms.
 using GeoPhyInv
 using Statistics
 using Plots
+using Test
 ```
 
 ### Setup a spatial grid

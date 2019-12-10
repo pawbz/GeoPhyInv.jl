@@ -2,6 +2,7 @@ using BenchmarkTools
 using GeoPhyInv
 using Test
 using Gadfly
+import Cairo, Fontconfig
 
 
 # To construct a variable to type `Medium`, the first step is to create a 2-D grid
@@ -31,9 +32,13 @@ mod[:vs].=2000.
 update!(mod, [:vp,:rho], randn_perc=1.)
 
 # Some plotting #1
-spy(mod[:vp], Guide.xlabel("x"), Guide.ylabel("z"))
+spy(mod[:vp], Guide.xlabel("x"), Guide.ylabel("z"))  |> SVG("foo.svg")
+
+# ![](foo.svg)
 
 
 # Some plotting #2
-spy(mod[:vs], Guide.xlabel("x"), Guide.ylabel("z"))
+draw(SVG("foo.svg", 6inch, 3inch), spy(mod[:vs], Guide.xlabel("x"), Guide.ylabel("z")));
+
+# ![](foo.svg)
 

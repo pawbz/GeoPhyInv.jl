@@ -1,5 +1,7 @@
 
 using Test
+using GeoPhyInv
+using LinearMaps
 
 # he linearized forward modeling operator `F`, such that
 # `Fx` can be computed without explicitly storing the operator matrix (
