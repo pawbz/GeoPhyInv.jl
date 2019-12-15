@@ -10,6 +10,6 @@ J.Models.Seismic_addon!(model, randn_perc=0.01)
 
 # a simple acquisition geometry
 
-acqgeom = GeoPhyInv.Gallery.Geom(model.mgrid,:xwell);
+acqgeom = GeoPhyInv.Gallery.AGeom(model.mgrid,:xwell);
 
 
