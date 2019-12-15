@@ -1,14 +1,13 @@
 using BenchmarkTools
 using GeoPhyInv
 using Test
-using Gadfly
-import Cairo, Fontconfig
+#md using Plots
 
 
-# To construct a variable to type `Medium`, the first step is to create a 2-D grid
+# To construct a variable to type `Medium`, the first step is to create a 2-D grid.
 mgrid = [range(0.0, stop=10.,step=0.1), range(0.0, stop=30.,step=0.2)];
 
-# Initiate the storage of medium parameters on the grid using...
+# Initiate the storage of medium parameters on the grid using
 mod = Medium(mgrid);
 
 # By default certain parameters are populated, see
@@ -25,20 +24,15 @@ update!(mod, [:vp,:vs,:rho], [vpb, vsb, rhob]);
 fill!(mod)
 
 # Otherwise, to manually fill in different parameters
-mod[:vp].=3000. 
-mod[:vs].=2000.
+mod[:vp].=3000.;
+mod[:vs].=2000.;
 
 # In order to add random noise to the models 
 update!(mod, [:vp,:rho], randn_perc=1.)
 
 # Some plotting #1
-spy(mod[:vp], Guide.xlabel("x"), Guide.ylabel("z"))  |> SVG("foo.svg")
-
-# ![](foo.svg)
-
+#md plot(mod, [:vp])
 
 # Some plotting #2
-draw(SVG("foo.svg", 6inch, 3inch), spy(mod[:vs], Guide.xlabel("x"), Guide.ylabel("z")));
-
-# ![](foo.svg)
+#md plot(mod, [:vs])
 

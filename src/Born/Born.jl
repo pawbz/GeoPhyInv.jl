@@ -54,7 +54,7 @@ function mod(;
 	end
 
 	
-	fnpow2grid = DSP.fftfreq(np2,inv(step(tgridmod)));
+	fnpow2grid = FFTW.fftfreq(np2,inv(step(tgridmod)));
 
 	nss = length(ageom)
 	data=Data(tgridmod, ageom, [:P])

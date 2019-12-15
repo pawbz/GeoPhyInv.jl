@@ -220,17 +220,30 @@ that are not present in `Seismic`.
 """
 function Base.getindex(mod::Medium, s::Symbol)
 	nznx=length(mod.m[:vp])
+	# check if vp, vs, and rho are present 
+	@assert :vp ∈ names(mod.m)[1]
+	@assert :rho ∈ names(mod.m)[1]
 	vp=mod.m[:vp]; rho=mod.m[:rho]
-	(s ∉ names(mod.m)[1]) && (mod.m=vcat(mod.m,NamedArray([zero(vp)],[[s],])))
-	x=mod.m[s]
-
 	if(s == :vp)
 		return vp
 	elseif(s == :rho)
 		return rho
-	elseif(s == :vs)
-		return mod.m[:vs]
-	elseif(s == :rhoI)
+	elseif(s in [:vs,:χmu])
+		@assert :vs ∈ names(mod.m)[1]
+		if(s==:vs)
+			return mod.m[:vs]
+		end
+	end
+
+
+
+
+	# add derived fields, if not present
+	(s ∉ names(mod.m)[1]) && (mod.m=vcat(mod.m,NamedArray([zero(vp)],[[s],])))
+	x=mod.m[s] 
+
+	# output derived fields
+	if(s == :rhoI)
 		@inbounds for i in 1:nznx; x[i]=inv(rho[i]); end
 	elseif(s == :χrhoI)
 		@inbounds for i in 1:nznx; x[i]=χ(inv(rho[i]),mod.ref[:rhoI],1); end

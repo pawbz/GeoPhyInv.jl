@@ -8,7 +8,7 @@ function chainrule!(gout::AbstractVector, g::AbstractVector, mod::Medium, parame
 
 	rho=mod[:rho]; 
 	vp=mod[:vp]; 
-	vs=mod[:vs]; 
+	# vs=mod[:vs]; # not implemented
 
 	if(parameterization == [:χKI, :χrhoI, :null]) 
 		@inbounds for i in 1:nznx
@@ -113,7 +113,8 @@ function chainrule!(
 	nznx=prod(length.(mod.mgrid))
 	(length(g)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
 
-	rho=mod[:rho]; vp=mod[:vp]; vs=mod[:vs];
+	rho=mod[:rho]; vp=mod[:vp]; 
+	# vs=mod[:vs];
 	if(flag == 1)
 		if(attribvec == [:χKI, :χrhoI, :null]) 
 			@inbounds for i in 1:nznx
