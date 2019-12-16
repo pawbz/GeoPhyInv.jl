@@ -10,7 +10,6 @@ using SparseArrays
 using StatsBase
 using LinearAlgebra
 using Random
-using ProgressMeter
 using LinearAlgebra
 using Test
 using ForwardDiff
@@ -60,7 +59,7 @@ Now, we will generate an acquisition ageometry and allocate a projection matrix 
 ageom=AGeom(mgrid, SSrcs(1), Srcs(1), Recs(30))
 update!(ageom, SSrcs(), [0,0], 5, [0,2π])
 update!(ageom, Recs(), [0,0], 5, [0,2π])
-ACQ=GeoPhyInv.ACQmat(ageom,mgrid);
+ACQ=SparseMatrixCSC(ageom[1],mgrid);
 @info "ACQ will be used to project ψ onto receivers."
 ```
 

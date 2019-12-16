@@ -18,16 +18,16 @@ makedocs(
 	    "AGeom" => "generated/ageom/doc.md",
 	    "SrcWav" => "generated/srcwav/doc.md",
 	    "Data" => "generated/data/doc.md",
-#	    "SeisForwExpt" => Any[
-#				  "Introduction" => "fdtd/intro.md",
-#				  "Basic usage" => "fdtd/reuse_expt.md",
-#				  "Generate snaps" => "fdtd/create_snaps.md",
-#				  ],
-#	    "PoissonExpt" => Any[
-#				  "Introduction" => "Poisson/intro.md",
-#				 "Record data" => "Poisson/forw.md",
-#				 "Born map" => "Poisson/test_born.md",
-#				 ],
+	    "SeisForwExpt" => Any[
+				  "Introduction" => "generated/fdtd/doc.md",
+				  "Basic usage" => "generated/fdtd/reuse_expt.md",
+				  "Generate snaps" => "generated/fdtd/create_snaps.md",
+				  ],
+	    "PoissonExpt" => Any[
+				  "Introduction" => "generated/Poisson/doc.md",
+				 "Record data" => "generated/Poisson/forw.md",
+				 "Born map" => "generated/Poisson/test_born.md",
+				 ],
 #	    "SeisInvExpt" => Any[]
 	    ]
 #	    "Seismic Born Modeling" => "FWI/born_map.md",

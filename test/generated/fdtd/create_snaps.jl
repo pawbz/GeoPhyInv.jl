@@ -1,6 +1,5 @@
 using GeoPhyInv
 using Statistics
-using Gadfly
 
 model=Medium(:acou_homo1); # load a simple homogeneous acoustic model from the gallery
 update!(model, [:vp,:rho], randn_perc=0.1); # add some random noise to the model

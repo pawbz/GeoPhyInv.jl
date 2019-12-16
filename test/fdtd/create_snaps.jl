@@ -4,7 +4,6 @@
 
 using GeoPhyInv
 using Statistics
-using Gadfly
 
 # ### Setting up the variables necessary to create the `Expt`
 

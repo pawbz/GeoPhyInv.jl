@@ -72,7 +72,7 @@ fill!(σ, 1.0)
 
 ageom=J.Acquisition.AGeom_circ(nss=1,nr=30,rad=[5.,5.])
 #ACQ=sprandn(200,441,0.9)
-ACQ=J.Acquisition.ACQmat(ageom,mgrid)
+ACQ=SparseMatrixCSC(ageom,mgrid)
 paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
 #paE=J.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, σobs=σobs, Qobs=Qobs,)
 

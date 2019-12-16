@@ -9,7 +9,6 @@ We aim to save the snapshots, at given time steps in `SeisForwExpt`.
 ```@example create_snaps
 using GeoPhyInv
 using Statistics
-using Gadfly
 ```
 
 ### Setting up the variables necessary to create the `Expt`

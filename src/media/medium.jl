@@ -577,8 +577,8 @@ function interp_spray!(mod::Medium, modi::Medium, attrib::Symbol, Battrib::Symbo
 		pa=Interpolation.Kernel([mod.mgrid[2], mod.mgrid[1]], [modi.mgrid[2], modi.mgrid[1]], Battrib)
 	end
 
-	@warn "check this"
-	"loop over fields in `Medium`"
+	# :vs is missing here....
+	"loop over fields in `Medium`, add vs later"
 	for field in fields
 		Interpolation.interp_spray!(mod[field],  modi[field], pa, attrib)
 	end

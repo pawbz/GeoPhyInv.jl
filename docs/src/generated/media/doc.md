@@ -98,13 +98,13 @@ nothing #hide
 Some plotting #1
 
 ```@example doc
-p1=plot(mod, [:vp]); plot(p1)
+p1=heatmap(mod, :vp); plot(p1)
 ```
 
 Some plotting #2
 
 ```@example doc
-p1=plot(mod, [:vs]); plot(p2)
+p2=heatmap(mod, :vs); plot(p2)
 ```
 
 # Methods

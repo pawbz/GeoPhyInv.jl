@@ -52,11 +52,11 @@ update!(mod, [:vp,:rho], randn_perc=1.);
 
 #-
 # Some plotting #1
-#md p1=plot(mod, [:vp]); plot(p1)
+#md p1=heatmap(mod, :vp); plot(p1)
 
 
 # Some plotting #2
-#md p1=plot(mod, [:vs]); plot(p2)
+#md p2=heatmap(mod, :vs); plot(p2)
 
 
 

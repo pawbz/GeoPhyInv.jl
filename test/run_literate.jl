@@ -19,14 +19,14 @@ end
 
 run_literate(["doc"], "media")
 
-run_literate(["gallery", "doc"], "ageom")
+run_literate(["doc"], "ageom")
 
 run_literate(["doc"], "srcwav")
 
 run_literate(["doc"], "data")
 
-run_literate(["forw", "test_born"], "Poisson")
+run_literate(["doc","forw", "test_born"], "Poisson")
 
-run_literate(["gradient_accuracy","born_map"], "fwi")
+#run_literate(["gradient_accuracy","born_map"], "fwi")
 
-run_literate(["create_snaps","reuse_expt"], "fdtd")
+run_literate(["doc","create_snaps","reuse_expt"], "fdtd")

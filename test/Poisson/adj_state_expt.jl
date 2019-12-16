@@ -67,7 +67,7 @@ using Calculus
 ageom=AGeom(mgrid, SSrcs(1), Srcs(1), Recs(30))
 update!(ageom, SSrcs(), [0,0], 5, [0,2π])
 update!(ageom, Recs(), [0,0], 5, [0,2π])
-ACQ=GeoPhyInv.ACQmat(ageom,mgrid)
+ACQ=SparseMatrixCSC(ageom[1],mgrid)
 paE=GeoPhyInv.Poisson.ParamExpt(p, tgrid, mgrid, Qv, k, η, σ, ACQ, σobs=σobs, Qobs=Qobs,)
 
 #src # GeoPhyInv.Poisson.updateLP!(paE, paE.Q)

@@ -18,39 +18,42 @@ fill!(model)
 
 update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise
 
-ageom=GeoPhyInv.Gallery.AGeom(model.mgrid,:surf, nss=3, nr=30);
+ageom=AGeom(model.mgrid,:surf, SSrcs(3), Recs(30));
 
-p1=JP.seismic(model)
-JP.ageom!(ageom)
+p1=heatmap(model, :vp)
+scatter!(ageom, SSrcs())
+scatter!(ageom, Recs())
 plot(p1)
 
 tgrid = range(0.0,stop=2.0,length=1000)
 
-wav = GeoPhyInv.Utils.Wavelets.ricker(10.0, tgrid, tpeak=0.25,);
+wav = ricker(10.0, tgrid, tpeak=0.25,);
 
-srcwav=GeoPhyInv.Acquisition.Src_fixed(ageom.nss,1,[:P],wav,tgrid);
+srcwav = SrcWav(tgrid, ageom, [:P])
+update!(srcwav, [:P], wav)
 
-pa=SeisForwExpt(npw=1,model=model,
+pa=SeisForwExpt(Fdtd(),npw=1,model=model,
 	ageom=[ageom], srcwav=[srcwav],
 	sflags=[2], rflags=[1],
 	tgridmod=tgrid, verbose=true);
 
-@time GeoPhyInv.Fdtd.mod!(pa);
+@time update!(pa);
 
-pdata=plot(pa.c.data[1].d[1,1])
+pdata=heatmap(pa[:data])
 plot(pdata)
 
-model_new=J.Gallery.Seismic(:acou_homo1) # prepare another model
+model_new=Medium(:acou_homo1) # prepare another model
 update!(model_new, [:vp,:rho], randn_perc=0.01)
 update!(model_new, [:vp,:rho], constant_pert=0.03) # perturb the model
-p2=JP.seismic(model_new) # plot new model
-JP.ageom!(ageom)
+p2=heatmap(model_new, :vp) # plot new model
+scatter!(ageom, SSrcs())
+scatter!(ageom, Recs())
 plot(p2)
 
 update!(pa, model_new)
 
-@time GeoPhyInv.Fdtd.mod!(pa);
+@time update!(pa);
 
-plot!(pdata, pa.c.data[1].d[1,1])
+heatmap!(pdata, pa[:data])
 plot(pdata)
 
