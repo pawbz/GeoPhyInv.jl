@@ -9,7 +9,7 @@ As of now, only seismic models are predefined in this package. Choose `attrib::S
 
 * `=:acou_homo1` : a test homogeneous acoustic model
 * `=:acou_homo2` : a test homogeneous acoustic model, but with coarser spatial sampling (faster testing)
-* `=:seismic_marmousi2` : marmousi2 model with lower resolution; useful for surface seismic experiments
+* `=:marmousi2` : marmousi2 model with lower resolution; useful for surface seismic experiments
 """
 function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 	bfrac=0.1; 
@@ -32,20 +32,21 @@ function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 		update!(model,[:vp,:rho],[vp0,rho0])
 		fill!(model)
 
-	elseif(attrib == :seismic_marmousi2)
+	elseif(attrib == :marmousi2)
 		vp, h= IO.readsu(joinpath(marmousi_folder,"vp_marmousi-ii_0.1.su"))
 		vs, h= IO.readsu(joinpath(marmousi_folder,"vs_marmousi-ii_0.1.su"))
 		rho,  h= IO.readsu(joinpath(marmousi_folder,"density_marmousi-ii_0.1.su"))
 		vp .*= 1000.; vs .*= 1000.; #rho .*=1000
-		vp0=Models.bounds(vp,bfrac); 
-		vs0=Models.bounds(vs,bfrac); 
-		rho0=Models.bounds(rho, bfrac);
 		mgrid=[range(0.,stop=3500.,length=size(vp,1)),range(0., stop=17000., length=size(vp,2))]
 		model=Medium(mgrid,[:vp,:rho,:vs])
-		update!(model,[:vp,:rho,:vs],[vp0,rho0,vs0])
 		copyto!(model[:vp],vp)
 		copyto!(model[:rho],rho)
 		copyto!(model[:vs],vs)
+		update!(model,bfrac); 
+#		vs0=Models.bounds(vs,bfrac); 
+#		rho0=Models.bounds(rho, bfrac);
+#		update!(model,[:vp,:rho,:vs],[vp0,rho0,vs0])
+#=
 	elseif(attrib == :seismic_marmousi2_high_res)
 		vp, h= IO.readsu(joinpath(marmousi_folder,"vp_marmousi-ii.su"))
 		vs, h= IO.readsu(joinpath(marmousi_folder,"vs_marmousi-ii.su"))
@@ -77,6 +78,7 @@ function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 		model=Medium_trun(Seismic(:seismic_marmousi2_high_res), 
 				     xmin=8000., xmax=10000., zmax=1700.,zmin=500.)
 		update!(model, bfrac) # adjust bounds just inside the bounds 
+		=#
 
 	else
 		error("invalid attrib")

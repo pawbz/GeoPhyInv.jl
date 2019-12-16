@@ -2,6 +2,7 @@ using BenchmarkTools
 using GeoPhyInv
 using Test
 #md using Plots
+#md gr()
 
 
 # # Intro
@@ -13,41 +14,49 @@ using Test
 
 # # Examples
 
-# To construct a variable to type `Medium`, the first step is to create a 2-D grid.
-mgrid = [range(0.0, stop=10.,step=0.1), range(0.0, stop=30.,step=0.2)];
+# Load a predefined model.
+mod=Medium(:marmousi2);
 
-# Initiate the storage of medium parameters on the grid using
-mod = Medium(mgrid);
-
-# By default certain parameters are populated, see
+# Get the medium parameters that are stored.
 names(mod)
 
-# To define parameters yourself
-mod = Medium(mgrid, [:vp,:rho,:vs])
+# Look at the reference values.
+mod.ref
+
+# Inspect the bounds.
+mod.bounds
+
+
+# To construct an instance of `Medium`, we need a 2-D grid.
+mgrid = [range(0.0, stop=10.,step=0.1), range(0.0, stop=30.,step=0.2)];
+
+# Allocate basic medium parameters on the grid.
+mod = Medium(mgrid, [:vp,:rho,:vs]);
 
 # Bounds for these parameters should be input for modeling or inversion. Use `update!`
-vpb=[2100.,2200.]; vsb=[1500, 1700]; rhob=[2100., 2300.]
+vpb=[2100.,2200.]; vsb=[1500, 1700]; rhob=[2100., 2300.];
 update!(mod, [:vp,:vs,:rho], [vpb, vsb, rhob]);
 
-# To just fill the Medium with average values, just do
-fill!(mod)
+# Just fill `mod` with average (reference) values.
+fill!(mod);
 
-# Otherwise, to manually fill in different parameters
+# Once the basic medium parameters are input, we can access some other derived parameters.
+mod[:Zp];
+
+# Otherwise, we can manually update parameters of `mod`.
 mod[:vp].=3000.;
 mod[:vs].=2000.;
 
-# In order to add random noise to the models 
-update!(mod, [:vp,:rho], randn_perc=1.)
+# A model can be also be updated by adding random noise.
+update!(mod, [:vp,:rho], randn_perc=1.);
 
 #-
 # Some plotting #1
-#md p1=plot(mod, [:vp]); savefig(p1,"p1.png")
-#md # ![waves](p1.png)
+#md p1=plot(mod, [:vp]); plot(p1)
 
 
 # Some plotting #2
-#md p1=plot(mod, [:vs]); savefig(p1,"p1.png")
-#md # ![waves](p1.png)
+#md p1=plot(mod, [:vs]); plot(p2)
 
 
 

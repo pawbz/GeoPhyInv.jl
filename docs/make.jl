@@ -1,4 +1,8 @@
+using Pkg; Pkg.add("Gadfly"); Pkg.add("Plots");
+
 using Documenter, GeoPhyInv
+using Gadfly, Plots
+gr()
 
 #makedocs(modules=[GeoPhyInv],
 #	         doctest=true)
