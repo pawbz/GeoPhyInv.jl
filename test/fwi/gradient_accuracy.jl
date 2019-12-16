@@ -10,35 +10,35 @@ using Test
 # This task is necessary to test the performance of the inversion algorithm
 # in various geological scenarios using different acquisition parameters.
 
-model = Medium(:acou_homo2);
-update!(model, [:vp,:rho], randn_perc=1)
+medium = Medium(:acou_homo2);
+update!(medium, [:vp,:rho], randn_perc=1)
 
-model0 = Medium(:acou_homo2);
-update!(model0, [:vp,:rho], randn_perc=1)
+medium0 = Medium(:acou_homo2);
+update!(medium0, [:vp,:rho], randn_perc=1)
 
-ageom=AGeom(model.mgrid, :surf)
-wav, tgrid=ricker(model, 3, 1.0)
+ageom=AGeom(medium.mgrid, :surf)
+wav, tgrid=ricker(medium, 3, 1.0)
 srcwav=SrcWav(tgrid,ageom,[:P])
 update!(srcwav,[:P], wav)
 
 parameterization=[:χvp, :χrho, :null]
 
-mgrid=model.mgrid
+mgrid=medium.mgrid
 
 @testset "test parallel implementation during gradient" begin
 	for attrib_mod in [Fdtd(), FdtdBorn()]
-		global pa=SeisInvExpt(attrib_mod, Migr(), srcwav=srcwav, ageom=ageom, tgrid=tgrid, modm=model0, 
-				     modm_obs=model,  
-				     modm0=model0,
+		global pa=SeisInvExpt(attrib_mod, Migr(), srcwav=srcwav, ageom=ageom, tgrid=tgrid, mediumm=medium0, 
+				     mediumm_obs=medium,  
+				     mediumm0=medium0,
 				     igrid_interp_scheme=:B2,    
 				     igrid=broadcast(x->range(x[1],stop=x[end],step=300.),mgrid),
 				     parameterization=parameterization,   verbose=false,
 				     nworker=1)
 
 
-		global pa_parallel=SeisInvExpt(attrib_mod, Migr(), srcwav=srcwav, ageom=ageom, tgrid=tgrid, modm=model0, 
-				     modm_obs=model,  
-				     modm0=model0,
+		global pa_parallel=SeisInvExpt(attrib_mod, Migr(), srcwav=srcwav, ageom=ageom, tgrid=tgrid, mediumm=medium0, 
+				     mediumm_obs=medium,  
+				     mediumm0=medium0,
 				     igrid_interp_scheme=:B2,    
 				     igrid=broadcast(x->range(x[1],stop=x[end],step=300.),mgrid),
 				     parameterization=parameterization,   verbose=false,
@@ -56,9 +56,9 @@ end
 
 @testset "Testing Born Modeling and its gradient" begin
 	global expt=x->SeisInvExpt(FdtdBorn(), x, 
-			     srcwav=srcwav, ageom=ageom, tgrid=tgrid, modm=model0, 
-	     		     modm0=model0,
-			     modm_obs=model,  
+			     srcwav=srcwav, ageom=ageom, tgrid=tgrid, mediumm=medium0, 
+	     		     mediumm0=medium0,
+			     mediumm_obs=medium,  
 			     igrid_interp_scheme=:B2,    
 			     igrid=broadcast(x->range(x[1],stop=x[end],step=350.),mgrid),
 			     parameterization=parameterization,   verbose=false)
@@ -83,9 +83,9 @@ end
 
 @testset "Testing gradient LS FWI" begin
 	expt=x->SeisInvExpt(Fdtd(), x, 
-			     srcwav=srcwav, ageom=ageom, tgrid=tgrid, modm=model0, 
-	     		     modm0=model0,
-			     modm_obs=model,  
+			     srcwav=srcwav, ageom=ageom, tgrid=tgrid, mediumm=medium0, 
+	     		     mediumm0=medium0,
+			     mediumm_obs=medium,  
 			     igrid_interp_scheme=:B2,    
 			     igrid=broadcast(x->range(x[1],stop=x[end],step=350.),mgrid),
 			     parameterization=parameterization,   verbose=false)

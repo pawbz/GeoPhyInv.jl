@@ -52,18 +52,18 @@ pa=SeisForwExpt(Fdtd(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, v
 # ### Modeling #1
 @time update!(pa);
 d1=copy(pa[:data][:P])
-#md p1=heatmap(pa[:data]);
+#md p1=heatmap(pa[:data], grid=true);
 
-# ### Update medium in `pa` without memory allocation
+# ### Change medium in `pa` without memory allocation
 update!(pa, medium_new)
 
-# ### Modeling #2 and plot
+# ### Modeling #2
 @time update!(pa);
 d2=copy(pa[:data][:P])
-#md p2=heatmap(pa[:data]);
+#md p2=heatmap(pa[:data], grid=true);
 
 # Test
 @test d1≠d2
 
-# ### Plotting
-plot(p1,p2, size=(500, 300))
+# ### Plotting #2
+#md plot(p1,p2, size=(500, 300))

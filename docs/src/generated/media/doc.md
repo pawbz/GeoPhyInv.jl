@@ -44,6 +44,13 @@ Inspect the bounds.
 mod.bounds
 ```
 
+Plotting is easy
+
+```@example doc
+p1=heatmap(mod, :vp)
+plot(p1,size=(800,400))
+```
+
 To construct an instance of `Medium`, we need a 2-D grid.
 
 ```@example doc
@@ -93,18 +100,6 @@ A model can be also be updated by adding random noise.
 ```@example doc
 update!(mod, [:vp,:rho], randn_perc=1.);
 nothing #hide
-```
-
-Some plotting #1
-
-```@example doc
-p1=heatmap(mod, :vp); plot(p1)
-```
-
-Some plotting #2
-
-```@example doc
-p2=heatmap(mod, :vs); plot(p2)
 ```
 
 # Methods

@@ -29,4 +29,5 @@ run_literate(["doc","forw", "test_born"], "Poisson")
 
 #run_literate(["gradient_accuracy","born_map"], "fwi")
 
+run_literate(["doc", "pizza", "born_tutorial"], "fwi")
 run_literate(["doc","create_snaps","reuse_expt"], "fdtd")

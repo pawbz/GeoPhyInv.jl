@@ -26,6 +26,10 @@ mod.ref
 # Inspect the bounds.
 mod.bounds
 
+# Plotting is easy
+#md p1=heatmap(mod, :vp)
+#md plot(p1,size=(800,400))
+
 
 # To construct an instance of `Medium`, we need a 2-D grid.
 mgrid = [range(0.0, stop=10.,step=0.1), range(0.0, stop=30.,step=0.2)];
@@ -49,15 +53,6 @@ mod[:vs].=2000.;
 
 # A model can be also be updated by adding random noise.
 update!(mod, [:vp,:rho], randn_perc=1.);
-
-#-
-# Some plotting #1
-#md p1=heatmap(mod, :vp); plot(p1)
-
-
-# Some plotting #2
-#md p2=heatmap(mod, :vs); plot(p2)
-
 
 
 # # Methods 

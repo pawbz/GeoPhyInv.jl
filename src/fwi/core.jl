@@ -1,7 +1,7 @@
 
 """
 Return functional and gradient of the LS objective 
-* `last_x::Vector{Float64}` : buffer is only updated when x!=last_x, and modified such that last_x=x
+* `last_x::Vector{Float64}` : buffer is only updated when x!=last_x, and mediumified such that last_x=x
 """
 function func(x::Vector{Float64}, last_x::Vector{Float64}, pa::PFWI)
 	global fwi_to
@@ -93,7 +93,7 @@ and boundary values for adjoint calculation.
 
 * `x::Vector{Float64}` : inversion variable
 * `pa::PFWI` : parameters that are constant during the inversion 
-* if x is absent, using `pa.modm` for modeling
+* if x is absent, using `pa.mediumm` for modeling
 """
 function F!(pa::PFWI{Fdtd,T1,T2}, x) where {T1,T2}
 
@@ -104,12 +104,12 @@ function F!(pa::PFWI{Fdtd,T1,T2}, x) where {T1,T2}
 	initialize_boundary!(pa.paf)
 
 	if(!(x===nothing))
-		# project x, which lives in modi, on to model space (modm)
-		x_to_modm!(pa, x)
+		# project x, which lives in mediumi, on to model space (mediumm)
+		x_to_mediumm!(pa, x)
 	end
 
 	# update model in the forward engine
-	update!(pa.paf.c, pa.modm)
+	update!(pa.paf.c, pa.mediumm)
 
 	pa.paf.c.activepw=[1,]
 	pa.paf.c.illum_flag=false
@@ -128,18 +128,18 @@ end
 
 
 """
-Born modeling with `modm` as the perturbed model and `modm0` as the background model.
+Born modeling with `mediumm` as the perturbed model and `mediumm0` as the background model.
 """
 function F!(pa::PFWI{FdtdBorn,T1,T2}, x) where {T1,T2}
 
 	# update background model in the forward engine 
-	update!(pa.paf.c, pa.modm0)
+	update!(pa.paf.c, pa.mediumm0)
 	if(!(x===nothing))
-		# project x, which lives in modi, on to model space (modm)
-		x_to_modm!(pa, x)
+		# project x, which lives in mediumi, on to model space (mediumm)
+		x_to_mediumm!(pa, x)
 	end
 	# update perturbed models in the forward engine
-	update_δmods!(pa.paf.c, pa.modm)
+	update_δmods!(pa.paf.c, pa.mediumm)
 
 	Fbornmod!(pa::PFWI)
 end
@@ -208,6 +208,16 @@ function Fadj!(pa::PFWI)
 end
 
 
+"""
+```
+F=LinearMap(pa)
+```
+If `pa` is an instance of `SeisInvExpt`, then 
+return the linearized forward modeling operator `F`, such that
+`F*x` can be computed without explicitly storing the operator matrix (see `LinearMaps.jl`).
+The imaging/migration operator is given by `transpose(F)`. 
+These operators are the building blocks of iterative optimization schemes.
+"""
 function LinearMaps.LinearMap(pa::PFWI{FdtdBorn,T2,T3}) where {T2,T3}
 	fw=(y,x)->Fborn_map!(y, x, pa)
 	bk=(y,x)->Fadj_map!(y, x, pa)
@@ -234,7 +244,7 @@ function Fadj_map!(δy, δx, pa)
 	Fadj!(pa)
 
 	# chain rule corresponding to reparameterization
-	pert_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm0, pa.parameterization)
+	pert_chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.mediumm0, pa.parameterization)
 
 	# finally, adjoint of interpolation
 	Interpolation.interp_spray!(δy, 

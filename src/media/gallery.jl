@@ -10,6 +10,7 @@ As of now, only seismic models are predefined in this package. Choose `attrib::S
 * `=:acou_homo1` : a test homogeneous acoustic model
 * `=:acou_homo2` : a test homogeneous acoustic model, but with coarser spatial sampling (faster testing)
 * `=:marmousi2` : marmousi2 model with lower resolution; useful for surface seismic experiments
+* `=:pizza` : `:acous_homo2` with some perturbations 
 """
 function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 	bfrac=0.1; 
@@ -22,6 +23,23 @@ function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 		model=Medium(mgrid,[:vp,:rho])
 		update!(model,[:vp,:rho],[vp0,rho0])
 		fill!(model)
+	elseif((attrib==:pizza))
+		vp0 = [1700., 2300.] # bounds for vp
+		rho0 = [1700., 2300.] # density bounds
+		mgrid = repeat([range(-1000.0,stop=1000.0,length=51)],2)
+		nz,nx=length.(mgrid)
+		model=Medium(mgrid,[:vp,:rho])
+		update!(model,[:vp,:rho],[vp0,rho0])
+		fill!(model)
+
+		# add some noise to starting model
+		update!(model, [:vp,:rho], randn_perc=0.5)
+
+		# add perturbations
+		for ellip_loc in [[500.,0.], [0.,500.], [-500.,0.], [0.,-500.]]
+			update!(model, [:vp,:rho], ellip_rad=50., ellip_loc=ellip_loc, 
+				ellip_pert=100.)
+		end
 
 	elseif((attrib == :acou_homo2))
 		vp0 = [1700., 2300.] # bounds for vp

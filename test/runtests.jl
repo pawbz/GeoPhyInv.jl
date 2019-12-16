@@ -37,7 +37,7 @@ run_test([],"ageom", ["doc"])
 run_test([],"srcwav", ["doc"])
 run_test([],"data", ["doc"])
 run_test(["accuracy","backprop", "rho_projection"],"fdtd", ["doc","create_snaps","reuse_expt"])
-run_test(["gradient_accuracy", "born_map"],"fwi", [])
+run_test(["gradient_accuracy", "born_map"],"fwi", ["doc", "pizza", "born_tutorial"])
 run_test(["interp_tests"],"Interpolation", [])
 run_test(["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx"], "Poisson", ["doc","forw", "test_born"])
 

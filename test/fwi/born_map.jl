@@ -3,13 +3,6 @@ using Test
 using GeoPhyInv
 using LinearMaps
 
-# he linearized forward modeling operator `F`, such that
-# `Fx` can be computed without explicitly storing the operator matrix (
-#  see `LinearMaps.jl`);
-# the imaging/migration operator `F*`;
-
-# These maps are the building blocks of iterative optimization schemes.
-
 
 for scenario in [:downhole, :pizza]
 	println("@@@@@@@@@@@@TESTING ", scenario)

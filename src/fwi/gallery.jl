@@ -1,30 +1,18 @@
-
-
 """
-Gallery of `SeisInvExpt`.
-# Arguments
-* `attrib::Symbol` : name 
-  * `=:pizza` all around sources and receivers
-  * `=:downhole` sources and receivers along a drill-bit
+```julia
+pa=SeisInvExpt(attrib_mod,attrib_inv, attrib; rfields, parameterization)
+```
+Predefined gallery of `SeisInvExpt`. Choose `attrib::Symbol`
+* `=:pizza` an experiment fast enough to be run on a laptop
+* `=:downhole` sources and receivers on a drill-string 
 """
 function SeisInvExpt(attrib_mod::Union{Fdtd, FdtdBorn},attrib_inv::Union{LS,LS_prior,Migr,Migr_FD}, attrib::Symbol; 
 		     rfields=[:Vx,:Vz,:P], α=0.0, parameterization=[:χvp, :χrho, :null])
 
 	if(attrib==:pizza)
 		# starting model
-		model0 = Medium(:acou_homo2);
-		model = deepcopy(model0)
-		# add some noise to starting model
-		update!(model0, [:vp,:rho], randn_perc=0.1)
-
-		print(model)
-
-		# add perturbations
-		for ellip_loc in [[500.,0.], [0.,500.], [-500.,0.], [0.,-500.]]
-			update!(model, [:vp,:rho], ellip_rad=50., ellip_loc=ellip_loc, 
-				ellip_pert=100.)
-		end
-		update!(model, [:vp,:rho], randn_perc=0.1)
+		model = Medium(:pizza);
+		model0 = similar(model)
 
 		ageom=AGeom(model.mgrid, SSrcs(5), Srcs(1), Recs(20))
 		update!(ageom, SSrcs(),[0,0],900.0,[0, 2π])
@@ -66,7 +54,7 @@ function SeisInvExpt(attrib_mod::Union{Fdtd, FdtdBorn},attrib_inv::Union{LS,LS_p
 
 	return  SeisInvExpt(attrib_mod, attrib_inv, srcwav=srcwav, ageom=ageom, tgrid=tgrid,
 		       rfields=rfields,
-		       modm=model0, modm0=model0, modm_obs=model, 
+		       mediumm=model0, mediumm0=model0, mediumm_obs=model, 
 		       igrid_interp_scheme=igrid_interp_scheme, 
 		       igrid=igrid, parameterization=parameterization, verbose=false);
 end

@@ -36,5 +36,3 @@ d2=copy(pa[:data][:P])
 
 @test d1≠d2
 
-plot(p1,p2, size=(500, 300))
-

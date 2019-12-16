@@ -33,25 +33,6 @@ struct Migr_FD end
 # create a timer object, used for inversion, see TimerOutputs.jl
 global const fwi_to = TimerOutput();
 
-"""
-PFWI Parameters
-
-# Fields
-
-* `mgrid::Vector{StepRangeLen}` : modelling grid
-* `igrid::Vector{StepRangeLen}` : inversion grid
-* `srcwav::SrcWav` : base source wavelet for modelling data
-* `ageom::AGeom` : acquisition ageometry
-* `tgrid::StepRangeLen` : 
-* `attrib_mod`
-* `model_obs` : model used for generating observed data
-* `model0` : background velocity model (only used during Born modeling and inversion)
-* `parameterization` : a vector of Symbols specifying parameterization of the inversion vector
-* `verbose` : print level on STOUT
-* `attrib` : synthetic or real
-
-TODO: add an extra attribute for coupling functions inversion and modelling
-"""
 mutable struct PFWI{Tmod, Tdatamisfit, Tinv}
 	attrib_inv::Tinv
 	"model inversion variable"
@@ -68,19 +49,19 @@ mutable struct PFWI{Tmod, Tdatamisfit, Tinv}
 	"acquisition ageometry for adjoint propagation"
 	adjageom::AGeom
 	"Seismic model on modeling grid"
-	modm::Medium
+	mediumm::Medium
 	"background Seismic model"
-	modm0::Medium
+	mediumm0::Medium
 	"Seismic on inversion grid"
-	modi::Medium
+	mediumi::Medium
 	"initialize on this model"
 	mod_initial::Medium
 	"prior model on the inversion grid"
 	priori::Medium
 	"gradient Seismic model on modeling grid"
-	gmodm::Medium
+	gmediumm::Medium
 	"gradient Seismic on inversion grid"
-	gmodi::Medium
+	gmediumi::Medium
 	"parameterization"
 	parameterization::Vector{Symbol}
 	"model preconditioning"
@@ -95,6 +76,46 @@ end
 
 
 Base.show(io::Base.IO, pa::PFWI)=nothing
+
+"""
+```julia
+pa=SeisInvExpt(attrib_mod, attrib_inv; srcwav, ageom, tgrid, mediumm, mediumm_obs, dobs)
+```
+
+# Arguments
+
+* `attrib_mod::Union{Fdtd,FdtdBorn}` : choose modeling attribute
+* `attrib_inv::Union{LS,LS_prior,Migr,Migr_FD}` : choose inversion attribute
+* `obj::Union{LS,LS_prior}` : which objective function?
+  * `=LS()` : least-squares inversion 
+  * `=LS_prior([1.0, 0.5])` regularized least-squares inversion
+  * `=Migr()` : migration image
+  * `=Migr_FD()` : finite-difference gradient (used for testing only)
+
+# Keyword Arguments
+* `srcwav::SrcWav` : source wavelets
+* `ageom::AGeom` : acquisition 
+* `tgrid::StepRangeLen` : modelling time grid
+* `mediumm::Medium` : an instance of `Medium` (used to generate initial model on the inversion grid)
+* `dobs::Data` : observed data (required only when `attrib==:field`)
+* `mediumm_obs::Medium` : medium used for generating *observed data* (required only when `attrib==:synthetic`)
+
+# Optional Keyword Arguments 
+
+* `igrid` : inversion grid (defaults to modeling grid)
+* `igrid_interp_scheme` : interpolation scheme
+  * `=:B1` linear 
+  * `=:B2` second order 
+* `mediumm0` : background seismic model for Born modelling and inversion
+* `parameterization::Vector{Symbol}` : subsurface parameterization
+  * `=[:χvp, :χrho, :null]` for vp and density contrast inversion
+  * `=[:null, :χrho, :null]` for density-only contrast inversion
+  * `=[:χvp, :null, :null]` for vp-only contrast  inversion
+* `tgrid_obs::StepRangeLen` : time grid for observed data
+* `attrib::Symbol=:synthetic` : an attribute to control class
+  * `=:synthetic` synthetic data inversion
+  * `=:field` field data inversion
+"""
 SeisInvExpt(m1::Union{Fdtd, FdtdBorn},m2::Union{LS,LS_prior,Migr,Migr_FD};args1...)=PFWI(m1,m2;args1...) # change this when you have more inversion experiments 
 
 """
@@ -111,6 +132,7 @@ function LS_prior(ninv::Int, α=[1.0, 0.5])
 end
 
 
+include("getprop.jl")
 include("core.jl")
 include("prior.jl")
 include("xfwi.jl")
@@ -152,40 +174,37 @@ Constructor for `PFWI`
 
 # Arguments
 
-* `attrib_mod::Union{Fdtd, FdtdBorn}` : modelling attribute
+* `attrib_mod::Union{Fdtd, FdtdBorn}` : modeling attribute
 * `attrib_inv::Union{LS,LS_prior,Migr,Migr_FD} : inversion attribute
 
 
 # Keyword Arguments
 * `srcwav::SrcWav` : source time functions
 * `ageom::AGeom` : acquisition ageometry
-* `tgrid::StepRangeLen` : modelling time grid
-* `modm::Medium` : seismic model on modelling mesh 
+* `tgrid::StepRangeLen` : modeling time grid
+* `mediumm::Medium` : seismic model on modeling mesh 
+* `mediumm_obs::Medium=mediumm` : actual seismic model to generate *observed* data
 
 # Optional Keyword Arguments 
 * `tgrid_obs::StepRangeLen` : time grid for observed data
-* `igrid::Vector{StepRangeLen}=modm.mgrid` : inversion grid if different from the modelling grid, i.e., `modm.mgrid`
+* `igrid::Vector{StepRangeLen}=mediumm.mgrid` : inversion grid if different from the modelling grid, i.e., `mediumm.mgrid`
 * `igrid_interp_scheme` : interpolation scheme
   * `=:B1` linear 
   * `=:B2` second order 
 * `mprecon_factor::Float64=1` : factor to control model preconditioner, always greater than 1
   * `=1` means the preconditioning is switched off
   * `>1` means the preconditioning is switched on, larger the mprecon_factor, stronger the applied preconditioner becomes
-* `dobs::Data.TD` : observed data
-* `dprecon::Data.TD=Data.TD_ones(1,dobs.tgrid,dobs.ageom)` : data preconditioning, defaults to one 
+* `dobs::Data` : observed data
+* `dprecon::Data=ones(Data)` : data preconditioning, defaults to one 
 * `tlagssf_fracs=0.0` : maximum lagtime of unknown source filter
 * `tlagrf_fracs=0.0` : maximum lagtime of unknown receiver filter
 * `srcwav_obs::SrcWav=srcwav` : source wavelets to generate *observed data*; can be different from `srcwav`
-* `modm_obs::Medium=modm` : actual seismic model to generate *observed data*
-* `modm0::Medium=fill!(modm,0.0)` : background seismic model for Born modelling and inversion
+* `mediumm0::Medium=fill!(mediumm,0.0)` : background seismic model for Born modelling and inversion
 * `parameterization::Vector{Symbol}` : subsurface parameterization
   * `=[:χvp, :χrho, :null]` for velocity and density inversion
   * `=[:null, :χrho, :null]` for density-only inversion
   * `=[:χvp, :null, :null]` for velocity-only inversion
 * `verbose::Bool=false` : print level on STDOUT during inversion 
-* `attrib::Symbol=:synthetic` : an attribute to control class
-  * `=:synthetic` synthetic data inversion
-  * `=:field` field data inversion
 * nworker : number of workers (input nothing to use all available)
 """
 function PFWI(
@@ -194,7 +213,7 @@ function PFWI(
 	      srcwav::SrcWav=nothing,
 	      ageom::AGeom=nothing,
 	      tgrid::StepRangeLen=nothing,
-	      modm::Medium=nothing,
+	      mediumm::Medium=nothing,
 	      # other optional 
 	      tgrid_obs::StepRangeLen=deepcopy(tgrid),
 	      rfields=[:P],
@@ -206,8 +225,8 @@ function PFWI(
 	      tlagssf_fracs=0.0,
 	      tlagrf_fracs=0.0,
 	      srcwav_obs::SrcWav=deepcopy(srcwav),
-	      modm_obs::Medium=modm,
-	      modm0=nothing,
+	      mediumm_obs::Medium=mediumm,
+	      mediumm0=nothing,
 	      parameterization::Vector{Symbol}=[:χvp, :χrho, :null],
 	      verbose::Bool=false,
 	      attrib::Symbol=:synthetic,
@@ -215,14 +234,14 @@ function PFWI(
 	      )
 
 	# make a copy of initial model
-	modm=deepcopy(modm)
+	mediumm=deepcopy(mediumm)
 
 	if(igrid===nothing)
-		igrid=deepcopy(modm.mgrid)
+		igrid=deepcopy(mediumm.mgrid)
 	end
 	# igrid has to truncated because the gradient evaluation 
 	# is inaccurate on boundaries
-	mg=modm.mgrid
+	mg=mediumm.mgrid
 	amin=max(igrid[1][1],mg[1][3])
 	amax=min(igrid[1][end],mg[1][end-2])
 	if(length(igrid[1])==1)
@@ -240,27 +259,27 @@ function PFWI(
 	igrid=[grid1, grid2]
 
 
-	# create modi according to igrid and interpolation of modm
-	modi = Medium(igrid, modm);
+	# create mediumi according to igrid and interpolation of mediumm
+	mediumi = Medium(igrid, mediumm);
 	# update bounds
-	update!(modi,modm)
-	interp_spray!(modm, modi, :interp)
+	update!(mediumi,mediumm)
+	interp_spray!(mediumm, mediumi, :interp)
 
-	# save the initial model, as modi will be changed during the iterations
-	mod_initial=deepcopy(modi)
+	# save the initial model, as mediumi will be changed during the iterations
+	mod_initial=deepcopy(mediumi)
 
 	# allocate prior inputs
-	priori=similar(modi)
+	priori=similar(mediumi)
 
-	# use default background model modm0
-	if(modm0 === nothing)
-		modm0=deepcopy(modm) # some dummy
-		fill!(modm0)
+	# use default background model mediumm0
+	if(mediumm0 === nothing)
+		mediumm0=deepcopy(mediumm) # some dummy
+		fill!(mediumm0)
 	end
-	isequal(modm0, modm_obs) && (@warn "modm0 == modm_obs")
+	isequal(mediumm0, mediumm_obs) && (@warn "mediumm0 == mediumm_obs")
 
 	if(attrib == :synthetic) 
-		isequal(modm, modm_obs) && error("initial model same as actual model, zero misfit?")
+		isequal(mediumm, mediumm_obs) && error("initial model same as actual model, zero misfit?")
 	end
 
 	# ageom ageometry for adjoint propagation
@@ -273,7 +292,7 @@ function PFWI(
 	# generating forward and adjoint modelling engines
 	# to generate modelled data, border values, etc.
 	# most of the parameters given to this are dummy
-	paf=SeisForwExpt(attrib_mod,npw=2, medium=modm,
+	paf=SeisForwExpt(attrib_mod,npw=2, medium=mediumm,
 		ageom=[ageom, adjageom], srcwav=[srcwav, adjsrc], 
 		rfields=rfields,
 		sflags=[3, 2], rflags=[1, 1],
@@ -281,8 +300,8 @@ function PFWI(
 		tgrid=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
 
 
-	gmodm=Medium(modm.mgrid,[:χvp,:χrho])
-	gmodi=Medium(modi.mgrid,[:χvp,:χrho])
+	gmediumm=Medium(mediumm.mgrid,[:χvp,:χrho])
+	gmediumi=Medium(mediumi.mgrid,[:χvp,:χrho])
 
 	#println("added fake precon")
 	#dprecon=deepcopy(dobs)
@@ -301,20 +320,26 @@ function PFWI(
  	# tlagssf_fracs==[0.0] | tlagssf_fracs=[0.0])
 	# paTD=Data.P_misfit(Data.TD_zeros(rfields,tgrid,ageom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
-	if(iszero(dobs))
-		Random.randn!(dobs) # dummy dobs, update later
+	if((attrib == :synthetic))
+		if(iszero(dobs))
+			Random.randn!(dobs) # dummy dobs, update later
+		end
+	else
+		if(iszero(dobs))
+			error("input observed data is zero")
+		end
 	end
 
 	paTD=VNamedD_misfit(Data(tgrid,ageom,rfields),dobs,w=dprecon);
 
-	paminterp=Interpolation.Kernel([modi.mgrid[2], modi.mgrid[1]], [modm.mgrid[2], modm.mgrid[1]], igrid_interp_scheme)
+	paminterp=Interpolation.Kernel([mediumi.mgrid[2], mediumi.mgrid[1]], [mediumm.mgrid[2], mediumm.mgrid[1]], igrid_interp_scheme)
 
-	mx=X(prod(length.(modi.mgrid))*count(parameterization.≠:null),2)
-	mxm=X(prod(length.(modm.mgrid))*count(parameterization.≠:null),2)
+	mx=X(prod(length.(mediumi.mgrid))*count(parameterization.≠:null),2)
+	mxm=X(prod(length.(mediumm.mgrid))*count(parameterization.≠:null),2)
 
 
-	# put modm as a vector, according to parameterization in mxm.x
-	copyto!(mxm.x,modm,parameterization)
+	# put mediumm as a vector, according to parameterization in mxm.x
+	copyto!(mxm.x,mediumm,parameterization)
 
 	pa = PFWI(
 		  attrib_inv,
@@ -324,9 +349,9 @@ function PFWI(
 	     SrcWav(tgrid,adjageom, rfields),
 	     deepcopy(ageom), 
 	     adjageom,
-	     deepcopy(modm), deepcopy(modm0), modi, mod_initial,
+	     deepcopy(mediumm), deepcopy(mediumm0), mediumi, mod_initial,
 	     priori,
-	     gmodm,gmodi,
+	     gmediumm,gmediumi,
 	     parameterization,
 	     zeros(2,2), # dummy, update mprecon later
 	     paTD,
@@ -335,7 +360,7 @@ function PFWI(
 
 	# generate observed data if attrib is synthetic
 	if((attrib == :synthetic))
-		update_observed_data!(pa, modm_obs)
+		update_observed_data!(pa, mediumm_obs)
 	end
 
 	iszero(dobs) && ((attrib == :real) ? error("input observed data for real data inversion") : error("problem generating synthetic observed data"))
@@ -359,23 +384,23 @@ end
 update the *synthetic* observed data in `PFWI`
 * allocated memory, don't use in inner loops
 """
-function update_observed_data!(pa::PFWI, modm_obs)
-	# save modm of pa to put it back later
-	modm_copy=deepcopy(pa.modm)
+function update_observed_data!(pa::PFWI, mediumm_obs)
+	# save mediumm of pa to put it back later
+	mediumm_copy=deepcopy(pa.mediumm)
 
-	# change modm in pa to actual model
-	copyto!(pa.modm, modm_obs)
+	# change mediumm in pa to actual model
+	copyto!(pa.mediumm, mediumm_obs)
 
 	# update models in the forward engine and do modelling
-	# FdtdBorn: modm0 will be used as a background model for Born modelling and modm will be perturbed model
-	# Fdtd: modm will be *the* model
+	# FdtdBorn: mediumm0 will be used as a background model for Born modelling and mediumm will be perturbed model
+	# Fdtd: mediumm will be *the* model
 	F!(pa, nothing)
 
 	# get observed data
 	copyto!(pa.paTD.y, pa.paTD.x)
 
 	# put back model and sources
-	copyto!(pa.modm, modm_copy)
+	copyto!(pa.mediumm, mediumm_copy)
 
 	initialize!(pa.paf.c)  # clear everything
 end
@@ -406,7 +431,7 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 	(any(illum .<= 0.0)) && error("illum cannot be negative or zero")
 	(mprecon_factor < 1.0)  && error("invalid mprecon_factor")
 
-	illumi = zeros(length(pa.modi.mgrid[1]), length(pa.modi.mgrid[2]))
+	illumi = zeros(length(pa.mediumi.mgrid[1]), length(pa.mediumi.mgrid[2]))
 	Interpolation.interp_spray!(illumi, illum, pa.paminterp, :spray)
 	(any(illumi .<= 0.0)) && error("illumi cannot be negative or zero")
 
@@ -428,18 +453,18 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 end
 
 
-# convert x to modm by interpolation
+# convert x to mediumm by interpolation
 # x is on the sparse grid, and is changed by parameterization
-function x_to_modm!(pa, x)
+function x_to_mediumm!(pa, x)
 
-	# put sparse x into modi (useless step, just for visualization)
-	copyto!(pa.modi, x, pa.parameterization) 
+	# put sparse x into mediumi (useless step, just for visualization)
+	copyto!(pa.mediumi, x, pa.parameterization) 
 
 	# get x on dense grid
 	Interpolation.interp_spray!(x, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
 
-	# put dense x into modm, according to parameterization
-	copyto!(pa.modm,pa.mxm.x,pa.parameterization) 
+	# put dense x into mediumm, according to parameterization
+	copyto!(pa.mediumm,pa.mxm.x,pa.parameterization) 
 end
 
 
@@ -448,7 +473,7 @@ function δx_to_δmods!(pa, δx)
 	Interpolation.interp_spray!(δx, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
 
 	# reparameterize accordingly to get [δKI, δrhoI]
-	copyto!(pa.paf.c.δmod, pa.mxm.x, pa.modm0, pa.parameterization)
+	copyto!(pa.paf.c.δmod, pa.mxm.x, pa.mediumm0, pa.parameterization)
 
 	# input [δKI, δrhoI] to the modeling engine
 	update_δmods!(pa.paf.c, pa.paf.c.δmod)
@@ -459,25 +484,25 @@ convert the gradient output from Fdtd to gx
 """
 function spray_gradient!(gx,  pa::PFWI{Fdtd,T1,T2}) where {T1,T2}
 
-	# apply chain rule on gmodm to get gradient w.r.t. dense x
-	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
+	# apply chain rule on gmediumm to get gradient w.r.t. dense x
+	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.mediumm, pa.parameterization)
 
 	# spray gradient w.r.t. dense x to the space of sparse x
 	Interpolation.interp_spray!(gx, pa.mxm.gx, pa.paminterp, :spray, count(pa.parameterization.≠:null))
 
-	# visualize gmodi here?
-	# visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)
+	# visualize gmediumi here?
+	# visualize_gx!(pa.gmediumm, pa.mediumm, pa.gmediumi, pa.mediumi, gx, pa)
 end
 function spray_gradient!(gx, pa::PFWI{FdtdBorn,T1,T2}) where {T1,T2}   
 
-	# apply chain rule on gmodm to get gradient w.r.t. dense x (note that background model is used for Born modeling here)
-	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.modm, pa.parameterization)
+	# apply chain rule on gmediumm to get gradient w.r.t. dense x (note that background model is used for Born modeling here)
+	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.mediumm, pa.parameterization)
 
 	# spray gradient w.r.t. dense x to the space of sparse x
 	Interpolation.interp_spray!(gx, pa.mxm.gx, pa.paminterp, :spray, count(pa.parameterization.≠:null))
 
-	# visualize gmodi here?
-	# visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)
+	# visualize gmediumi here?
+	# visualize_gx!(pa.gmediumm, pa.mediumm, pa.gmediumi, pa.mediumi, gx, pa)
 end
 
 
@@ -487,11 +512,11 @@ Return bound vectors for the `Seismic` model,
 depeding on paramaterization
 """
 function Seismic_xbound!(lower_x, upper_x, pa)
-	nznx = prod(length.(pa.modi.mgrid))
+	nznx = prod(length.(pa.mediumi.mgrid))
 
 	bound1 = similar(lower_x)
 	# create a Seismic model with minimum possible values
-	modbound = deepcopy(pa.modi);
+	modbound = deepcopy(pa.mediumi);
 	copyto!(modbound[:vp], fill(modbound.bounds[:vp][1], size(modbound[:vp])))
 	if (:vs ∈ names(modbound.m)[1]) 
 	#	copyto!(modbound[:vs], fill(modbound.bounds[:vs][1], size(modbound[:vs])))
@@ -518,13 +543,13 @@ function Seismic_xbound!(lower_x, upper_x, pa)
 	return modbound
 end
 
-# gmodi, gmodm <-- gx (just for visualizing gradient)
-function visualize_gx!(gmodm, modm, gmodi, modi, gx, pa)
+# gmediumi, gmediumm <-- gx (just for visualizing gradient)
+function visualize_gx!(gmediumm, mediumm, gmediumi, mediumi, gx, pa)
 	# chain rule depending on re-parameterization
-	chainrule!(gmodi, modi, gx, pa.parameterization, 1)
+	chainrule!(gmediumi, mediumi, gx, pa.parameterization, 1)
 
 	# get gradient after interpolation (just for visualization, not exact)
-#	interp_spray!(gmodi, gmodm, :interp, :B2, [:χvp,:χrho], pa=pa.paminterp)
+#	interp_spray!(gmediumi, gmediumm, :interp, :B2, [:χvp,:χrho], pa=pa.paminterp)
 end
 
 """

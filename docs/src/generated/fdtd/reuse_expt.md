@@ -82,22 +82,22 @@ nothing #hide
 ```@example reuse_expt
 @time update!(pa);
 d1=copy(pa[:data][:P])
-p1=heatmap(pa[:data]);
+p1=heatmap(pa[:data], grid=true);
 nothing #hide
 ```
 
-### Update medium in `pa` without memory allocation
+### Change medium in `pa` without memory allocation
 
 ```@example reuse_expt
 update!(pa, medium_new)
 ```
 
-### Modeling #2 and plot
+### Modeling #2
 
 ```@example reuse_expt
 @time update!(pa);
 d2=copy(pa[:data][:P])
-p2=heatmap(pa[:data]);
+p2=heatmap(pa[:data], grid=true);
 nothing #hide
 ```
 
@@ -107,7 +107,7 @@ Test
 @test d1≠d2
 ```
 
-### Plotting
+### Plotting #2
 
 ```@example reuse_expt
 plot(p1,p2, size=(500, 300))

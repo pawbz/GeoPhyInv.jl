@@ -74,11 +74,11 @@ nothing #hide
 Most of the methods listed below are also applicable to individual elements of `srcwav`.
 
 ```@docs
-update!(GeoPhyInv.VNamedD, ::Vector{Symbol}, ::AbstractVector{Float64},)
+update!(GeoPhyInv.VNamedD, ::Vector{Symbol}, ::AbstractArray)
 Base.reverse!(::GeoPhyInv.VNamedD)
 Base.iszero(::GeoPhyInv.VNamedD)
 Base.isequal(::GeoPhyInv.VNamedD, ::GeoPhyInv.VNamedD)
-issimilar(::GeoPhyInv.VNamedD, ::GeoPhyInv.VNamedD)
+GeoPhyInv.issimilar(::GeoPhyInv.VNamedD, ::GeoPhyInv.VNamedD)
 Base.vec(::GeoPhyInv.VNamedD)
 Random.randn!(::GeoPhyInv.VNamedD)
 Base.fill!(::GeoPhyInv.VNamedD, ::Float64)

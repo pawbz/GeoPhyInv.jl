@@ -1,8 +1,9 @@
 using Pkg; Pkg.add("Gadfly"); Pkg.add("Plots");
 
-using Documenter, GeoPhyInv
+using Documenter, GeoPhyInv, SparseArrays, LinearAlgebra, Random, LinearMaps
 using Gadfly, Plots
 gr()
+theme(:juno)
 
 #makedocs(modules=[GeoPhyInv],
 #	         doctest=true)
@@ -23,12 +24,16 @@ makedocs(
 				  "Tutorial I" => "generated/fdtd/create_snaps.md",
 				  "Tutorial II" => "generated/fdtd/reuse_expt.md",
 				  ],
-	    "PoissonExpt" => Any[
-				  "Introduction" => "generated/Poisson/doc.md",
-				 "Record data" => "generated/Poisson/forw.md",
-				 "Born map" => "generated/Poisson/test_born.md",
+	    "SeisInvExpt" => Any[
+				  "Description" => "generated/fwi/doc.md",
+				  "Tutorial" => "generated/fwi/pizza.md",
+				  "Adjoint Tests" => "generated/fwi/born_tutorial.md",
 				 ],
-#	    "SeisInvExpt" => Any[]
+	    "PoissonExpt" => Any[
+				  "Description" => "generated/Poisson/doc.md",
+				 "Tutorial" => "generated/Poisson/forw.md",
+				 "Adjoint Tests" => "generated/Poisson/test_born.md",
+				 ],
 	    ]
 #	    "Seismic Born Modeling" => "FWI/born_map.md",
 #	    "Seismic Full Waveform Inversion" => "FWI/gradient_accuracy.md",

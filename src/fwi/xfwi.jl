@@ -18,45 +18,45 @@ end
 
 # finalize xfwi or wfwi on pa
 function finalize!(pa::PFWI, xminimizer)
-	# update modm
-	x_to_modm!(pa, xminimizer)
+	# update mediumm
+	x_to_mediumm!(pa, xminimizer)
 
 	# update calculated data using the minimizer
 	F!(pa, nothing)
 
-	# put minimizer into modi
-	copyto!(pa.modi, xminimizer, pa.parameterization) 
+	# put minimizer into mediumi
+	copyto!(pa.mediumi, xminimizer, pa.parameterization) 
 
 	# update initial model using minimizer, so that running xfwi! next time will start with updated model
-	copyto!(pa.mod_initial, pa.modi)
+	copyto!(pa.mod_initial, pa.mediumi)
 end
 
 """
+```julia
+update!(pa)
+```
 Full Waveform Inversion using `Optim` and `Ipopt` packages.
-This method updates `pa.modm` and `pa.dcal`. More details about the
+This method updates `pa.mediumm` and `pa.dcal`. More details about the
 optional parameters can be found in the documentation of the `Optim` 
 package.
-The gradiet is computed using the adjoint state method.
-`pa.modi` is used as initial model if non-zero.
+The gradient is computed using the adjoint state method.
+`pa.mediumi` is used as initial model if non-zero.
 
 # Arguments
 
 * `pa::PFWI` : inversion object (updated inside method)
-* `obj::Union{LS,LS_prior}` : which objective function?
-  * `=LS()`
-  * `=LS_prior([1.0, 0.5])`
+
+# Keywords Arguments
+* `solver` Choose `Symbol`
+  * `=:ipopt` for `Ipopt.jl` 
+  * `=:optim` for `Optim.jl`
 
 # Optional Arguments
 
-* `optim_options` : see Optim.jl package for optimization options
-* `optim_scheme=LBFGS()` : see Optim.jl for other options
-* `bounded_flag=true` : use box constraints, see Optim.jl
-
-# Outputs
-
-* updated `modm` in the input `PFWI`
-* returns the result of optimization as an Optim.jl object
-  * `=:migr_finite_difference` same as above but *not* using adjoint state method; time consuming; only for testing, TODO: implement autodiff here
+* `optim_options` : see `Optim.jl` package for optimization options
+* `optim_scheme=LBFGS()` : see `Optim.jl` for other options
+* `bounded_flag=true` : constrained inversion using medium parameter bounds (`Ipopt.jl` only has bounded inversion)
+* `ipopt_options` : see `Ipopt.jl` 
 """
 function update!(pa::PFWI{T1,T2,T3};
 	   optim_scheme=LBFGS(),
@@ -68,13 +68,13 @@ function update!(pa::PFWI{T1,T2,T3};
 	   f_tol=1e-5, 
 	   g_tol=1e-8, 
 	   x_tol=1e-5, ),
-	   bounded_flag=false, solver=nothing, 
+	   bounded_flag=true, solver=nothing, 
 	   ipopt_options=[["max_iter", 5]]) where {T1,T2,T3<:Union{LS,LS_prior}}
 
 	global fwi_to
 	reset_timer!(fwi_to)
 
-	println("updating modm and modi...")
+	println("updating mediumm and mediumi...")
 	println("> xfwi: number of inversion variables:\t", xfwi_ninv(pa)) 
 
 	initialize!(pa)
@@ -82,6 +82,7 @@ function update!(pa::PFWI{T1,T2,T3};
 	f(x) = ζfunc(x, pa.mx.last_x,  pa)
 	g!(storage, x) = ζgrad!(storage, x, pa.mx.last_x, pa)
 	if(!bounded_flag)
+		(solver==:ipopt) && @info("bounded_flag not functional for Ipopt, switching to Optim")
 		"""
 		Unbounded LBFGS inversion, only for testing
 		"""
@@ -157,7 +158,10 @@ end
 
 
 """
-Return gradient at the first iteration, i.e., a migration image
+```julia
+update!(pa)
+```
+Return gradient at the first iteration, i.e., a migration image, when `attrib_inv==Migr()`.
 """
 function update!(pa::PFWI{T1,T2,Migr}) where {T1,T2}
 
@@ -173,15 +177,18 @@ function update!(pa::PFWI{T1,T2,Migr}) where {T1,T2}
 	println(fwi_to)
 
 	# convert gradient vector to model
-	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, g1, pa)
+	visualize_gx!(pa.gmediumm, pa.mediumm, pa.gmediumi, pa.mediumi, g1, pa)
 
-	return pa.gmodi, g1
+	return pa.gmediumi, g1
 end
 
 
 """
+```julia
+update!(pa)
+```
 Return gradient at the first iteration, i.e., a migration image, without using
-adjoint state method.
+adjoint state method, when `attrib_inv==Migr_FD()`.
 """
 function update!(pa::PFWI{T1,T2,Migr_FD}) where {T1,T2}   
 	global fwi_to
@@ -199,9 +206,9 @@ function update!(pa::PFWI{T1,T2,Migr_FD}) where {T1,T2}
 	println(fwi_to)
 
 	# convert gradient vector to model
-	visualize_gx!(pa.gmodm, pa.modm, pa.gmodi, pa.modi, gx, pa)
+	visualize_gx!(pa.gmediumm, pa.mediumm, pa.gmediumi, pa.mediumi, gx, pa)
 
-	return pa.gmodi, gx
+	return pa.gmediumi, gx
 end
                 
 
@@ -246,16 +253,16 @@ end
 		Harvest the Optim result to plot functional and gradient --- to be updated later
 		if(extended_trace)
 			# convert gradient vector to model
-			gmodi = [Medium_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
-			gmodm = [Medium_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)] 
-			modi = [Medium_zeros(pa.modi.mgrid) for itr=1:Optim.iterations(res)]
-			modm = [Medium_zeros(pa.modm.mgrid) for itr=1:Optim.iterations(res)]
+			gmediumi = [Medium_zeros(pa.mediumi.mgrid) for itr=1:Optim.iterations(res)]
+			gmediumm = [Medium_zeros(pa.mediumm.mgrid) for itr=1:Optim.iterations(res)] 
+			mediumi = [Medium_zeros(pa.mediumi.mgrid) for itr=1:Optim.iterations(res)]
+			mediumm = [Medium_zeros(pa.mediumm.mgrid) for itr=1:Optim.iterations(res)]
 			for itr=1:Optim.iterations(res)
-				# update modm and modi
-				Seismic_x!(modm[itr], modi[itr], Optim.x_trace(res)[itr], pa, -1)
+				# update mediumm and mediumi
+				Seismic_x!(mediumm[itr], mediumi[itr], Optim.x_trace(res)[itr], pa, -1)
 
-				# update gmodm and gmodi
-				Seismic_gx!(gmodm[itr],modm[itr],gmodi[itr],modi[itr],Optim.trace(res)[itr].metadata["g(x)"],pa,-1)
+				# update gmediumm and gmediumi
+				Seismic_gx!(gmediumm[itr],mediumm[itr],gmediumi[itr],mediumi[itr],Optim.trace(res)[itr].metadata["g(x)"],pa,-1)
 			end
 			
 		else

@@ -191,7 +191,7 @@ end
 
 """
 ```julia
-pa = SeisForwExpt(attrib_mod, ageom=ageom, srcwav=srcwav, medium=mod, tgrid=tgrid);
+pa = SeisForwExpt(attrib_mod; ageom, srcwav, medium, tgrid);
 ```
 Method to create an instance of `SeisForwExpt`. 
 The output of this method can be used as an input to the in-place method `update!`, to actually perform a
@@ -206,6 +206,9 @@ finite-difference modeling.
 * `tgrid` : modeling time grid, maximum time in `tgrid`should be greater than or equal to maximum source time, same sampling interval as in `srcwav`
 * `ageom` :  acquisition 
 * `srcwav` : source wavelets  
+
+# Optional Keyword Arguments 
+
 * `sflags=2` : source related flags 
   * `=0` inactive sources
   * `=1` sources with injection rate

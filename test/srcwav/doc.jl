@@ -45,11 +45,11 @@ rmul!(srcwav, 2.0);
 # Most of the methods listed below are also applicable to individual elements of `srcwav`.
 
 #md # ```@docs
-#md # update!(GeoPhyInv.VNamedD, ::Vector{Symbol}, ::AbstractVector{Float64},)
+#md # update!(GeoPhyInv.VNamedD, ::Vector{Symbol}, ::AbstractArray)
 #md # Base.reverse!(::GeoPhyInv.VNamedD)
 #md # Base.iszero(::GeoPhyInv.VNamedD)
 #md # Base.isequal(::GeoPhyInv.VNamedD, ::GeoPhyInv.VNamedD)
-#md # issimilar(::GeoPhyInv.VNamedD, ::GeoPhyInv.VNamedD)
+#md # GeoPhyInv.issimilar(::GeoPhyInv.VNamedD, ::GeoPhyInv.VNamedD)
 #md # Base.vec(::GeoPhyInv.VNamedD)
 #md # Random.randn!(::GeoPhyInv.VNamedD)
 #md # Base.fill!(::GeoPhyInv.VNamedD, ::Float64)

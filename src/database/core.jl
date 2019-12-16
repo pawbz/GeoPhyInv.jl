@@ -103,7 +103,7 @@ update!(srcwav[1], [:P, :Vx], w)
 ```
 Populate first supersource of `srcwav` by a wavelet `w` for `:P` and `:Vx` fields.
 """
-function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractVector{Float64},)
+function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractArray)
 	@assert length(w)==length(d.grid)
 	@inbounds for f in fields
 		@assert f ∈ names(d.d)[1]
@@ -116,13 +116,15 @@ function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractVector{Float64},)
 	return d
 end
 
+
+
 """
 ```julia
 update!(srcwav, [:P, :Vx], w)
 ```
 Populate `srcwav` by a wavelet vector `w` for `:P` and `:Vx` fields.
 """
-function update!(dat::VNamedD, fields::Vector{Symbol}, w::AbstractVector{Float64},)
+function update!(dat::VNamedD, fields::Vector{Symbol}, w::AbstractArray)
 	for d in dat
 		update!(d,fields,w)
 	end
@@ -155,6 +157,7 @@ Return if two `NamedD`'s have same dimensions and bounds.
 function issimilar(dat1::NamedD, dat2::NamedD)
 	return isequal(dat1.grid, dat2.grid) && isequal(names(dat1.d), names(dat2.d)) && (size(dat1.d)==size(dat2.d)) 
 end
+
 """
 ```julia
 issimilar(srcwav1, srcwav2)
@@ -354,7 +357,6 @@ fill!(srcwav, b)
 ```
 In-place method to fill `srcwav` with scalar `b`.
 """
-
 function Base.fill!(data::VNamedD, k::Float64)
 	for d in data
 		fill!(d,k)
@@ -376,7 +378,6 @@ reverse!(srcwav)
 ```
 Perform in-place time-reversal operation for each wavelet in `srcwav`.
 """
-
 function Base.reverse!(data::VNamedD)
 	for d in data
 		reverse!(d)

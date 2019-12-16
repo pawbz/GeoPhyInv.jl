@@ -1,8 +1,8 @@
 mutable struct VNamedD_misfit{T}
 	x::Vector{NamedD{T}} # modelled data
-	y::Vector{NamedD{T}} # modelled data
-	w::Vector{NamedD{T}} # modelled data
-	dJx::Vector{NamedD{T}} # modelled data
+	y::Vector{NamedD{T}} # observed data
+	w::Vector{NamedD{T}} # weights
+	dJx::Vector{NamedD{T}} # gradient 
 	ynorm::Float64 # normalize functional with energy of y
 end
 
