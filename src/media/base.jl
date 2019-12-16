@@ -46,10 +46,12 @@ end
 
 
 """
-Return a similar model to the input model, used for allocation.
+Return a similar model (size, bounds and reference values) to the input model, used for allocation.
 """
 function Base.similar(mod::Medium)
-	return zero(Medium, mod.mgrid, names(mod.m)[1])
+	mod_new=deepcopy(mod)
+	fill!(mod_new)
+	return mod_new
 end
 
 

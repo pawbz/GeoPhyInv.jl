@@ -4,40 +4,37 @@ using Test
 
 zgrid=range(-1000.0,stop=1000.0,length=201)
 xgrid=range(-1000.0,stop=1000.0,length=201)
-mgrid = [zgrid, xgrid]
-@info string("spatial sampling intervals (dz,dx)=", step.(mgrid))
+mgrid = [zgrid, xgrid];
 
 vpb = [1500., 3500.] # bounds for vp
 rhob = [1500., 3500.] # density bounds
+medium=Medium(mgrid);
+update!(medium, [:vp,:rho], [vpb,rhob]);
+fill!(medium);
+update!(medium, [:vp,:rho], randn_perc=5); # add some random noise
 
-model=Medium(mgrid)
-update!(model, [:vp,:rho], [vpb,rhob])
-fill!(model)
-@info "a seismic model is created"
+medium_new=similar(medium)
+update!(medium_new, [:vp,:rho], randn_perc=5.) # add some noise
+update!(medium_new, [:vp], constant_pert=500.) # perturb velocity
 
-update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise
+ageom=AGeom(medium.mgrid,:surf, SSrcs(3), Recs(30)); # surface seismic
 
-ageom=AGeom(model.mgrid,:surf, SSrcs(3), Recs(30));
+tgrid = range(0.0,stop=1.0,length=1000) # generate a temporal grid
+wav = ricker(10.0, tgrid, tpeak=0.25,); # Choose a source wavelet
+srcwav = SrcWav(tgrid, ageom, [:P]) # initialize
+update!(srcwav, [:P], wav) # distribute to all supersources
 
-tgrid = range(0.0,stop=2.0,length=1000)
-
-wav = ricker(10.0, tgrid, tpeak=0.25,);
-
-srcwav = SrcWav(tgrid, ageom, [:P])
-update!(srcwav, [:P], wav)
-
-pa=SeisForwExpt(Fdtd(),npw=1,model=model,
-	ageom=[ageom], srcwav=[srcwav],
-	sflags=[2], rflags=[1],
-	tgridmod=tgrid, verbose=true);
+pa=SeisForwExpt(Fdtd(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
 
 @time update!(pa);
+d1=copy(pa[:data][:P])
 
-model_new=Medium(:acou_homo1) # prepare another model
-update!(model_new, [:vp,:rho], randn_perc=0.01)
-update!(model_new, [:vp,:rho], constant_pert=0.03) # perturb the model
-
-update!(pa, model_new)
+update!(pa, medium_new)
 
 @time update!(pa);
+d2=copy(pa[:data][:P])
+
+@test d1≠d2
+
+plot(p1,p2, size=(500, 300))
 

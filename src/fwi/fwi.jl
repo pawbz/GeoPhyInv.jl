@@ -273,12 +273,12 @@ function PFWI(
 	# generating forward and adjoint modelling engines
 	# to generate modelled data, border values, etc.
 	# most of the parameters given to this are dummy
-	paf=SeisForwExpt(attrib_mod,npw=2, model=modm,
+	paf=SeisForwExpt(attrib_mod,npw=2, medium=modm,
 		ageom=[ageom, adjageom], srcwav=[srcwav, adjsrc], 
 		rfields=rfields,
 		sflags=[3, 2], rflags=[1, 1],
 		backprop_flag=1, 
-		tgridmod=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
+		tgrid=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
 
 
 	gmodm=Medium(modm.mgrid,[:χvp,:χrho])

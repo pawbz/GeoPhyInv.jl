@@ -1,16 +1,16 @@
 
-model=Medium(:acou_homo1)
-update!(model, [:vp,:rho], randn_perc=0.1)
-ageom=AGeom(model.mgrid, SSrcs(4), Srcs(1), Recs(100))
+medium=Medium(:acou_homo1)
+update!(medium, [:vp,:rho], randn_perc=0.1)
+ageom=AGeom(medium.mgrid, SSrcs(4), Srcs(1), Recs(100))
 update!(ageom, SSrcs(),[0,0],990.0,[0, 2π])
 update!(ageom, Recs(),[0,0],990.0,[0, 2π])
 
-wav, tgrid=ricker(model, 3, 0.4)
+wav, tgrid=ricker(medium, 3, 0.4)
 srcwav = SrcWav(tgrid, ageom, [:P])
 update!(srcwav, [:P], wav)
 
 for sflags in [[1,-1],[2,-2]]
-	pa=SeisForwExpt(Fdtd(),npw=1, tgridmod=tgrid,
+	pa=SeisForwExpt(Fdtd(),npw=1, tgrid=tgrid,
 	#	abs_trbl=[:null],
 		gmodel_flag=false,
 		sflags=[sflags[1]],
@@ -18,7 +18,7 @@ for sflags in [[1,-1],[2,-2]]
 		verbose=true,
 		backprop_flag=1,
 		illum_flag=true,ageom=[ageom], srcwav=[srcwav],
-		model=model);
+		medium=medium);
 
 	update!(pa);
 	rec1=deepcopy(pa.c.data[1])

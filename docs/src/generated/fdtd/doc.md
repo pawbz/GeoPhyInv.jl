@@ -2,11 +2,23 @@
 EditURL = "<unknown>/fdtd/doc.jl"
 ```
 
-A forward experiment, where the seismic data are generated
-using some models and acquisition parameters from our gallery.
-Forward modeling consists of a finite-difference simulation of the acoustic wave-equation.
-
 ```@example doc
-b=4
+using BenchmarkTools
+using GeoPhyInv
+using Test
+```
+
+# Intro
+
+```@docs
+SeisForwExpt
+Base.getindex(::GeoPhyInv.PFdtd, ::Symbol, ::Int)
+```
+
+# Methods
+```@docs
+update!(::GeoPhyInv.PFdtd)
+update!(::GeoPhyInv.PFdtd, ::Medium)
+update!(::GeoPhyInv.PFdtd, ::SrcWav, ::Any)
 ```
 

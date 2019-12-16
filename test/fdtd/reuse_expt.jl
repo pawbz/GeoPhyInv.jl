@@ -1,98 +1,69 @@
-# This tutorial first creates a variable `pa`, i.e. allocates
-# necessary memory to perform `SeisForwExpt`. 
-# Then, we perform forward modeling using an in-place 
-# function `mod!`. Finally, we will update `pa` with a different 
-# subsurface model and re-run the modeling task with no additional memory 
-# allocation. 
-# The ability to iteratively run the forward modeling task on  
-# various subsurface models is necessary while implementing inversion 
-# algorithms.
-
-# ### Load packages
 
 using GeoPhyInv
 using Statistics
-#md using Plots
+#md using Plots; gr();
 using Test
 
+# This tutorial demonstrates how an instance of `SeisForwExpt` can be used iteratively 
+# to perform forward modeling using `update!` for 
+# various bundles of medium parameters.
 
-# ### Setup a spatial grid
+
+# ### Grid
 zgrid=range(-1000.0,stop=1000.0,length=201)
 xgrid=range(-1000.0,stop=1000.0,length=201)
-mgrid = [zgrid, xgrid]
-@info string("spatial sampling intervals (dz,dx)=", step.(mgrid))
+mgrid = [zgrid, xgrid];
 
 
-# ### Allocate a `Seismic` model, and adjust bounds
+# ### Medium #1
 vpb = [1500., 3500.] # bounds for vp
 rhob = [1500., 3500.] # density bounds
+medium=Medium(mgrid);
+update!(medium, [:vp,:rho], [vpb,rhob]);
+fill!(medium);
+update!(medium, [:vp,:rho], randn_perc=5); # add some random noise
 
-model=Medium(mgrid)
-update!(model, [:vp,:rho], [vpb,rhob])
-fill!(model)
-@info "a seismic model is created" 
+# ### Medium #2
+medium_new=similar(medium)
+update!(medium_new, [:vp,:rho], randn_perc=5.) # add some noise
+update!(medium_new, [:vp], constant_pert=500.) # perturb velocity
 
-# ### Add some noise to the model (optional) 
-update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise
+# ### AGeom
+ageom=AGeom(medium.mgrid,:surf, SSrcs(3), Recs(30)); # surface seismic
 
-# ### A surface acquisition ageometry
-ageom=AGeom(model.mgrid,:surf, SSrcs(3), Recs(30));
-
-# ### Plot the model and source, receivers
-#md p1=heatmap(model, :vp) 
+# ### Plotting #1
+#md p1=heatmap(medium, :vp) 
 #md scatter!(ageom, SSrcs())
 #md scatter!(ageom, Recs())
-#md plot(p1)
-
-# ### Generate a temporal grid
-tgrid = range(0.0,stop=2.0,length=1000)
-
-# ### Choose a source wavelet
-wav = ricker(10.0, tgrid, tpeak=0.25,);
-
-# ### Distribute the same source wavelet to all the supsersources 
-srcwav = SrcWav(tgrid, ageom, [:P])
-update!(srcwav, [:P], wav)
-
-# create `Fdtd.Param` object to prepare forward modelling
-# * npw corresponds to the number of independently propagating wavefields (1 in most cases)
-# Once the `Param` object is created, do the modelling "without any memory allocations" using `mod!`
-
-pa=SeisForwExpt(Fdtd(),npw=1,model=model,
-	ageom=[ageom], srcwav=[srcwav],
-	sflags=[2], rflags=[1],
-	tgridmod=tgrid, verbose=true);
-
-@time update!(pa);
-
-# plot a record after modelling
-#md pdata=heatmap(pa[:data])
-#md plot(pdata)
-
-# create new seismic model
-
-model_new=Medium(:acou_homo1) # prepare another model
-update!(model_new, [:vp,:rho], randn_perc=0.01)
-update!(model_new, [:vp,:rho], constant_pert=0.03) # perturb the model
-#md p2=heatmap(model_new, :vp) # plot new model 
+#md p2=heatmap(medium_new, :vp) 
 #md scatter!(ageom, SSrcs())
 #md scatter!(ageom, Recs())
-#md plot(p2)
+#md plot(p1, p2, size=(800,300))
 
+# ### SrcWav
+tgrid = range(0.0,stop=1.0,length=1000) # generate a temporal grid
+wav = ricker(10.0, tgrid, tpeak=0.25,); # Choose a source wavelet
+srcwav = SrcWav(tgrid, ageom, [:P]) # initialize 
+update!(srcwav, [:P], wav) # distribute to all supersources
 
-# Now, we the change the model in the `Param` object without memory allocation
-# This routine can be used during FWI, 
-# where medium parameters are itertively updated in the same `Fdtd.Param` object
+# ### SeisForwExpt
+pa=SeisForwExpt(Fdtd(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
 
-update!(pa, model_new)
-
-
-
-
-# run modelling now and plot data again
+# ### Modeling #1
 @time update!(pa);
+d1=copy(pa[:data][:P])
+#md p1=heatmap(pa[:data]);
 
-# plot a record after modelling
-#md heatmap!(pdata, pa[:data])
-#md plot(pdata)
+# ### Update medium in `pa` without memory allocation
+update!(pa, medium_new)
 
+# ### Modeling #2 and plot
+@time update!(pa);
+d2=copy(pa[:data][:P])
+#md p2=heatmap(pa[:data]);
+
+# Test
+@test d1≠d2
+
+# ### Plotting
+plot(p1,p2, size=(500, 300))

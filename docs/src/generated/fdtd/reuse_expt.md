@@ -2,141 +2,114 @@
 EditURL = "<unknown>/fdtd/reuse_expt.jl"
 ```
 
-This tutorial first creates a variable `pa`, i.e. allocates
-necessary memory to perform `SeisForwExpt`.
-Then, we perform forward modeling using an in-place
-function `mod!`. Finally, we will update `pa` with a different
-subsurface model and re-run the modeling task with no additional memory
-allocation.
-The ability to iteratively run the forward modeling task on
-various subsurface models is necessary while implementing inversion
-algorithms.
-
-### Load packages
-
 ```@example reuse_expt
 using GeoPhyInv
 using Statistics
-using Plots
+using Plots; gr();
 using Test
 ```
 
-### Setup a spatial grid
+This tutorial demonstrates how an instance of `SeisForwExpt` can be used iteratively
+to perform forward modeling using `update!` for
+various bundles of medium parameters.
+
+### Grid
 
 ```@example reuse_expt
 zgrid=range(-1000.0,stop=1000.0,length=201)
 xgrid=range(-1000.0,stop=1000.0,length=201)
-mgrid = [zgrid, xgrid]
-@info string("spatial sampling intervals (dz,dx)=", step.(mgrid))
+mgrid = [zgrid, xgrid];
+nothing #hide
 ```
 
-### Allocate a `Seismic` model, and adjust bounds
+### Medium #1
 
 ```@example reuse_expt
 vpb = [1500., 3500.] # bounds for vp
 rhob = [1500., 3500.] # density bounds
-
-model=Medium(mgrid)
-update!(model, [:vp,:rho], [vpb,rhob])
-fill!(model)
-@info "a seismic model is created"
-```
-
-### Add some noise to the model (optional)
-
-```@example reuse_expt
-update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise
+medium=Medium(mgrid);
+update!(medium, [:vp,:rho], [vpb,rhob]);
+fill!(medium);
+update!(medium, [:vp,:rho], randn_perc=5); # add some random noise
 nothing #hide
 ```
 
-### A surface acquisition ageometry
+### Medium #2
 
 ```@example reuse_expt
-ageom=AGeom(model.mgrid,:surf, SSrcs(3), Recs(30));
+medium_new=similar(medium)
+update!(medium_new, [:vp,:rho], randn_perc=5.) # add some noise
+update!(medium_new, [:vp], constant_pert=500.) # perturb velocity
+```
+
+### AGeom
+
+```@example reuse_expt
+ageom=AGeom(medium.mgrid,:surf, SSrcs(3), Recs(30)); # surface seismic
 nothing #hide
 ```
 
-### Plot the model and source, receivers
+### Plotting #1
 
 ```@example reuse_expt
-p1=heatmap(model, :vp)
+p1=heatmap(medium, :vp)
 scatter!(ageom, SSrcs())
 scatter!(ageom, Recs())
-plot(p1)
-```
-
-### Generate a temporal grid
-
-```@example reuse_expt
-tgrid = range(0.0,stop=2.0,length=1000)
-```
-
-### Choose a source wavelet
-
-```@example reuse_expt
-wav = ricker(10.0, tgrid, tpeak=0.25,);
-nothing #hide
-```
-
-### Distribute the same source wavelet to all the supsersources
-
-```@example reuse_expt
-srcwav = SrcWav(tgrid, ageom, [:P])
-update!(srcwav, [:P], wav)
-```
-
-create `Fdtd.Param` object to prepare forward modelling
-* npw corresponds to the number of independently propagating wavefields (1 in most cases)
-Once the `Param` object is created, do the modelling "without any memory allocations" using `mod!`
-
-```@example reuse_expt
-pa=SeisForwExpt(Fdtd(),npw=1,model=model,
-	ageom=[ageom], srcwav=[srcwav],
-	sflags=[2], rflags=[1],
-	tgridmod=tgrid, verbose=true);
-
-@time update!(pa);
-nothing #hide
-```
-
-plot a record after modelling
-
-```@example reuse_expt
-pdata=heatmap(pa[:data])
-plot(pdata)
-```
-
-create new seismic model
-
-```@example reuse_expt
-model_new=Medium(:acou_homo1) # prepare another model
-update!(model_new, [:vp,:rho], randn_perc=0.01)
-update!(model_new, [:vp,:rho], constant_pert=0.03) # perturb the model
-p2=heatmap(model_new, :vp) # plot new model
+p2=heatmap(medium_new, :vp)
 scatter!(ageom, SSrcs())
 scatter!(ageom, Recs())
-plot(p2)
+plot(p1, p2, size=(800,300))
 ```
 
-Now, we the change the model in the `Param` object without memory allocation
-This routine can be used during FWI,
-where medium parameters are itertively updated in the same `Fdtd.Param` object
+### SrcWav
 
 ```@example reuse_expt
-update!(pa, model_new)
+tgrid = range(0.0,stop=1.0,length=1000) # generate a temporal grid
+wav = ricker(10.0, tgrid, tpeak=0.25,); # Choose a source wavelet
+srcwav = SrcWav(tgrid, ageom, [:P]) # initialize
+update!(srcwav, [:P], wav) # distribute to all supersources
 ```
 
-run modelling now and plot data again
+### SeisForwExpt
+
+```@example reuse_expt
+pa=SeisForwExpt(Fdtd(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
+nothing #hide
+```
+
+### Modeling #1
 
 ```@example reuse_expt
 @time update!(pa);
+d1=copy(pa[:data][:P])
+p1=heatmap(pa[:data]);
 nothing #hide
 ```
 
-plot a record after modelling
+### Update medium in `pa` without memory allocation
 
 ```@example reuse_expt
-heatmap!(pdata, pa[:data])
-plot(pdata)
+update!(pa, medium_new)
+```
+
+### Modeling #2 and plot
+
+```@example reuse_expt
+@time update!(pa);
+d2=copy(pa[:data][:P])
+p2=heatmap(pa[:data]);
+nothing #hide
+```
+
+Test
+
+```@example reuse_expt
+@test d1≠d2
+```
+
+### Plotting
+
+```@example reuse_expt
+plot(p1,p2, size=(500, 300))
 ```
 

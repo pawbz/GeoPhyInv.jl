@@ -1,13 +1,21 @@
-#
-#
-# 
+using BenchmarkTools
+using GeoPhyInv
+using Test
 
-# A forward experiment, where the seismic data are generated
-# using some models and acquisition parameters from our gallery.
-# Forward modeling consists of a finite-difference simulation of the acoustic wave-equation.
+# # Intro
+
+#md # ```@docs
+#md # SeisForwExpt 
+#md # Base.getindex(::GeoPhyInv.PFdtd, ::Symbol, ::Int)
+#md # ```
+
+# # Methods
+#md # ```@docs
+#md # update!(::GeoPhyInv.PFdtd)
+#md # update!(::GeoPhyInv.PFdtd, ::Medium)
+#md # update!(::GeoPhyInv.PFdtd, ::SrcWav, ::Any)
+#md # ```
 #
-#
-b=4
 #
 #
 #

@@ -1,9 +1,10 @@
 """
-Return snaps stored in `SeisForwExpt` after using `mod!`. 
-
-# Arguments
-
-* `iss::Int64=1` : supersource index
+## Indexing
+`pa` is an instance of `SeisForwExpt`. 
+* `pa[:data,i]` : get data for ith supersource (defaults to first), after `update!`
+* `pa[:ageom]` : get `ageom` originally input while creating `pa`
+* `pa[:srcwav]`: `srcwav` used to create `pa`
+* `pa[:snaps,i]` : snapshots corresponding to `tsnaps` and ith source, after `update!`
 """
 function Base.getindex(pa::PFdtd, s::Symbol, iss::Int=1)
 	@assert iss≤length(pa.c.ageom[1])

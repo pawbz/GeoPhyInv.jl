@@ -19,9 +19,9 @@ makedocs(
 	    "SrcWav" => "generated/srcwav/doc.md",
 	    "Data" => "generated/data/doc.md",
 	    "SeisForwExpt" => Any[
-				  "Introduction" => "generated/fdtd/doc.md",
-				  "Basic usage" => "generated/fdtd/reuse_expt.md",
-				  "Generate snaps" => "generated/fdtd/create_snaps.md",
+				  "Description" => "generated/fdtd/doc.md",
+				  "Tutorial I" => "generated/fdtd/create_snaps.md",
+				  "Tutorial II" => "generated/fdtd/reuse_expt.md",
 				  ],
 	    "PoissonExpt" => Any[
 				  "Introduction" => "generated/Poisson/doc.md",

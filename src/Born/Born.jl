@@ -24,7 +24,7 @@ end
 function mod(;
 	     vp0::Float64=2000.0,
 	     rho0::Float64=2000.0,
-	     model_pert::Medium=nothing,
+	     medium_pert::Medium=nothing,
              born_flag::Bool=false,
 	     tgridmod::StepRangeLen=nothing,
 	     tgrid::StepRangeLen = tgridmod,
@@ -42,15 +42,15 @@ function mod(;
 		
 
 	if(born_flag)
-		mesh_x=model_pert.mgrid[2]
-		mesh_z=model_pert.mgrid[1]
+		mesh_x=medium_pert.mgrid[2]
+		mesh_z=medium_pert.mgrid[1]
 		nz=length(mesh_z)
 		nx=length(mesh_x)
 		δx = step(mesh_x)
 		δz = step(mesh_z)
 
-		δmodtt = model_pert[:KI] - (vp0 * vp0 * rho0)^(-1)
-		δmodrr = model_pert[:rhoI] - (rho0)^(-1)
+		δmodtt = medium_pert[:KI] - (vp0 * vp0 * rho0)^(-1)
+		δmodrr = medium_pert[:rhoI] - (rho0)^(-1)
 	end
 
 	

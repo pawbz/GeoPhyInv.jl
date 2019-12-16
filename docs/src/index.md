@@ -1,11 +1,13 @@
-# The Expt Datatypes
+# The Expt Types
 
 The methods in this package numerically solve some
 differential equations commonly faced in geophysical inverse problems.
 The functionality of this package revolves around the mutable `Expt` types.
 Julia's multiple dispatch is used to overload `Base` methods whenever possible. 
 Which means, if one is familiar with the `Base` methods of Julia, then (almost) no additional syntax is required 
-to use this package. 
+to use this package. Easy!
+
+
 While performing a given experiment,
 firstly, most of the memory necessary
 is allocated while creating the `Expt` variables.

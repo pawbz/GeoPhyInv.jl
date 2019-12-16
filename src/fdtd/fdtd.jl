@@ -1,8 +1,36 @@
-# modeling types in this module
+# 
+# # Credits 
+# Author: Pawan Bharadwaj 
+#         (bharadwaj.pawan@gmail.com)
+# 
+# * original code in FORTRAN90: March 2013
+# * modified: 11 Sept 2013
+# * major update: 25 July 2014
+# * code optimization with help from Jan Thorbecke: Dec 2015
+# * rewritten in Julia: June 2017
+# * added parrallelization over supersources in Julia: July 2017
+# * efficient parrallelization using distributed arrays: Sept 2017
+# * optimized memory allocation: Oct 2017
+# 
+
+
+
+
+
+
+
+
+
+"""
+Forward modeling using a finite-difference simulation of the acoustic wave-equation.
+"""
 struct Fdtd end
 
-struct FdtdBorn end
 
+"""
+Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
+"""
+struct FdtdBorn end
 
 
 
@@ -14,7 +42,6 @@ global const nlayer_rand = 0
 #As forward modeling method, the 
 #finite-difference method is employed. 
 #It uses a discrete version of the two-dimensional isotropic acoustic wave equation.
-#As shown in  
 #
 #```math
 #\pp[\tzero] - \pp[\tmo] = \dt \mB \left({\partial_x\vx}[\tmh]
@@ -24,8 +51,6 @@ global const nlayer_rand = 0
 #\pp[\tpo] - \pp[\tzero] = \dt \mB \left(\partial_x \vx[\tph]
 # + {\partial_z \vz}[\tph]  + \dt\sum_{0}^{\tzero}\sfo\right)
 # ```
-
-
 
 """
 Modelling parameters common for all supersources
@@ -44,8 +69,6 @@ Modelling parameters common for all supersources
 * final conditions of the first propagating wavefield as `Array{Float64,4}` (use for back propagation)
 * gradient model as `Seismic`
 * stored snaps shots at tsnaps as Array{Float64,4} 
-
-
 """
 mutable struct PFdtdc{T}
 	jobname::Symbol
@@ -165,6 +188,42 @@ mutable struct PFdtd{T}
 	c::PFdtdc{T} # common parameters
 end
 
+
+"""
+```julia
+pa = SeisForwExpt(attrib_mod, ageom=ageom, srcwav=srcwav, medium=mod, tgrid=tgrid);
+```
+Method to create an instance of `SeisForwExpt`. 
+The output of this method can be used as an input to the in-place method `update!`, to actually perform a
+finite-difference modeling.
+
+# Keyword Arguments
+
+* `attrib_mod` : attribute to choose the type of modeling. Choose from 
+  * `=Fdtd()` for full wavefield modeling  (finite-difference simulation of the acoustic wave-equation)
+  * `=FdtdBorn()` for Born modeling 
+* `model::Medium` : medium parameters 
+* `tgrid` : modeling time grid, maximum time in `tgrid`should be greater than or equal to maximum source time, same sampling interval as in `srcwav`
+* `ageom` :  acquisition 
+* `srcwav` : source wavelets  
+* `sflags=2` : source related flags 
+  * `=0` inactive sources
+  * `=1` sources with injection rate
+  * `=2` volume injection sources
+  * `=3` sources input after time reversal (use only during backpropagation)
+* `rflags=1` : receiver related flags 
+  * `=0` receivers do not record (or) inactive receivers
+  * `=1` receivers are active only for the second propagating wavefield
+* `rfields=[:P]` : multi-component receiver flag. Choose `Vector{Symbol}`
+  * `=[:P]` record pressure 
+  * `=[:Vx]` record horizontal component of particle velocity  
+  * `=[:Vz]` record vertical component of particle velocity  
+  * `=[:P, :Vx]` record both pressure and velocity 
+* `tsnaps` : store snaps at these modeling times (defaults to half time)
+  * `=[0.1,0.2,0.3]` record at these instances of tgrid
+* `snaps_flag::Bool=false` : return snapshots or not
+* `verbose::Bool=false` : verbose flag
+"""
 SeisForwExpt(attrib_mod::Union{Fdtd,FdtdBorn},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
 
 
@@ -248,80 +307,50 @@ function reset_per_ss!(pap::PFdtdp)
 end
 
 
+
 """
-Method to create `PFdtd` modeling parameters.
-The output of this method can be used as an input to `update!`, where the actual 
-finite-difference modeling is performed.
+Primary method to generate Expt variable when Fdtd() and FdtdBorn() are used.
 
-# Keyword Arguments
-
-* `attrib_mod` : do only Born modeling or full wavefield modelling (to be updated soon)
+# Some internal arguments
 * `jobname::String` : name
 * `npw::Int64=1` : number of independently propagating wavefields in `model`
-* `model::Medium` : seismic medium parameters 
-* `tgridmod::StepRangeLen=` : modeling time grid, maximum time in tgridmod should be greater than or equal to maximum source time, same sampling interval as the wavelet
-* `tgrid::StepRangeLen=tgridmod` : output records are resampled on this time grid
-* `ageom::Vector{AGeom}` :  acquisition ageometry for each independently propagating wavefield
-* `srcwav::Vector{SrcWav}` : source acquisition parameters for each independently propagating wavefield
-* `sflags::Vector{Int64}=fill(2,npw)` : source related flags for each propagating wavefield
-  * `=[0]` inactive sources
-  * `=[1]` sources with injection rate
-  * `=[2]` volume injection sources
-  * `=[3]` sources input after time reversal (use only during backpropagation)
-* `rflags::Vector{Int64}=fill(1,npw)` : receiver related flags for each propagating wavefield
-  * `=[0]` receivers do not record (or) inactive receivers
-  * `=[0,1]` receivers are active only for the second propagating wavefield
-* `rfields::Vector{Symbol}=[:P]` : multi-component receiver flag; types fields the receivers record (to be changed later)
 * `backprop_flag::Bool=Int64` : save final state variables and the boundary conditions for later use
   * `=1` save boundary and final values in `boundary` 
   * `=-1` use stored values in `boundary` for back propagation
+* `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
+* `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
 * `abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left]` : use absorbing PML boundary conditions or not
   * `=[:top, :bottom]` apply PML conditions only at the top and bottom of the model 
   * `=[:bottom, :right, :left]` top is reflecting
-* `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
-* `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
-* `tsnaps::Vector{Float64}=fill(0.5*(tgridmod[end]+tgridmod[1]),1)` : store snaps at these modelling times
-* `snaps_flag::Bool=false` : return snaps or not
-* `verbose::Bool=false` : verbose flag
-
-# Example
-
-```julia
-pa = GeoPhyInv.PFdtd.PFdtd(ageom=ageom, srcwav=srcwav, model=model, tgridmod=tgridmod);
-GeoPhyInv.PFdtd.update!(pa);
-```
-# Credits 
-
-Author: Pawan Bharadwaj 
-        (bharadwaj.pawan@gmail.com)
-
-* original code in FORTRAN90: March 2013
-* modified: 11 Sept 2013
-* major update: 25 July 2014
-* code optimization with help from Jan Thorbecke: Dec 2015
-* rewritten in Julia: June 2017
-* added parrallelization over supersources in Julia: July 2017
-* efficient parrallelization using distributed arrays: Sept 2017
-* optimized memory allocation: Oct 2017
 """
 function PFdtd(attrib_mod;
 	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
-	model::Medium=nothing,
+	medium::Medium=nothing,
 	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
-	tgridmod::StepRangeLen=nothing,
-	ageom::Vector{AGeom}=nothing,
-	srcwav::Array{SrcWav}=nothing,
-	sflags::Vector{Int64}=fill(2,npw), 
-	rflags::Vector{Int64}=fill(1,npw),
+	tgrid::StepRangeLen=nothing,
+	ageom::Union{AGeom,Vector{AGeom}}=nothing,
+	srcwav::Union{SrcWav,Vector{SrcWav}}=nothing,
+	sflags::Union{Int,Vector{Int}}=fill(2,npw), 
+	rflags::Union{Int,Vector{Int}}=fill(1,npw),
 	rfields::Vector{Symbol}=[:P], 
 	backprop_flag::Int64=0,  
 	gmodel_flag::Bool=false,
 	illum_flag::Bool=false,
-	tsnaps::Vector{Float64}=fill(0.5*(tgridmod[end]+tgridmod[1]),1),
+	tsnaps::Vector{Float64}=fill(0.5*(tgrid[end]+tgrid[1]),1),
 	snaps_flag::Bool=false,
 	verbose::Bool=false,
 	nworker=nothing)
+
+	# convert to vectors 
+	if(typeof(ageom)==AGeom); ageom=[ageom]; end
+	if(typeof(srcwav)==SrcWav); srcwav=[srcwav]; end
+	if(typeof(sflags)==Int); sflags=[sflags]; end
+	if(typeof(rflags)==Int); rflags=[rflags]; end
+
+	# alias
+	model=medium
+	tgridmod=tgrid
 
 	#println("********PML Removed*************")
 	#abs_trbl=[:null]
@@ -576,8 +605,14 @@ function update_δmods!(pac::PFdtdc, model_pert::Medium)
 end
 
 """
-Update the `Seismic` model in `PFdtdc` without additional memory allocation.
-This routine is used during FWI, where medium parameters are itertively updated. 
+```julia
+update!(pa,medium_new)
+```
+Update `pa` with a new bundle of medium parameters `medium_new`, without additional memory allocation.
+This routine is used during inversion, where medium parameters are iteratively updated. 
+The ability to iteratively run the forward modeling task (with no additional memory allocation) on  
+various subsurface models is necessary while implementing inversion 
+algorithms.
 """
 function update!(pa::PFdtd, model::Medium)
 	return update!(pa.c, model)
@@ -596,6 +631,16 @@ function update!(pac::PFdtdc, model::Medium)
 	return nothing
 end 
 
+"""
+```julia
+update!(pa,srcwav_new,sflags)
+```
+Update `pa` with a new bundle of source wavelets `srcwav_new`, without additional memory allocation.
+Optionally, `sflags` can be changed. 
+"""
+function update!(pa::PFdtd, srcwav::SrcWav, sflags::Any=nothing)
+	update_srcwav!(pa,[srcwav],sflags)
+end
 function update_srcwav!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags=nothing)
 	# update srcwav in pa.c
 	(length(srcwav) ≠ pa.c.npw) && error("cannot update")
@@ -725,29 +770,11 @@ include("gallery.jl")
 
 
 """
-This method updated the input `PFdtd.PFdtd` after the wave propagation.
-
-# Arguments
-
-* `pa::PFdtd` : modelling parameters
-
-# Useful fields in `pa` that are modified by the method
-
-* `pa.c.TDout::Vector{Data.TD}` : seismic data at receivers after modeling, for each propagating wavefield
-* `pa.c.snaps::Array{Float64,4}` : snaps with size `(nz,nx,length(tsnaps),nss)` saved at `tsnaps`
-* `pa.c.gradient::Medium` : gradient model modified only if `gmodel_flag`
-* `pa.c.illum_stack::Array{Float64,2}` source energy of size `(nz,nx)` if `illum_flag`
-
-# Example
-
 ```julia
-GeoPhyInv.PFdtd.update!(pa)
+update!(pa)
 ```
-# Credits 
-
-Author: Pawan Bharadwaj 
-        (bharadwaj.pawan@gmail.com)
-
+In-place method to perform the experiment and update `pa` after wave propagation. After update, see
+`pa[:data]` and `pa[:snaps]`.
 """
 @fastmath function update!(pa::PFdtd)
 

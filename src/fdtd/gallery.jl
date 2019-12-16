@@ -1,10 +1,4 @@
 
-"""
-Gallery of `SeisForwExpt`.
-# Arguments
-* `attrib::Symbol` : name 
-  * `=:acou_homo1` 
-"""
 function SeisForwExpt(attrib::Symbol)
 	@assert attrib in [:acou_homo1]
 
