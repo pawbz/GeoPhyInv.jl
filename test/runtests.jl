@@ -10,60 +10,36 @@ using Profile
 using LinearMaps
 
 
-function initialize(fp)
-	println(" *********************************")
-	println(" *********** $(fp) ***************")
-	println(" *********************************")
-	include(fp)
-end
-
-folder="media"
-for t in ["convert", "param_adj", "doc"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
-
-folder="ageom"
-for t in ["doc", "gallery"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
-
-folder="srcwav"
-for t in ["doc"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
-
-folder="data"
-for t in ["doc"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
-
-folder="fdtd"
-for t in ["accuracy", "backprop", "rho_projection", "create_snaps"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
-
-folder="fwi"
-for t in ["gradient_accuracy", "born_map"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
+"""
+* `files` are in folder
+* `gfiles` are files in the generated folder
+"""
+function run_test(files,folder,gfiles=[])
+	for file in files
+		fp = joinpath(folder, string(file, ".jl"))
+		println(" ***********************************************")
+		println(" *********** $(fp) ***************")
+		println(" ***********************************************")
+		include(fp)
+	end
+	for file in gfiles
+		fpg = joinpath("generated",folder,string(file, ".jl"))
+		println(" ***********************************************")
+		println(" ******** $(fpg) *********")
+		println(" ***********************************************")
+		include(fpg)
+	end
 end
 
 
-folder="Interpolation"
-for t in ["interp_tests"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
+run_test(["convert", "param_adj"],"media", ["doc"])
+run_test(["gallery"],"ageom", ["doc"])
+run_test([],"srcwav", ["doc"])
+run_test([],"data", ["doc"])
+run_test(["accuracy","backprop", "rho_projection"],"fdtd", ["create_snaps"])
+run_test(["gradient_accuracy", "born_map"],"fwi", [])
+run_test(["interp_tests"],"Interpolation", [])
+run_tests(["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx", "forw", "test_born"], "Poisson", [])
 
-folder="Poisson"
-for t in ["testscript_RandomEigenfns", "adj_state_expt", "adj_state", "testdAdx", "forw", "test_born"]
-	fp = joinpath(folder, string(t, ".jl"))
-	initialize(fp)
-end
 
 

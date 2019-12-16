@@ -25,7 +25,6 @@ function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 	δ=Float64(δ)
 	if((attrib == :acou_homo1))
 		vp0 = [1500., 3500.] # bounds for vp
-		vs0 = [1.0, 1.0] # dummy
 		rho0 = [1500., 3500.] # density bounds
 		mgrid = repeat([range(-1000.0,stop=1000.0,length=201)],2)
 		nz,nx=length.(mgrid)
@@ -35,7 +34,6 @@ function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 
 	elseif((attrib == :acou_homo2))
 		vp0 = [1700., 2300.] # bounds for vp
-		vs0 = [1.0, 1.0] # dummy
 		rho0 = [1700., 2300.] # density bounds
 		mgrid = repeat([range(-1000.0,stop=1000.0,length=51)],2)
 		nz,nx=length.(mgrid)

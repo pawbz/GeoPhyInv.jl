@@ -1,16 +1,21 @@
+```@meta
+EditURL = "<unknown>/fwi/born_map.jl"
+```
 
+```@example born_map
 using Test
 using GeoPhyInv
 using LinearMaps
+```
 
-# he linearized forward modeling operator `F`, such that
-# `Fx` can be computed without explicitly storing the operator matrix (
-#  see `LinearMaps.jl`);
-# the imaging/migration operator `F*`;
+he linearized forward modeling operator `F`, such that
+`Fx` can be computed without explicitly storing the operator matrix (
+ see `LinearMaps.jl`);
+the imaging/migration operator `F*`;
 
-# These maps are the building blocks of iterative optimization schemes.
+These maps are the building blocks of iterative optimization schemes.
 
-
+```@example born_map
 for scenario in [:downhole, :pizza]
 	println("@@@@@@@@@@@@TESTING ", scenario)
 	for rfields in [[:P], [:Vx], [:Vz]]
@@ -19,8 +24,8 @@ for scenario in [:downhole, :pizza]
 
 		F=LinearMap(pa);
 
-		x1=randn(size(F,2)) 
-		x2=randn(size(F,2)) 
+		x1=randn(size(F,2))
+		x2=randn(size(F,2))
 		x12=x1.+x2
 
 
@@ -44,7 +49,7 @@ for scenario in [:downhole, :pizza]
 			a=LinearAlgebra.dot(y,F*x)
 			b=LinearAlgebra.dot(x,adjoint(F)*y)
 			c=LinearAlgebra.dot(x, transpose(F)*F*x)
-			println("adjoint test: ", a, "\t", b)       
+			println("adjoint test: ", a, "\t", b)
 			@test isapprox(a,b,rtol=1e-5)
 			println("must be positive: ", c)
 			@test c>0.0
@@ -56,7 +61,5 @@ for scenario in [:downhole, :pizza]
 		end
 	end
 end
-
-
-
+```
 

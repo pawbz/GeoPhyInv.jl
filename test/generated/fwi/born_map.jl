@@ -1,19 +1,7 @@
-```@meta
-EditURL = "<unknown>/fwi/born_map.jl"
-```
-
-```@example born_map
 using Test
-```
+using GeoPhyInv
+using LinearMaps
 
-he linearized forward modeling operator `F`, such that
-`Fx` can be computed without explicitly storing the operator matrix (
- see `LinearMaps.jl`);
-the imaging/migration operator `F*`;
-
-These maps are the building blocks of iterative optimization schemes.
-
-```@example born_map
 for scenario in [:downhole, :pizza]
 	println("@@@@@@@@@@@@TESTING ", scenario)
 	for rfields in [[:P], [:Vx], [:Vz]]
@@ -59,5 +47,4 @@ for scenario in [:downhole, :pizza]
 		end
 	end
 end
-```
 

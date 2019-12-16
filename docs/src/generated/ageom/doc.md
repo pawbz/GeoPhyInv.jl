@@ -3,6 +3,9 @@ EditURL = "<unknown>/ageom/doc.jl"
 ```
 
 ```@example doc
+using GeoPhyInv
+using Test
+
 #AGeom in mgrid
 ```
 

@@ -6,17 +6,17 @@ EditURL = "<unknown>/media/doc.jl"
 using BenchmarkTools
 using GeoPhyInv
 using Test
-using Gadfly
+using Plots
 ```
 
-To construct a variable to type `Medium`, the first step is to create a 2-D grid
+To construct a variable to type `Medium`, the first step is to create a 2-D grid.
 
 ```@example doc
 mgrid = [range(0.0, stop=10.,step=0.1), range(0.0, stop=30.,step=0.2)];
 nothing #hide
 ```
 
-Initiate the storage of medium parameters on the grid using...
+Initiate the storage of medium parameters on the grid using
 
 ```@example doc
 mod = Medium(mgrid);
@@ -52,8 +52,9 @@ fill!(mod)
 Otherwise, to manually fill in different parameters
 
 ```@example doc
-mod[:vp].=3000.
-mod[:vs].=2000.
+mod[:vp].=3000.;
+mod[:vs].=2000.;
+nothing #hide
 ```
 
 In order to add random noise to the models
@@ -65,12 +66,12 @@ update!(mod, [:vp,:rho], randn_perc=1.)
 Some plotting #1
 
 ```@example doc
-spy(mod[:vp], Guide.xlabel("x"), Guide.ylabel("z"))
+plot(mod, [:vp])
 ```
 
 Some plotting #2
 
 ```@example doc
-spy(mod[:vs], Guide.xlabel("x"), Guide.ylabel("z"))
+plot(mod, [:vs])
 ```
 
