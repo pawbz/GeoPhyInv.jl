@@ -1,6 +1,5 @@
 using GeoPhyInv
 using Statistics
-using Plots
 using Test
 
 zgrid=range(-1000.0,stop=1000.0,length=201)
@@ -20,11 +19,6 @@ update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise
 
 ageom=AGeom(model.mgrid,:surf, SSrcs(3), Recs(30));
 
-p1=heatmap(model, :vp)
-scatter!(ageom, SSrcs())
-scatter!(ageom, Recs())
-plot(p1)
-
 tgrid = range(0.0,stop=2.0,length=1000)
 
 wav = ricker(10.0, tgrid, tpeak=0.25,);
@@ -39,21 +33,11 @@ pa=SeisForwExpt(Fdtd(),npw=1,model=model,
 
 @time update!(pa);
 
-pdata=heatmap(pa[:data])
-plot(pdata)
-
 model_new=Medium(:acou_homo1) # prepare another model
 update!(model_new, [:vp,:rho], randn_perc=0.01)
 update!(model_new, [:vp,:rho], constant_pert=0.03) # perturb the model
-p2=heatmap(model_new, :vp) # plot new model
-scatter!(ageom, SSrcs())
-scatter!(ageom, Recs())
-plot(p2)
 
 update!(pa, model_new)
 
 @time update!(pa);
-
-heatmap!(pdata, pa[:data])
-plot(pdata)
 

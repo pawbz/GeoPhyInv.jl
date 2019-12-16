@@ -12,7 +12,7 @@
 
 using GeoPhyInv
 using Statistics
-using Plots
+#md using Plots
 using Test
 
 
@@ -39,10 +39,10 @@ update!(model, [:vp,:rho], randn_perc=0.01); # add some random noise
 ageom=AGeom(model.mgrid,:surf, SSrcs(3), Recs(30));
 
 # ### Plot the model and source, receivers
-p1=heatmap(model, :vp) 
-scatter!(ageom, SSrcs())
-scatter!(ageom, Recs())
-plot(p1)
+#md p1=heatmap(model, :vp) 
+#md scatter!(ageom, SSrcs())
+#md scatter!(ageom, Recs())
+#md plot(p1)
 
 # ### Generate a temporal grid
 tgrid = range(0.0,stop=2.0,length=1000)
@@ -66,18 +66,18 @@ pa=SeisForwExpt(Fdtd(),npw=1,model=model,
 @time update!(pa);
 
 # plot a record after modelling
-pdata=heatmap(pa[:data])
-plot(pdata)
+#md pdata=heatmap(pa[:data])
+#md plot(pdata)
 
 # create new seismic model
 
 model_new=Medium(:acou_homo1) # prepare another model
 update!(model_new, [:vp,:rho], randn_perc=0.01)
 update!(model_new, [:vp,:rho], constant_pert=0.03) # perturb the model
-p2=heatmap(model_new, :vp) # plot new model 
-scatter!(ageom, SSrcs())
-scatter!(ageom, Recs())
-plot(p2)
+#md p2=heatmap(model_new, :vp) # plot new model 
+#md scatter!(ageom, SSrcs())
+#md scatter!(ageom, Recs())
+#md plot(p2)
 
 
 # Now, we the change the model in the `Param` object without memory allocation
@@ -93,6 +93,6 @@ update!(pa, model_new)
 @time update!(pa);
 
 # plot a record after modelling
-heatmap!(pdata, pa[:data])
-plot(pdata)
+#md heatmap!(pdata, pa[:data])
+#md plot(pdata)
 
