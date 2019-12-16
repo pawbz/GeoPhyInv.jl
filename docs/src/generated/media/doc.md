@@ -9,6 +9,14 @@ using Test
 using Plots
 ```
 
+# Intro
+
+```@docs
+GeoPhyInv.Medium
+```
+
+# Examples
+
 To construct a variable to type `Medium`, the first step is to create a 2-D grid.
 
 ```@example doc
@@ -66,12 +74,24 @@ update!(mod, [:vp,:rho], randn_perc=1.)
 Some plotting #1
 
 ```@example doc
-plot(mod, [:vp])
+p1=plot(mod, [:vp]); savefig(p1,"p1.png")
 ```
+
+![waves](p1.png)
 
 Some plotting #2
 
 ```@example doc
-plot(mod, [:vs])
+p1=plot(mod, [:vs]); savefig(p1,"p1.png")
+```
+
+![waves](p1.png)
+
+# Methods
+```@docs
+Base.getindex(::Medium, ::Symbol)
+GeoPhyInv.update!(::GeoPhyInv.Medium, ::Vector{Symbol},)
+Base.copyto!(x::AbstractArray, mod::Medium, fields::Vector{Symbol})
+Base.vec(mod::Medium, ::Symbol)
 ```
 

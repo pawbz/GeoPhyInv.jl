@@ -34,7 +34,7 @@ mgrid=model.mgrid
 
 @testset "test parallel implementation during gradient" begin
 	for attrib_mod in [Fdtd(), FdtdBorn()]
-		pa=SeisInvExpt(attrib_mod, Migr(), srcwav=srcwav, ageom=ageom, tgrid=tgrid, modm=model0,
+		global pa=SeisInvExpt(attrib_mod, Migr(), srcwav=srcwav, ageom=ageom, tgrid=tgrid, modm=model0,
 				     modm_obs=model,
 				     modm0=model0,
 				     igrid_interp_scheme=:B2,
@@ -43,7 +43,7 @@ mgrid=model.mgrid
 				     nworker=1)
 
 
-		pa_parallel=SeisInvExpt(attrib_mod, Migr(), srcwav=srcwav, ageom=ageom, tgrid=tgrid, modm=model0,
+		global pa_parallel=SeisInvExpt(attrib_mod, Migr(), srcwav=srcwav, ageom=ageom, tgrid=tgrid, modm=model0,
 				     modm_obs=model,
 				     modm0=model0,
 				     igrid_interp_scheme=:B2,
@@ -62,7 +62,7 @@ end
 
 
 @testset "Testing Born Modeling and its gradient" begin
-	expt=x->SeisInvExpt(FdtdBorn(), x,
+	global expt=x->SeisInvExpt(FdtdBorn(), x,
 			     srcwav=srcwav, ageom=ageom, tgrid=tgrid, modm=model0,
 	     		     modm0=model0,
 			     modm_obs=model,
@@ -70,7 +70,7 @@ end
 			     igrid=broadcast(x->range(x[1],stop=x[end],step=350.),mgrid),
 			     parameterization=parameterization,   verbose=false)
 
-	pa=expt(LS())
+	global pa=expt(LS())
 
 
 	update!(pa, bounded_flag=true, solver=:ipopt,

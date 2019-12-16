@@ -1,7 +1,26 @@
 #module Media
 
+"""
+Mutable type for storing medium parameters.
+```julia
+mod=Medium(mgrid, names=[:vp,:rho])
+```
+This initializes a subsurface model with `:vp` and `:rho` parameters. Print the
+names of the medium parameters stored in `mod`.
+```julia
+names(mod)
+```
 
+## Indexing
+* `mod.mgrid` : returns the spatial-grid bundle
+* `mod[:vp]` : P-wave velocity
+* `mod[:rho]` : mass density
+* `mod[:Zp]` : P-wave impedance 
+* `mod[:K]` : bulk modulus 
+* `mod.ref` : reference medium parameters 
+* `mod.bounds` : bounds of medium parameters
 
+"""
 mutable struct Medium
 	mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}}
 	m::NamedArrays.NamedArray{Array{Float64,2},1,Array{Array{Float64,2},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
@@ -17,22 +36,6 @@ end
 include("base.jl")
 include("gallery.jl")
 
-
-#=
-"""
-Store reference model parameters
-"""
-mutable struct Medium_ref{T<:Real}
-	vp::T
-	vs::T
-	rho::T
-	K::T
-	mu::T
-	KI::T
-	muI::T
-	rhoI::T
-end
-=#
 
 
 #=

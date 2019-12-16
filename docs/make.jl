@@ -7,12 +7,13 @@ using Documenter, GeoPhyInv
 makedocs(
 	 format = Documenter.HTML(
 		  prettyurls = get(ENV, "CI", nothing) == "true"),
-   sitename = "Toolbox for Geophysical Inversion",
+	 modules=[GeoPhyInv],
+   sitename = "GeoPhyInv",
    pages = ["Home" => "index.md",
 	    "Medium" => "generated/media/doc.md",
-#	    "AGeom" => "ageom/doc.md",
-#	    "SrcWav" => "srcwav/doc.md",
-#	    "Data" => "data/doc.md",
+	    "AGeom" => "generated/ageom/doc.md",
+	    "SrcWav" => "generated/srcwav/doc.md",
+	    "Data" => "generated/data/doc.md",
 #	    "SeisForwExpt" => Any[
 #				  "Introduction" => "fdtd/intro.md",
 #				  "Basic usage" => "fdtd/reuse_expt.md",

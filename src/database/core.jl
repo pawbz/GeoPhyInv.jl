@@ -71,13 +71,24 @@ end
 #end
 
 
-
-
+"""
+```
+rmul!(srcwav[1], b)
+```
+Scale `srcwav` for first supersource by a scalar `b` overwriting in-place.
+"""
 function LinearAlgebra.rmul!(dat::NamedD, x::Number)
 	for dd in dat.d
 		rmul!(dd, x)
 	end
 end
+
+"""
+```
+rmul!(srcwav, b)
+```
+Scale `srcwav` for all supersources by a scalar `b` overwriting in-place.
+"""
 function LinearAlgebra.rmul!(dat::VNamedD, x::Number)
 	for d in dat
 		rmul!(d,x)
@@ -86,8 +97,13 @@ end
 
 
 
-
-function update!(d::NamedD, fields::Vector{Symbol}, w::Array{Float64},)
+"""
+```julia
+update!(srcwav[1], [:P, :Vx], w)
+```
+Populate first supersource of `srcwav` by a wavelet `w` for `:P` and `:Vx` fields.
+"""
+function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractVector{Float64},)
 	@assert length(w)==length(d.grid)
 	@inbounds for f in fields
 		@assert f ∈ names(d.d)[1]
@@ -99,7 +115,14 @@ function update!(d::NamedD, fields::Vector{Symbol}, w::Array{Float64},)
 	end
 	return d
 end
-function update!(dat::VNamedD, fields::Vector{Symbol}, w::Array{Float64},)
+
+"""
+```julia
+update!(srcwav, [:P, :Vx], w)
+```
+Populate `srcwav` by a wavelet vector `w` for `:P` and `:Vx` fields.
+"""
+function update!(dat::VNamedD, fields::Vector{Symbol}, w::AbstractVector{Float64},)
 	for d in dat
 		update!(d,fields,w)
 	end
@@ -107,11 +130,21 @@ end
 
 
 """
-Compare if two `NamedD`'s  are equal
+```julia
+isequal(srcwav[1], srcwav[2])
+```
+Assert if wavelets due to first two supersources are equal.
 """
 function Base.isequal(dat1::NamedD, dat2::NamedD)
 	return (dat1.grid==dat2.grid) && (dat1.d==dat2.d)
 end
+
+"""
+```julia
+isequal(srcwav1, srcwav2)
+```
+Assert if `srcwav1` and `srcwav2` are equal.
+"""
 function Base.isequal(dat1::VNamedD, dat2::VNamedD)
 	return all([isequal(dat1[i],dat2[i]) for i in 1:length(dat1)])
 end
@@ -122,6 +155,12 @@ Return if two `NamedD`'s have same dimensions and bounds.
 function issimilar(dat1::NamedD, dat2::NamedD)
 	return isequal(dat1.grid, dat2.grid) && isequal(names(dat1.d), names(dat2.d)) && (size(dat1.d)==size(dat2.d)) 
 end
+"""
+```julia
+issimilar(srcwav1, srcwav2)
+```
+Assert if `srcwav1` and `srcwav2` have same dimensions and fields.
+"""
 function issimilar(dat1::VNamedD, dat2::VNamedD)
 	@assert length(dat1)==length(dat2)
 	return all([issimilar(dat1[i],dat2[i]) for i in 1:length(dat1)])
@@ -142,6 +181,14 @@ function Base.vec(data::NamedD)
 	end
 	return v
 end
+
+
+"""
+```julia
+v=vec(srcwav)
+Reshape `srcwav` as a one-dimensional column vector.
+```
+"""
 function Base.vec(data::VNamedD)
 	v=Vector{Float64}()
 	for d in data
@@ -150,11 +197,6 @@ function Base.vec(data::VNamedD)
 	return v
 end
 
-
-"""
-Method to Devectorize data!
-No memory allocations
-"""
 function Base.copyto!(d::NamedD, v::AbstractVector{Float64}, i0=1)
 #	@assert length(d)==length(v)
 	for dd in d.d
@@ -167,6 +209,17 @@ function Base.copyto!(d::NamedD, v::AbstractVector{Float64}, i0=1)
 	end
 	return i0
 end
+
+
+"""
+```julia
+v=vec(srcwav) 
+randn!(v)
+copyto!(srcwav, v)
+```
+Copy `v` to `srcwav`. The sizes of the two objects much match.
+No memory allocations.
+"""
 function Base.copyto!(d::VNamedD, v::AbstractVector{Float64})
 	i0=1
 	for i in 1:length(d)
@@ -175,6 +228,8 @@ function Base.copyto!(d::VNamedD, v::AbstractVector{Float64})
 	end
 	return d
 end
+
+
 
 
 function Base.copyto!(v::AbstractVector{Float64}, d::NamedD,i0=1)
@@ -188,6 +243,13 @@ function Base.copyto!(v::AbstractVector{Float64}, d::NamedD,i0=1)
 	end
 	return i0
 end
+
+"""
+```julia
+copyto!(v, srcwav)
+```
+Same as `vec(srcwav)`, but in-place operation.
+"""
 function Base.copyto!(v::AbstractVector{Float64}, d::VNamedD)
 	i0=1
 	for i in 1:length(d)
@@ -198,9 +260,6 @@ function Base.copyto!(v::AbstractVector{Float64}, d::VNamedD)
 end
 
 
-"""
-Fill with randn values
-"""
 function Random.randn!(data::NamedD)
 	for dd in data.d
 		Random.randn!(dd)
@@ -208,15 +267,16 @@ function Random.randn!(data::NamedD)
 	return data
 end
 
+
+"""
+Fill `srcwav` with Random values.
+"""
 function Random.randn!(data::VNamedD)
 	for d in data
 		Random.randn!(d)
 	end
 end
 
-"""
-Copy `NamedD`'s, which are similar.
-"""
 function Base.copyto!(dataout::NamedD, data::NamedD)
 	for i in names(dataout.d)[1]
 		d1=dataout.d[i]
@@ -224,6 +284,13 @@ function Base.copyto!(dataout::NamedD, data::NamedD)
 		copyto!(d1,d2)
 	end
 end
+
+"""
+```julia
+copyto!(srcwav1, srcwav2)
+```
+Copy `srcwav2` to `srcwav1`, which has same size.
+"""
 function Base.copyto!(dataout::VNamedD, data::VNamedD)
 	for i in 1:length(dataout)
 		d1=dataout[i]
@@ -233,29 +300,20 @@ function Base.copyto!(dataout::VNamedD, data::VNamedD)
 end
 
 
-"""
-Returns bool depending on if input `data::NamedD` has all zeros or not.
-"""
 function Base.iszero(data::NamedD)
 	return maximum(broadcast(maximum,abs,data.d)) == 0.0 ? true : false
 end
+
+"""
+```julia
+iszero(srcwav)
+```
+Returns bool if `srcwav` has all zeros.
+"""
 function Base.iszero(data::VNamedD)
 	return all([iszero(d) for d in data])
 end
 
-
-"""
-Returns dot product of data.
-
-# Arguments 
-
-* `data1::NamedD` : data 1
-* `data2::NamedD` : data 2
-
-# Return
-
-* dot product as `Float64`
-"""
 function LinearAlgebra.dot(data1::NamedD, data2::NamedD)
 	dotd = 0.0;
 	for iff in names(data1.d)[1]
@@ -266,6 +324,13 @@ function LinearAlgebra.dot(data1::NamedD, data2::NamedD)
 	return dotd
 end
 
+
+"""
+```julia
+dot(srcwav1, srcwav2)
+```
+Returns dot product. The sizes must match.
+"""
 function LinearAlgebra.dot(data1::VNamedD, data2::VNamedD)
 	dotd = 0.0;
 	for i in 1:length(data1)
@@ -282,6 +347,14 @@ function Base.fill!(data::NamedD, k::Float64)
 		fill!(dd,k)
 	end
 end
+
+"""
+```julia
+fill!(srcwav, b)
+```
+In-place method to fill `srcwav` with scalar `b`.
+"""
+
 function Base.fill!(data::VNamedD, k::Float64)
 	for d in data
 		fill!(d,k)
@@ -296,6 +369,13 @@ function Base.reverse!(data::NamedD)
 		end
 	end
 end
+
+"""
+```julia
+reverse!(srcwav)
+```
+Perform in-place time-reversal operation for each wavelet in `srcwav`.
+"""
 
 function Base.reverse!(data::VNamedD)
 	for d in data

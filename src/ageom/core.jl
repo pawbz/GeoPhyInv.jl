@@ -1,23 +1,5 @@
-
-
-
 """
-Acquisiton has supersources, sources and receivers.
-Each supersource has `ns` multiple sources that are 
-injected (or active) simultaneously.
-For each supersource,
-a set of `nr` receivers are 
-recording waves.
-
-# Fields
-
-* `sx::Vector{Vector{Float64,1},1}` : ``x`` positions of sources
-* `sz::Vector{Vector{Float64,1},1}` : ``z`` positions of sources
-* `rx::Vector{Vector{Float64,1},1}` : ``x`` positions of receivers
-* `rz::Vector{Vector{Float64,1},1}` : ``z`` positions of receivers
-* `nss::Int64` : number of supersources
-* `ns::Vector{Int64,1}` : number of sources for every supersource
-* `nr::Vector{Int64,1}` : number of receivers for every supersource 
+Acquisition geometry for each supersource.
 """
 mutable struct AGeomss
 	sx::Vector{Float64}
@@ -37,7 +19,7 @@ mutable struct AGeomss
 		error("AGeomss construct") : new(sx, sz, rx, rz, ns, nr)
 end # type
 
-AGeom=Array{AGeomss,1}
+include("gallery.jl")
  
 
 """
@@ -52,14 +34,29 @@ function AGeomss(mgrid::AbstractArray{T}, s::Srcs, r::Recs) where {T<:StepRangeL
 		    Random.rand(Uniform(xmin,xmax),r.n), Random.rand(Uniform(zmin,zmax),r.n), s.n, r.n)
 end
 
+"""
+```julia
+ageom=AGeom(mgrid, SSrcs(2), [Srcs(3), Srcs(2)], [Recs(10), Recs(20)])
+```
+
+Initialize an acquisition, with 2 supersources, by randomly placing a 
+sources and receivers in `mgrid`.
+"""
 function Array{AGeomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Vector{Srcs}, r::Vector{Recs}) where {T<:StepRangeLen}   
 	return [AGeomss(mgrid,s[i],r[i]) for i in 1:ss.n]
 end
+
+"""
+```julia
+ageom=AGeom(mgrid, SSrcs(10), Srcs(10), Recs(20))
+```
+Initialize an acquisition, with 10 supersources, by randomly placing a 
+sources and receivers in `mgrid`. All the supersources have same source and receiver positions.
+"""
 function Array{AGeomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Srcs, r::Recs)  where {T<:StepRangeLen}   
 	return Array{AGeomss,1}(mgrid, ss, fill(s,ss.n), fill(r,ss.n))
 end
 
-"Compare if two `AGeom` variables are equal"
 function Base.isequal(ageom1::AGeomss, ageom2::AGeomss, attrib=:all)
 	srcfnames = [:sx, :sz, :ns]
 	recfnames = [:rx, :rz, :nr]
@@ -73,6 +70,13 @@ function Base.isequal(ageom1::AGeomss, ageom2::AGeomss, attrib=:all)
 		return all(vcat(srcvec, recvec))
 	end
 end
+
+"""
+```julia
+isequal(ageom1, ageom2)
+```
+Assert if `ageom1` equals `ageom2`.
+"""
 function Base.isequal(ageom1::AGeom, ageom2::AGeom, attrib=:all)
 	return (length(ageom1)==length(ageom2)) ? all([isequal(ageom1[iss],ageom2[iss]) for iss in 1:length(ageom1)]) : false
 end
@@ -108,7 +112,16 @@ function spread(n, p0::Vector{T1}, rad::T2, angles::Vector{T3}, rand_flag::Bool=
 end
 
 """
-Update source positions
+```julia
+update!(ageom[1], Srcs(10), p1, p2)
+```
+Update source geometry for the first supersource, with 10 sources placed regularly between `p1=[z1,x1]` and `p2=[z2,x2]`
+
+```julia
+update!(ageom[2], Srcs(10), p0, rad, angles)
+```
+Update source geometry for the second supersource, with 10 sources placed equidistant from `p0=[z0,x0]` given radius `rad`
+and angles `angles=[0,2pi]`.
 """
 function update!(ageomss::AGeomss, ::Srcs, args...) where {T<:Real}
 	z,x=spread(ageomss.ns,args...)
@@ -118,7 +131,10 @@ function update!(ageomss::AGeomss, ::Srcs, args...) where {T<:Real}
 end
 
 """
-Update receiver positions
+```julia
+update!(ageom[1], Recs(10), args...)
+```
+Similar to updating source positions, but for receivers.
 """
 function update!(ageomss::AGeomss, ::Recs, args...)
 	z,x=spread(ageomss.nr,args...)
@@ -128,7 +144,11 @@ function update!(ageomss::AGeomss, ::Recs, args...)
 end
 
 """
-Update supersource positions
+```julia
+update!(ageom, SSrcs(), p1, p2)
+update!(ageom, SSrcs(), p0, rad, angles)
+```
+Update source positions for all supersources. 
 """
 function update!(ageom::AGeom, ::SSrcs, args...)
 	z,x=spread(length(ageom), args...)
@@ -139,7 +159,11 @@ function update!(ageom::AGeom, ::SSrcs, args...)
 end
 
 """
-Update receiver positions in all supersources
+```julia
+update!(ageom, Recs(), p1, p2)
+update!(ageom, Recs(), p0, rad, angles)
+```
+Update receiver positions for all supersources.
 """
 function update!(ageom::AGeom, ::Recs, args...)
 	for iss in 1:length(ageom)
@@ -150,11 +174,11 @@ end
 
 
 """
-Check if all the sources and receivers in `AGeom` are within the model 
-
-# Return
-
-* `true` if all the positions within the model, `false` otherwise
+```julia
+ageom ∈ mgrid
+in(ageom, mgrid)
+```
+Assert if all the sources and receivers in `AGeom` are within bounds of `mgrid`.
 """
 function Base.in(ageom::AGeom, mgrid::AbstractVector{T}) where {T<:StepRangeLen}     
 	xmin, zmin, xmax, zmax = mgrid[2][1], mgrid[1][1], mgrid[2][end], mgrid[1][end]
@@ -177,21 +201,23 @@ end
 
 
 """
-Return a sparse ACQ matrix, for a given ageom
-data=ACQ*snapshot
+```julia
+A=SparseArrays.SparseMatrixCSC(ageom[1],mgrid)
+D=A*P
+```
+Return a sparse matrix that restricts the field `P` on `mgrid` to receiver positions, to give `D`.
 """
-function ACQmat(ageom::AGeom,mgrid,iss=1)
+function SparseArrays.SparseMatrixCSC(ageomss::AGeomss,mgrid::AbstractVector{T}) where {T<:StepRangeLen}  
 	nz,nx=length.(mgrid)
-	ACQ=spzeros(ageom[iss].nr,prod(length.(mgrid)))
-	for ir = 1:ageom[iss].nr
-		irx=argmin(abs.(mgrid[2].-ageom[iss].rx[ir]))
-		irz=argmin(abs.(mgrid[1].-ageom[iss].rz[ir]))
+	ACQ=spzeros(ageomss.nr,prod(length.(mgrid)))
+	for ir = 1:ageomss.nr
+		irx=argmin(abs.(mgrid[2].-ageomss.rx[ir]))
+		irz=argmin(abs.(mgrid[1].-ageomss.rz[ir]))
 		ACQ[ir,irz+(irx-1)*nz]=1.0
 	end
 	return ACQ
 end
 
-include("gallery.jl")
 
 #=
 

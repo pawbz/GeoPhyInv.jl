@@ -1,11 +1,25 @@
 
-SrcWav=Array{NamedD{Srcs},1}
 function Array{NamedD{Srcs},1}(grid::StepRangeLen, ageom::AGeom, fields::Vector{Symbol}) 
 	return [NamedD(grid,Srcs(ageom[i].ns),fields) for i in 1:length(ageom)]
 end
 
 
+"""
+A mutable type that bundles multi-component source wavelets. 
+```julia
+srcwav=SrcWav(tgrid, ageom, [:P, :Vx])
 
+```
+Here, we initialized wavelets, for `:P` and `:Vx` fields, in time domain for sources and supersources in `ageom`.
+
+## Indexing
+* `srcwav[i]` : wavelets for ith supersource of all fields
+* `srcwav[i][:P]` : extract field `:P` 
+* `srcwav[i][:ns]` : number of sources (same as in `ageom`)
+* `srcwav.grid` : returns `tgrid` 
+As mutable objects in Julia are like containers that might hold different values over time, `srcwav` can be modified.
+"""
+SrcWav=Array{NamedD{Srcs},1}
 
 function issimilar(ageom::AGeom, srcwav::SrcWav)
 	test=[]
@@ -18,6 +32,7 @@ issimilar(srcwav::SrcWav, ageom::AGeom)=issimilar(ageom, srcwav)
 
 
 
+#=
 
 #"""
 #Allocate `SrcWav` with zeros depending on the acquisition ageometry.
@@ -188,4 +203,5 @@ function SrcWav_getvec(src::Vector{SrcWav}, field::Symbol)
 	return vec(hcat(hcat(vect...)...))
 end
 
+=#
 =#

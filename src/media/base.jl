@@ -237,7 +237,6 @@ function Base.getindex(mod::Medium, s::Symbol)
 
 
 
-
 	# add derived fields, if not present
 	(s ∉ names(mod.m)[1]) && (mod.m=vcat(mod.m,NamedArray([zero(vp)],[[s],])))
 	x=mod.m[s] 
@@ -274,7 +273,11 @@ end
 
 
 
-function Base.copyto!(x, mod::Medium, fields::Vector{Symbol})
+"""
+Copy medium parameters from Medium `mod`, to vector `x`. Return `x`.
+copyto!(x,mod,[:vp])
+"""
+function Base.copyto!(x::AbstractArray{T}, mod::Medium, fields::Vector{Symbol}) where {T}
 	rho=mod.m[:rho]; 
 	vp=mod.m[:vp]; 
 	nznx=length(rho)
@@ -291,6 +294,11 @@ function Base.copyto!(x, mod::Medium, fields::Vector{Symbol})
 	return x
 end
 
+
+"""
+Return a vector of medium parameters `x`, from Medium `mod`.
+x=vec(mod)
+"""
 function Base.vec(mod::Medium, field::Symbol)
 	# allocate
 	rout=zeros(length(mod.mgrid[1]), length(mod.mgrid[2]))

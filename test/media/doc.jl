@@ -4,6 +4,15 @@ using Test
 #md using Plots
 
 
+# # Intro
+
+#md # ```@docs
+#md # GeoPhyInv.Medium
+#md # Medium(::Symbol, ::Real) 
+#md # ```
+
+# # Examples
+
 # To construct a variable to type `Medium`, the first step is to create a 2-D grid.
 mgrid = [range(0.0, stop=10.,step=0.1), range(0.0, stop=30.,step=0.2)];
 
@@ -30,9 +39,23 @@ mod[:vs].=2000.;
 # In order to add random noise to the models 
 update!(mod, [:vp,:rho], randn_perc=1.)
 
+#-
 # Some plotting #1
-#md plot(mod, [:vp])
+#md p1=plot(mod, [:vp]); savefig(p1,"p1.png")
+#md # ![waves](p1.png)
+
 
 # Some plotting #2
-#md plot(mod, [:vs])
+#md p1=plot(mod, [:vs]); savefig(p1,"p1.png")
+#md # ![waves](p1.png)
+
+
+
+# # Methods 
+#md # ```@docs
+#md # Base.getindex(::Medium, ::Symbol)
+#md # GeoPhyInv.update!(::GeoPhyInv.Medium, ::Vector{Symbol},)
+#md # Base.copyto!(x::AbstractArray, mod::Medium, fields::Vector{Symbol})  
+#md # Base.vec(mod::Medium, ::Symbol)  
+#md # ```
 
