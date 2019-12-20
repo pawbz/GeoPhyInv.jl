@@ -57,8 +57,7 @@ end
 
 "Compare if two `Seismic` models are equal"
 function Base.isequal(mod1::T, mod2::T) where {T<:Union{Medium}}
-
-	fnames = fieldnames(T)
+	fnames = fieldnames(typeof(mod1))
 	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
 	return all(vec)
 end
