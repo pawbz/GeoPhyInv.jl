@@ -158,9 +158,9 @@ function update_adjsrc!(adjsrc, δdat::Data, adjageom)
 	return nothing
 end
 
-value_adjsrc(s, ::P) = s
-value_adjsrc(s, ::Vx) = -1.0*s # see adj tests
-value_adjsrc(s, ::Vz) = -1.0*s
+value_adjsrc(s, ::p) = s
+value_adjsrc(s, ::vx) = -1.0*s # see adj tests
+value_adjsrc(s, ::vz) = -1.0*s
 
 
 function generate_adjsrc(fields, tgrid, adjageom)

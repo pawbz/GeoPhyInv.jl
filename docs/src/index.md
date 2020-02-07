@@ -34,7 +34,7 @@ pa=SeisInvExpt(Fdtd(), LS(), :pizza); # "pizza" is the name of the experiment
 ```
 Then, simply use `update!` to perform least-squares inversion.
 ```julia
-update!(pa)
+update!(pa, solver=:ipopt)
 ```
 
 

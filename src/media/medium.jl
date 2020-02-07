@@ -17,6 +17,7 @@ names(mod)
 * `mod[:rho]` : mass density
 * `mod[:Zp]` : P-wave impedance 
 * `mod[:K]` : bulk modulus 
+* `mod[:Q]` : quality factor (optimized to be constant for all frequencies; Robertsson, et. al, 1994)
 * `mod.ref` : reference medium parameters 
 * `mod.bounds` : bounds of medium parameters
 

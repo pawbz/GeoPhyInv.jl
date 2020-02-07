@@ -388,3 +388,85 @@ end
 
 include("misfits.jl")
 include("statistics.jl")
+
+
+
+
+
+"""
+```julia
+srcwav_new=interp(srcwav, grid_new)
+```
+Interpolates `srcwav` onto a new grid.
+"""
+function interp(data::VNamedD, grid::StepRangeLen, Battrib=:B1)
+	nss = length(data)
+	dataout = [NamedD(grid,  data[iss].sr,  names(data[iss].d,1)) for iss in 1:nss]
+	interp_spray!(data, dataout, :interp, Battrib) 
+	return dataout
+end
+
+function interp(data::NamedD, grid::StepRangeLen, Battrib=:B1)
+	dataout = NamedD(grid,  data.sr,  names(data.d,1))
+	interp_spray!(data, dataout, :interp, Battrib) 
+	return dataout
+end
+
+
+function taper!(data::VNamedD, perc=0.0; bperc=perc,eperc=perc)
+	for d in data
+		taper!(d, perc, bperc=bperc, eperc=eperc)
+	end
+	return data
+end
+
+function taper!(data::NamedD, perc=0.0; bperc=perc,eperc=perc)
+	for dd in data 
+		Utils.taper!(dd,bperc=bperc,eperc=eperc)
+	end
+	return data
+end
+
+
+
+
+"""
+```julia
+interp_spray!(srcwav_new, srcwav, attrib, Battrib)
+```
+Method to interpolate `srcwav` onto to a new grid.
+Can reduce allocations =========
+
+
+"""
+function interp_spray!(data::NamedD, dataout::NamedD, attrib=:interp, Battrib=:B1; pa=nothing)
+	@assert length(data.d)==length(dataout.d)
+	xin=data.grid
+	xout=dataout.grid
+	if(pa===nothing)
+		pa=Interpolation.Kernel([xin], [xout], :B1)
+	end
+	for i in 1:length(data.d)
+		dd=data.d[i]
+		ddo=dataout.d[i]
+		@assert size(dd,2)==size(ddo,2)
+		for ir in 1:size(dd,2)
+				din=view(dd,:,ir)
+				dout=view(ddo,:,ir)
+				Interpolation.interp_spray!(din, dout, pa, attrib)
+		end
+	end
+	return dataout
+end
+
+function interp_spray!(data::VNamedD, dataout::VNamedD, attrib=:interp, Battrib=:B1; pa=nothing)
+	@assert length(data)==length(dataout)
+	for i in 1:length(data)
+		d=data[i]
+		dout=dataout[i]
+		interp_spray!(d, dout, attrib, Battrib, pa=pa)
+	end
+end
+
+
+

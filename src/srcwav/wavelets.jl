@@ -192,7 +192,7 @@ function get_fqdom_tgrid( mod::Medium, nλ::Int, tmaxfrac::Real)
 	# dominant wavelength using mod dimensions
 	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nλ)
 	# average P velocity
-	vavg=mean(mod[:vp])
+	vavg=mod.ref[:vp]
 
 	fqdom = vavg/λdom
 

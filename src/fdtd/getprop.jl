@@ -41,9 +41,9 @@ function Base.show(io::Base.IO, pa::PFdtd)
 	println("pa[:srcwav]")
 end
 
-Base.show(io::Base.IO, pa::PFdtdp)=nothing
-Base.show(io::Base.IO, pa::PFdtdc)=nothing
-Base.show(io::Base.IO, pa::PFdtdss)=nothing
+Base.show(io::Base.IO, pa::P_x_worker)=nothing
+Base.show(io::Base.IO, pa::P_x_worker_x_pw)=nothing
+Base.show(io::Base.IO, pa::P_x_worker_x_pw_x_ss)=nothing
 
 
 

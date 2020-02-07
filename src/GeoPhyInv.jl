@@ -79,9 +79,9 @@ include("data/core.jl")
 
 
 # Pressure and velocity fields (used for multiple dispatch)
-struct P end
-struct Vx end
-struct Vz end
+struct p end
+struct vx end
+struct vz end
 
 
 

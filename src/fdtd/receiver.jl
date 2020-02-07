@@ -4,29 +4,28 @@ struct Receiver_B1 end
 
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac::PFdtdc, pass::Vector{PFdtdss}, pap::PFdtdp, ::Receiver_B1)
-	p=pap.p
-	rinterpolatew=pass[issp].rinterpolatew
-	irx1=pass[issp].irx1
-	irx2=pass[issp].irx2
-	irz1=pass[issp].irz1
-	irz2=pass[issp].irz2
+@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac, pap, ::Receiver_B1)
 
 	for ipw in pac.activepw
-		pw=p[ipw]
-		recs=pass[issp].records[ipw]
-		for (ifieldr, ifield) in enumerate(pac.irfields)
+		rinterpolatew=pap[ipw].ss[issp].rinterpolatew
+		irx1=pap[ipw].ss[issp].rindices[:x1]
+		irx2=pap[ipw].ss[issp].rindices[:x2]
+		irz1=pap[ipw].ss[issp].rindices[:z1]
+		irz2=pap[ipw].ss[issp].rindices[:z2]
+		for rfield in pac.rfields
+			recs=pap[ipw].ss[issp].records[rfield]
+			pw=pap[ipw].p[rfield]
 			@simd for ir = 1:pac.ageom[ipw][iss].nr
-				recs[it,ir,ifieldr]= 
+				recs[it,ir]= 
 				(
-				pw[irz1[ipw][ir],irx1[ipw][ir],ifield]*
-				rinterpolatew[ipw][1,ir]+
-				pw[irz1[ipw][ir],irx2[ipw][ir],ifield]*
-				rinterpolatew[ipw][2,ir]+
-				pw[irz2[ipw][ir],irx1[ipw][ir],ifield]*
-				rinterpolatew[ipw][3,ir]+
-				pw[irz2[ipw][ir],irx2[ipw][ir],ifield]*
-				rinterpolatew[ipw][4,ir]
+				pw[irz1[ir],irx1[ir]]*
+				rinterpolatew[1,ir]+
+				pw[irz1[ir],irx2[ir]]*
+				rinterpolatew[2,ir]+
+				pw[irz2[ir],irx1[ir]]*
+				rinterpolatew[3,ir]+
+				pw[irz2[ir],irx2[ir]]*
+				rinterpolatew[4,ir]
 				)
 		end
 	end
@@ -36,18 +35,17 @@ end
 
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac::PFdtdc, pass::Vector{PFdtdss}, pap::PFdtdp, ::Receiver_B0)
-	p=pap.p
-	rinterpolatew=pass[issp].rinterpolatew
-	irx1=pass[issp].irx1
-	irz1=pass[issp].irz1
-
+@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac, pap, ::Receiver_B0)
 	for ipw in pac.activepw
-		pw=p[ipw]
-		recs=pass[issp].records[ipw]
-		for (ifieldr, ifield) in enumerate(pac.irfields)
+
+		rinterpolatew=pap[ipw].ss[issp].rinterpolatew
+		irx1=pap[ipw].ss[issp].rindices[:x1]
+		irz1=pap[ipw].ss[issp].rindices[:z1]
+		for rfield in pac.rfields
+			recs=pap[ipw].ss[issp].records[rfield]
+			pw=pap[ipw].p[rfield]
 			@simd for ir = 1:pac.ageom[ipw][iss].nr
-				recs[it,ir,ifieldr]=(pw[irz1[ipw][ir],irx1[ipw][ir],ifield])
+				recs[it,ir]=(pw[irz1[ir],irx1[ir]])
 		end
 	end
 	end

@@ -104,17 +104,22 @@ end
 
 @inbounds @fastmath function advance!(pac, pap)
 	# aliases
+	#=
 	p=pap.p; pp=pap.pp; ppp=pap.ppp;
 	dpdx=pap.dpdx; dpdz=pap.dpdz;
 	memory_dp_dx=pap.memory_dp_dx; memory_dp_dz=pap.memory_dp_dz; 
 	memory_dvx_dx=pap.memory_dvx_dx; memory_dvz_dz=pap.memory_dvz_dz
 	modttI=pac.modttI; modrrvx=pac.modrrvx; modrrvz=pac.modrrvz
 	δx24I=pac.δx24I; δz24I=pac.δz24I; δt=pac.δt
-	nx=pac.nx; nz=pac.nz
+	nx=pac.nx; nz=ic[:nz]
 	a_x=pac.a_x; b_x=pac.b_x; k_xI=pac.k_xI; a_x_half=pac.a_x_half; b_x_half=pac.b_x_half; k_x_halfI=pac.k_x_halfI 
 	a_z=pac.a_z; b_z=pac.b_z; k_zI=pac.k_zI; a_z_half=pac.a_z_half; b_z_half=pac.b_z_half; k_z_halfI=pac.k_z_halfI
+	attrib_mod=pac.attrib_mod
+	=#
 
 	for ipw in pac.activepw
+		papw=pap[ipw]
+		#=
 		pw=p[ipw]
 		ppw=pp[ipw]
 		pppw=ppp[ipw]
@@ -124,34 +129,41 @@ end
 		memory_dp_dzw=memory_dp_dz[ipw]
 		memory_dvx_dxw=memory_dvx_dx[ipw]
 		memory_dvz_dzw=memory_dvz_dz[ipw]
+		=#
 
 		# store p for the last two steps
-		pppppp!(pw,ppw,pppw)
+		pppppp!(papw)
 
-		advance_kernel!(pw, dpdxw, dpdzw, δx24I, δz24I,
-			 memory_dp_dxw, memory_dp_dzw,
-			 b_x_half,b_z_half,a_x_half,a_z_half,k_x_halfI,k_z_halfI,
-			 nx,nz,δt,modrrvx,modrrvz,memory_dvx_dxw,memory_dvz_dzw,
-			 b_x,b_z,a_x,a_z,k_xI,k_zI,modttI)
+		advance_kernel!(papw, pac.ic, pac.fc, pac.pml,pac.mod)
+		  #dpdxw, dpdzw, δx24I, δz24I,
+		#	 memory_dp_dxw, memory_dp_dzw,
+		#	 b_x_half,b_z_half,a_x_half,a_z_half,k_x_halfI,k_z_halfI,
+		##	 nx,nz,δt,modrrvx,modrrvz,memory_dvx_dxw,memory_dvz_dzw,
+	#		 b_x,b_z,a_x,a_z,k_xI,k_zI,modttI,attrib_mod)
 
 	end
 	
 	return nothing
 end
 
-function advance_kernel!(pw, dpdxw, dpdzw, δx24I, δz24I,
-			 memory_dp_dxw,memory_dp_dzw,
-			 b_x_half,b_z_half,a_x_half,a_z_half,k_x_halfI,k_z_halfI,
-			 nx,nz,δt,modrrvx,modrrvz,memory_dvx_dxw,memory_dvz_dzw,
-			 b_x,b_z,a_x,a_z,k_xI,k_zI,modttI)
+function advance_kernel!(pa,ic,fc,pml,mod)
+#	pw, dpdxw, dpdzw, δx24I, δz24I,
+#			 memory_dp_dxw,memory_dp_dzw,
+#			 b_x_half,b_z_half,a_x_half,a_z_half,k_x_halfI,k_z_halfI,
+#			 nx,nz,δt,modrrvx,modrrvz,memory_dvx_dxw,memory_dvz_dzw,
+#			 b_x,b_z,a_x,a_z,k_xI,k_zI,modttI, attrib_mod)
 	#compute dpdx and dpdz at [it-1] for all propagating fields
-	update_dpdx!(pw, dpdxw, δx24I, memory_dp_dxw, b_x_half, a_x_half, k_x_halfI, nx, nz)
-	update_dpdz!(pw, dpdzw, δz24I, memory_dp_dzw, b_z_half, a_z_half, k_z_halfI, nx, nz)
+	update_dpdx!(pa,ic,fc,pml)
+#pw, dpdxw, δx24I, memory_dp_dxw, b_x_half, a_x_half, k_x_halfI, nx, nz)
+        update_dpdz!(pa,ic,fc,pml)
+#pw, dpdzw, δz24I, memory_dp_dzw, b_z_half, a_z_half, k_z_halfI, nx, nz)
 
 	#update velocity at [it-1/2] using 
 	#velocity at [it-3/2] and dpdx and dpdz at [it-1] 
-	update_vx!(pw, dpdxw, δt, modrrvx, nx, nz)
-	update_vz!(pw, dpdzw, δt, modrrvz, nx, nz)
+	update_vx!(pa,ic,fc,pml,mod)
+#pw, dpdxw, δt, modrrvx, nx, nz)
+	update_vz!(pa,ic,fc,pml,mod)
+#pw, dpdzw, δt, modrrvz, nx, nz)
 
 	#rigid boundary conditions (not currently implemented, need to do adjoint test)
 	#such that:
@@ -163,61 +175,120 @@ function advance_kernel!(pw, dpdxw, dpdzw, δx24I, δz24I,
 #	rigid_boundary_bottom!(p,nx,nz)
 
 
-	dvdx!(dpdxw,pw,memory_dvx_dxw,b_x,a_x,k_xI,nz,nx,δx24I)
-	dvdz!(dpdzw,pw,memory_dvz_dzw,b_z,a_z,k_zI,nz,nx,δz24I)
+	dvdx!(pa,ic,fc,pml)
+#dpdxw,pw,memory_dvx_dxw,b_x,a_x,k_xI,nz,nx,δx24I)
+	dvdz!(pa,ic,fc,pml)
+#dpdzw,pw,memory_dvz_dzw,b_z,a_z,k_zI,nz,nx,δz24I)
 
 	#compute pressure at [it] using p at [it-1] and dvxdx
 	#and dvzdz at [it-1/2]
-	pvzvx!(pw,dpdxw,dpdzw,modttI,nz,nx,δt)
+	pvzvx!(pa,ic,fc,pml,mod)
+#pw,dpdxw,dpdzw,modttI,nz,nx,δt,attrib_mod)
 
 end
 
 
-function pppppp!(pw,ppw,pppw)
-	copyto!(pppw,ppw)
-	copyto!(ppw,pw)
+function pppppp!(pa)
+	copyto!.(pa.ppp,pa.pp)
+	copyto!.(pa.pp,pa.p)
 end
 
 
 # 
-@inbounds @fastmath function dvdx!(dpdxw,pw,memory_dvx_dxw,b_x,a_x,k_xI,nz,nx,δx24I)
-	for ix=3:nx-1 # ix=1,2,nx are useless, rigid boundary conditions apply on ix=3,nx-1
-	@simd for iz=1:nz
-		@inbounds dpdxw[iz,ix,2] = (27.e0*pw[iz,ix,2]-27.e0*pw[iz,ix-1,2]-pw[iz,ix+1,2]+pw[iz,ix-2,2]) * (δx24I)
-		@inbounds memory_dvx_dxw[iz,ix] = b_x[ix] * memory_dvx_dxw[iz,ix] + a_x[ix] * dpdxw[iz,ix,2] # pml 
-		@inbounds dpdxw[iz,ix,2] = dpdxw[iz,ix,2] * k_xI[ix] + memory_dvx_dxw[iz,ix] # pml
+@inbounds @fastmath function dvdx!(pa,ic,fc,pml)#dpdxw,pw,memory_dvx_dxw,b_x,a_x,k_xI,nz,nx,δx24I)
+	dvdx=pa.dpdx[:vx]
+	vx=pa.p[:vx]
+	mp=pa.memory_pml[:dvxdx]
+
+	for ix=3:ic[:nx]-1 # ix=1,2,nx are useless, rigid boundary conditions apply on ix=3,nx-1
+	@simd for iz=1:ic[:nz]
+		@inbounds dvdx[iz,ix] = (27.e0*vx[iz,ix]-27.e0*vx[iz,ix-1]-vx[iz,ix+1]+vx[iz,ix-2]) * (fc[:δx24I])
+		@inbounds mp[iz,ix] = pml[:b_x][ix] * mp[iz,ix] + pml[:a_x][ix] * dvdx[iz,ix] # pml 
+		@inbounds dvdx[iz,ix] = dvdx[iz,ix] * pml[:k_xI][ix] + mp[iz,ix] # pml
 	end
 	end
 end
 
 
-@inbounds @fastmath function dvdz!(dpdzw,pw,memory_dvz_dzw,b_z,a_z,k_zI,nz,nx,δz24I)
-	for ix=1:nx
-	@simd for iz=3:nz-1 # iz=1,2 are usless, boundary conditions on iz=3,nz-1
-		@inbounds dpdzw[iz,ix,3] = (27.e0*pw[iz,ix,3]-27.e0*pw[iz-1,ix,3]-pw[iz+1,ix,3]+pw[iz-2,ix,3]) * (δz24I)
-		@inbounds memory_dvz_dzw[iz,ix] = b_z[iz] * memory_dvz_dzw[iz,ix] + a_z[iz] * dpdzw[iz,ix,3] # pml
-		@inbounds dpdzw[iz,ix,3] = dpdzw[iz,ix,3] * k_zI[iz] + memory_dvz_dzw[iz,ix] # pml
+@inbounds @fastmath function dvdz!(pa,ic,fc,pml)#dpdzw,pw,memory_dvz_dzw,b_z,a_z,k_zI,nz,nx,δz24I)
+	dvdz=pa.dpdz[:vz]
+	vz=pa.p[:vz]
+	mp=pa.memory_pml[:dvzdz]
+
+	for ix=1:ic[:nx]
+	@simd for iz=3:ic[:nz]-1 # iz=1,2 are usless, boundary conditions on iz=3,nz-1
+		@inbounds dvdz[iz,ix] = (27.e0*vz[iz,ix]-27.e0*vz[iz-1,ix]-vz[iz+1,ix]+vz[iz-2,ix]) * (fc[:δz24I])
+		@inbounds mp[iz,ix] = pml[:b_z][iz] * mp[iz,ix] + pml[:a_z][iz] * dvdz[iz,ix] # pml
+		@inbounds dvdz[iz,ix] = dvdz[iz,ix] * pml[:k_zI][iz] + mp[iz,ix] # pml
 	end
 	end
 end
 
-@inbounds @fastmath function pvzvx!(pw,dpdxw,dpdzw,modttI,nz,nx,δt)
-	for ix=1:nx  # see limits above
-	@simd for iz=1:nz
+# no attenuation (no memory in stress-strain relation)
+@inbounds @fastmath function pvzvx!(pa,ic,fc,pml,mod)#pw,dpdxw,dpdzw,modttI,nz,nx,δt, ::T) where {T<:Union{Fdtd,FdtdBorn}}
+	dvdx=pa.dpdx[:vx]
+	dvdz=pa.dpdz[:vz]
+	p=pa.p[:p]
+
+	for ix=1:ic[:nx]  # see limits above
+	@simd for iz=1:ic[:nz]
+		@inbounds p[iz,ix] += (mod[:ttI][iz,ix] * (dvdx[iz,ix] + dvdz[iz,ix])) * fc[:δt] #* boundary_p(iz,ix)
+	end
+	end
+end
+
+#=
+# viscoacoustic modeling (memory in stress-strain relation)
+@inbounds @fastmath function pvzvx!(pa,ic,fc,pml)#pw,dpdxw,dpdzw,modttI,nz,nx,δt, ::FdtdVisco)
+	for ix=1:ic[:nx]  # see limits above
+	@simd for iz=1:ic[:nz]
+		#=
+
+		 # use the Auxiliary Differential Equation form, 
+		 # which is second-order accurate in time if implemented 
+		 #following eq (14) of Robertsson, Blanch and Symes, Geophysics, vol.
+		 #	  59(9), pp 1444-1456 (1994), which is what we do here        
+		 sum_of_memory_variables_kappa = 0.d0        
+		 
+		 # loop over standard linear solids
+		 for i_sls = 1,N_SLS
+			 # this average of the two terms comes from eq (14) of 
+			 #Robertsson, Blanch and Symes, Geophysics, vol. 59(9), pp 1444-1456 (1994)          
+			 memory_variable_R_dot(i,j,i_sls) = 
+			 	(memory_variable_R_dot_old(i,j,i_sls) + (value_dvx_dx + value_dvy_dy) * 
+      kappa_unrelaxed(i,j) * 
+      DELTAT_delta_relaxed_over_tau_sigma_without_Kappa(i_sls) - memory_variable_R_dot_old(i,j,i_sls) * 
+      HALF_DELTAT_over_tau_sigma_kappa(i_sls))  * multiplication_factor_tau_sigma_kappa(i_sls)          
+				
+	sum_of_memory_variables_kappa = sum_of_memory_variables_kappa + &       
+				    memory_variable_R_dot(i,j,i_sls) + memory_variable_R_dot_old(i,j,i_sls)        
+		 end
+		 =#
+
 		@inbounds pw[iz,ix,1] += (modttI[iz,ix] * (dpdxw[iz,ix,2] + dpdzw[iz,ix,3])) * δt #* boundary_p(iz,ix)
+
+		  # this average of the two terms comes from eq (13) of 
+		  #Robertsson, Blanch and Symes, Geophysics, vol. 59(9), pp 1444-1456 (1994)  
+	        #pressure(i,j) = pressure(i,j) + (- kappa_half_x * (value_dvx_dx + value_dvy_dy) + 
+		#  0.5d0 * sum_of_memory_variables_kappa) * DELTAT
 	end
 	end
 end
+=#
 
 # update for ix=[3,...,nx-2]
 # ix=1,2 are virtual nodes (apply rigid boundary condition later)
 # ix=nx-1,nx are virtual nodes (apply rigid boundary condition later)
-@inbounds @fastmath function update_dpdx!(pw, dpdxw, δx24I, memory_dp_dxw, b_x_half, a_x_half, k_x_halfI, nx, nz)
-	for ix=2:nx-2
-	@simd for iz=1:nz
-		@inbounds dpdxw[iz,ix,1] = (27.e0*pw[iz,ix+1,1]-27.e0*pw[iz,ix,1]-pw[iz,ix+2,1]+pw[iz,ix-1,1]) * (δx24I)
-		@inbounds memory_dp_dxw[iz,ix] = b_x_half[ix] * memory_dp_dxw[iz,ix] + a_x_half[ix] * dpdxw[iz,ix,1] # pml
-		@inbounds dpdxw[iz,ix,1] = dpdxw[iz,ix,1] * k_x_halfI[ix] + memory_dp_dxw[iz,ix] # pml
+@inbounds @fastmath function update_dpdx!(pa,ic,fc,pml)#pw, dpdxw, δx24I, memory_dp_dxw, b_x_half, a_x_half, k_x_halfI, nx, nz)
+	dpdx=pa.dpdx[:p]
+	p=pa.p[:p]
+	mp=pa.memory_pml[:dpdx]
+
+	for ix=2:ic[:nx]-2
+	@simd for iz=1:ic[:nz]
+		@inbounds dpdx[iz,ix] = (27.e0*p[iz,ix+1]-27.e0*p[iz,ix]-p[iz,ix+2]+p[iz,ix-1]) * (fc[:δx24I])
+		@inbounds mp[iz,ix] = pml[:b_x_half][ix] * mp[iz,ix] + pml[:a_x_half][ix] * dpdx[iz,ix] # pml
+		@inbounds dpdx[iz,ix] = dpdx[iz,ix] * pml[:k_x_halfI][ix] + mp[iz,ix] # pml
 	end
 	end
 end
@@ -225,30 +296,37 @@ end
 # update for iz=[2,...,nz-2]
 # iz=1,2 are virtual node
 # iz=nz-1,nz are virtual nodes
-@inbounds @fastmath function update_dpdz!(pw, dpdzw, δz24I, memory_dp_dzw, b_z_half, a_z_half, k_z_halfI, nx, nz)
-	for ix=1:nx
-	@simd for iz=2:nz-2
-		@inbounds dpdzw[iz,ix,1] = (27.e0*pw[iz+1,ix,1]-27.e0*pw[iz,ix,1]-pw[iz+2,ix,1]+pw[iz-1,ix,1]) * (δz24I)
-		@inbounds memory_dp_dzw[iz,ix] = b_z_half[iz] * memory_dp_dzw[iz,ix] + a_z_half[iz] * dpdzw[iz,ix,1] # pml
-		@inbounds dpdzw[iz,ix,1] = dpdzw[iz,ix,1] * k_z_halfI[iz] + memory_dp_dzw[iz,ix] # pml
+@inbounds @fastmath function update_dpdz!(pa,ic,fc,pml)#pw, dpdzw, δz24I, memory_dp_dzw, b_z_half, a_z_half, k_z_halfI, nx, nz)
+	dpdz=pa.dpdz[:p]
+	p=pa.p[:p]
+	mp=pa.memory_pml[:dpdz]
+	for ix=1:ic[:nx]
+	@simd for iz=2:ic[:nz]-2
+		@inbounds dpdz[iz,ix] = (27.e0*p[iz+1,ix]-27.e0*p[iz,ix]-p[iz+2,ix]+p[iz-1,ix]) * fc[:δz24I]
+		@inbounds mp[iz,ix] = pml[:b_z_half][iz] * mp[iz,ix] + pml[:a_z_half][iz] * dpdz[iz,ix] # pml
+		@inbounds dpdz[iz,ix] = dpdz[iz,ix] * pml[:k_z_halfI][iz] + mp[iz,ix] # pml
 	end
 	end
 end
 
 # dpdx is previously computed from [2,...,nx-2]
-@inbounds @fastmath function update_vx!(pw, dpdxw, δt, modrrvx,  nx, nz)
-	for ix=1:nx # see dpdxw computation above
-	@simd for iz=1:nz
-		@inbounds pw[iz,ix,2] += (dpdxw[iz,ix,1]) * δt * modrrvx[iz,ix] #* boundary_vx(iz,ix)
+@inbounds @fastmath function update_vx!(pa,ic,fc,pml,mod)#pw, dpdxw, δt, modrrvx,  nx, nz)
+	dpdx=pa.dpdx[:p]
+	vx=pa.p[:vx]
+	for ix=1:ic[:nx] # see dpdxw computation above
+	@simd for iz=1:ic[:nz]
+		@inbounds vx[iz,ix] += (dpdx[iz,ix]) * fc[:δt] * mod[:rrvx][iz,ix] #* boundary_vx(iz,ix)
 	end
 	end
 end
 
 # dpdz is previously computed from [2,...,nz-2]
-@inbounds @fastmath function update_vz!(pw, dpdzw, δt, modrrvz, nx, nz)
-	for ix=1:nx
-	@simd for iz=1:nz # see dpdzw computation above
-		@inbounds pw[iz,ix,3] +=  (dpdzw[iz,ix,1]) * δt * modrrvz[iz,ix] #* boundary_vz(iz,ix)
+@inbounds @fastmath function update_vz!(pa,ic,fc,pml,mod)#pw, dpdzw, δt, modrrvz, nx, nz)
+	dpdz=pa.dpdz[:p]
+	vz=pa.p[:vz]
+	for ix=1:ic[:nx]
+	@simd for iz=1:ic[:nz]# see dpdzw computation above
+		@inbounds vz[iz,ix] +=  (dpdz[iz,ix]) * fc[:δt] * mod[:rrvz][iz,ix] #* boundary_vz(iz,ix)
 	end
 	end
 end

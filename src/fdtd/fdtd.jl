@@ -1,4 +1,6 @@
 # 
+# implementation greatly inspired from: https://github.com/geodynamics/seismic_cpml/blob/master
+
 # # Credits 
 # Author: Pawan Bharadwaj 
 #         (bharadwaj.pawan@gmail.com)
@@ -11,20 +13,19 @@
 # * added parrallelization over supersources in Julia: July 2017
 # * efficient parrallelization using distributed arrays: Sept 2017
 # * optimized memory allocation: Oct 2017
+
 # 
 
 
-
-
-
-
-
-
-
 """
-Forward modeling using a finite-difference simulation of the acoustic wave-equation.
+Acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
 struct Fdtd end
+
+"""
+ViscoAcoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
+"""
+struct FdtdVisco end
 
 
 """
@@ -37,6 +38,9 @@ struct FdtdBorn end
 
 global const npml = 50
 global const nlayer_rand = 0
+
+include("types.jl")
+include("attenuation.jl")
 
 # 
 #As forward modeling method, the 
@@ -52,140 +56,17 @@ global const nlayer_rand = 0
 # + {\partial_z \vz}[\tph]  + \dt\sum_{0}^{\tzero}\sfo\right)
 # ```
 
-"""
-Modelling parameters common for all supersources
-# Keyword Arguments that are modified by the method (some of them are returned as well)
+#attenuation related
+#Rmemory::StackedArray2DVector{Array{Float64,3}} # memory variable for attenuation, see Carcione et al (1988), GJ
+#Rmemoryp::StackedArray2DVector{Array{Float64,3}} # at previous time step
 
-* `gradient::Vector{Float64}=Medium(model.mgrid)` : gradient model modified only if `gmodel_flag`
-* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
-* `illum::Array{Float64,2}=zeros(length(model.mgrid[1]), length(model.mgrid[2]))` : source energy if `illum_flag`
-* `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
-* `snaps::Array{Float64,4}=zeros(length(model.mgrid[1]),length(model.mgrid[2]),length(tsnaps),ageom[1].nss)` :snapshots saved at `tsnaps`
-
-# Return (in order)
-
-* modelled data for each propagating wavefield as `Vector{TD}`
-* stored boundary values of the first propagating wavefield as `Array{Array{Float64,4},1}` (use for backpropagation)
-* final conditions of the first propagating wavefield as `Array{Float64,4}` (use for back propagation)
-* gradient model as `Seismic`
-* stored snaps shots at tsnaps as Array{Float64,4} 
-"""
-mutable struct PFdtdc{T}
-	jobname::Symbol
-	attrib_mod::T
-	npw::Int64 
-	activepw::Vector{Int64}
-	exmodel::Medium
-	model::Medium
-	ageom::Vector{AGeom}
-	srcwav::Vector{SrcWav}
-	abs_trbl::Vector{Symbol}
-	sfields::Vector{Vector{Symbol}}
-	isfields::Vector{Vector{Int64}}
-	sflags::Vector{Int64} 
-	irfields::Vector{Int64}
-	rflags::Vector{Int64}
-	δt::Float64
-	δxI::Float64
-	δzI::Float64
-	nx::Int64
-	nz::Int64
-	nt::Int64
-	δtI::Float64 
-	δx24I::Float64
-	δz24I::Float64
-	a_x::Vector{Float64}
-	b_x::Vector{Float64}
-	k_xI::Vector{Float64}
-	a_x_half::Vector{Float64}
-	b_x_half::Vector{Float64}
-	k_x_halfI::Vector{Float64} 
-	a_z::Vector{Float64}
-	b_z::Vector{Float64}
-	k_zI::Vector{Float64}
-	a_z_half::Vector{Float64}
-	b_z_half::Vector{Float64}
-	k_z_halfI::Vector{Float64}
-	modtt::Matrix{Float64}
-	modttI::Matrix{Float64} # just storing inv(modtt) for speed
-	modrr::Matrix{Float64}
-	modrrvx::Matrix{Float64}
-	modrrvz::Matrix{Float64}
-	δmodtt::Matrix{Float64}
-	δmodrr::Matrix{Float64} 
-	δmodrrvx::Matrix{Float64}
-	δmodrrvz::Matrix{Float64}
-	δmod::Vector{Float64} # perturbation vector (KI, rhoI)
-	gradient::Vector{Float64}  # output gradient vector w.r.t (KI, rhoI)
-	grad_modtt_stack::SharedArrays.SharedArray{Float64,2} # contains gmodtt
-	grad_modrrvx_stack::SharedArrays.SharedArray{Float64,2}
-	grad_modrrvz_stack::SharedArrays.SharedArray{Float64,2}
-	grad_modrr_stack::Array{Float64,2}
-	illum_flag::Bool
-	illum_stack::SharedArrays.SharedArray{Float64,2}
-	backprop_flag::Int64
-	snaps_flag::Bool
-	itsnaps::Vector{Int64}
-	gmodel_flag::Bool
-	ibx0::Int64
-	ibz0::Int64
-	ibx1::Int64
-	ibz1::Int64
-	isx0::Int64
-	isz0::Int64
-	datamat::SharedArrays.SharedArray{Float64,3}
-	data::Vector{Data}
-	verbose::Bool
-end 
-
-"""
-Modelling parameters per every supersource for each worker
-"""
-mutable struct PFdtdss
-	iss::Int64
-	wavelets::Matrix{Matrix{Float64}}
-	ssprayw::Vector{Matrix{Float64}}
-	records::Vector{Array{Float64,3}}
-	rinterpolatew::Vector{Matrix{Float64}}
-	isx1::Vector{Vector{Int64}} 
-	isx2::Vector{Vector{Int64}}
-	isz1::Vector{Vector{Int64}} 
-	isz2::Vector{Vector{Int64}}
-	irx1::Vector{Vector{Int64}}
-	irx2::Vector{Vector{Int64}}
-	irz1::Vector{Vector{Int64}}
-	irz2::Vector{Vector{Int64}}
-        boundary::Vector{Array{Float64,3}}
-	snaps::Array{Float64,3}
-	illum::Matrix{Float64}
-	grad_modtt::Matrix{Float64} 
-	grad_modrrvx::Matrix{Float64}
-	grad_modrrvz::Matrix{Float64}
-end
-
-"""
-PFdtdeters per every worker, not necessarily for every supersource.
-Note that a single worker can take care of multiple supersources.
-"""
-mutable struct PFdtdp
-	ss::Vector{PFdtdss}
-	p::Vector{Array{Float64,3}}
-	pp::Vector{Array{Float64,3}}
-	ppp::Vector{Array{Float64,3}}
-	dpdx::Vector{Array{Float64,3}}
-	dpdz::Vector{Array{Float64,3}}
-	memory_dp_dx::Vector{Array{Float64,2}}
-	memory_dp_dz::Vector{Array{Float64,2}}
-	memory_dvx_dx::Vector{Array{Float64,2}}
-	memory_dvz_dz::Vector{Array{Float64,2}}
-	born_svalue_stack::Matrix{Float64} 
-end
+P_x_worker=Vector{P_x_worker_x_pw}
 
 
 mutable struct PFdtd{T}
 	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
-	p::DistributedArrays.DArray{PFdtdp,1,PFdtdp} # distributed parameters among workers
-	c::PFdtdc{T} # common parameters
+	p::DistributedArrays.DArray{P_x_worker,1,P_x_worker} # distributed parameters among workers
+	c::P_common{T} # common parameters
 end
 
 
@@ -227,22 +108,32 @@ finite-difference modeling.
 * `snaps_flag::Bool=false` : return snapshots or not
 * `verbose::Bool=false` : verbose flag
 """
-SeisForwExpt(attrib_mod::Union{Fdtd,FdtdBorn},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
+SeisForwExpt(attrib_mod::Union{Fdtd,FdtdBorn,FdtdVisco},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
 
 
-function initialize!(pap::PFdtdp)
-	reset_per_ss!(pap)
-	for issp in 1:length(pap.ss)
-		pass=pap.ss[issp]
-		for i in 1:length(pass.records)
-			fill!(pass.records[i],0.0)
-		end
-		fill!(pass.snaps,0.0)
-		fill!(pass.illum,0.0)
-		fill!(pass.grad_modtt,0.0)
-		fill!(pass.grad_modrrvx,0.0)
-		fill!(pass.grad_modrrvz,0.0)
+function initialize!(pap::P_x_worker)
+
+	for pap_x_pw in pap
+		fill!(pap_x_pw.born_svalue_stack,0.0)
+		fill!.(pap_x_pw.p,0.0)
+		fill!.(pap_x_pw.pp,0.0)
+		fill!.(pap_x_pw.ppp,0.0)
+		fill!.(pap_x_pw.dpdx,0.0)
+		fill!.(pap_x_pw.dpdz,0.0)
+		fill!.(pap_x_pw.memory_pml,0.0)
+		initialize!.(pap_x_pw.ss)
 	end
+
+end
+
+function initialize!(pa::P_x_worker_x_pw_x_ss)
+	fill!.(pa.records,0.0)
+	fill!(pa.snaps,0.0)
+	fill!(pa.illum,0.0)
+	fill!(pa.grad_mod[:tt],0.0)
+	fill!(pa.grad_mod[:rrvx],0.0)
+	fill!(pa.grad_mod[:rrvz],0.0)
+
 end
 
 function iszero_boundary(pa)
@@ -281,32 +172,17 @@ function initialize_boundary!(pa)
 	end
 end
 
-function initialize!(pac::PFdtdc)
+function initialize!(pac::P_common)
 	fill!(pac.gradient,0.0)
-	fill!(pac.grad_modtt_stack,0.0)
-	fill!(pac.grad_modrrvx_stack,0.0)
-	fill!(pac.grad_modrrvz_stack,0.0)
-	fill!(pac.grad_modrr_stack,0.0)
+	fill!(pac.grad_mod[:tt],0.0)
+	fill!(pac.grad_mod[:rrvx],0.0)
+	fill!(pac.grad_mod[:rrvz],0.0)
+	fill!(pac.grad_mod[:rr],0.0)
 	fill!(pac.illum_stack,0.0)
 	for dat in pac.data
 		fill!(dat, 0.0)
 	end
 	fill!(pac.datamat,0.0)
-end
-
-function reset_per_ss!(pap::PFdtdp)
-	for ipw in 1:length(pap.p)
-		fill!(pap.born_svalue_stack,0.0)
-		fill!(pap.p[ipw],0.0)
-		fill!(pap.pp[ipw],0.0)
-		fill!(pap.ppp[ipw],0.0)
-		fill!(pap.dpdx[ipw],0.0)
-		fill!(pap.dpdz[ipw],0.0)
-		fill!(pap.memory_dp_dz[ipw],0.0)
-		fill!(pap.memory_dp_dx[ipw],0.0)
-		fill!(pap.memory_dvx_dx[ipw],0.0)
-		fill!(pap.memory_dvz_dz[ipw],0.0)
-	end
 end
 
 
@@ -336,7 +212,7 @@ function PFdtd(attrib_mod;
 	srcwav::Union{SrcWav,Vector{SrcWav}}=nothing,
 	sflags::Union{Int,Vector{Int}}=fill(2,npw), 
 	rflags::Union{Int,Vector{Int}}=fill(1,npw),
-	rfields::Vector{Symbol}=[:P], 
+	rfields::Vector{Symbol}=[:p], 
 	backprop_flag::Int64=0,  
 	gmodel_flag::Bool=false,
 	illum_flag::Bool=false,
@@ -389,19 +265,8 @@ function PFdtd(attrib_mod;
 	nss = length(ageom[1]);
 	sfields=[names(srcwav[ipw][1].d)[1] for ipw in 1:npw]
 	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
-	for ipw in 1:npw
-		for (i,field) in enumerate(sfields[ipw])
-			isfields[ipw][i]=findfirst(isequal(field), [:P,:Vx,:Vz])
-		end
-	end
+	#
 	fill(nss, npw) != [length(ageom[ip]) for ip=1:npw] ? error("different supersources") : nothing
-
-	# create acquisition ageometry with each source shooting 
-	# at every unique receiver position
-	irfields = Array{Int}(undef,length(rfields))
-	for (i,field) in enumerate(rfields)
-		irfields[i]=findfirst(isequal(field), [:P,:Vx,:Vz])
-	end
 
 
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
@@ -428,6 +293,8 @@ function PFdtd(attrib_mod;
 
 	# for snaps
 	isx0, isz0=npml, npml
+
+	bindices=NamedArray([ibx0,ibx1,ibz0,ibz1,isx0,isz0],([:bx0,:bx1,:bz0,:bz1,:sx0,:sz0],))
 
 	# extend models in the PML layers
 	exmodel = Medium_pml_pad_trun(model, nlayer_rand, npml);
@@ -458,27 +325,41 @@ function PFdtd(attrib_mod;
 	nt=length(tgridmod)
 	mesh_x, mesh_z = exmodel.mgrid[2], exmodel.mgrid[1]
 
+	# some float constants
+	fc=NamedArray(
+	[δt, δxI, δzI, δtI, δx24I, δz24I], 
+	([:δt, :δxI, :δzI, :δtI, :δx24I, :δz24I],))
+
 
 	# perturbation vectors are required on full space
 	δmodtt = zeros(nz, nx)
-	δmod = zeros(2*nzd*nxd)
+	δmodall = zeros(2*nzd*nxd)
 	δmodrr = zeros(nz, nx)
 	δmodrrvx = zeros(nz, nx)
 	δmodrrvz = zeros(nz, nx)
 
 
+	mod=NamedArray([modtt, modttI,modrr,modrrvx,modrrvz], ([:tt,:ttI,:rr,:rrvx,:rrvz],))
+	δmod=NamedArray([δmodtt,δmodrr,δmodrrvx,δmodrrvz], ([:tt,:rr,:rrvx,:rrvz],))
+
 	# pml_variables
-	a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI = pml_variables(nx, δt, δx, npml-3, vpmax, vpmin, freqmin, freqmax, 
-							       [any(abs_trbl .== :left), any(abs_trbl .== :right)])
-	a_z, b_z, k_zI, a_z_half, b_z_half, k_z_halfI = pml_variables(nz, δt, δz, npml-3, vpmax, vpmin, freqmin, freqmax,
-							       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])
+	pml_names=vcat([:a_x,:b_x,:k_xI,:a_x_half,:b_x_half,:k_x_halfI], [:a_z,:b_z,:k_zI,:a_z_half,:b_z_half,:k_z_halfI])
+	pml=NamedArray(vcat(
+		pml_variables(nx, δt, δx, npml-3, vpmax, vpmin, freqmin, freqmax, 
+	       [any(abs_trbl .== :left), any(abs_trbl .== :right)]), 
+		pml_variables(nz, δt, δz, npml-3, vpmax, vpmin, freqmin, freqmax,
+	       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])),
+		(pml_names,))
 
 	gradient=zeros(2*nzd*nxd)
 	grad_modtt_stack=SharedMatrix{Float64}(zeros(nz,nx))
 	# these are full size, as rhoI -> rhovx and rhovz is also full size
 	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nz,nx))
 	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nz,nx))
-	grad_modrr_stack=zeros(nz,nx)
+	grad_modrr_stack=SharedMatrix{Float64}(zeros(nz,nx))
+
+	grad_mod=NamedArray([grad_modtt_stack, grad_modrrvx_stack, grad_modrrvz_stack,grad_modrr_stack], 
+	    ([:tt,:rrvx,:rrvz,:rr],))
 	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
 
 	itsnaps = [argmin(abs.(tgridmod .- tsnaps[i])) for i in 1:length(tsnaps)]
@@ -489,25 +370,43 @@ function PFdtd(attrib_mod;
 
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
-	pac=PFdtdc(jobname,attrib_mod,npw,activepw,
+	
+	if(typeof(attrib_mod)==FdtdVisco)
+		nsls=Int32(3)
+		#function calculate_relaxation_times(Q, nsls, fmin, fmax)
+
+	else
+		# dummy
+		nsls=Int32(0) 
+		Rmemory_coeff1=zeros(1,1,1)
+		Rmemory_coeff2=zeros(1,1,1)
+	end
+
+	pac=P_common(jobname,attrib_mod,activepw,
 	    exmodel,model,
 	    ageom,srcwav,abs_trbl,sfields,isfields,sflags,
-	    irfields,rflags,δt,δxI,δzI,
-            nx,nz,nt,δtI,δx24I,δz24I,a_x,b_x,k_xI,a_x_half,b_x_half,k_x_halfI,a_z,b_z,k_zI,a_z_half,b_z_half,k_z_halfI,
-	    modtt, modttI,modrr,modrrvx,modrrvz,
-	    δmodtt,δmodrr,δmodrrvx,δmodrrvz,
+	    rfields,rflags,
+	    fc,
+	    NamedArray([nx,nz,nt,nsls,npw],([:nx,:nz,:nt,:nsls,:npw],)),
+            #nx,nz,nt,
+	    pml,
+	    mod,
+	    NamedArray([Rmemory_coeff1,Rmemory_coeff2],([:memcoeff1,:memcoeff2],)),
+	    #modtt, modttI,modrr,modrrvx,modrrvz,
 	    δmod,
+	    δmodall,
+	    #δmodtt,δmodrr,δmodrrvx,δmodrrvz,δmod,
 	    gradient,
-	    grad_modtt_stack,
-	    grad_modrrvx_stack,
-	    grad_modrrvz_stack,grad_modrr_stack,
+	    grad_mod,
+	    #grad_modtt_stack, grad_modrrvx_stack, grad_modrrvz_stack,grad_modrr_stack,
 	    illum_flag,illum_stack,
 	    backprop_flag,
 	    snaps_flag,
 	    itsnaps,
 	    gmodel_flag,
-	    ibx0,ibz0,ibx1,ibz1,
-	    isx0,isz0,
+	    bindices,
+	    #ibx0,ibz0,ibx1,ibz1,
+	    #isx0,isz0,
 	    datamat,
 	    data,
 	    verbose)	
@@ -523,8 +422,8 @@ function PFdtd(attrib_mod;
 		sschunks[ib]=ssi[ib]+1:ssi[ib+1]
 	end
 
-	# a distributed array of PFdtdp --- note that the parameters for each super source are efficiently distributed here
-	papa=ddata(T=PFdtdp, init=I->PFdtdp(sschunks[I...][1],pac), pids=work);
+	# a distributed array of P_x_worker --- note that the parameters for each super source are efficiently distributed here
+	papa=ddata(T=P_x_worker, init=I->P_x_worker(sschunks[I...][1],pac), pids=work);
 
 	return PFdtd(sschunks, papa, pac)
 end
@@ -534,30 +433,39 @@ Create modeling parameters for each worker.
 Each worker performs the modeling of supersources in `sschunks`.
 The parameters common to all workers are stored in `pac`.
 """
-function PFdtdp(sschunks::UnitRange{Int64},pac::PFdtdc)
-	nx=pac.nx; nz=pac.nz; npw=pac.npw
+function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::P_common)
+	nx=pac.ic[:nx]; nz=pac.ic[:nz]; npw=pac.ic[:npw]
 
 	born_svalue_stack = zeros(nz, nx)
 
+	fields=[:p,:vx,:vz]
+
+	p=NamedArray([zeros(nz,nx) for i in fields], (fields,))
+	pp=NamedArray([zeros(nz,nx) for i in fields], (fields,))
+	ppp=NamedArray([zeros(nz,nx) for i in fields], (fields,))
+	dpdx=NamedArray([zeros(nz,nx) for i in fields], (fields,))
+	dpdz=NamedArray([zeros(nz,nx) for i in fields], (fields,))
+
+
+	#=
 	p=[zeros(nz,nx,3) for ipw in 1:npw]; 
 	dpdx=[zeros(nz,nx,3) for ipw in 1:npw]; 
 	dpdz=[zeros(nz,nx,3) for ipw in 1:npw]; 
 	pp=[zeros(nz,nx,3) for ipw in 1:npw]; 
 	ppp=[zeros(nz,nx,3) for ipw in 1:npw]; 
+		=#
 
-	memory_dvx_dx=[zeros(nz,nx) for ipw in 1:npw]
-	memory_dvx_dz=[zeros(nz,nx) for ipw in 1:npw]
-	memory_dvz_dx=[zeros(nz,nx) for ipw in 1:npw]
-	memory_dvz_dz=[zeros(nz,nx) for ipw in 1:npw]
-	memory_dp_dx=[zeros(nz,nx) for ipw in 1:npw]
-	memory_dp_dz=[zeros(nz,nx) for ipw in 1:npw]
-	
-	ss=[PFdtdss(iss, pac) for (issp,iss) in enumerate(sschunks)]
+	pml_fields=[:dvxdx, :dvzdz, :dpdz, :dpdx]
 
-	pap=PFdtdp(ss,p,pp,ppp,dpdx,dpdz,memory_dp_dx,memory_dp_dz,memory_dvx_dx,memory_dvz_dz,
-	    born_svalue_stack)
+	memory_pml=NamedArray([zeros(nz,nx) for i in pml_fields], (pml_fields,))
 
-	return pap
+	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
+
+	return P_x_worker_x_pw(ss,p,pp,ppp,dpdx,dpdz,memory_pml,born_svalue_stack)
+end
+
+function Vector{P_x_worker_x_pw}(sschunks::UnitRange{Int64},pac::P_common)
+	return [P_x_worker_x_pw(ipw, sschunks,pac) for ipw in 1:pac.ic[:npw]]
 end
 
 
@@ -566,10 +474,10 @@ update the perturbation vector using the perturbed model
 in this case, model will be treated as the background model 
 * `δmod` is [δKI, δrhoI]
 """
-function update_δmods!(pac::PFdtdc, δmod::Vector{Float64})
-	nx=pac.nx; nz=pac.nz
+function update_δmods!(pac::P_common, δmod::Vector{Float64})
+	nx=pac.ic[:nx]; nz=pac.ic[:nz]
 	nznxd=prod(length.(pac.model.mgrid))
-	copyto!(pac.δmod, δmod)
+	copyto!(pac.δmodall, δmod)
 	fill!(pac.δmodtt,0.0)
 	δmodtt=view(pac.δmodtt,npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
@@ -594,16 +502,16 @@ Update the `δmods` when a perturbed `model_pert` is input.
 The model through which the waves are propagating 
 is assumed to be the background model.
 """
-function update_δmods!(pac::PFdtdc, model_pert::Medium)
+function update_δmods!(pac::P_common, model_pert::Medium)
 	nznxd=prod(length.(pac.model.mgrid))
-	fill!(pac.δmod,0.0)
-	copyto!(pac.δmod, model_pert, [:KI, :rhoI])
+	fill!(pac.δmodall,0.0)
+	copyto!(pac.δmodall, model_pert, [:KI, :rhoI])
 
 	for i in 1:nznxd
-		pac.δmod[i] -= pac.modtt[i] # subtracting the background model
-		pac.δmod[nznxd+i] -= pac.modrr[i] # subtracting the background model
+		pac.δmodall[i] -= pac.modtt[i] # subtracting the background model
+		pac.δmodall[nznxd+i] -= pac.modrr[i] # subtracting the background model
 	end
-	update_δmods!(pac, pac.δmod)
+	update_δmods!(pac, pac.δmodall)
 	return nothing
 end
 
@@ -620,7 +528,7 @@ algorithms.
 function update!(pa::PFdtd, model::Medium)
 	return update!(pa.c, model)
 end
-function update!(pac::PFdtdc, model::Medium)
+function update!(pac::P_common, model::Medium)
 
 	copyto!(pac.model, model)
 
@@ -674,13 +582,12 @@ end
 Create modeling parameters for each supersource. 
 Every worker models one or more supersources.
 """
-function PFdtdss(iss::Int64, pac::PFdtdc)
+function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common)
 
-	irfields=pac.irfields
-	isfields=pac.isfields
-	npw=pac.npw
-	nt=pac.nt
-	nx=pac.nx; nz=pac.nz
+	rfields=pac.rfields
+	sfields=pac.sfields
+	nt=pac.ic[:nt]
+	nx=pac.ic[:nx]; nz=pac.ic[:nz]
 	nzd,nxd=length.(pac.model.mgrid)
 	ageom=pac.ageom
 	srcwav=pac.srcwav
@@ -688,12 +595,13 @@ function PFdtdss(iss::Int64, pac::PFdtdc)
 	mesh_x, mesh_z = pac.exmodel.mgrid[2], pac.exmodel.mgrid[1]
 
 	# records_output, distributed array among different procs
-	records = [zeros(nt,pac.ageom[ipw][iss].nr,length(irfields)) for ipw in 1:npw]
+	records = NamedArray([zeros(nt,pac.ageom[ipw][iss].nr) for i in 1:length(rfields)], (rfields,))
 
 	# gradient outputs
 	grad_modtt = zeros(nz, nx)
 	grad_modrrvx = zeros(nz, nx)
 	grad_modrrvz = zeros(nz, nx)
+
 
 	# saving illum
 	illum =  (pac.illum_flag) ? zeros(nz, nx) : zeros(1,1)
@@ -701,10 +609,8 @@ function PFdtdss(iss::Int64, pac::PFdtdc)
 	snaps = (pac.snaps_flag) ? zeros(nzd,nxd,length(pac.itsnaps)) : zeros(1,1,1)
 
 	# source wavelets
-	wavelets = [zeros(pac.ageom[ipw][iss].ns,length(isfields[ipw])) for ipw in 1:npw, it in 1:nt]
-	fill_wavelets!(iss, wavelets, srcwav, sflags)
-
-	
+	wavelets = [NamedArray([zeros(pac.ageom[ipw][iss].ns) for i in 1:length(sfields[ipw])],(sfields[ipw],)) for it in 1:nt]
+	fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
 
 	# storing boundary values for back propagation
 	nz1, nx1=length.(pac.model.mgrid)
@@ -717,47 +623,41 @@ function PFdtdss(iss::Int64, pac::PFdtdc)
 	else
 		boundary=[zeros(1,1,1) for ii in 1:5]
 	end
+
+	coords=[:x1,:x2,:z1,:z2]
+
+	is=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
 	# source_spray_weights per supersource
-	ssprayw = [zeros(4,ageom[ipw][iss].ns) for ipw in 1:npw]
-	denomsI = [zeros(ageom[ipw][iss].ns) for ipw in 1:npw]
-	isx1=[zeros(Int64,ageom[ipw][iss].ns) for ipw in 1:npw]
-	isx2=[zeros(Int64,ageom[ipw][iss].ns) for ipw in 1:npw]
-	isz1=[zeros(Int64,ageom[ipw][iss].ns) for ipw in 1:npw]
-	isz2=[zeros(Int64,ageom[ipw][iss].ns) for ipw in 1:npw]
-	for ipw=1:npw
-		for is=1:ageom[ipw][iss].ns
-			weights=ssprayw[ipw]
-			denom=denomsI[ipw]
-			Interpolation.get_spray_weights!(view(weights, :,is), view(denom,is), 
-				    view(isx1[ipw],is), view(isx2[ipw],is),
-				    view(isz1[ipw],is), view(isz2[ipw],is),
-				    mesh_x, mesh_z, ageom[ipw][iss].sx[is], ageom[ipw][iss].sz[is])
-		end
+	ssprayw = zeros(4,ageom[ipw][iss].ns)
+	denomsI = zeros(ageom[ipw][iss].ns)
+
+	sindices=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
+	for is=1:ageom[ipw][iss].ns
+		weights=ssprayw
+		denom=denomsI
+		Interpolation.get_spray_weights!(view(weights, :,is), view(denom,is), 
+			    view(sindices[:x1],is), view(sindices[:x2],is),
+			    view(sindices[:z1],is), view(sindices[:z2],is),
+			    mesh_x, mesh_z, ageom[ipw][iss].sx[is], ageom[ipw][iss].sz[is])
 	end
 
 	# receiver interpolation weights per sequential source
-	rinterpolatew = [zeros(4,ageom[ipw][iss].nr) for ipw in 1:npw]
-	denomrI = [zeros(ageom[ipw][iss].nr) for ipw in 1:npw]
-	irx1=[zeros(Int64,ageom[ipw][iss].nr) for ipw in 1:npw]
-	irx2=[zeros(Int64,ageom[ipw][iss].nr) for ipw in 1:npw]
-	irz1=[zeros(Int64,ageom[ipw][iss].nr) for ipw in 1:npw]
-	irz2=[zeros(Int64,ageom[ipw][iss].nr) for ipw in 1:npw]
-	for ipw=1:npw
-		for ir=1:ageom[ipw][iss].nr
-			weights=rinterpolatew[ipw]
-			denom=denomrI[ipw]
-			Interpolation.get_interpolate_weights!(view(weights, :,ir), view(denom, ir), 
-				  view(irx1[ipw],ir), view(irx2[ipw],ir),
-				  view(irz1[ipw],ir), view(irz2[ipw],ir),
-				  mesh_x, mesh_z, ageom[ipw][iss].rx[ir], ageom[ipw][iss].rz[ir])
-		end
+	rinterpolatew = zeros(4,ageom[ipw][iss].nr)
+	denomrI = zeros(ageom[ipw][iss].nr)
+	rindices=NamedArray([zeros(Int64,ageom[ipw][iss].nr) for i in coords], (coords,))
+	for ir=1:ageom[ipw][iss].nr
+		weights=rinterpolatew
+		denom=denomrI
+		Interpolation.get_interpolate_weights!(view(weights, :,ir), view(denom, ir), 
+			  view(rindices[:x1],ir), view(rindices[:x2],ir),
+			  view(rindices[:z1],ir), view(rindices[:z2],ir),
+			  mesh_x, mesh_z, ageom[ipw][iss].rx[ir], ageom[ipw][iss].rz[ir])
 	end
 
 
-	pass=PFdtdss(iss,wavelets,ssprayw,records,rinterpolatew,
-	      isx1,isx2,isz1,isz2,irx1,irx2,irz1,irz2,boundary,snaps,illum, 
-	      grad_modtt,grad_modrrvx,grad_modrrvz)
-
+	pass=P_x_worker_x_pw_x_ss(iss,wavelets,ssprayw,records,rinterpolatew,
+			   sindices,rindices, boundary,snaps,illum,# grad_modtt,grad_modrrvx,grad_modrrvz)
+			   NamedArray([grad_modtt,grad_modrrvx,grad_modrrvz],([:tt,:rrvx,:rrvz],)))
 
 	return pass
 end
@@ -800,13 +700,13 @@ In-place method to perform the experiment and update `pa` after wave propagation
 	end
 
 
-	@timeit to "mod_per_proc!" begin
+	@timeit to "mod_x_proc!" begin
 		# all localparts of DArray are input to this method
 		# parallelization over shots
 		@sync begin
 			for (ip, p) in enumerate(procs(pa.p))
 				@async remotecall_wait(p) do 
-					mod_per_proc!(pa.c, localpart(pa.p))
+					mod_x_proc!(pa.c, localpart(pa.p))
 				end
 			end
 		end
@@ -833,17 +733,17 @@ In-place method to perform the experiment and update `pa` after wave propagation
 	@timeit to "record data" begin
 	for ipw in pa.c.activepw
 		if(pa.c.rflags[ipw] ≠ 0) # record only if rflags is non-zero
-			for ifield in 1:length(pa.c.irfields)
+			for rfield in pa.c.rfields
 
 				fill!(pa.c.datamat, 0.0)
 				@sync begin
 					for (ip, p) in enumerate(procs(pa.p))
 						@sync remotecall_wait(p) do 
-							update_datamat!(ifield, ipw, pa.c, localpart(pa.p))
+							update_datamat!(rfield, ipw, pa.c, localpart(pa.p))
 						end
 					end
 				end
-				update_data!(ifield, ipw, pa.c)
+				update_data!(rfield, ipw, pa.c)
 			end
 		end
 	end
@@ -855,26 +755,26 @@ In-place method to perform the experiment and update `pa` after wave propagation
 	return nothing
 end
 
-function update_datamat!(ifield, ipw, pac::PFdtdc, pap::PFdtdp)
+function update_datamat!(rfield, ipw, pac::P_common, pap::P_x_worker)
 	datamat=pac.datamat
-        pass=pap.ss
+	pass=pap[ipw].ss
 	for issp in 1:length(pass)
 		iss=pass[issp].iss
-		records=pass[issp].records[ipw]
+		records=pass[issp].records
 		for ir in 1:pac.ageom[ipw][iss].nr
-			for it in 1:pac.nt
-				datamat[it,ir,iss]=records[it,ir,ifield]
+			for it in 1:pac.ic[:nt]
+				datamat[it,ir,iss]=records[rfield][it,ir]
 			end
 		end
         end
 end
 
-function update_data!(ifield, ipw, pac::PFdtdc)
+function update_data!(rfield, ipw, pac::P_common)
 	datamat=pac.datamat
 	for iss in 1:length(pac.ageom[1])
-		data=pac.data[ipw][iss].d[ifield]
+		data=pac.data[ipw][iss].d[rfield]
 		for ir in 1:pac.ageom[ipw][iss].nr
-			for it in 1:pac.nt
+			for it in 1:pac.ic[:nt]
 				data[it,ir]=datamat[it,ir,iss]
 			end
 		end
@@ -884,7 +784,7 @@ end
 
 # update TDout after forming a vector and resampling
 #	ipropout=0;
-#	for iprop in 1:pac.npw
+#	for iprop in 1:pac.ic[:npw]
 #		if(pac.rflags[iprop] ≠ 0)
 #			ipropout += 1
 ##			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, ageom[iprop],
@@ -897,8 +797,8 @@ end
 	#return [Data.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
 	#		       tgridmod, ageom[1]) for iprop in 1:npw]
 
-function stack_illums!(pac::PFdtdc, pap::PFdtdp)
-	nx, nz=pac.nx, pac.nz
+function stack_illums!(pac::P_common, pap::P_x_worker)
+	nx, nz=pac.ic[:nx], pac.ic[:nz]
 	illums=pac.illum_stack
 	pass=pap.ss
 	for issp in 1:length(pass)
@@ -910,55 +810,56 @@ end
 
 
 
-# modelling for each processor
-function mod_per_proc!(pac::PFdtdc, pap::PFdtdp) 
+# modelling for each worker
+function mod_x_proc!(pac::P_common, pap::P_x_worker) 
 	# source_loop
-	for issp in 1:length(pap.ss)
-		reset_per_ss!(pap)
+	for issp in 1:length(pap[1].ss) # note, all fields have same sources
+		initialize!(pap)
 
-		iss=pap.ss[issp].iss
+		iss=pap[1].ss[issp].iss # same note as above
 
+		# only for first propagating wavefield, i.e., pap[1]
 		if(pac.backprop_flag==-1)
 			"initial conditions from boundary for first propagating field only"
-			boundary_force_snap_p!(issp,pac,pap.ss,pap)
-			boundary_force_snap_vxvz!(issp,pac,pap.ss,pap)
+			boundary_force_snap_p!(issp,pac,pap[1].ss,pap)
+			boundary_force_snap_vxvz!(issp,pac,pap[1].ss,pap)
 		end
 
-		prog = Progress(pac.nt, dt=1, desc="\tmodeling supershot $iss/$(length(pac.ageom[1])) ", 
+		prog = Progress(pac.ic[:nt], dt=1, desc="\tmodeling supershot $iss/$(length(pac.ageom[1])) ", 
 		  		color=:white) 
 		# time_loop
 		"""
 		* don't use shared arrays inside this time loop, for speed when using multiple procs
 		"""
-		for it=1:pac.nt
+		for it=1:pac.ic[:nt]
 
 			pac.verbose && next!(prog, :white)
 
 			advance!(pac,pap)
 		
-			# force p[1] on boundaries
-			(pac.backprop_flag==-1) && boundary_force!(it,issp,pac,pap.ss,pap)
+			# force p[1] on boundaries, only for ipw=1
+			(pac.backprop_flag==-1) && boundary_force!(it,issp,pac,pap)
 	 
-			add_source!(it, issp, iss, pac, pap.ss, pap, Source_B1())
+			add_source!(it, issp, iss, pac, pap, Source_B1())
 
 			# no born flag for adjoint modelling
 			if(!pac.gmodel_flag)
-				(typeof(pac.attrib_mod)==FdtdBorn) && add_born_sources!(issp, pac, pap.ss, pap)
+				(typeof(pac.attrib_mod)==FdtdBorn) && add_born_sources!(issp, pac, pap)
 			end
 
 			# record boundaries after time reversal already
-			(pac.backprop_flag==1) && boundary_save!(pac.nt-it+1,issp,pac,pap.ss,pap)
+			(pac.backprop_flag==1) && boundary_save!(pac.ic[:nt]-it+1,issp,pac,pap)
 
-			record!(it, issp, iss, pac, pap.ss, pap, Receiver_B1())
+			record!(it, issp, iss, pac, pap, Receiver_B1())
 
-			(pac.gmodel_flag) && compute_gradient!(issp, pac, pap.ss, pap)
+			(pac.gmodel_flag) && compute_gradient!(issp, pac, pap)
 
-			(pac.illum_flag) && compute_illum!(issp, pap.ss, pap)
+			(pac.illum_flag) && compute_illum!(issp, pap)
 
 			if(pac.snaps_flag)
 				iitsnaps=findall(x->==(x,it),pac.itsnaps)
 				for itsnap in iitsnaps
-					snaps_save!(itsnap,issp,pac,pap.ss,pap)
+					snaps_save!(itsnap,issp,pac,pap)
 				end
 			end
 
@@ -969,26 +870,26 @@ function mod_per_proc!(pac::PFdtdc, pap::PFdtdp)
 		advance!(pac,pap)
 
 		"save last snap of pressure field"
-		(pac.backprop_flag==1) && boundary_save_snap_p!(issp,pac,pap.ss,pap)
+		(pac.backprop_flag==1) && boundary_save_snap_p!(issp,pac,pap)
 
 		"one more propagating step to save velocities at [nt+3/2] -- for time reversal"
 		advance!(pac,pap)
 
 		"save last snap of velocity fields with opposite sign for adjoint propagation"
-		(pac.backprop_flag==1) && boundary_save_snap_vxvz!(issp,pac,pap.ss,pap)
+		(pac.backprop_flag==1) && boundary_save_snap_vxvz!(issp,pac,pap)
 
 		"scale gradients for each issp"
 		(pac.gmodel_flag) && scale_gradient!(issp, pap.ss, step(pac.model.mgrid[2])*step(pac.model.mgrid[1]))
 		
 
 	end # source_loop
-end # mod_per_shot
+end # mod_x_shot
 
 
 
 
 # Need illumination to estimate the approximate diagonal of Hessian
-@inbounds @fastmath function compute_illum!(issp::Int64, pass::Vector{PFdtdss}, pap::PFdtdp)
+@inbounds @fastmath function compute_illum!(issp::Int64,  pap::P_x_worker)
 	# saving illumination to be used as preconditioner 
 	p=pap.p
 	illum=pass[issp].illum
@@ -999,7 +900,7 @@ end # mod_per_shot
 end
 
 
-@fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::PFdtdc,pass::Vector{PFdtdss},pap::PFdtdp)
+@fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::P_common,pap::P_x_worker)
 	isx0=pac.isx0
 	isz0=pac.isz0
 	p=pap.p
@@ -1158,7 +1059,7 @@ function pml_variables(
 	k_x_halfI = k_x_half.^(-1.e0)
 
 
-	return a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI
+	return [a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI]
 end
 
 

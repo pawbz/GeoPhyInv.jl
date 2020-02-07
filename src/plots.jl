@@ -32,7 +32,7 @@ end
 	rx, rz
 end
 
-@recipe function heatmap(dat::NamedD, field::Symbol=:P, wclip_perc=0.0, bclip_perc=0.0)
+@recipe function heatmap(dat::NamedD, field::Symbol=:p, wclip_perc=0.0, bclip_perc=0.0)
 
 	#wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
 	#bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
@@ -55,6 +55,30 @@ end
 
 
 
+@userplot Spectrum
+
+
+@recipe function pspectrum(p::Spectrum; tgrid=nothing)
+	wav=p.args[1]
+	if(tgrid===nothing)
+		x=0:length(wav)
+		tgrid=range(0.0, stop=Float64(length(wav)-1), step=1.0)
+	end
+
+	fgrid= FFTW.rfftfreq(length(tgrid), inv(step(tgrid)))
+	powwav = (abs.(FFTW.rfft(wav, [1])).^2)
+	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
+
+	@series begin        
+		subplot := 1
+		legend := false
+		ylabel := "power (dB)"
+		xlabel := "frequency (Hz)"
+		fgrid, powwavdb
+	end
+end
+
+
 
 #=
 Plot time-domain data of type `Data.TD`
@@ -69,7 +93,7 @@ Plot time-domain data of type `Data.TD`
 * `attrib::Symbol=:wav` : specify type of plot
 """
 
-	if(ssvec===nothing)
+	ff(ssvec===nothing)
 		if(:r ∈ fields)
 			urpos = AGeom_get([ageom],:urpos)
 			rx=urpos[2]
@@ -221,29 +245,6 @@ end
 #	close(fout)
 #end
 	
-
-@userplot Spectrum
-
-
-@recipe function pspectrum(p::Spectrum; tgrid=nothing)
-	wav=p.args[1]
-	if(tgrid===nothing)
-		x=0:length(wav)
-		tgrid=range(0.0, stop=Float64(length(wav)-1), step=1.0)
-	end
-
-	fgrid= DSP.rfftfreq(length(tgrid), inv(step(tgrid)))
-	powwav = (abs.(FFTW.rfft(wav, [1])).^2)
-	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
-
-	@series begin        
-		subplot := 1
-		legend := false
-		ylabel := "power (dB)"
-		xlabel := "frequency (Hz)"
-		fgrid, powwavdb
-	end
-end
 
 @userplot Src
 

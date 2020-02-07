@@ -80,7 +80,7 @@ function update_gx!(X, α)
 	end
 end
 
-function initialize!(X)
+function initialize!(X::X)
 	T=eltype(X.x)
 	for i in eachindex(X.x)
 		X.x[i]=zero(T)
