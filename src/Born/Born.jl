@@ -57,7 +57,7 @@ function mod(;
 	fnpow2grid = FFTW.fftfreq(np2,inv(step(tgridmod)));
 
 	nss = length(ageom)
-	data=Data(tgridmod, ageom, [:P])
+	data=Data(tgridmod, ageom, [:p])
 
 	for iss in 1:nss, ifield in 1:length(data[iss].d)
 		sx = ageom[iss].sx

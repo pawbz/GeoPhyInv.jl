@@ -7,14 +7,14 @@ end
 """
 A mutable type that bundles multi-component source wavelets. 
 ```julia
-srcwav=SrcWav(tgrid, ageom, [:P, :Vx])
+srcwav=SrcWav(tgrid, ageom, [:p, :vx])
 
 ```
-Here, we initialized wavelets, for `:P` and `:Vx` fields, in time domain for sources and supersources in `ageom`.
+Here, we initialized wavelets, for `:p` and `:vx` fields, in time domain for sources and supersources in `ageom`.
 
 ## Indexing
 * `srcwav[i]` : wavelets for ith supersource of all fields
-* `srcwav[i][:P]` : extract field `:P` 
+* `srcwav[i][:p]` : extract field `:p` 
 * `srcwav[i][:ns]` : number of sources (same as in `ageom`)
 * `srcwav.grid` : returns `tgrid` 
 As mutable objects in Julia are like containers that might hold different values over time, `srcwav` can be modified.

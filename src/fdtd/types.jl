@@ -17,7 +17,7 @@ mutable struct P_x_worker_x_pw_x_ss
 	rinterpolatew::Matrix{Float64}
 	sindices::NamedStack{Vector{Int64}} # contains [:x1,:x2,:z1,:z2]
 	rindices::NamedStack{Vector{Int64}}
-        boundary::Vector{Array{Float64,3}}
+    boundary::Vector{Array{Float64,3}}
 	snaps::Array{Float64,3}
 	illum::Matrix{Float64}
 	grad_mod::NamedStack{Matrix{Float64}} # w.r.t different coeffs
@@ -35,11 +35,13 @@ Note that a single worker can take care of multiple supersources.
 """
 mutable struct P_x_worker_x_pw
 	ss::Vector{P_x_worker_x_pw_x_ss}
-	p::NamedStack{Matrix{Float64}} # p, vx, vz
+	w2::NamedStack{NamedStack{Matrix{Float64}}} # p, vx, vz
+	#=
 	pp::NamedStack{Matrix{Float64}} # same as above, at previous time step
 	ppp::NamedStack{Matrix{Float64}} # ../../p, vx, vz
 	dpdx::NamedStack{Matrix{Float64}} # x derivatives of p, vx, vz
 	dpdz::NamedStack{Matrix{Float64}} # z derivatives of p, vx, vz
+	=#
 	memory_pml::NamedStack{Matrix{Float64}} # PML related (stored dpdx, dpdz, dvxdx, dvzdz)
 	born_svalue_stack::Matrix{Float64} # used for born modeling 
 end

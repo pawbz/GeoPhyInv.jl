@@ -40,7 +40,7 @@ mutable struct TD
 	"adding conditions that are to be false while construction"
 	#TD(d, fields, tgrid, ageom) = 
 #		any([
-#		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
+#		  any([fields[ifield] ∉ [:p, :vx, :vz] for ifield in 1:length(fields)]),
 #		  length(fields) == 0,
 #		  broadcast(size,d) != [(length(tgrid),ageom[iss].nr) for iss=1:length(ageom), ifield=1:length(fields)]
 #		  ]) ? 

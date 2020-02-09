@@ -99,9 +99,9 @@ end
 
 """
 ```julia
-update!(srcwav[1], [:P, :Vx], w)
+update!(srcwav[1], [:p, :vx], w)
 ```
-Populate first supersource of `srcwav` by a wavelet `w` for `:P` and `:Vx` fields.
+Populate first supersource of `srcwav` by a wavelet `w` for `:p` and `:vx` fields.
 """
 function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractArray)
 	@assert length(w)==length(d.grid)
@@ -120,9 +120,9 @@ end
 
 """
 ```julia
-update!(srcwav, [:P, :Vx], w)
+update!(srcwav, [:p, :vx], w)
 ```
-Populate `srcwav` by a wavelet vector `w` for `:P` and `:Vx` fields.
+Populate `srcwav` by a wavelet vector `w` for `:p` and `:vx` fields.
 """
 function update!(dat::VNamedD, fields::Vector{Symbol}, w::AbstractArray)
 	for d in dat

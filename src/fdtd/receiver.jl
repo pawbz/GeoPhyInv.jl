@@ -14,7 +14,7 @@ struct Receiver_B1 end
 		irz2=pap[ipw].ss[issp].rindices[:z2]
 		for rfield in pac.rfields
 			recs=pap[ipw].ss[issp].records[rfield]
-			pw=pap[ipw].p[rfield]
+			pw=pap[ipw].w2[:t][rfield]
 			@simd for ir = 1:pac.ageom[ipw][iss].nr
 				recs[it,ir]= 
 				(
@@ -43,7 +43,7 @@ end
 		irz1=pap[ipw].ss[issp].rindices[:z1]
 		for rfield in pac.rfields
 			recs=pap[ipw].ss[issp].records[rfield]
-			pw=pap[ipw].p[rfield]
+			pw=pap[ipw].p.w2[:t][rfield]
 			@simd for ir = 1:pac.ageom[ipw][iss].nr
 				recs[it,ir]=(pw[irz1[ir],irx1[ir]])
 		end

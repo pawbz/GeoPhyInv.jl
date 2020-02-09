@@ -6,8 +6,8 @@ update!(ageom, SSrcs(),[0,0],990.0,[0, 2π])
 update!(ageom, Recs(),[0,0],990.0,[0, 2π])
 
 wav, tgrid=ricker(medium, 3, 0.4)
-srcwav = SrcWav(tgrid, ageom, [:P])
-update!(srcwav, [:P], wav)
+srcwav = SrcWav(tgrid, ageom, [:p])
+update!(srcwav, [:p], wav)
 
 for sflags in [[1,-1],[2,-2]]
 	pa=SeisForwExpt(Fdtd(),npw=1, tgrid=tgrid,

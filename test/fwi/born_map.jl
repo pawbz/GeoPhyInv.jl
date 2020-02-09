@@ -6,7 +6,7 @@ using LinearMaps
 
 for scenario in [:downhole, :pizza]
 	println("@@@@@@@@@@@@TESTING ", scenario)
-	for rfields in [[:P], [:Vx], [:Vz]]
+	for rfields in [[:p], [:vx], [:vz]]
 		pa=SeisInvExpt(FdtdBorn(), LS(), scenario, rfields=rfields)
 
 

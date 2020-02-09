@@ -2,14 +2,14 @@
 """
 A mutable type that bundles multi-component records at multiple receivers.
 ```julia
-data=Data(tgrid, ageom, [:P, :Vx])
+data=Data(tgrid, ageom, [:p, :vx])
 
 ```
-Here, we initialized records, of `:P` and `:Vx` fields, in time domain for receivers and supersources in `ageom`.
+Here, we initialized records, of `:p` and `:vx` fields, in time domain for receivers and supersources in `ageom`.
 
 ## Indexing
 * `data[i]` : the records due to ith supersource of all fields
-* `data[i][:P]` : extract field `:P` 
+* `data[i][:p]` : extract field `:p` 
 * `data[i][:nr]` : number of receivers (same as in `ageom`)
 * `data.grid` : returns `tgrid` 
 As mutable objects in Julia are like containers that might hold different values over time, `data` can be modified.

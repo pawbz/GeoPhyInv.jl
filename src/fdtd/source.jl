@@ -75,7 +75,7 @@ struct Source_B0 end
 	adding source to pressure field at [it] 
 	"""
 	for ipw in pac.activepw
-		p=pap[ipw].p;
+		p=pap[ipw].w2[:t];
 		wavelets=pap[ipw].ss[issp].wavelets
 		isx1=pap[ipw].ss[issp].sindices[:x1]
 		isx2=pap[ipw].ss[issp].sindices[:x2]
@@ -120,7 +120,7 @@ end
 	adding source to pressure field at [it] 
 	"""
 	for ipw in pac.activepw
-		p=pap[ipw].p;
+		p=pap[ipw].w2[:t];
 		wavelets=pap[ipw].ss[issp].wavelets
 		sfields=pac.sfields[ipw]
 		isfields=pac.isfields[ipw]

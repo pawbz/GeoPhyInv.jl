@@ -7,7 +7,7 @@ Predefined gallery of `SeisInvExpt`. Choose `attrib::Symbol`
 * `=:downhole` sources and receivers on a drill-string 
 """
 function SeisInvExpt(attrib_mod::Union{Fdtd, FdtdBorn},attrib_inv::Union{LS,LS_prior,Migr,Migr_FD}, attrib::Symbol; 
-		     rfields=[:Vx,:Vz,:P], α=0.0, parameterization=[:χvp, :χrho, :null])
+		     rfields=[:vx,:vz,:p], α=0.0, parameterization=[:χvp, :χrho, :null])
 
 	if(attrib==:pizza)
 		# starting model
@@ -20,8 +20,8 @@ function SeisInvExpt(attrib_mod::Union{Fdtd, FdtdBorn},attrib_inv::Union{LS,LS_p
 
 
 		wav, tgrid=ricker(model, 3, 1.0)
-		srcwav = SrcWav(tgrid, ageom, [:P])
-		update!(srcwav, [:P], wav)
+		srcwav = SrcWav(tgrid, ageom, [:p])
+		update!(srcwav, [:p], wav)
 
 		igrid=broadcast(x->range(x[1],stop=x[end],step=50.),model.mgrid)
 		igrid_interp_scheme=:B2
@@ -43,8 +43,8 @@ function SeisInvExpt(attrib_mod::Union{Fdtd, FdtdBorn},attrib_inv::Union{LS,LS_p
 		update!(ageom, Recs(),[-100,0],[-50,0])
 
 		wav, tgrid=ricker(model, 8, 0.8)
-		srcwav = SrcWav(tgrid, ageom, [:P])
-		update!(srcwav, [:P], wav)
+		srcwav = SrcWav(tgrid, ageom, [:p])
+		update!(srcwav, [:p], wav)
 
 		igrid=[range(-40.,stop=30.,length=100), range(-30.,length=1,step=60.)]
 		igrid_interp_scheme=:B2

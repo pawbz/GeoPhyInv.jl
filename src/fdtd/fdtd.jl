@@ -112,18 +112,22 @@ SeisForwExpt(attrib_mod::Union{Fdtd,FdtdBorn,FdtdVisco},args1...;args2...)=PFdtd
 
 
 function initialize!(pap::P_x_worker)
-
+	reset_w2!(pap)
 	for pap_x_pw in pap
-		fill!(pap_x_pw.born_svalue_stack,0.0)
-		fill!.(pap_x_pw.p,0.0)
-		fill!.(pap_x_pw.pp,0.0)
-		fill!.(pap_x_pw.ppp,0.0)
-		fill!.(pap_x_pw.dpdx,0.0)
-		fill!.(pap_x_pw.dpdz,0.0)
-		fill!.(pap_x_pw.memory_pml,0.0)
 		initialize!.(pap_x_pw.ss)
 	end
 
+end
+
+# reset wavefields for every worker
+function reset_w2!(pap::P_x_worker)
+	for pap_x_pw in pap
+		fill!(pap_x_pw.born_svalue_stack,0.0)
+		for w in pap_x_pw.w2
+			fill!.(w,0.0)
+		end
+		fill!.(pap_x_pw.memory_pml,0.0)
+	end
 end
 
 function initialize!(pa::P_x_worker_x_pw_x_ss)
@@ -440,20 +444,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::P_common)
 
 	fields=[:p,:vx,:vz]
 
-	p=NamedArray([zeros(nz,nx) for i in fields], (fields,))
-	pp=NamedArray([zeros(nz,nx) for i in fields], (fields,))
-	ppp=NamedArray([zeros(nz,nx) for i in fields], (fields,))
-	dpdx=NamedArray([zeros(nz,nx) for i in fields], (fields,))
-	dpdz=NamedArray([zeros(nz,nx) for i in fields], (fields,))
-
-
-	#=
-	p=[zeros(nz,nx,3) for ipw in 1:npw]; 
-	dpdx=[zeros(nz,nx,3) for ipw in 1:npw]; 
-	dpdz=[zeros(nz,nx,3) for ipw in 1:npw]; 
-	pp=[zeros(nz,nx,3) for ipw in 1:npw]; 
-	ppp=[zeros(nz,nx,3) for ipw in 1:npw]; 
-		=#
+	w2=NamedArray([NamedArray([zeros(nz,nx) for i in fields], (fields,)) for i in 1:5], ([:t, :tp, :tpp, :dx, :dz],))
 
 	pml_fields=[:dvxdx, :dvzdz, :dpdz, :dpdx]
 
@@ -461,7 +452,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::P_common)
 
 	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
 
-	return P_x_worker_x_pw(ss,p,pp,ppp,dpdx,dpdz,memory_pml,born_svalue_stack)
+	return P_x_worker_x_pw(ss,w2,memory_pml,born_svalue_stack)
 end
 
 function Vector{P_x_worker_x_pw}(sschunks::UnitRange{Int64},pac::P_common)
@@ -814,7 +805,7 @@ end
 function mod_x_proc!(pac::P_common, pap::P_x_worker) 
 	# source_loop
 	for issp in 1:length(pap[1].ss) # note, all fields have same sources
-		initialize!(pap)
+		reset_w2!(pap)
 
 		iss=pap[1].ss[issp].iss # same note as above
 
@@ -901,13 +892,13 @@ end
 
 
 @fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::P_common,pap::P_x_worker)
-	isx0=pac.isx0
-	isz0=pac.isz0
-	p=pap.p
-	snaps=pass[issp].snaps
+	isx0=pac.bindices[:sx0]
+	isz0=pac.bindices[:sz0]
+	p=pap[1].w2[:t][:p]
+	snaps=pap[1].ss[issp].snaps
 	for ix=1:size(snaps,2)
 		@simd for iz=1:size(snaps,1)
-			snaps[iz,ix,itsnap]=p[1][isz0+iz,isx0+ix,1]
+			snaps[iz,ix,itsnap]=p[isz0+iz,isx0+ix]
 		end
 	end
 end
