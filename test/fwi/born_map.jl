@@ -19,9 +19,9 @@ for scenario in [:downhole, :pizza]
 
 		d12=F*x12
 		d1=F*x1
-		δmodtt1=copy(pa.paf.c.δmodtt)
+		δmodtt1=copy(pa.paf.c.δmod[:tt])
 		d2=F*x2
-		δmodtt2=copy(pa.paf.c.δmodtt)
+		δmodtt2=copy(pa.paf.c.δmod[:tt])
 
 
 		d12new=d1.+d2
@@ -44,7 +44,7 @@ for scenario in [:downhole, :pizza]
 		end
 
 
-		for i in 1:3
+		for i in 1:1
 			adjtest()
 		end
 	end

@@ -30,6 +30,7 @@ function add_born_sources!(issp::Int64, pac, pap)
 	# modrrvx scatterrer source term at [it-1]
 	# modrrvz scatterrer source term at [it-1]
 
+	# compute strength of secondary sources to δmod
 	born_stacktt!(born_svalue_stack,p1,p1p,p1pp,δmodtt,nx,nz,δtI,δt)
 	born_stackrrvx!(born_svalue_stack,dpdx1,δmodrrvx,nx,nz,δx24I,δt)
 	born_stackrrvz!(born_svalue_stack,dpdz1,δmodrrvz,nx,nz,δz24I,δt)
@@ -59,6 +60,7 @@ end
 		end
 	end
 end
+# add secondary sources to second pw
 @inbounds @fastmath function born_stack!(p2,born_svalue_stack,modttI,nx,nz,δt)
 	for ix=1:nx
 		@simd for iz=1:nz

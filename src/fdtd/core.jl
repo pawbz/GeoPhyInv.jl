@@ -1,43 +1,10 @@
 @inbounds @fastmath function advance!(pac, pap)
-	# aliases
-	#=
-	p=pap.p; pp=pap.pp; ppp=pap.ppp;
-	dpdx=pap.dpdx; dpdz=pap.dpdz;
-	memory_dp_dx=pap.memory_dp_dx; memory_dp_dz=pap.memory_dp_dz; 
-	memory_dvx_dx=pap.memory_dvx_dx; memory_dvz_dz=pap.memory_dvz_dz
-	modttI=pac.modttI; modrrvx=pac.modrrvx; modrrvz=pac.modrrvz
-	δx24I=pac.δx24I; δz24I=pac.δz24I; δt=pac.δt
-	nx=pac.nx; nz=nz
-	a_x=pac.a_x; b_x=pac.b_x; k_xI=pac.k_xI; a_x_half=pac.a_x_half; b_x_half=pac.b_x_half; k_x_halfI=pac.k_x_halfI 
-	a_z=pac.a_z; b_z=pac.b_z; k_zI=pac.k_zI; a_z_half=pac.a_z_half; b_z_half=pac.b_z_half; k_z_halfI=pac.k_z_halfI
-	attrib_mod=pac.attrib_mod
-	=#
-
 	for ipw in pac.activepw
 		w2=pap[ipw].w2
 		mpml=pap[ipw].memory_pml
-		#=
-		pw=p[ipw]
-		ppw=pp[ipw]
-		pppw=ppp[ipw]
-		dpdxw=dpdx[ipw]
-		dpdzw=dpdz[ipw]
-		memory_dp_dxw=memory_dp_dx[ipw]
-		memory_dp_dzw=memory_dp_dz[ipw]
-		memory_dvx_dxw=memory_dvx_dx[ipw]
-		memory_dvz_dzw=memory_dvz_dz[ipw]
-		=#
-
 		# store p for the last two steps
 		pppppp!(w2)
-
 		advance_kernel!(w2, pac.ic, pac.fc, mpml, pac.pml,pac.mod)
-		  #dpdxw, dpdzw, δx24I, δz24I,
-		#	 memory_dp_dxw, memory_dp_dzw,
-		#	 b_x_half,b_z_half,a_x_half,a_z_half,k_x_halfI,k_z_halfI,
-		##	 nx,nz,δt,modrrvx,modrrvz,memory_dvx_dxw,memory_dvz_dzw,
-	#		 b_x,b_z,a_x,a_z,k_xI,k_zI,modttI,attrib_mod)
-
 	end
 	
 	return nothing
@@ -72,16 +39,22 @@ function advance_kernel!(w2,ic,fc,mpml,pml,mod)
 
 end
 
-
+"""
+Exchange pointers (i.e., set names of NamedArray) instead of copying arrays around
+"""
 function pppppp!(w2)
-	copyto!.(w2[:tpp],w2[:tp])
-	copyto!.(w2[:tp],w2[:t])
+	names_old=names(w2)[1]
+	names_new=vcat(circshift(names_old[1:3],-1), names_old[4:end])
+	setnames!(w2, names_new, 1)
+	# (old method), use for debugging
+	#copyto!.(w2[:tpp],w2[:tp])
+	#copyto!.(w2[:tp],w2[:t])
 end
 
 
 
 # 
-@inbounds @fastmath function update_dvdx!(w2,ic,fc,mpml,pml)#dpdxw,pw,memory_dvx_dxw,b_x,a_x,k_xI,nz,nx,δx24I)
+@inbounds @fastmath function update_dvdx!(w2,ic,fc,mpml,pml)#
 	dvdx=w2[:dx][:vx]
 	vx=w2[:t][:vx]
 	mp=mpml[:dvxdx]
@@ -98,7 +71,7 @@ end
 end
 
 
-@inbounds @fastmath function update_dvdz!(w2,ic,fc,mpml,pml)#dpdzw,pw,memory_dvz_dzw,b_z,a_z,k_zI,nz,nx,δz24I)
+@inbounds @fastmath function update_dvdz!(w2,ic,fc,mpml,pml)#
 	dvdz=w2[:dz][:vz]
 	vz=w2[:t][:vz]
 	mp=mpml[:dvzdz]
@@ -115,16 +88,17 @@ end
 end
 
 # no attenuation (no memory in stress-strain relation)
-@inbounds @fastmath function update_p!(w2,ic,fc,mod)#pw,dpdxw,dpdzw,modttI,nz,nx,δt, ::T) where {T<:Union{Fdtd,FdtdBorn}}
+@inbounds @fastmath function update_p!(w2,ic,fc,mod)#
 	dvdx=w2[:dx][:vx]
 	dvdz=w2[:dz][:vz]
 	p=w2[:t][:p]
-	pvzvx!(p,dvdz,dvdx,mod[:ttI],fc[:δt],ic[:nz],ic[:nx])
+	pp=w2[:tp][:p]
+	pvzvx!(p,pp,dvdz,dvdx,mod[:ttI],fc[:δt],ic[:nz],ic[:nx])
 end
-@inbounds @fastmath function pvzvx!(p,dvdz,dvdx,mod,fc1,nz,nx)
+@inbounds @fastmath function pvzvx!(p,pp,dvdz,dvdx,mod,fc1,nz,nx)
 	for ix=1:nx  # see limits above
 	@simd for iz=1:nz
-		@inbounds p[iz,ix] += (mod[iz,ix] * (dvdx[iz,ix] + dvdz[iz,ix])) * fc1 #* boundary_p(iz,ix)
+		@inbounds p[iz,ix] = pp[iz,ix] + (mod[iz,ix] * (dvdx[iz,ix] + dvdz[iz,ix])) * fc1 #* boundary_p(iz,ix)
 	end
 	end
 end
@@ -133,9 +107,9 @@ end
 # update for ix=[3,...,nx-2]
 # ix=1,2 are virtual nodes (apply rigid boundary condition later)
 # ix=nx-1,nx are virtual nodes (apply rigid boundary condition later)
-@inbounds @fastmath function update_dpdx!(w2,ic,fc,mpml,pml)#pw, dpdxw, δx24I, memory_dp_dxw, b_x_half, a_x_half, k_x_halfI, nx, nz)
+@inbounds @fastmath function update_dpdx!(w2,ic,fc,mpml,pml)#
 	dpdx=w2[:dx][:p]
-	p=w2[:t][:p]
+	p=w2[:tp][:p]
 	mp=mpml[:dpdx]
 	dpdx!(dpdx,p,mp,pml[:b_x_half],pml[:a_x_half],pml[:k_x_halfI],fc[:δx24I],ic[:nz],ic[:nx])
 end
@@ -152,9 +126,9 @@ end
 # update for iz=[2,...,nz-2]
 # iz=1,2 are virtual node
 # iz=nz-1,nz are virtual nodes
-@inbounds @fastmath function update_dpdz!(w2,ic,fc,mpml,pml)#pw, dpdzw, δz24I, memory_dp_dzw, b_z_half, a_z_half, k_z_halfI, nx, nz)
+@inbounds @fastmath function update_dpdz!(w2,ic,fc,mpml,pml)#
 	dpdz=w2[:dz][:p]
-	p=w2[:t][:p]
+	p=w2[:tp][:p]
 	mp=mpml[:dpdz]
 	dpdz!(dpdz,p,mp,pml[:b_z_half],pml[:a_z_half],pml[:k_z_halfI],fc[:δz24I],ic[:nz],ic[:nx])
 end
@@ -169,29 +143,31 @@ end
 end
 
 # dpdx is previously computed from [2,...,nx-2]
-@inbounds @fastmath function update_vx!(w2,ic,fc,mod)#pw, dpdxw, δt, modrrvx,  nx, nz)
+@inbounds @fastmath function update_vx!(w2,ic,fc,mod)#
 	dpdx=w2[:dx][:p]
 	vx=w2[:t][:vx]
-	vx!(vx,dpdx,mod[:rrvx],fc[:δt],ic[:nz],ic[:nx])
+	vxp=w2[:tp][:vx]
+	vx!(vx,vxp,dpdx,mod[:rrvx],fc[:δt],ic[:nz],ic[:nx])
 end
-@inbounds @fastmath function vx!(vx,dpdx,mod,fc1,nz,nx)
+@inbounds @fastmath function vx!(vx,vxp,dpdx,mod,fc1,nz,nx)
 	for ix=1:nx # see dpdxw computation above
 	@simd for iz=1:nz
-		@inbounds vx[iz,ix] += (dpdx[iz,ix]) * fc1 * mod[iz,ix] #* boundary_vx(iz,ix)
+		@inbounds vx[iz,ix] = vxp[iz,ix] + (dpdx[iz,ix]) * fc1 * mod[iz,ix] #* boundary_vx(iz,ix)
 	end
 	end
 end
 
 # dpdz is previously computed from [2,...,nz-2]
-@inbounds @fastmath function update_vz!(w2,ic,fc,mod)#pw, dpdzw, δt, modrrvz, nx, nz)
+@inbounds @fastmath function update_vz!(w2,ic,fc,mod)#
 	dpdz=w2[:dz][:p]
 	vz=w2[:t][:vz]
-	vz!(vz,dpdz,mod[:rrvz],fc[:δt],ic[:nz],ic[:nx])
+	vzp=w2[:tp][:vz]
+	vz!(vz,vzp,dpdz,mod[:rrvz],fc[:δt],ic[:nz],ic[:nx])
 end
-@inbounds @fastmath function vz!(vz,dpdz,mod,fc1,nz,nx)
+@inbounds @fastmath function vz!(vz,vzp,dpdz,mod,fc1,nz,nx)
 	for ix=1:nx
 	@simd for iz=1:nz # see dpdzw computation above
-		@inbounds vz[iz,ix] +=  (dpdz[iz,ix]) * fc1 * mod[iz,ix] #* boundary_vz(iz,ix)
+		@inbounds vz[iz,ix] = vzp[iz,ix] + (dpdz[iz,ix]) * fc1 * mod[iz,ix] #* boundary_vz(iz,ix)
 	end
 	end
 end

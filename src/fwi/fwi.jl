@@ -473,10 +473,10 @@ function δx_to_δmods!(pa, δx)
 	Interpolation.interp_spray!(δx, pa.mxm.x, pa.paminterp, :interp, count(pa.parameterization.≠:null))
 
 	# reparameterize accordingly to get [δKI, δrhoI]
-	copyto!(pa.paf.c.δmod, pa.mxm.x, pa.mediumm0, pa.parameterization)
+	copyto!(pa.paf.c.δmodall, pa.mxm.x, pa.mediumm0, pa.parameterization)
 
 	# input [δKI, δrhoI] to the modeling engine
-	update_δmods!(pa.paf.c, pa.paf.c.δmod)
+	update_δmods!(pa.paf.c, pa.paf.c.δmodall)
 end
 
 """
