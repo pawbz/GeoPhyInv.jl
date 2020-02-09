@@ -73,7 +73,7 @@ end
 """
 ```julia
 pa = SeisForwExpt(attrib_mod; ageom, srcwav, medium, tgrid);
-```
+```168G
 Method to create an instance of `SeisForwExpt`. 
 The output of this method can be used as an input to the in-place method `update!`, to actually perform a
 finite-difference modeling.
@@ -161,14 +161,16 @@ end
 
 function initialize_boundary!(pa)
 	# zero out results stored per worker
-	@sync begin
-		for (ip, p) in enumerate(procs(pa.p))
-			@async remotecall_wait(p) do 
-				pap=localpart(pa.p)
-				for issp in 1:length(pap.ss)
-					pass=pap.ss[issp]
-					for i in 1:length(pass.boundary)
-						fill!(pass.boundary[i],0.0)
+	for ipw in 1:pa.c.ic[:npw]
+		@sync begin
+			for (ip, p) in enumerate(procs(pa.p))
+				@async remotecall_wait(p) do 
+					pap=localpart(pa.p)[ipw]
+					for issp in 1:length(pap.ss)
+						pass=pap.ss[issp]
+						for i in 1:length(pass.boundary)
+							fill!(pass.boundary[i],0.0)
+						end
 					end
 				end
 			end
@@ -872,7 +874,7 @@ function mod_x_proc!(pac::P_common, pap::P_x_worker)
 		(pac.backprop_flag==1) && boundary_save_snap_vxvz!(issp,pac,pap)
 
 		"scale gradients for each issp"
-		(pac.gmodel_flag) && scale_gradient!(issp, pap.ss, step(pac.model.mgrid[2])*step(pac.model.mgrid[1]))
+		(pac.gmodel_flag) && scale_gradient!(issp, pap, step(pac.model.mgrid[2])*step(pac.model.mgrid[1]))
 		
 
 	end # source_loop

@@ -216,7 +216,7 @@ function PFWI(
 	      mediumm::Medium=nothing,
 	      # other optional 
 	      tgrid_obs::StepRangeLen=deepcopy(tgrid),
-	      rfields=[:P],
+	      rfields=[:p],
 	      igrid=nothing,
 	      igrid_interp_scheme::Symbol=:B2,
 	      mprecon_factor::Float64=1.0,
