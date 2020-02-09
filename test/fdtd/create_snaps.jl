@@ -12,8 +12,8 @@ ageom=AGeom(medium.mgrid,:xwell, SSrcs(2)); # load a simple acquisition using `m
 # ### SrcWav
 tgrid = range(0.0,stop=2.0,length=2000); # generate a time grid
 wav = ricker(10.0, tgrid, tpeak=0.25,); # ricker wavelet
-srcwav = SrcWav(tgrid, ageom, [:P]);
-update!(srcwav, [:P], wav);
+srcwav = SrcWav(tgrid, ageom, [:p]);
+update!(srcwav, [:p], wav);
 
 # ### Plotting #1
 #md p1=heatmap(medium, :vp)

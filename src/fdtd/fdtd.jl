@@ -469,21 +469,21 @@ function update_δmods!(pac::P_common, δmod::Vector{Float64})
 	nx=pac.ic[:nx]; nz=pac.ic[:nz]
 	nznxd=prod(length.(pac.model.mgrid))
 	copyto!(pac.δmodall, δmod)
-	fill!(pac.δmodtt,0.0)
-	δmodtt=view(pac.δmodtt,npml+1:nz-npml,npml+1:nx-npml)
+	fill!(pac.δmod[:tt],0.0)
+	δmodtt=view(pac.δmod[:tt],npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
 		# put perturbation due to KI as it is
 		δmodtt[i] = δmod[i] 
 	end
-	fill!(pac.δmodrr,0.0)
-	δmodrr=view(pac.δmodrr,npml+1:nz-npml,npml+1:nx-npml)
+	fill!(pac.δmod[:rr],0.0)
+	δmodrr=view(pac.δmod[:rr],npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
 		# put perturbation due to rhoI here
 		δmodrr[i] = δmod[nznxd+i]
 	end
 	# project δmodrr onto the vz and vx grids
-	get_rhovxI!(pac.δmodrrvx, pac.δmodrr)
-	get_rhovzI!(pac.δmodrrvz, pac.δmodrr)
+	get_rhovxI!(pac.δmod[:rrvx], pac.δmod[:rr])
+	get_rhovzI!(pac.δmod[:rrvz], pac.δmod[:rr])
 	return nothing
 end
 
@@ -499,8 +499,8 @@ function update_δmods!(pac::P_common, model_pert::Medium)
 	copyto!(pac.δmodall, model_pert, [:KI, :rhoI])
 
 	for i in 1:nznxd
-		pac.δmodall[i] -= pac.modtt[i] # subtracting the background model
-		pac.δmodall[nznxd+i] -= pac.modrr[i] # subtracting the background model
+		pac.δmodall[i] -= pac.mod[:tt][i] # subtracting the background model
+		pac.δmodall[nznxd+i] -= pac.mod[:rr][i] # subtracting the background model
 	end
 	update_δmods!(pac, pac.δmodall)
 	return nothing
@@ -525,11 +525,11 @@ function update!(pac::P_common, model::Medium)
 
 	Medium_pml_pad_trun!(pac.exmodel, pac.model, nlayer_rand)
 
-	copyto!(pac.modttI, pac.exmodel, [:K]) 
-	copyto!(pac.modtt, pac.exmodel, [:KI]) 
-	copyto!(pac.modrr, pac.exmodel, [:rhoI])
-	get_rhovxI!(pac.modrrvx, pac.modrr)
-	get_rhovzI!(pac.modrrvz, pac.modrr)
+	copyto!(pac.mod[:ttI], pac.exmodel, [:K]) 
+	copyto!(pac.mod[:tt], pac.exmodel, [:KI]) 
+	copyto!(pac.mod[:rr], pac.exmodel, [:rhoI])
+	get_rhovxI!(pac.mod[:rrvx], pac.mod[:rr])
+	get_rhovzI!(pac.mod[:rrvz], pac.mod[:rr])
 	return nothing
 end 
 
@@ -545,7 +545,7 @@ function update!(pa::PFdtd, srcwav::SrcWav, sflags::Any=nothing)
 end
 function update_srcwav!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags=nothing)
 	# update srcwav in pa.c
-	(length(srcwav) ≠ pa.c.npw) && error("cannot update")
+	(length(srcwav) ≠ pa.c.ic[:npw]) && error("cannot update")
 	for i in 1:length(srcwav)
 		copyto!(pa.c.srcwav[i], srcwav[i])
 	end
@@ -553,16 +553,18 @@ function update_srcwav!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags=nothing)
 		copyto!(pa.c.sflags, sflags)
 	end
 
-	# fill_wavelets for each supersource
-	@sync begin
-		for (ip, p) in enumerate(procs(pa.p))
-			@async remotecall_wait(p) do 
-				pap=localpart(pa.p)
-				for is in 1:length(pap.ss)
-					iss=pap.ss[is].iss
-					wavelets=pap.ss[is].wavelets
-					fill!.(wavelets, 0.0)
-					fill_wavelets!(iss, wavelets, pa.c.srcwav, pa.c.sflags)
+	for ipw in 1:pa.c.ic[:npw]
+		# fill_wavelets for each supersource
+		@sync begin
+			for (ip, p) in enumerate(procs(pa.p))
+				@async remotecall_wait(p) do 
+					pap=localpart(pa.p)[ipw]
+					for is in 1:length(pap.ss)
+						iss=pap.ss[is].iss
+						wavelets=pap.ss[is].wavelets
+						broadcast(x->fill!.(x,0.0), wavelets)
+						fill_wavelets!(ipw, iss, wavelets, pa.c.srcwav, pa.c.sflags)
+					end
 				end
 			end
 		end
@@ -791,7 +793,7 @@ end
 function stack_illums!(pac::P_common, pap::P_x_worker)
 	nx, nz=pac.ic[:nx], pac.ic[:nz]
 	illums=pac.illum_stack
-	pass=pap.ss
+	pass=pap[1].ss
 	for issp in 1:length(pass)
 		gs=pass[issp].illum
 		gss=view(gs,npml+1:nz-npml,npml+1:nx-npml)
@@ -812,8 +814,8 @@ function mod_x_proc!(pac::P_common, pap::P_x_worker)
 		# only for first propagating wavefield, i.e., pap[1]
 		if(pac.backprop_flag==-1)
 			"initial conditions from boundary for first propagating field only"
-			boundary_force_snap_p!(issp,pac,pap[1].ss,pap)
-			boundary_force_snap_vxvz!(issp,pac,pap[1].ss,pap)
+			boundary_force_snap_p!(issp,pac,pap)
+			boundary_force_snap_vxvz!(issp,pac,pap)
 		end
 
 		prog = Progress(pac.ic[:nt], dt=1, desc="\tmodeling supershot $iss/$(length(pac.ageom[1])) ", 
@@ -882,11 +884,10 @@ end # mod_x_shot
 # Need illumination to estimate the approximate diagonal of Hessian
 @inbounds @fastmath function compute_illum!(issp::Int64,  pap::P_x_worker)
 	# saving illumination to be used as preconditioner 
-	p=pap.p
-	illum=pass[issp].illum
-	pp=view(p[1],:,:,1)
+	p=pap[1].w2[:t][:p]
+	illum=pap[1].ss[issp].illum
 	for i in eachindex(illum)
-		illum[i] += abs2(pp[i])
+		illum[i] += abs2(p[i])
 	end
 end
 

@@ -43,15 +43,15 @@ ageom=AGeom(medium.mgrid,:surf, SSrcs(3), Recs(30)); # surface seismic
 # ### SrcWav
 tgrid = range(0.0,stop=1.0,length=1000) # generate a temporal grid
 wav = ricker(10.0, tgrid, tpeak=0.25,); # Choose a source wavelet
-srcwav = SrcWav(tgrid, ageom, [:P]) # initialize 
-update!(srcwav, [:P], wav) # distribute to all supersources
+srcwav = SrcWav(tgrid, ageom, [:p]) # initialize 
+update!(srcwav, [:p], wav) # distribute to all supersources
 
 # ### SeisForwExpt
 pa=SeisForwExpt(Fdtd(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
 
 # ### Modeling #1
 @time update!(pa);
-d1=copy(pa[:data][:P])
+d1=copy(pa[:data][:p])
 #md p1=heatmap(pa[:data], grid=true);
 
 # ### Change medium in `pa` without memory allocation
@@ -59,7 +59,7 @@ update!(pa, medium_new)
 
 # ### Modeling #2
 @time update!(pa);
-d2=copy(pa[:data][:P])
+d2=copy(pa[:data][:p])
 #md p2=heatmap(pa[:data], grid=true);
 
 # Test

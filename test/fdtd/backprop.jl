@@ -6,42 +6,46 @@ update!(ageom, SSrcs(),[0,0],990.0,[0, 2π])
 update!(ageom, Recs(),[0,0],990.0,[0, 2π])
 
 wav, tgrid=ricker(medium, 3, 0.4)
-srcwav = SrcWav(tgrid, ageom, [:p])
-update!(srcwav, [:p], wav)
 
-for sflags in [[1,-1],[2,-2]]
-	pa=SeisForwExpt(Fdtd(),npw=1, tgrid=tgrid,
-	#	abs_trbl=[:null],
-		gmodel_flag=false,
-		sflags=[sflags[1]],
-		snaps_flag=true,
-		verbose=true,
-		backprop_flag=1,
-		illum_flag=true,ageom=[ageom], srcwav=[srcwav],
-		medium=medium);
+for field in [:p, :vx,:vz]
+	println("############ Testing Backprop for source type ", field)
+	srcwav = SrcWav(tgrid, ageom, [field])
+	update!(srcwav, [field], wav)
 
-	update!(pa);
-	rec1=deepcopy(pa.c.data[1])
+	for sflags in [[1,-1],[2,-2]]
+		pa=SeisForwExpt(Fdtd(),npw=1, tgrid=tgrid,
+		#	abs_trbl=[:null],
+			gmodel_flag=false,
+			sflags=[sflags[1]],
+			snaps_flag=true,
+			verbose=true,
+			backprop_flag=1,
+			illum_flag=true,ageom=[ageom], srcwav=[srcwav],
+			medium=medium);
 
-	# change source flag and update wavelets in pa
-	pa.c.sflags=[sflags[2]];
-	GeoPhyInv.update_srcwav!(pa,[srcwav])
-	pa.c.backprop_flag=-1 # do backpropagation
+		update!(pa);
+		rec1=deepcopy(pa.c.data[1])
 
-	update!(pa)
-	rec2=deepcopy(pa.c.data[1])
+		# change source flag and update wavelets in pa
+		pa.c.sflags=[sflags[2]];
+		GeoPhyInv.update_srcwav!(pa,[srcwav])
+		pa.c.backprop_flag=-1 # do backpropagation
 
-	# time reverse
-	reverse!(rec2);
+		update!(pa)
+		rec2=deepcopy(pa.c.data[1])
 
-	# compare results
-	# least-squares misfit
-	paerr=GeoPhyInv.VNamedD_misfit(rec1, rec2)
-	err = GeoPhyInv.func_grad!(paerr)
+		# time reverse
+		reverse!(rec2);
 
-	# normalized error
-	error = err[1]./paerr.ynorm
+		# compare results
+		# least-squares misfit
+		paerr=GeoPhyInv.VNamedD_misfit(rec1, rec2)
+		err = GeoPhyInv.func_grad!(paerr)
 
-	# desired accuracy?
-	@test error<1e-20
+		# normalized error
+		error = err[1]./paerr.ynorm
+
+		# desired accuracy?
+		@test error<1e-20
+	end
 end

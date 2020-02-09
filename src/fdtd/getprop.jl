@@ -19,7 +19,7 @@ function Base.getindex(pa::PFdtd, s::Symbol, iss::Int=1)
 			@sync remotecall_wait(p) do 
 				pap=localpart(pa.p)
 				for i in eachindex(snaps_all)
-					snaps_all[i]=pap.ss[issp].snaps[i]
+					snaps_all[i]=pap[1].ss[issp].snaps[i] # only first wavefield
 				end
 			end
 		end
