@@ -126,6 +126,9 @@ function reset_w2!(pap::P_x_worker)
 		for w in pap_x_pw.w2
 			fill!.(w,0.0)
 		end
+		for w in pap_x_pw.w3
+			fill!.(w,0.0)
+		end
 		fill!.(pap_x_pw.memory_pml,0.0)
 	end
 end
@@ -379,13 +382,13 @@ function PFdtd(attrib_mod;
 	
 	if(typeof(attrib_mod)==FdtdVisco)
 		nsls=Int32(3)
-		#function calculate_relaxation_times(Q, nsls, fmin, fmax)
-
+		Q=10.
+		memcoeff1, memcoeff2=calculate_relaxation_times(Q, nz,nx, nsls, freqmin, freqmax)
 	else
 		# dummy
 		nsls=Int32(0) 
-		Rmemory_coeff1=zeros(1,1,1)
-		Rmemory_coeff2=zeros(1,1,1)
+		memcoeff1=zeros(1,1,1)
+		memcoeff2=zeros(1,1,1)
 	end
 
 	pac=P_common(jobname,attrib_mod,activepw,
@@ -394,25 +397,19 @@ function PFdtd(attrib_mod;
 	    rfields,rflags,
 	    fc,
 	    NamedArray([nx,nz,nt,nsls,npw],([:nx,:nz,:nt,:nsls,:npw],)),
-            #nx,nz,nt,
 	    pml,
 	    mod,
-	    NamedArray([Rmemory_coeff1,Rmemory_coeff2],([:memcoeff1,:memcoeff2],)),
-	    #modtt, modttI,modrr,modrrvx,modrrvz,
+	    NamedArray([memcoeff1,memcoeff2],([:memcoeff1,:memcoeff2],)),
 	    δmod,
 	    δmodall,
-	    #δmodtt,δmodrr,δmodrrvx,δmodrrvz,δmod,
 	    gradient,
 	    grad_mod,
-	    #grad_modtt_stack, grad_modrrvx_stack, grad_modrrvz_stack,grad_modrr_stack,
 	    illum_flag,illum_stack,
 	    backprop_flag,
 	    snaps_flag,
 	    itsnaps,
 	    gmodel_flag,
 	    bindices,
-	    #ibx0,ibz0,ibx1,ibz1,
-	    #isx0,isz0,
 	    datamat,
 	    data,
 	    verbose)	
@@ -448,13 +445,20 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::P_common)
 
 	w2=NamedArray([NamedArray([zeros(nz,nx) for i in fields], (fields,)) for i in 1:5], ([:t, :tp, :tpp, :dx, :dz],))
 
+	if(typeof(pac.attrib_mod)==FdtdVisco)
+		w3=NamedArray([NamedArray([zeros(pac.ic[:nsls],nz,nx) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
+	else
+		# dummy
+		w3=NamedArray([NamedArray([zeros(1,1,1) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
+	end
+
 	pml_fields=[:dvxdx, :dvzdz, :dpdz, :dpdx]
 
 	memory_pml=NamedArray([zeros(nz,nx) for i in pml_fields], (pml_fields,))
 
 	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
 
-	return P_x_worker_x_pw(ss,w2,memory_pml,born_svalue_stack)
+	return P_x_worker_x_pw(ss,w2,w3,memory_pml,born_svalue_stack)
 end
 
 function Vector{P_x_worker_x_pw}(sschunks::UnitRange{Int64},pac::P_common)

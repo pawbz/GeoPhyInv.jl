@@ -5,7 +5,8 @@ then Q is given by Re(K(ω))/Im(K(ω))
 * `n_sls` : number of standard linear solids
 * 
 """
-function calculate_relaxation_times(Q, n_sls, fmin, fmax)
+function calculate_relaxation_times(Q, nz,nx, n_sls, fmin, fmax)
+	Q=Q.* ones(nz,nx)
 	τ_ϵ=zeros(n_sls, size(Q)...)
 	τ_σ=zeros(n_sls, size(Q)...)
 

@@ -101,7 +101,7 @@ export update!, Medium
 export ricker, ormsby 
 export Srcs, Recs, SSrcs
 export AGeom, AGeomss
-export update!, SeisForwExpt, SeisInvExpt, Fdtd, FdtdBorn, LS, LS_prior, Migr, Migr_FD
+export update!, SeisForwExpt, SeisInvExpt, Fdtd, FdtdBorn, FdtdVisco, LS, LS_prior, Migr, Migr_FD
 
 # export the Expt for Poisson
 const PoissonExpt=GeoPhyInv.Poisson.ParamExpt

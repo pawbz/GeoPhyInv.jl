@@ -21,11 +21,6 @@ mutable struct P_x_worker_x_pw_x_ss
 	snaps::Array{Float64,3}
 	illum::Matrix{Float64}
 	grad_mod::NamedStack{Matrix{Float64}} # w.r.t different coeffs
-	#=
-	grad_modtt::Matrix{Float64} 
-	grad_modrrvx::Matrix{Float64}
-	grad_modrrvz::Matrix{Float64}
-	=#
 end
 
 
@@ -35,13 +30,11 @@ Note that a single worker can take care of multiple supersources.
 """
 mutable struct P_x_worker_x_pw
 	ss::Vector{P_x_worker_x_pw_x_ss}
+	# 2D arrays of p, vx, vz, their previous snapshots, and 
+	# x derivatives of p, vx, vz
+	# z derivatives of p, vx, vz
 	w2::NamedStack{NamedStack{Matrix{Float64}}} # p, vx, vz
-	#=
-	pp::NamedStack{Matrix{Float64}} # same as above, at previous time step
-	ppp::NamedStack{Matrix{Float64}} # ../../p, vx, vz
-	dpdx::NamedStack{Matrix{Float64}} # x derivatives of p, vx, vz
-	dpdz::NamedStack{Matrix{Float64}} # z derivatives of p, vx, vz
-	=#
+	w3::NamedStack{NamedStack{Array{Float64,3}}} # required for attenuation, where third dimension is nsls
 	memory_pml::NamedStack{Matrix{Float64}} # PML related (stored dpdx, dpdz, dvxdx, dvzdz)
 	born_svalue_stack::Matrix{Float64} # used for born modeling 
 end
@@ -97,7 +90,7 @@ mutable struct P_common{T}
 	k_z_halfI::Vector{Float64}
 	=#
 	mod::NamedStack{Matrix{Float64}}
-	mod3d::NamedStack{Array{Float64,3}}
+	mod3::NamedStack{Array{Float64,3}}
 	#=
 	modtt::Matrix{Float64}
 	modttI::Matrix{Float64} # just storing inv(modtt) for speed
