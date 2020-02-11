@@ -124,8 +124,9 @@ end
 		 sumr=0.0
 		 for isls = 1:nsls
 			# this average of the two terms comes from eq (14) of 
-			#Robertsson, Blanch and Symes, Geophysics, vol. 59(9), pp 1444-1456 (1994)          
-			r[isls,iz,ix] = r[isls,iz,ix] + ((dvdx[iz,ix] + dvdz[iz,ix]) * mod[iz,ix] * mod32[isls,iz,ix] - (mod31[isls,iz,ix] * r[isls,iz,ix])) * fc1
+			#Robertsson, Blanch and Symes, Geophysics, vol. 59(9), pp 1444-1456 (1994) 
+			# central finite-difference around the time of vx (not the staggerred time grid!); therefore the factor 0.5         
+			r[isls,iz,ix] = r[isls,iz,ix] + ((dvdx[iz,ix] + dvdz[iz,ix]) * mod[iz,ix] * mod32[isls,iz,ix] - (mod31[isls,iz,ix] * r[isls,iz,ix])) * fc1 * 0.5
 			sumr += r[isls,iz,ix] 
 		 end
 
@@ -133,6 +134,7 @@ end
 		#Robertsson, Blanch and Symes, Geophysics, vol. 59(9), pp 1444-1456 (1994)  
 		#pressure(i,j) = pressure(i,j) + (- kappa_half_x * (value_dvx_dx + value_dvy_dy) + 
 		#  0.5d0 * sum_of_memory_variables_kappa) * DELTAT
+		# Here sumr should be at the time same as dvdx
 		@inbounds p[iz,ix] = pp[iz,ix] + ((mod[iz,ix] * (dvdx[iz,ix] + dvdz[iz,ix])) + (sumr)) * fc1  
 	end
 	end

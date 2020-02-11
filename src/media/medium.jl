@@ -16,8 +16,8 @@ names(mod)
 * `mod[:vp]` : P-wave velocity
 * `mod[:rho]` : mass density
 * `mod[:Zp]` : P-wave impedance 
-* `mod[:K]` : bulk modulus 
-* `mod[:Q]` : quality factor (optimized to be constant for all frequencies; Robertsson, et. al, 1994)
+* `mod[:K]` : bulk modulus (unrelaxed when considering attenuation) 
+* `mod[:Q]` : quality factor (relaxation times are optimized to be constant over all frequencies; see Robertsson, et. al, 1994)
 * `mod.ref` : reference medium parameters 
 * `mod.bounds` : bounds of medium parameters
 
@@ -27,6 +27,14 @@ mutable struct Medium
 	m::NamedArrays.NamedArray{Array{Float64,2},1,Array{Array{Float64,2},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 	bounds::NamedArrays.NamedArray{Array{Float64,1},1,Array{Array{Float64,1},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 	ref::NamedArray{Float64,1,Array{Float64,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
+	# store some floats specific to the medium
+	fc::NamedArrays.NamedArray{Float64,1,Array{Float64,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
+	# store some integer constants
+	ic::NamedArrays.NamedArray{Int64,1,Array{Int64,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
+	# store 3D arrays, if any
+	m3::NamedStack{Array{Float64,3}}
+	# default construction without fcs and ics, and m3
+	Medium(mgrid,m,bounds,ref) = new(mgrid,m,bounds,ref,NamedArray([0.0],([:o],)),NamedArray([0],([:o],)),NamedArray([zeros(1,1,1)], ([:o],))) 
 end
 
 function NamedArrays.names(mod::Medium)
@@ -34,6 +42,7 @@ function NamedArrays.names(mod::Medium)
 end
 	
 
+include("attenuation.jl")
 include("base.jl")
 include("gallery.jl")
 
@@ -464,6 +473,16 @@ function Medium_pml_pad_trun!(modex::Medium, mod::Medium, nlayer_rand)
 	vpex=modex[:vp]; rhoex=modex[:rho];
 	pml_pad_trun!(vpex,vp,mod.bounds[:vp],nlayer_rand,50.0);	
 	pml_pad_trun!(rhoex,rho,mod.bounds[:rho],nlayer_rand,0.0)
+	if(:vs ∈ names(mod.m)[1])
+		vs=mod[:vs];
+		vsex=modex[:vs]; 
+		pml_pad_trun!(vsex,vs,mod.bounds[:vs],nlayer_rand,50.0);	
+	end
+	if(:Q ∈ names(mod.m)[1])
+		Q=mod[:Q];
+		Qex=modex[:Q]; 
+		pml_pad_trun!(Qex,Q,mod.bounds[:Q],nlayer_rand,50.0);	
+	end
 end
 
 function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)

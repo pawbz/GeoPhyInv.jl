@@ -382,8 +382,9 @@ function PFdtd(attrib_mod;
 	
 	if(typeof(attrib_mod)==FdtdVisco)
 		nsls=Int32(3)
-		Q=10.
-		memcoeff1, memcoeff2=calculate_relaxation_times(Q, nz,nx, nsls, freqmin, freqmax)
+		exmodel.ic=vcat(exmodel.ic,NamedArray([nsls], ([:nsls],)))
+		exmodel.fc=vcat(exmodel.fc,NamedArray(2*pi .* [freqmin, freqmax], ([:freqmin,:freqmax],)))
+		memcoeff1, memcoeff2=get_memcoeff(exmodel)
 	else
 		# dummy
 		nsls=Int32(0) 

@@ -103,24 +103,6 @@ function Base.show(io::Base.IO, mod::Medium)
 	println(io, mod.bounds)
 end
 
-"""
-Return `Seismic` with zeros everywhere;
-this method is used for preallocation.
-
-# Arguments
-* `mgrid` : used for sizes of χ fields 
-"""
-function Seismic_zeros(mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}})
-	nz=length(mgrid[1]); nx=length(mgrid[2])
-	return Seismic(mgrid,NamedArray([zeros(nz,nx),zeros(nx,nz)], ([:vp,:rho],)),
-		       NamedArray([fill(0.0,2),fill(0.0,2)], ([:vp,:rho],)), 
-		       NamedArray([0.0,0.0],([:vp,:rho],)))
-end
-
-
-
-
-
 
 """
 Re-parameterization routine 
@@ -234,13 +216,30 @@ function Base.getindex(mod::Medium, s::Symbol)
 		if(s==:vs)
 			return mod.m[:vs]
 		end
+	elseif(s == :Q)
+		@assert :Q ∈ names(mod.m)[1]
+		return mod.m[:Q]
+	end
+
+	# these are 3D arrays
+	if(s in [:tau_epsilon, :tau_sigma])
+		@assert :Q ∈ names(mod.m)[1] # need quality factor
+		@assert :freqmin ∈ names(mod.fc)[1] # need minimum freq that is being modelled
+		@assert :freqmax ∈ names(mod.fc)[1] # need max freq
+		@assert :nsls ∈ names(mod.ic)[1] # need number of standard linear solids
+
+		nz,nx=size(mod.m[:vp])
+		# add derived fields, if not present
+		(s ∉ names(mod.m3)[1]) && (mod.m3=vcat(mod.m3,NamedArray([zeros(mod.ic[:nsls],nz,nx)],[[s],])))
+		x=mod.m3[s] # going to return this 
+	else
+		# add derived fields, if not present
+		(s ∉ names(mod.m)[1]) && (mod.m=vcat(mod.m,NamedArray([zero(vp)],[[s],])))
+		x=mod.m[s] # going to return this
 	end
 
 
 
-	# add derived fields, if not present
-	(s ∉ names(mod.m)[1]) && (mod.m=vcat(mod.m,NamedArray([zero(vp)],[[s],])))
-	x=mod.m[s] 
 
 	# output derived fields
 	if(s == :rhoI)
@@ -264,10 +263,18 @@ function Base.getindex(mod::Medium, s::Symbol)
 		@inbounds for i in 1:nznx; x[i]=vp[i]*vp[i]*rho[i]; end
 	elseif(s == :Zp)
 		@inbounds for i in 1:nznx; x[i]=vp[i]*rho[i]; end
+	elseif(s == :tau_epsilon)
+		# memory optimize later
+		tau_sigma, tau_epsilon = get_relaxation_times(mod.m[:Q], mod.ic[:nsls], mod.fc[:freqmin], mod.fc[:freqmax])
+		copyto!(x, tau_epsilon)
+	elseif(s == :tau_sigma)
+		# memory optimize later
+		tau_sigma, tau_epsilon = get_relaxation_times(mod.m[:Q], mod.ic[:nsls], mod.fc[:freqmin], mod.fc[:freqmax])
+		copyto!(x, tau_sigma)
 	else
 		error(string("invalid attrib\t",s))
 	end
-	return mod.m[s]
+	return x
 end
 
 

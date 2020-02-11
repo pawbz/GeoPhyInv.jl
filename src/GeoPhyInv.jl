@@ -34,11 +34,9 @@ using FFTW
 
 
 
-
-
-
-
-
+# this is extensively used to stack arrays
+# define a specific namedarray
+NamedStack{T}=NamedArray{T,1,Array{T,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 
 
 # create a timer object, used throughout this package, see TimerOutputs.jl
