@@ -51,16 +51,19 @@ function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 		fill!(model)
 
 	elseif(attrib == :marmousi2)
-		vp, h= IO.readsu(joinpath(marmousi_folder,"vp_marmousi-ii_0.1.su"))
-		vs, h= IO.readsu(joinpath(marmousi_folder,"vs_marmousi-ii_0.1.su"))
-		rho,  h= IO.readsu(joinpath(marmousi_folder,"density_marmousi-ii_0.1.su"))
-		vp .*= 1000.; vs .*= 1000.; #rho .*=1000
-		mgrid=[range(0.,stop=3500.,length=size(vp,1)),range(0., stop=17000., length=size(vp,2))]
-		model=Medium(mgrid,[:vp,:rho,:vs])
-		copyto!(model[:vp],vp)
-		copyto!(model[:rho],rho)
-		copyto!(model[:vs],vs)
-		update!(model,bfrac); 
+		c = h5open(joinpath(marmousi_folder,"marmousi2.h5"),"r") do file
+			vp=read(file, "vp")
+			vs=read(file, "vs")
+			rho=read(file, "rho")
+			xgrid=read(file, "xgrid")
+			zgrid=read(file, "zgrid")
+			mgrid=[range(zgrid[1],stop=zgrid[end],length=size(vp,1)),range(xgrid[1], stop=xgrid[end], length=size(vp,2))]
+			model=Medium(mgrid,[:vp,:rho,:vs])
+			copyto!(model[:vp],vp)
+			copyto!(model[:rho],rho)
+			copyto!(model[:vs],vs)
+			update!(model,bfrac); 
+		end
 #		vs0=Models.bounds(vs,bfrac); 
 #		rho0=Models.bounds(rho, bfrac);
 #		update!(model,[:vp,:rho,:vs],[vp0,rho0,vs0])

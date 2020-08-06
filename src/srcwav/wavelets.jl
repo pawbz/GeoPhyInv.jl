@@ -2,7 +2,7 @@
 """
 Generate a Ricker Wavelet. Reference:
 Frequencies of the Ricker wavelet, Yanghua Wang, GEOPHYSICS, VOL. 80, NO. 2
-Bandwidth = 1.2 * fpeak for ricker
+Bandwidth is roughly 1.2 * fpeak for ricker
 
 # Keyword Arguments
 

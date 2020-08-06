@@ -101,9 +101,9 @@ end
 ```julia
 update!(srcwav[1], [:p, :vx], w)
 ```
-Populate first supersource of `srcwav` by a wavelet `w` for `:p` and `:vx` fields.
+Populate first supersource of `srcwav` by a wavelet vector `w` for `:p` and `:vx` fields.
 """
-function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractArray)
+function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractVector)
 	@assert length(w)==length(d.grid)
 	@inbounds for f in fields
 		@assert f ∈ names(d.d)[1]
@@ -115,6 +115,28 @@ function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractArray)
 	end
 	return d
 end
+
+"""
+```julia
+update!(srcwav[1], [:p, :vx], w)
+```
+Populate first supersource of `srcwav` by a wavelets `w` for `:p` and `:vx` fields.
+"""
+function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractMatrix)
+	@assert size(w,1)==length(d.grid)
+	@assert size(w,2)==d[:n]
+	@inbounds for f in fields
+		@assert f ∈ names(d.d)[1]
+		@inbounds for i in 1:d[:n]
+			for it in 1:length(d.grid)
+				d.d[f][it,i]=w[it,i]
+			end
+		end
+	end
+	return d
+end
+
+
 
 
 

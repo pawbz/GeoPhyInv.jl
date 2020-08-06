@@ -295,16 +295,18 @@ function update!(mod::Medium, fields::Vector{Symbol};
 		       point_pert::Float64=0.0,
 		       ellip_loc=[0., 0.,],
 		       ellip_rad=0.0,
-		       ellip_pert::Float64=0.0,
+		       ellip_pert::Real=0.0,
 		       ellip_α=0.0,
 		       rect_loc=[0., 0., 0., 0.,],
 		       rect_pert::Float64=0.0,
 		       constant_pert::Float64=0.0,
 		       randn_perc::Real=0.0,
-		       onlyin::Vector{Vector{Float64}}=[[typemin(Float64), typemax(Float64)] for i in fields]
-		       )
+			   layerlocations=nothing
+			   )
+
+    # only editing basic fields is allowed
 	for field in fields
-		@assert field ∈ [:vp,:vs,:rho]
+		@assert field ∈ [:vp,:vs,:rho,:Q]
 	end
 	rect_loc=convert.(Float64,rect_loc);
 	ellip_loc=convert.(Float64,ellip_loc);
@@ -321,7 +323,7 @@ function update!(mod::Medium, fields::Vector{Symbol};
 		rads= (length(ellip_rad)==1) ? [ellip_rad[1],ellip_rad[1]] : [ellip_rad[1],ellip_rad[2]]
 
 		temp += [(((((mod.mgrid[2][ix]-ellip_loc[2])*cos(α)+(mod.mgrid[1][iz]-ellip_loc[1])*sin(α))^2*inv(rads[1]^2) + 
-	      ((-mod.mgrid[1][iz]+ellip_loc[1])*cos(α)+(mod.mgrid[2][ix]-ellip_loc[2])*sin(α))^2*inv(rads[2]^2)) <= 1.) ? ellip_pert : 0.0)  for 
+	      ((-mod.mgrid[1][iz]+ellip_loc[1])*cos(α)+(mod.mgrid[2][ix]-ellip_loc[2])*sin(α))^2*inv(rads[2]^2)) <= 1.) ? Float64(ellip_pert) : 0.0)  for 
 	   		iz in 1:length(mod.mgrid[1]), ix in 1:length(mod.mgrid[2]) ]
 	end
 	if(!(rect_pert == 0.0))
@@ -338,9 +340,22 @@ function update!(mod::Medium, fields::Vector{Symbol};
 
 	for (iff,field) in enumerate(fields)
 		m=mod.m[field]
+		if(!(layerlocations===nothing))
+			onlyatvalues=[]
+			for ipos in layerlocations
+				ipx = Interpolation.indminn(mod.mgrid[2], Float64(ipos[2]), 1)[1] 
+				ipz = Interpolation.indminn(mod.mgrid[1], Float64(ipos[1]), 1)[1] 
+				push!(onlyatvalues,m[ipz,ipx])
+			end
+		end
 		for i in eachindex(m)
-			if(((m[i]-onlyin[iff][1])*(m[i]-onlyin[iff][2]))<0.0)
+			# if(((m[i]-onlyin[iff][1])*(m[i]-onlyin[iff][2]))<0.0)
+			if(layerlocations===nothing)
 				m[i] += temp[i]
+			else
+				if( m[i] ∈ onlyatvalues)
+					m[i] += temp[i]
+				end
 			end
 		end
 	end
@@ -414,20 +429,20 @@ the input bounds cannot be strictly imposed.
 
 # Keyword Arguments
 
-* `zmin::Float64=mod.mgrid[1][1]` : 
-* `zmax::Float64=mod.mgrid[1][end]` : 
-* `xmin::Float64=mod.mgrid[2][1]` : 
-* `xmax::Float64=mod.mgrid[2][end]` : 
+* `zmin::Real=mod.mgrid[1][1]` : 
+* `zmax::Real=mod.mgrid[1][end]` : 
+* `xmin::Real=mod.mgrid[2][1]` : 
+* `xmax::Real=mod.mgrid[2][end]` : 
 """
 function Medium_trun(mod::Medium;
-			 zmin::Float64=mod.mgrid[1][1], zmax::Float64=mod.mgrid[1][end],
-			 xmin::Float64=mod.mgrid[2][1], xmax::Float64=mod.mgrid[2][end],
+			 zmin::Real=mod.mgrid[1][1], zmax::Real=mod.mgrid[1][end],
+			 xmin::Real=mod.mgrid[2][1], xmax::Real=mod.mgrid[2][end],
 			 )
 
-	izmin = Interpolation.indminn(mod.mgrid[1], zmin, 1)[1]
-	izmax = Interpolation.indminn(mod.mgrid[1], zmax, 1)[1]
-	ixmin = Interpolation.indminn(mod.mgrid[2], xmin, 1)[1]
-	ixmax = Interpolation.indminn(mod.mgrid[2], xmax, 1)[1]
+	izmin = Interpolation.indminn(mod.mgrid[1], Float64(zmin), 1)[1]
+	izmax = Interpolation.indminn(mod.mgrid[1], Float64(zmax), 1)[1]
+	ixmin = Interpolation.indminn(mod.mgrid[2], Float64(xmin), 1)[1]
+	ixmax = Interpolation.indminn(mod.mgrid[2], Float64(xmax), 1)[1]
 
 	x = mod.mgrid[2][ixmin:ixmax]
 	z = mod.mgrid[1][izmin:izmax]
@@ -436,7 +451,7 @@ function Medium_trun(mod::Medium;
 	mod_trun = Medium([z,x], names(mod.m)[1])
 	update!(mod_trun, mod)
 
-	for f in names(mod.m)
+	for f in names(mod.m)[1]
 		m=view(mod[f],izmin:izmax, ixmin:ixmax)
 		copyto!(mod_trun[f],m)
 	end
