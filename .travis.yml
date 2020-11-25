@@ -4,7 +4,7 @@ os:
   - linux
   - osx
 julia:
-  - 1.0.5
+  - 1.3
   - nightly
 notifications:
   email: true
@@ -39,7 +39,7 @@ after_success:
 jobs:
   include:
     - stage: "Documentation"
-      julia: 1.0.5
+      julia: 1.3
       os: linux
       script:
         - julia --project=docs/ -e 'using Pkg; Pkg.add("Documenter"); Pkg.add("Gadfly");Pkg.add(PackageSpec(name="Misfits",url="https://github.com/pawbz/Misfits.jl.git"));Pkg.add(PackageSpec(name="Conv",url="https://github.com/pawbz/Conv.jl.git"));Pkg.develop(PackageSpec(path=pwd()));Pkg.instantiate()'
