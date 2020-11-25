@@ -136,7 +136,8 @@ function update!(mod::Medium)
 
 
 	for s in newnames
-		(s ∉ names(mod.bounds)[1]) && (mod.bounds=vcat(mod.bounds,NamedArray([[0.0,0.0]],[[s],])))
+		# println(typeof(mod.bounds), '\'NamedArray([[0.0,0.0]],[[s],]))
+		(s ∉ names(mod.bounds)[1]) && (mod.bounds=vcat(mod.bounds,NamedArray([[0.0,0.0]],[s,])))
 	end
 
 	for s in newnames
@@ -148,7 +149,7 @@ function update!(mod::Medium)
 		if(s ∈ names(mod.ref)[1])
 			mod.ref[s]=meanvalue
 		else
-			mod.ref=vcat(mod.ref, NamedArray([meanvalue], [[s],]))
+			mod.ref=vcat(mod.ref, NamedArray([meanvalue], [s,]))
 		end
 	end
 

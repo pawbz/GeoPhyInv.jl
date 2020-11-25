@@ -1,13 +1,13 @@
 @recipe function heatmap(mod::Medium, field=:vp)
 	mx = mod.mgrid[2]
 	mz = mod.mgrid[1]
-	xlabel --> "x"
-	ylabel --> "z"
-	color --> :pu_or
-	xlim --> (mx[1], mx[end])
-	zlim --> (mz[1], mz[end])
+	xguide --> "x"
+	yguide --> "z"
+	seriescolor --> :roma
+	xlims --> (mx[1], mx[end])
+	zlims --> (mz[1], mz[end])
 	title --> string(field)
-	clim --> (mod.bounds[field][1], mod.bounds[field][2])
+	clims --> (mod.bounds[field][1], mod.bounds[field][2])
 	yflip := true
 	mx, mz, mod[field]
 end
@@ -45,10 +45,10 @@ end
 	dmin=dmin+bclip_perc*inv(100)*abs(dmin)
 	dmax=dmax-wclip_perc*inv(100)*abs(dmax)
 	legend --> true
-	xlabel --> "channel index"
-	ylabel --> "time"
+	xguide --> "channel index"
+	yguide --> "time"
 	color --> :grays
-	clim --> (dmin, dmax)
+	clims --> (dmin, dmax)
 	yflip := true
 	dx, dz, dp
 end
@@ -72,8 +72,8 @@ end
 	@series begin        
 		subplot := 1
 		legend := false
-		ylabel := "power (dB)"
-		xlabel := "frequency (Hz)"
+		yguide := "power (dB)"
+		xguide := "frequency (Hz)"
 		fgrid, powwavdb
 	end
 end
@@ -196,8 +196,8 @@ Plot the velocity and density seismic models.
 			aspect_ratio := :equal
 			seriestype := :heatmap
 			legend --> true
-			xlabel --> "x [m]"
-			ylabel --> "z [m]"
+			xguide --> "x [m]"
+			yguide --> "z [m]"
 			color --> :grays
 			#xlim --> (mx[1], mx[end])
 			#zlim --> (mz[1], mz[end])
@@ -264,8 +264,8 @@ Plot the source wavelet used for acquisition.
 	@series begin        
 		subplot := 1
 		legend := false
-		xlabel := "time [s]"
-		ylabel := "amplitude" 
+		xguide := "time [s]"
+		yguide := "amplitude" 
 		tgrid, wav 
 	end
 
@@ -274,8 +274,8 @@ Plot the source wavelet used for acquisition.
 	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
 	@series begin        
 		subplot := 2
-		ylabel := "power [dB]"
-		xlabel := "frequency [Hz]"
+		yguide := "power [dB]"
+		xguide := "frequency [Hz]"
 		legend := false
 		fgrid, powwavdb
 	end
@@ -306,8 +306,8 @@ function mscatter(x, y, titname="", axla=["",""])
     li = 1.2*max(xmax, ymax)
     #xlim(-li, li)
     #ylim(-li, li)
-    xlabel(axla[1])
-    ylabel(axla[2])
+    xguide(axla[1])
+    yguide(axla[2])
     title(titname)
     return nothing
 end

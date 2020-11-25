@@ -230,11 +230,11 @@ function Base.getindex(mod::Medium, s::Symbol)
 
 		nz,nx=size(mod.m[:vp])
 		# add derived fields, if not present
-		(s ∉ names(mod.m3)[1]) && (mod.m3=vcat(mod.m3,NamedArray([zeros(mod.ic[:nsls],nz,nx)],[[s],])))
+		(s ∉ names(mod.m3)[1]) && (mod.m3=vcat(mod.m3,NamedArray([zeros(mod.ic[:nsls],nz,nx)],[s,])))
 		x=mod.m3[s] # going to return this 
 	else
 		# add derived fields, if not present
-		(s ∉ names(mod.m)[1]) && (mod.m=vcat(mod.m,NamedArray([zero(vp)],[[s],])))
+		(s ∉ names(mod.m)[1]) && (mod.m=vcat(mod.m,NamedArray([zero(vp)],[s,])))
 		x=mod.m[s] # going to return this
 	end
 
