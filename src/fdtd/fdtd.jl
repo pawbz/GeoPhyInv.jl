@@ -629,37 +629,69 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common)
 	is=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
 	# source_spray_weights per supersource
 	ssprayw = zeros(4,ageom[ipw][iss].ns)
-	denomsI = zeros(ageom[ipw][iss].ns)
+	# denomsI = zeros(ageom[ipw][iss].ns)
 
 	sindices=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
-	for is=1:ageom[ipw][iss].ns
-		weights=ssprayw
-		denom=denomsI
-		Interpolation.get_spray_weights!(view(weights, :,is), view(denom,is), 
-			    view(sindices[:x1],is), view(sindices[:x2],is),
-			    view(sindices[:z1],is), view(sindices[:z2],is),
-			    mesh_x, mesh_z, ageom[ipw][iss].sx[is], ageom[ipw][iss].sz[is])
-	end
-
+	
 	# receiver interpolation weights per sequential source
 	rinterpolatew = zeros(4,ageom[ipw][iss].nr)
-	denomrI = zeros(ageom[ipw][iss].nr)
+	# denomrI = zeros(ageom[ipw][iss].nr)
 	rindices=NamedArray([zeros(Int64,ageom[ipw][iss].nr) for i in coords], (coords,))
-	for ir=1:ageom[ipw][iss].nr
-		weights=rinterpolatew
-		denom=denomrI
-		Interpolation.get_interpolate_weights!(view(weights, :,ir), view(denom, ir), 
-			  view(rindices[:x1],ir), view(rindices[:x2],ir),
-			  view(rindices[:z1],ir), view(rindices[:z2],ir),
-			  mesh_x, mesh_z, ageom[ipw][iss].rx[ir], ageom[ipw][iss].rz[ir])
-	end
-
 
 	pass=P_x_worker_x_pw_x_ss(iss,wavelets,ssprayw,records,rinterpolatew,
 			   sindices,rindices, boundary,snaps,illum,# grad_modtt,grad_modrrvx,grad_modrrvz)
 			   NamedArray([grad_modtt,grad_modrrvx,grad_modrrvz],([:tt,:rrvx,:rrvz],)))
 
+    # update acquisition
+	update!(pass,ipw,iss,ageom[ipw][iss],pac)
 	return pass
+end
+
+function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
+	@assert ageomss.ns == pac.ageom[ipw][iss].ns
+	@assert ageomss.nr == pac.ageom[ipw][iss].nr
+
+	mesh_x, mesh_z = pac.exmodel.mgrid[2], pac.exmodel.mgrid[1]
+	ssprayw=pass.ssprayw
+	rinterpolatew=pass.rinterpolatew
+	sindices=pass.sindices
+	rindices=pass.rindices
+
+	for is=1:ageomss.ns
+		weights=ssprayw
+		Interpolation.get_spray_weights!(view(weights, :,is),  
+			    view(sindices[:x1],is), view(sindices[:x2],is),
+			    view(sindices[:z1],is), view(sindices[:z2],is),
+			    mesh_x, mesh_z, ageomss.sx[is], ageomss.sz[is])
+	end
+	for ir=1:ageomss.nr
+		weights=rinterpolatew
+		Interpolation.get_interpolate_weights!(view(weights, :,ir),
+			  view(rindices[:x1],ir), view(rindices[:x2],ir),
+			  view(rindices[:z1],ir), view(rindices[:z2],ir),
+			  mesh_x, mesh_z, ageomss.rx[ir], ageomss.rz[ir])
+	end
+
+end
+
+# if just one propagating field
+update!(pa::PFdtd, ageom::AGeom)=update!(pa,[ageom])
+
+function update!(pa::PFdtd, ageom::Vector{AGeom})
+	for ipw in 1:pa.c.ic[:npw]
+		copyto!(pa.c.ageom[ipw], ageom[ipw])
+		@sync begin
+			for (ip, p) in enumerate(procs(pa.p))
+				@async remotecall_wait(p) do 
+					pap=localpart(pa.p)[ipw]
+					for is in 1:length(pap.ss)
+						iss=pap.ss[is].iss
+						update!(localpart(pap).ss[is],ipw,iss,ageom[ipw][iss],pa.c)
+					end
+				end
+			end
+		end
+	end
 end
 
 include("source.jl")
@@ -898,7 +930,7 @@ end # mod_x_shot
 	end
 end
 
-
+``
 @fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::P_common,pap::P_x_worker)
 	isx0=pac.bindices[:sx0]
 	isz0=pac.bindices[:sz0]
@@ -928,7 +960,9 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 		if(all(δs_max .> δs_temp)) 
 			@warn "decrease spatial sampling ($str1) below $str2"
 		else
-			@info "spatial sampling ($str1) can be as high as $str2"
+			if(verbose)
+				@info "spatial sampling ($str1) can be as high as $str2"
+			end
 		end
 	end
 
@@ -941,7 +975,9 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 		if(all(δt .> δt_temp))
 			@warn "decrease time sampling ($str1) below $str2"
 		else
-			@info "time sampling ($str1) can be as high as $str2"
+			if(verbose)
+				@info "time sampling ($str1) can be as high as $str2"
+			end
 		end
 	end
 
