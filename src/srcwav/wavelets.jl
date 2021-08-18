@@ -137,7 +137,7 @@ function  ormsby(
 		wav = wav[abs(wav).>=trim_tol]
 	end
 
-	wav = wav .* DSP.taper(ones(length(wav)),tperc)
+	wav = wav .* Utils.taper(ones(length(wav)),tperc)
 	return wav
 
 end

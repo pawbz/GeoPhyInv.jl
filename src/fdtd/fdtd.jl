@@ -654,6 +654,8 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
 	mesh_x, mesh_z = pac.exmodel.mgrid[2], pac.exmodel.mgrid[1]
 	ssprayw=pass.ssprayw
 	rinterpolatew=pass.rinterpolatew
+	fill!(ssprayw,0.0)
+	fill!(rinterpolatew,0.0)
 	sindices=pass.sindices
 	rindices=pass.rindices
 

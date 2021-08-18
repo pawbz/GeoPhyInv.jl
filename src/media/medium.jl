@@ -409,7 +409,7 @@ function Medium_smooth(mod::Medium, zperc::Real, xperc::Real=zperc;
 	ixmin = Interpolation.indminn(mod.mgrid[2], Float64(xmin), 1)[1]
 	ixmax = Interpolation.indminn(mod.mgrid[2], Float64(xmax), 1)[1]
 	
-	@warn "check this routine, smooth contrast values instead?"
+	# @warn "check this routine, smooth contrast values instead?"
 
 	modg=deepcopy(mod)
 	for (i,iff) in enumerate(fields)
