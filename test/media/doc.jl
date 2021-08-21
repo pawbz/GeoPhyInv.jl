@@ -31,8 +31,12 @@ mod.bounds
 #md plot(p1,size=(800,400))
 
 
-# To construct an instance of `Medium`, we need a 2-D grid.
+# To construct an instance of 2-D `Medium`, we need ranges for `z` and `x`.
 mgrid = [range(0.0, stop=10.,step=0.1), range(0.0, stop=30.,step=0.2)];
+
+
+# For 3-D, it is `z`, `y` and `x`.
+mgrid = fill(range(-10, stop=10.,step=0.1), 3)
 
 # Allocate basic medium parameters on the grid.
 mod = Medium(mgrid, [:vp,:rho,:vs]);
@@ -51,9 +55,10 @@ mod[:Zp];
 mod[:vp].=3000.;
 mod[:vs].=2000.;
 
+println(mod)
+
 # A model can be also be updated by adding random noise.
 update!(mod, [:vp,:rho], randn_perc=1.);
-
 
 # # Methods 
 #md # ```@docs

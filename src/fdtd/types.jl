@@ -10,7 +10,7 @@ mutable struct P_x_worker_x_pw_x_ss
 	rinterpolatew::Matrix{Float64}
 	sindices::NamedStack{Vector{Int64}} # contains [:x1,:x2,:z1,:z2]
 	rindices::NamedStack{Vector{Int64}}
-    boundary::Vector{Array{Float64,3}}
+    	boundary::Vector{Array{Float64,3}}
 	snaps::Array{Float64,3}
 	illum::Matrix{Float64}
 	grad_mod::NamedStack{Matrix{Float64}} # w.r.t different coeffs
@@ -48,7 +48,7 @@ Modelling parameters common for all supersources
 * modelled data for each propagating wavefield as `Vector{TD}`
 * stored boundary values of the first propagating wavefield as `Array{Array{Float64,4},1}` (use for backpropagation)
 * final conditions of the first propagating wavefield as `Array{Float64,4}` (use for back propagation)
-* gradient model as `Seismic`
+* gradient model as `Medium`
 * stored snaps shots at tsnaps as Array{Float64,4} 
 """
 mutable struct P_common{T}

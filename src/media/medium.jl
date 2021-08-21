@@ -22,9 +22,9 @@ names(mod)
 * `mod.bounds` : bounds of medium parameters
 
 """
-mutable struct Medium
+mutable struct Medium{N} # N is 2 for 2D, and 3 for 3D
 	mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}}
-	m::NamedArrays.NamedArray{Array{Float64,2},1,Array{Array{Float64,2},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
+	m::NamedStack{Array{Float64,N}}
 	bounds::NamedArrays.NamedArray{Array{Float64,1},1,Array{Array{Float64,1},1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 	ref::NamedArray{Float64,1,Array{Float64,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 	# store some floats specific to the medium
@@ -33,8 +33,11 @@ mutable struct Medium
 	ic::NamedArrays.NamedArray{Int64,1,Array{Int64,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 	# store 3D arrays, if any
 	m3::NamedStack{Array{Float64,3}}
-	# default construction without fcs and ics, and m3
-	Medium(mgrid,m,bounds,ref) = new(mgrid,m,bounds,ref,NamedArray([0.0],([:o],)),NamedArray([0],([:o],)),NamedArray([zeros(1,1,1)], ([:o],))) 
+end
+
+# default construction without fcs and ics, and m3
+function Medium(mgrid,m::NamedStack{Array{Float64,N}},bounds,ref) where N
+	return Medium(mgrid,m,bounds,ref,NamedArray([0.0],([:o],)),NamedArray([0],([:o],)),NamedArray([zeros(1,1,1)], ([:o],))) 
 end
 
 function NamedArrays.names(mod::Medium)
@@ -292,13 +295,13 @@ In-place method to add features to the input model.
 * `onlyin` : `mod` is modified only when field values are in these ranges 
 """
 function update!(mod::Medium, fields::Vector{Symbol}; 
-		       point_loc=[0., 0.,],
+		       point_loc=fill(0.0,ndims(mod)),
 		       point_pert::Float64=0.0,
-		       ellip_loc=[0., 0.,],
+		       ellip_loc=fill(0.0,ndims(mod)),
 		       ellip_rad=0.0,
 		       ellip_pert::Real=0.0,
 		       ellip_α=0.0,
-		       rect_loc=[0., 0., 0., 0.,],
+		       rect_loc=fill(0.0,ndims(mod)),
 		       rect_pert::Float64=0.0,
 		       constant_pert::Float64=0.0,
 		       randn_perc::Real=0.0,
@@ -312,11 +315,10 @@ function update!(mod::Medium, fields::Vector{Symbol};
 	rect_loc=convert.(Float64,rect_loc);
 	ellip_loc=convert.(Float64,ellip_loc);
 
-	temp = zeros(length(mod.mgrid[1]), length(mod.mgrid[2]))
+	temp = zeros(length.(mod.mgrid)...)
 
-	ipointlocx = Interpolation.indminn(mod.mgrid[2], Float64(point_loc[2]), 1)[1] 
-	ipointlocz = Interpolation.indminn(mod.mgrid[1], Float64(point_loc[1]), 1)[1] 
-	temp[ipointlocz, ipointlocx] += point_pert
+	ipointloc = [Interpolation.indminn(mod.mgrid[i], Float64(point_loc[i]), 1)[1] for i in 1:length(mod.mgrid)]
+	temp[ipointloc...] += point_pert
 
 	if(!(ellip_pert == 0.0))
 		α=ellip_α*pi/180.

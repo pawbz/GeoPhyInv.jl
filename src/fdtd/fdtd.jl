@@ -137,9 +137,9 @@ function initialize!(pa::P_x_worker_x_pw_x_ss)
 	fill!.(pa.records,0.0)
 	fill!(pa.snaps,0.0)
 	fill!(pa.illum,0.0)
-	fill!(pa.grad_mod[:tt],0.0)
-	fill!(pa.grad_mod[:rrvx],0.0)
-	fill!(pa.grad_mod[:rrvz],0.0)
+	fill!.(pa.grad_mod,0.0)
+	# fill!(pa.grad_mod[:rrvx],0.0)
+	# fill!(pa.grad_mod[:rrvz],0.0)
 
 end
 
@@ -183,10 +183,10 @@ end
 
 function initialize!(pac::P_common)
 	fill!(pac.gradient,0.0)
-	fill!(pac.grad_mod[:tt],0.0)
-	fill!(pac.grad_mod[:rrvx],0.0)
-	fill!(pac.grad_mod[:rrvz],0.0)
-	fill!(pac.grad_mod[:rr],0.0)
+	fill!.(pac.grad_mod,0.0)
+	# fill!(pac.grad_mod[:rrvx],0.0)
+	# fill!(pac.grad_mod[:rrvz],0.0)
+	# fill!(pac.grad_mod[:rr],0.0)
 	fill!(pac.illum_stack,0.0)
 	for dat in pac.data
 		fill!(dat, 0.0)
@@ -986,7 +986,8 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 end
 
 """
-Output vectors related to PML boundaries.
+Generate vectors related to PML boundaries, e.g., damping profiles.
+This function outputs a_x, b_x, and k_x variables in eq. 25-26 from Komatitsch 2007 (Geophysics).
 """
 function pml_variables(
 		nx::Int64, 
@@ -1084,7 +1085,8 @@ function pml_variables(
 		(alpha_x[ix] < 0.0) ? alpha_x[ix] = 0.0 : nothing
 		(alpha_x_half[ix] < 0.0) ? alpha_x_half[ix] = 0.0 : nothing
 
-		b_x[ix] = exp(- (d_x[ix] / k_x[ix] + alpha_x[ix]) * δt)
+		# see equation 25 Komatitsch, 2007, get b_x and a_x (need k_x, alpha_x, and d_x before this )
+		b_x[ix] = exp(- (d_x[ix] / k_x[ix] + alpha_x[ix]) * δt) 
 		b_x_half[ix] = exp(- (d_x_half[ix] / k_x_half[ix] + alpha_x_half[ix]) * δt)
 
 		# this to avoid division by zero outside the PML

@@ -3,8 +3,8 @@
 Initialize an model with zeros, given mgrid and names.
 """
 function Base.zero(::Type{Medium}, mgrid, names=[:vp,:rho])
-	nz=length(mgrid[1]); nx=length(mgrid[2])
-	return Medium(mgrid,NamedArray([zeros(nz,nx) for i in names], (names,)),
+	nvec=length.(mgrid)
+	return Medium(mgrid,NamedArray([zeros(nvec...) for i in names], (names,)),
 		       NamedArray([fill(0.0,2) for i in names], (names,)), 
 		       NamedArray([0.0 for i in names],(names,)))
 end
@@ -14,7 +14,7 @@ Medium(mgrid, m::Medium)=zero(Medium, mgrid, names(m.m)[1])
 
 
 """
-Return true if a `Seismic` model is just allocated with zeros.
+Return true if a `Medium` model is just allocated with zeros.
 """
 function Base.iszero(mod::Medium)
 	if (any(broadcast(iszero,mod.bounds)) && any(broadcast(iszero,mod.ref)))
@@ -33,7 +33,7 @@ end
 
 
 """
-Return true if a `Seismic` model is just allocated with zeros.
+Return true if a `Medium` model is just allocated with zeros.
 """
 function Base.isassigned(mod::Medium, fields=[:vp,:rho,:vs])
 	for field in fields
@@ -42,8 +42,6 @@ function Base.isassigned(mod::Medium, fields=[:vp,:rho,:vs])
 
 	return any(broadcast(iszero,mod.bounds)) && any(broadcast(iszero,mod.ref))
 end
-
-
 
 """
 Return a similar model (size, bounds and reference values) to the input model, used for allocation.
@@ -55,7 +53,7 @@ function Base.similar(mod::Medium)
 end
 
 
-"Compare if two `Seismic` models are equal"
+"Compare if two `Medium` models are equal"
 function Base.isequal(mod1::T, mod2::T) where {T<:Union{Medium}}
 	fnames = fieldnames(typeof(mod1))
 	vec=[(isequal(getfield(mod1, name),getfield(mod2, name))) for name in fnames]
@@ -63,14 +61,21 @@ function Base.isequal(mod1::T, mod2::T) where {T<:Union{Medium}}
 end
 
 """
-Return if two `Seismic` models have same dimensions and bounds.
+Return if two `Medium` models have same dimensions and bounds.
 """
 function Base.size(mod::Medium)
 	return length.(mod.mgrid)
 end
 
 """
-Copy for `Seismic` models. The models should have same bounds and sizes.
+Return the number of dimensions of `Medium` 
+"""
+function Base.ndims(mod::Medium)
+	return length(mod.mgrid)
+end
+
+"""
+Copy for `Medium` models. The models should have same bounds and sizes.
 Doesn't allocate any memory.
 Only copy primary medium parameters
 """
@@ -91,12 +96,12 @@ end
 
 
 """
-Print information about `Seismic`
+Print information about `Medium`
 """
 function Base.show(io::Base.IO, mod::Medium)
 	println(io, "> Medium")
-	println(io, "> number of samples:\t","x\t",length(mod.mgrid[2]),"\tz\t",length(mod.mgrid[1]))
-	println(io, "> sampling intervals:\t","x\t",step(mod.mgrid[2]),"\tz\t",step(mod.mgrid[1]))
+	println(io, "> number of samples:\t",length.(mod.mgrid))
+	println(io, "> sampling intervals:\t",step.(mod.mgrid))
 	println(io, "> vp:\t","min\t",minimum(mod[:vp]),"\tmax\t",maximum(mod[:vp]))
 	println(io, "> rho:\t","min\t",minimum(mod[:rho]),"\tmax\t",maximum(mod[:rho]))
 	println(io, "> Bounds:")
@@ -196,7 +201,7 @@ end
 
 """
 Get other dependent model parameters of a seismic model
-that are not present in `Seismic`.
+that are not present in `Medium`.
 
 * `:rhoI` : inverse of density
 * `:Zp` : P-wave impedance

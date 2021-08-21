@@ -508,7 +508,7 @@ end
 
 
 """
-Return bound vectors for the `Seismic` model, 
+Return bound vectors for the `Medium` model, 
 depeding on paramaterization
 """
 function Seismic_xbound!(lower_x, upper_x, pa)
