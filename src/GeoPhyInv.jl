@@ -13,6 +13,7 @@ using ProgressMeter
 using Distributed
 using DistributedArrays
 using SharedArrays
+using ParallelStencil
 using Printf
 using DataFrames
 using SparseArrays
@@ -31,8 +32,12 @@ using Distributions
 using StatsBase
 using RecipesBase
 using FFTW
+using CUDA
 using HDF5
 
+
+# initialize ParallelStencil
+# @init_parallel_stencil(CUDA, Float64, 3)
 
 
 # this is extensively used to stack arrays

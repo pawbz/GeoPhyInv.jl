@@ -1112,8 +1112,8 @@ function pml_variables(
 		(abs(d_x_half[ix]) > 1.e-6) ? a_x_half[ix] = d_x_half[ix] * (b_x_half[ix] - 1.e0) / (k_x_half[ix] * (d_x_half[ix] + k_x_half[ix] * alpha_x_half[ix])) : nothing
 
 	end
-	k_xI = k_x.^(-1.e0)
-	k_x_halfI = k_x_half.^(-1.e0)
+	copyto!(k_xI, inv.(k_x))
+	copyto!(k_x_halfI, inv.(k_x_half))
 
 
 
