@@ -165,9 +165,9 @@ use this fraction to increase of reduce the maximum time
 # Keyword Arguments
 * all the keywords arguments of the `ricker` method can be used.
 """
-function ricker(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0; args... )
+function ricker(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0, epsilon=0.5; args... )
 	@assert(!iszero(mod))
-	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac)
+	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac, epsilon)
 	wav=ricker(fqdom, tgrid; args...)
 	return wav, tgrid
 end
@@ -177,7 +177,7 @@ Same as ricker, but return ormsby...
 """
 function ormsby(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0; args... )
 	@assert(!iszero(mod))
-	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac)
+	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac, epsilon)
 	wav=ormsby(fqdom, tgrid; args...)
 	return wav, tgrid
 end
@@ -185,8 +185,9 @@ end
 """
 Return dominant source frequency, and its temporal grid for a finite-difference simulation, for given number of wavelengths `nλ` in the medium.
 The model has `nλ` wavelengths, and the maximum modeling time is determined by `tmaxfrac`.
+`epsilon` is Courant number.
 """
-function get_fqdom_tgrid( mod::Medium, nλ::Int, tmaxfrac::Real)
+function get_fqdom_tgrid( mod::Medium, nλ::Int, tmaxfrac::Real, epsilon)
 
 	x=mod.mgrid[2]; z=mod.mgrid[1]
 	# dominant wavelength using mod dimensions
@@ -203,9 +204,13 @@ function get_fqdom_tgrid( mod::Medium, nλ::Int, tmaxfrac::Real)
 	tmax=2.0*d*inv(vavg)*tmaxfrac
 
 	# choose sampling interval to obey max freq of source wavelet
-	δmin = minimum([step(mod.mgrid[2]), step(mod.mgrid[1])])
-	vpmax = mod.bounds[:vp][2]
-	δt=0.5*δmin/vpmax
+	δmin = minimum(step.(mod.mgrid))
+	vmax=try
+		sqrt(bounds[:vp][2]^2 + bounds[:vs][2]^2) # see Virieux (1986)
+	catch
+		mod.bounds[:vp][2]
+	end
+	δt=epsilon*δmin/vmax
 
 	# check if δt is reasonable
 	#(δt > 0.1/fqdom) : error("decrease spatial sampling or nλ")

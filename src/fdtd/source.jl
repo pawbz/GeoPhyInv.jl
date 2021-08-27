@@ -151,10 +151,10 @@ end
 # on pressure grid
 source(source_term, spray, pac, iz, ix, ::p) = source_term * spray * pac.mod[:ttI][iz,ix]
 
-# on Vx grid
+# on vx grid
 source(source_term, spray, pac, iz, ix, ::vx) = source_term * spray * pac.mod[:rrvx][iz,ix]
 
-# on Vz grid
+# on vz grid
 source(source_term, spray, pac, iz, ix, ::vz) = source_term * spray * pac.mod[:rrvz][iz,ix]
 
 

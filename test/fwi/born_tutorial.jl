@@ -7,7 +7,7 @@ using LinearAlgebra
 
 
 # ### SeisInvExpt
-pa=SeisInvExpt(FdtdBorn(), LS(), :pizza, rfields=[:P, :Vz]); # use linearized modeling attribute
+pa=SeisInvExpt(FdtdBorn(), LS(), :pizza, rfields=[:P, :vz]); # use linearized modeling attribute
 F=LinearMap(pa); # generate LinearMap 
 
 # ### Linearity test

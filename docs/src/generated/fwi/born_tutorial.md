@@ -13,7 +13,7 @@ using LinearAlgebra
 ### SeisInvExpt
 
 ```@example born_tutorial
-pa=SeisInvExpt(FdtdBorn(), LS(), :pizza, rfields=[:P, :Vz]); # use linearized modeling attribute
+pa=SeisInvExpt(FdtdBorn(), LS(), :pizza, rfields=[:P, :vz]); # use linearized modeling attribute
 F=LinearMap(pa); # generate LinearMap
 nothing #hide
 ```

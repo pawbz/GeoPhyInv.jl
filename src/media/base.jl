@@ -102,8 +102,9 @@ function Base.show(io::Base.IO, mod::Medium)
 	println(io, "> Medium")
 	println(io, "> number of samples:\t",length.(mod.mgrid))
 	println(io, "> sampling intervals:\t",step.(mod.mgrid))
-	println(io, "> vp:\t","min\t",minimum(mod[:vp]),"\tmax\t",maximum(mod[:vp]))
-	println(io, "> rho:\t","min\t",minimum(mod[:rho]),"\tmax\t",maximum(mod[:rho]))
+	try;println(io, "> vp:\t","min\t",minimum(mod[:vp]),"\tmax\t",maximum(mod[:vp])); catch; end
+	try;println(io, "> vs:\t","min\t",minimum(mod[:vs]),"\tmax\t",maximum(mod[:vs])); catch; end
+	try;println(io, "> rho:\t","min\t",minimum(mod[:rho]),"\tmax\t",maximum(mod[:rho])); catch; end
 	println(io, "> Bounds:")
 	println(io, mod.bounds)
 end
@@ -205,6 +206,10 @@ that are not present in `Medium`.
 
 * `:rhoI` : inverse of density
 * `:Zp` : P-wave impedance
+* `:lambda` : first Lame parameter
+* `:mu` : shear modulus
+* `:K` : bulk modulus
+* `:M` : P-wave modulus
 """
 function Base.getindex(mod::Medium, s::Symbol)
 	nznx=length(mod.m[:vp])
@@ -212,6 +217,9 @@ function Base.getindex(mod::Medium, s::Symbol)
 	@assert :vp ∈ names(mod.m)[1]
 	@assert :rho ∈ names(mod.m)[1]
 	vp=mod.m[:vp]; rho=mod.m[:rho]
+	if(:vs ∈ names(mod.m)[1])
+		vs=mod.m[:vs]
+	end
 	if(s == :vp)
 		return vp
 	elseif(s == :rho)
@@ -249,6 +257,14 @@ function Base.getindex(mod::Medium, s::Symbol)
 	# output derived fields
 	if(s == :rhoI)
 		@inbounds for i in 1:nznx; x[i]=inv(rho[i]); end
+	elseif(s == :lambda)
+		if(:vs ∈ names(mod.m)[1])
+			@inbounds for i in 1:nznx; x[i]=(vp[i]*vp[i]-2*vs[i]*vs[i])*rho[i]; end
+		else
+			@inbounds for i in 1:nznx; x[i]=vp[i]*vp[i]*rho[i]; end
+		end
+	elseif(s == :M)
+			@inbounds for i in 1:nznx; x[i]=vp[i]*vp[i]*rho[i]; end
 	elseif(s == :χrhoI)
 		@inbounds for i in 1:nznx; x[i]=χ(inv(rho[i]),mod.ref[:rhoI],1); end
 	elseif(s == :χrho)
@@ -256,16 +272,37 @@ function Base.getindex(mod::Medium, s::Symbol)
 	elseif(s == :χvp)
 		@inbounds for i in 1:nznx; x[i]=χ(vp[i],mod.ref[:vp],1); end
 	elseif(s == :χK)
+		if(:vs ∈ names(mod.m)[1])
+			@inbounds for i in 1:nznx; x[i]=χ((vp[i]*vp[i]-4.0/3.0*vs[i]*vs[i])*rho[i],mod.ref[:K],1); end
+		else
+			@inbounds for i in 1:nznx; x[i]=χ(vp[i]*vp[i]*rho[i],mod.ref[:K],1); end
+		end
+	elseif(s == :χM)
 		@inbounds for i in 1:nznx; x[i]=χ(vp[i]*vp[i]*rho[i],mod.ref[:K],1); end
+	elseif(s == :mu)
+		@inbounds for i in 1:nznx; x[i]=mod.m[:vs][i]*mod.m[:vs][i]*rho[i]; end
 	elseif(s == :χmu)
-		@inbounds for i in 1:nznx; x[i]=χ(mod.m[:vs][i]*mod.m[:vs][i]*rho[i],
-			mod.ref[:mu],1); end
+		@inbounds for i in 1:nznx; x[i]=χ(mod.m[:vs][i]*mod.m[:vs][i]*rho[i],mod.ref[:mu],1); end
 	elseif(s == :χKI)
+		if(:vs ∈ names(mod.m)[1])
+			@inbounds for i in 1:nznx; x[i]=χ(inv((vp[i]*vp[i]-4.0/3.0*vs[i]*vs[i])*rho[i]),mod.ref[:KI],1); end
+		else
+			@inbounds for i in 1:nznx; x[i]=χ(inv(vp[i]*vp[i]*rho[i]),mod.ref[:KI],1); end
+		end
+	elseif(s == :χMI)
 		@inbounds for i in 1:nznx; x[i]=χ(inv(vp[i]*vp[i]*rho[i]),mod.ref[:KI],1); end
 	elseif(s == :KI)
-		@inbounds for i in 1:nznx; x[i]=inv(vp[i]*vp[i]*rho[i]); end
+		if(:vs ∈ names(mod.m)[1])
+			@inbounds for i in 1:nznx; x[i]=inv((vp[i]*vp[i]-4.0/3.0*vs[i]*vs[i])*rho[i]); end
+		else
+			@inbounds for i in 1:nznx; x[i]=inv(vp[i]*vp[i]*rho[i]); end
+		end
 	elseif(s == :K)
-		@inbounds for i in 1:nznx; x[i]=vp[i]*vp[i]*rho[i]; end
+		if(:vs ∈ names(mod.m)[1])
+			@inbounds for i in 1:nznx; x[i]=(vp[i]*vp[i]-4.0/3.0*vs[i]*vs[i])*rho[i]; end
+		else
+			@inbounds for i in 1:nznx; x[i]=vp[i]*vp[i]*rho[i]; end
+		end
 	elseif(s == :Zp)
 		@inbounds for i in 1:nznx; x[i]=vp[i]*rho[i]; end
 	elseif(s == :tau_epsilon)

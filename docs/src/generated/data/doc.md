@@ -30,10 +30,10 @@ tgrid=range(0, stop=1.0, step=0.1);
 nothing #hide
 ```
 
-Lets initialize records for `:P` and `:Vz` fields.
+Lets initialize records for `:P` and `:vz` fields.
 
 ```@example doc
-data=Data(tgrid, ageom, [:P,:Vz]);
+data=Data(tgrid, ageom, [:P,:vz]);
 nothing #hide
 ```
 

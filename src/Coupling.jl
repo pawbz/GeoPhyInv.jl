@@ -40,7 +40,7 @@ mutable struct TD
 	ageom::AGeom
 	TD(ssf, rf, fields, tgridssf, tgridrf, ssflags, rflags, ageom) = 
 		any([
-		  any([fields[ifield] ∉ [:P, :Vx, :Vz] for ifield in 1:length(fields)]),
+		  any([fields[ifield] ∉ [:P, :vx, :vz] for ifield in 1:length(fields)]),
 		  length(fields) == 0,
 		  broadcast(size,ssf) != [(length(tgridssf),) for iss=1:ageom.nss, ifield=1:length(fields)]
 		  ]) ? 

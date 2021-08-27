@@ -7,7 +7,7 @@ ageom=AGeom(mgrid, SSrcs(10), Srcs(10), Recs(10));
 
 tgrid=range(0, stop=1.0, step=0.1);
 
-data=Data(tgrid, ageom, [:P,:Vz]);
+data=Data(tgrid, ageom, [:P,:vz]);
 
 Random.randn!(data[3][:P]);
 

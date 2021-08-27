@@ -123,17 +123,20 @@ function update!(mod::Medium)
 	"note that: mean(K0) ≠ 1/mean(KI0)"
 	mb=deepcopy(mod.bounds)
 
-	K = mb[:vp] .* mb[:vp] .* mb[:rho]; 
-	KI = reverse(inv.(K),dims=1);
 	rho = mb[:rho]; 
 	rhoI = reverse(inv.(rho),dims=1);
-	newnames=[:K,:KI,:rhoI]
 
-	if(:vs ∈ names(mb,1))
+	if(:vs ∈ names(mb)[1])
+		K = (mb[:vp] .* mb[:vp] .- 4.0/3.0 .* mb[:vs] .* mb[:vs]) .* mb[:rho]; 
+		KI = reverse(inv.(K),dims=1);
+		newnames=[:K,:KI,:rhoI,:mu,:muI]
 		mu = mb[:vs] .* mb[:vs] .* mb[:rho];
 		muI = reverse(inv.(mu),dims=1);
-		mbnew=NamedArray([K,KI,rhoI,mu,muI],(vcat(newnames,[:mu,:muI]),))
+		mbnew=NamedArray([K,KI,rhoI,mu,muI],(newnames,))
 	else
+		K = (mb[:vp] .* mb[:vp]) .* mb[:rho]; 
+		KI = reverse(inv.(K),dims=1);
+		newnames=[:K,:KI,:rhoI]
 		mbnew=NamedArray([K,KI,rhoI],(newnames,))
 	end
 

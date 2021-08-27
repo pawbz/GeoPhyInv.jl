@@ -100,9 +100,9 @@ finite-difference modeling.
   * `=1` receivers are active only for the second propagating wavefield
 * `rfields=[:P]` : multi-component receiver flag. Choose `Vector{Symbol}`
   * `=[:P]` record pressure 
-  * `=[:Vx]` record horizontal component of particle velocity  
-  * `=[:Vz]` record vertical component of particle velocity  
-  * `=[:P, :Vx]` record both pressure and velocity 
+  * `=[:vx]` record horizontal component of particle velocity  
+  * `=[:vz]` record vertical component of particle velocity  
+  * `=[:P, :vx]` record both pressure and velocity 
 * `tsnaps` : store snaps at these modeling times (defaults to half time)
   * `=[0.1,0.2,0.3]` record at these instances of tgrid
 * `snaps_flag::Bool=false` : return snapshots or not
@@ -949,18 +949,37 @@ end
 
 
 
+"""
+* `H : number of grid points inside wavelength
+	* choose 5 for 4th order scheme?
+* `epsilon` : Courant number
+"""
+function check_fd_stability(bounds, mgrid, tgrid, freqmin, freqmax, verbose=true, H=5, epsilon=0.5)
 
-function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::Float64, freqmin::Float64, freqmax::Float64, δt::Float64, verbose::Bool)
+	δ=step.(mgrid)
+	δt=step(tgrid)
 
+	if(:vs ∈ names(bounds)[1])
+		vmin=bounds[:vs][1] # vs condition overrides 
+		vmax=sqrt(bounds[:vp][2]^2 + bounds[:vs][2]^2) # see Virieux (1986)
 
-	# check spatial sampling
-	δs_temp=round(vpmin/5.0/freqmax,digits=2);
-	δs_max = maximum([δx, δz])
+	else
+		vmin=bounds[:vp][1]
+		vmax=bounds[:vp][2]
+	end
+
+	# check spatial sampling, i.e., number of grid points in minimum wavelength
+	if(:vs ∈ names(bounds)[1])
+		δs_temp=round(vmin/H/freqmax,digits=2); 
+	else
+		δs_temp=round(vmin/H/freqmax,digits=2);
+	end
+	δs_max = maximum(δ)
 	str1=@sprintf("%0.2e",δs_max)
 	str2=@sprintf("%0.2e",δs_temp)
 	if(str1 ≠ str2)
 		if(all(δs_max .> δs_temp)) 
-			@warn "decrease spatial sampling ($str1) below $str2"
+			@warn "decrease maximum spatial sampling ($str1) below $str2"
 		else
 			if(verbose)
 				@info "spatial sampling ($str1) can be as high as $str2"
@@ -968,9 +987,9 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 		end
 	end
 
-	# check time sampling
-	δs_min = minimum([δx, δz])
-	δt_temp=0.5*δs_min/vpmax
+	# check time sampling, i.e., Courant criteria 
+	δs_min = minimum(δ)
+	δt_temp=epsilon*δs_min/vmax
 	str1=@sprintf("%0.2e", δt)
 	str2=@sprintf("%0.2e", δt_temp)
 	if(str1 ≠ str2)
@@ -982,7 +1001,6 @@ function check_fd_stability(vpmin::Float64, vpmax::Float64, δx::Float64, δz::F
 			end
 		end
 	end
-
 end
 
 """
@@ -994,7 +1012,7 @@ function pml_variables(
 		δt::Float64, 
 		δx::Float64, mesh_na_pml::Int64, 
 		velmax::Float64, velmin::Float64, 
-		freqmin::Float64, freqmax::Float64,
+		freqmin::Float64, freqmax::Float64,  # should replace this average with peak frequency
 	        flags::Vector{Bool}
 		)
 
@@ -1098,7 +1116,10 @@ function pml_variables(
 	k_x_halfI = k_x_half.^(-1.e0)
 
 
-	return [a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI]
+
+	names=[:a,:b,:kI,:a_half,:b_half,:k_halfI]
+	# return [d_x, d_x_half, alpha_x, alpha_x_half]
+	return NamedArray([a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI], names)
 end
 
 
