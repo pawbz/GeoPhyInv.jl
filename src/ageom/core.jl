@@ -2,21 +2,22 @@
 Acquisition geometry for each supersource.
 """
 mutable struct AGeomss
-	sx::Vector{Float64}
-	sz::Vector{Float64}
-	rx::Vector{Float64}
-	rz::Vector{Float64}
+	s::NamedStack{Vector{Float64}} # x, y, z coordinates
+	r::NamedStack{Vector{Float64}} # x, y, z coordinates
+	# sx::Vector{Float64}
+	# sz::Vector{Float64}
+	# rx::Vector{Float64}
+	# rz::Vector{Float64}
 	ns::Int64 # change to +ve only integer later
 	nr::Int64 # change to +ve only integer later
 	"adding conditions that are to be false while construction"
-	AGeomss(sx, sz, rx, rz, ns, nr) = 
-		any([
-                  length(sx) != ns,
-                  length(sz) != ns,
-                  length(rx) != nr,
-                  length(rz) != nr,
-		  ]) ? 
-		error("AGeomss construct") : new(sx, sz, rx, rz, ns, nr)
+	AGeomss(s,r,ns,nr) = 
+		(
+		any(names(s)[1] != names(r)[1]) |
+		any( [length(ss) != ns for ss in s] ) | 
+		any( [length(rr) != nr for rr in r] )  
+		) ?
+		error("AGeomss construct") : new(s, r, ns, nr)
 end # type
 
 include("gallery.jl")
@@ -26,19 +27,21 @@ include("gallery.jl")
 Randomly place a given number of source and receivers in a `mgrid`.
 """
 function AGeomss(mgrid::AbstractArray{T}, s::Srcs, r::Recs) where {T<:StepRangeLen}
-	xmin=mgrid[2][1]
-	xmax=mgrid[2][end]
-	zmin=mgrid[1][1]
-	zmax=mgrid[1][end]
-	return AGeomss(Random.rand(Uniform(xmin,xmax),s.n), Random.rand(Uniform(zmin,zmax),s.n),
-		    Random.rand(Uniform(xmin,xmax),r.n), Random.rand(Uniform(zmin,zmax),r.n), s.n, r.n)
+	nd=length(mgrid)
+	names=[:z,:y,:x][1:nd]
+	mins=[m[1] for m in mgrid]
+	maxs=[m[end] for m in mgrid]
+	return AGeomss(
+		NamedArray([Random.rand(Uniform(mins[i],maxs[i]),s.n) for i in 1:nd], (names,)),
+		NamedArray([Random.rand(Uniform(mins[i],maxs[i]),r.n) for i in 1:nd], (names,)),
+		s.n,r.n
+	)
 end
 
 """
 ```julia
 ageom=AGeom(mgrid, SSrcs(2), [Srcs(3), Srcs(2)], [Recs(10), Recs(20)])
 ```
-
 Initialize an acquisition, with 2 supersources, by randomly placing a 
 sources and receivers in `mgrid`.
 """
@@ -58,16 +61,17 @@ function Array{AGeomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Srcs, r::Recs)
 end
 
 function Base.isequal(ageom1::AGeomss, ageom2::AGeomss, attrib=:all)
-	srcfnames = [:sx, :sz, :ns]
+	@assert dims(ageom1) == dims(ageom2) "attempt to compare acquisitions of different dimensions"
+	names = [:sx, :sz, :ns]
 	recfnames = [:rx, :rz, :nr]
-	srcvec=[(isequal(getfield(ageom1, name),getfield(ageom2, name))) for name in srcfnames]
-	recvec=[(isequal(getfield(ageom1, name),getfield(ageom2, name))) for name in recfnames]
+	src=all([(isequal(ageom1.s[name],ageom2.s[name])) for name in names(ageom1.s)[1]]) & (ageom1.ns==ageom2.ns) 
+	rec=all([(isequal(getfield(ageom1, name),getfield(ageom2, name))) for name in recfnames]) & (ageom1.nr==ageom2.nr) 
 	if(attrib == :sources)
-		return all(srcvec)
+		return src
 	elseif(attrib == :receivers)
-		return all(recvec)
+		return rec 
 	else
-		return all(vcat(srcvec, recvec))
+		return src & rec 
 	end
 end
 
@@ -85,30 +89,50 @@ function Base.show(io::Base.IO, ageomss::AGeomss)
 	print(io, "\t> acquisition with ",ageomss.ns," source(s) and ",ageomss.nr, " receiver(s)")
 end
 
+function Base.ndims(ageomss::AGeomss)
+	return length(ageomss.s)
+end
+
+function Base.ndims(ageom::Array{AGeomss,1})
+	nd=ndims.(ageom)
+	@assert all(y->y==nd[1],nd)
+	return nd[1]
+end
+
 """
 Output `n` interpolated 2-D points between `p1` and `p2`. 
 """
 function spread(n, p1::Vector{T1}, p2::Vector{T2}, rand_flag::Bool=false) where {T1<:Real,T2<:Real}
-	@assert (length(p1)==2) && (length(p2)==2)
-
+	@assert (length(p1)==length(p2)) # check if 2D or 3D
+	nd=length(p1)
 	if(n==1)
-		return [p1[1]], [p1[2]]
+		return Tuple([[p1[i]] for i in 1:nd])
 	else
 		knots = ([1,n],)
-		itpz = Interpolations.interpolate(knots, [p1[1],p2[1]],  Gridded(Linear()));
-		itpx = Interpolations.interpolate(knots, [p1[2],p2[2]],  Gridded(Linear()));
-		return [itpz(i) for i in 1:n], [itpx(i) for i in 1:n]
+		itp = [Interpolations.interpolate(knots, [p1[i],p2[i]],  Gridded(Linear())) for i in 1:nd]
+		return Tuple([[it(i) for i in 1:n] for it in itp])
 	end
 end
 
-function spread(n, p0::Vector{T1}, rad::T2, angles::Vector{T3}, rand_flag::Bool=false)  where {T1<:Real,T2<:Real,T3<:Real}  
-	th,ni=spread(n, [angles[1], 1],[angles[2], n], rand_flag)
-	x=zeros(n); z=zeros(n)
+"""
+theta=0 means in x-z plane
+"""
+function spread(n, p0::Vector{T1}, rad::T2, phi::Vector{T4}, theta::Vector{T3}=[0,0], rand_flag::Bool=false)  where {T1<:Real,T2<:Real,T3<:Real,T4<:Real}  
+	phi=spread(n, [phi[1]],[phi[2]], rand_flag)
+	theta=spread(n, [theta[1]],[theta[2]], rand_flag)
+	nd=length(p0)
+	p=fill(zeros(n),nd)
+
 	for i in 1:n
-		x[i]=p0[2]+rad*cos(th[i])
-		z[i]=p0[1]+rad*sin(th[i])
+		p[1][i]=p0[1]+rad*cos(phi[i])
+		if(nd>1)
+			p[2][i]=p0[2]+rad*sin(phi[i])*sin(theta[i])
+		end
+		if(nd>2)
+			p[3][i]=p0[3]+rad*sin(phi[i])*cos(theta[i])
+		end
 	end
-	return z,x
+	return Tuple(p)
 end
 
 """
@@ -124,9 +148,10 @@ Update source geometry for the second supersource, with 10 sources placed equidi
 and angles `angles=[0,2pi]`.
 """
 function update!(ageomss::AGeomss, ::Srcs, args...) where {T<:Real}
-	z,x=spread(ageomss.ns,args...)
-	copyto!(ageomss.sx,x)
-	copyto!(ageomss.sz,z)
+	p=spread(ageomss.ns,args...)
+	for id in 1:ndims(ageomss)
+		copyto!(ageomss.s[id],p[id])
+	end
 	return ageomss
 end
 
@@ -137,9 +162,11 @@ update!(ageom[1], Recs(10), args...)
 Similar to updating source positions, but for receivers.
 """
 function update!(ageomss::AGeomss, ::Recs, args...)
+	p=spread(ageomss.nr,args...)
 	z,x=spread(ageomss.nr,args...)
-	copyto!(ageomss.rx,x)
-	copyto!(ageomss.rz,z)
+	for id in ndims(ageomss)
+		copyto!(ageomss.r[id],p[id])
+	end
 	return ageomss
 end
 
@@ -148,12 +175,13 @@ end
 update!(ageom, SSrcs(), p1, p2)
 update!(ageom, SSrcs(), p0, rad, angles)
 ```
-Update source positions for all supersources. 
+Update all source positions in each supersources. 
 """
 function update!(ageom::AGeom, ::SSrcs, args...)
-	z,x=spread(length(ageom), args...)
+	p=spread(length(ageom),args...)
+	pz=collect(zip(p...))
 	for iss in 1:length(ageom)
-		update!(ageom[iss], Srcs(), [z[iss],x[iss]], [z[iss],x[iss]])    
+		update!(ageom[iss], Srcs(), collect(pz[iss]), collect(pz[iss]))    
 	end
 	return ageom
 end
@@ -181,20 +209,20 @@ in(ageom, mgrid)
 Assert if all the sources and receivers in `AGeom` are within bounds of `mgrid`.
 """
 function Base.in(ageom::AGeom, mgrid::AbstractVector{T}) where {T<:StepRangeLen}     
-	xmin, zmin, xmax, zmax = mgrid[2][1], mgrid[1][1], mgrid[2][end], mgrid[1][end]
+	# xmin, zmin, xmax, zmax = mgrid[2][1], mgrid[1][1], mgrid[2][end], mgrid[1][end]
 	checkvec=fill(false, length(ageom))
 	for iss=1:length(ageom)
+		nd=ndims(ageom[iss])
+		@assert nd==length(mgrid)
+		names=[:z,:y,:x][1:nd]
 		checkvec[iss] = any(
-		      vcat(
-			   (((ageom[iss].sx .- xmin).*(xmax .- ageom[iss].sx)) .< 0.0),
-			   (((ageom[iss].sz .- zmin).*(zmax .- ageom[iss].sz)) .< 0.0),
-			   (((ageom[iss].rx .- xmin).*(xmax .- ageom[iss].rx)) .< 0.0),
-			   (((ageom[iss].rz .- zmin).*(zmax .- ageom[iss].rz)) .< 0.0),
-			   isnan.(ageom[iss].sx),
-			   isnan.(ageom[iss].sz),
-			   isnan.(ageom[iss].rx),
-			   isnan.(ageom[iss].rz),
-		     ) )
+		      hcat(
+			   [ vcat((((ageom[iss].s[dn] .- mgrid[id][1]).*(mgrid[id][end] .- ageom[iss].s[dn])) .< 0.0),
+			   (((ageom[iss].r[dn] .- mgrid[id][1]).*(mgrid[id][end] .- ageom[iss].r[dn])) .< 0.0),
+			   isnan.(ageom[iss].s[dn]),
+			   isnan.(ageom[iss].r[dn]))
+			   for (id,dn) in enumerate(names)]...)
+		     ) 
 	end
 	return !(any(checkvec))
 end
@@ -208,11 +236,12 @@ D=A*P
 Return a sparse matrix that restricts the field `P` on `mgrid` to receiver positions, to give `D`.
 """
 function SparseArrays.SparseMatrixCSC(ageomss::AGeomss,mgrid::AbstractVector{T}) where {T<:StepRangeLen}  
+	@assert length(mgrid)==2 #  need to update this routine for 3D acq
 	nz,nx=length.(mgrid)
 	ACQ=spzeros(ageomss.nr,prod(length.(mgrid)))
 	for ir = 1:ageomss.nr
-		irx=argmin(abs.(mgrid[2].-ageomss.rx[ir]))
-		irz=argmin(abs.(mgrid[1].-ageomss.rz[ir]))
+		irx=argmin(abs.(mgrid[2].-ageomss.r[:x][ir]))
+		irz=argmin(abs.(mgrid[1].-ageomss.r[:z][ir]))
 		ACQ[ir,irz+(irx-1)*nz]=1.0
 	end
 	return ACQ
@@ -231,10 +260,10 @@ Advance either source or receiver array in an acquisition ageometry in horizonta
 function AGeom_advance(ageom::AGeom, advances::Vector{Vector{Float64}}=[[0.,0.], [0.,0.]]) 
 	ageom_out=deepcopy(ageom)
 	for iss=1:ageom.nss
-		ageom_out.sx[iss][:] .+= advances[1][2]
-		ageom_out.sz[iss][:] .+= advances[1][1]
-		ageom_out.rx[iss][:] .+= advances[2][2]
-		ageom_out.rz[iss][:] .+= advances[2][1]
+		ageom_out.s[:x][iss][:] .+= advances[1][2]
+		ageom_out.s[:z][iss][:] .+= advances[1][1]
+		ageom_out.r[:x][iss][:] .+= advances[2][2]
+		ageom_out.r[:z][iss][:] .+= advances[2][1]
 	end
 	return ageom_out
 end
@@ -253,9 +282,9 @@ function save(ageom, folder)
 	!(isdir(folder)) && error("invalid directory")
 	for iss in 1:ageom.nss
 		file=joinpath(folder, string("s", iss, ".csv"))
-		CSV.write(file,DataFrame(hcat(ageom.sx[iss], ageom.sz[iss])))
+		CSV.write(file,DataFrame(hcat(ageom.s[:x][iss], ageom.s[:z][iss])))
 		file=joinpath(folder, string("r", iss, ".csv"))
-		CSV.write(file,DataFrame(hcat(ageom.rx[iss], ageom.rz[iss])))
+		CSV.write(file,DataFrame(hcat(ageom.r[:x][iss], ageom.r[:z][iss])))
 	end
 end
 
@@ -269,10 +298,10 @@ where the supersources of both acquisitions are appended.
 """
 function AGeom_add!(ageom1::AGeom, ageomv::Vector{AGeom})
 	for iageom=1:length(ageomv)
-		append!(ageom1.sx, ageomv[iageom].sx)
-		append!(ageom1.sz, ageomv[iageom].sz)
-		append!(ageom1.rx, ageomv[iageom].rx)
-		append!(ageom1.rz, ageomv[iageom].rz)
+		append!(ageom1.s[:x], ageomv[iageom].s[:x])
+		append!(ageom1.s[:z], ageomv[iageom].s[:z])
+		append!(ageom1.r[:x], ageomv[iageom].r[:x])
+		append!(ageom1.r[:z], ageomv[iageom].r[:z])
 		append!(ageom1.ns, ageomv[iageom].ns)
 		append!(ageom1.nr, ageomv[iageom].nr)
 		ageom1.nss += ageomv[iageom].nss
@@ -288,12 +317,12 @@ function AGeom_add!(ageom::AGeom, zpos::Vector{Float64}, xpos::Vector{Float64}, 
 	length(xpos) == length(zpos) ? nothing : error("same length vectors needed")
 	for iss=1:ageom.nss
 		if(attrib == :receivers)
-			ageom.rx[iss] = vcat(ageom.rx[iss][:], xpos)
-			ageom.rz[iss] = vcat(ageom.rz[iss][:], zpos)
+			ageom.r[:x][iss] = vcat(ageom.r[:x][iss][:], xpos)
+			ageom.r[:z][iss] = vcat(ageom.r[:z][iss][:], zpos)
 			ageom.nr[iss] += length(xpos)
 		elseif(attrib == :sources)
-			ageom.sx[iss] = vcat(ageom.sx[iss][:], xpos)
-			ageom.sz[iss] = vcat(ageom.sz[iss][:], zpos)
+			ageom.s[:x][iss] = vcat(ageom.s[:x][iss][:], xpos)
+			ageom.s[:z][iss] = vcat(ageom.s[:z][iss][:], zpos)
 			ageom.ns[iss] += length(xpos)
 		end
 	end

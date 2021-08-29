@@ -78,10 +78,10 @@ function mod(medium::Medium;
 	data=Data(tgridmod, ageom, [:p])
 
 	for iss in 1:nss, ifield in 1:length(data[iss].d)
-		sx = ageom[iss].sx
-		rx = ageom[iss].rx
-		sz = ageom[iss].sz
-		rz = ageom[iss].rz
+		sx = ageom[iss].s[:x]
+		rx = ageom[iss].r[:x]
+		sz = ageom[iss].s[:z]
+		rz = ageom[iss].r[:z]
 
 		for ir = 1:ageom[iss].nr
 

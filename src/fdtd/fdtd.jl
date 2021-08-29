@@ -18,22 +18,21 @@
 
 
 """
-Acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
+2-D acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct Fdtd end
-
-"""
-ViscoAcoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
-"""
-struct FdtdVisco end
+struct FdtdAcou end
 
 
 """
-Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
+2-D ViscoAcoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct FdtdBorn end
+struct FdtdAcouVisco end
 
 
+"""
+2-D Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
+"""
+struct FdtdAcouBorn end
 
 
 global const npml = 50
@@ -60,16 +59,6 @@ include("attenuation.jl")
 #Rmemory::StackedArray2DVector{Array{Float64,3}} # memory variable for attenuation, see Carcione et al (1988), GJ
 #Rmemoryp::StackedArray2DVector{Array{Float64,3}} # at previous time step
 
-P_x_worker=Vector{P_x_worker_x_pw}
-
-
-mutable struct PFdtd{T}
-	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
-	p::DistributedArrays.DArray{P_x_worker,1,P_x_worker} # distributed parameters among workers
-	c::P_common{T} # common parameters
-end
-
-
 """
 ```julia
 pa = SeisForwExpt(attrib_mod; ageom, srcwav, medium, tgrid);
@@ -81,8 +70,8 @@ finite-difference modeling.
 # Keyword Arguments
 
 * `attrib_mod` : attribute to choose the type of modeling. Choose from 
-  * `=Fdtd()` for full wavefield modeling  (finite-difference simulation of the acoustic wave-equation)
-  * `=FdtdBorn()` for Born modeling 
+  * `=FdtdAcou()` for full wavefield modeling  (finite-difference simulation of the acoustic wave-equation)
+  * `=FdtdAcouBorn()` for Born modeling 
 * `model::Medium` : medium parameters 
 * `tgrid` : modeling time grid, maximum time in `tgrid`should be greater than or equal to maximum source time, same sampling interval as in `srcwav`
 * `ageom` :  acquisition 
@@ -108,7 +97,7 @@ finite-difference modeling.
 * `snaps_flag::Bool=false` : return snapshots or not
 * `verbose::Bool=false` : verbose flag
 """
-SeisForwExpt(attrib_mod::Union{Fdtd,FdtdBorn,FdtdVisco},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
+SeisForwExpt(attrib_mod::Union{FdtdAcou,FdtdAcouBorn,FdtdAcouVisco},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
 
 
 function initialize!(pap::P_x_worker)
@@ -197,7 +186,7 @@ end
 
 
 """
-Primary method to generate Expt variable when Fdtd() and FdtdBorn() are used.
+Primary method to generate Expt variable when FdtdAcou() and FdtdAcouBorn() are used.
 
 # Some internal arguments
 * `jobname::String` : name
@@ -229,6 +218,7 @@ function PFdtd(attrib_mod;
 	snaps_flag::Bool=false,
 	verbose::Bool=false,
 	nworker=nothing)
+
 
 	# convert to vectors 
 	if(typeof(ageom)==AGeom); ageom=[ageom]; end
@@ -316,7 +306,7 @@ function PFdtd(attrib_mod;
 	modttI = copy(exmodel[:K]) 
 	modtt = copy(exmodel[:KI])
 
-	if(typeof(attrib_mod)==FdtdBorn)
+	if(typeof(attrib_mod)==FdtdAcouBorn)
 		(npw≠2) && error("born modeling needs npw=2")
 	end
 
@@ -380,7 +370,7 @@ function PFdtd(attrib_mod;
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
 	
-	if(typeof(attrib_mod)==FdtdVisco)
+	if(typeof(attrib_mod)==FdtdAcouVisco)
 		nsls=Int32(3)
 		exmodel.ic=vcat(exmodel.ic,NamedArray([nsls], ([:nsls],)))
 		exmodel.fc=vcat(exmodel.fc,NamedArray(2*pi .* [freqmin, freqmax], ([:freqmin,:freqmax],)))
@@ -446,7 +436,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::P_common)
 
 	w2=NamedArray([NamedArray([zeros(nz,nx) for i in fields], (fields,)) for i in 1:5], ([:t, :tp, :tpp, :dx, :dz],))
 
-	if(typeof(pac.attrib_mod)==FdtdVisco)
+	if(typeof(pac.attrib_mod)==FdtdAcouVisco)
 		w3=NamedArray([NamedArray([zeros(pac.ic[:nsls],nz,nx) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
 	else
 		# dummy
@@ -664,14 +654,14 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
 		Interpolation.get_spray_weights!(view(weights, :,is),  
 			    view(sindices[:x1],is), view(sindices[:x2],is),
 			    view(sindices[:z1],is), view(sindices[:z2],is),
-			    mesh_x, mesh_z, ageomss.sx[is], ageomss.sz[is])
+			    mesh_x, mesh_z, ageomss.s[:x][is], ageomss.s[:z][is])
 	end
 	for ir=1:ageomss.nr
 		weights=rinterpolatew
 		Interpolation.get_interpolate_weights!(view(weights, :,ir),
 			  view(rindices[:x1],ir), view(rindices[:x2],ir),
 			  view(rindices[:z1],ir), view(rindices[:z2],ir),
-			  mesh_x, mesh_z, ageomss.rx[ir], ageomss.rz[ir])
+			  mesh_x, mesh_z, ageomss.r[:x][ir], ageomss.r[:z][ir])
 	end
 
 end
@@ -698,7 +688,7 @@ end
 
 include("source.jl")
 include("receiver.jl")
-include("core.jl")
+include("core_acou.jl")
 include("rho_projection.jl")
 include("gradient.jl")
 include("born.jl")
@@ -823,7 +813,7 @@ end
 #			ipropout += 1
 ##			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, ageom[iprop],
 ##				ageom_urpos[1].nr[1],
-##				(ageom_urpos[1].rz[1], ageom_urpos[1].rx[1])
+##				(ageom_urpos[1].r[:z][1], ageom_urpos[1].r[:x][1])
 ##				)) 
 #		end
 #	end
@@ -878,7 +868,7 @@ function mod_x_proc!(pac::P_common, pap::P_x_worker)
 
 			# no born flag for adjoint modelling
 			if(!pac.gmodel_flag)
-				(typeof(pac.attrib_mod)==FdtdBorn) && add_born_sources!(issp, pac, pap)
+				(typeof(pac.attrib_mod)==FdtdAcouBorn) && add_born_sources!(issp, pac, pap)
 			end
 
 			# record boundaries after time reversal already

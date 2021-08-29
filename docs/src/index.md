@@ -30,7 +30,7 @@ Some of the commonly used (and exported) mutable types to create the `Expt` vari
 To get started, as an example, simply load a seismic inversion experiment already defined in our package gallery into REPL:
 ```julia
 using GeoPhyInv # load package (after installation)
-pa=SeisInvExpt(Fdtd(), LS(), :pizza); # "pizza" is the name of the experiment
+pa=SeisInvExpt(FdtdAcou(), LS(), :pizza); # "pizza" is the name of the experiment
 ```
 Then, simply use `update!` to perform least-squares inversion.
 ```julia

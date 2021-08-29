@@ -52,7 +52,7 @@ Once the `Expt` object is created, do the modeling "without approximately any
 memory allocations" using `update!`
 
 ```@example create_snaps
-pa=SeisForwExpt(Fdtd(),medium=medium, ageom=ageom, srcwav=srcwav,
+pa=SeisForwExpt(FdtdAcou(),medium=medium, ageom=ageom, srcwav=srcwav,
 	snaps_flag=true, tsnaps=[0.3, 0.4, 0.5], tgrid=tgrid, verbose=true);
 nothing #hide
 ```

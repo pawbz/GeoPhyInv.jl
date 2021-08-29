@@ -1,4 +1,7 @@
 
+
+
+
 """
 Modelling parameters per every supersource for each worker
 """
@@ -128,4 +131,12 @@ mutable struct P_common{T}
 	# attenuation related parameters
 	verbose::Bool
 end 
+
+
+P_x_worker=Vector{P_x_worker_x_pw}
+mutable struct PFdtd{T}
+	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
+	p::DistributedArrays.DArray{P_x_worker,1,P_x_worker} # distributed parameters among workers
+	c::P_common{T} # common parameters
+end
 

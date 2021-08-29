@@ -21,10 +21,10 @@ Let `ageom` be an instance of this type, then fields
 can be accessed using:
 
 * `ageom[i]` : acquisition for ith supersource
-* `ageom[i].sx` : x positions of sources
-* `ageom[i].sz` : z positions of sources
-* `ageom[i].rx` : x positions of receivers
-* `ageom[i].rz` : z positions of receivers
+* `ageom[i].s[:x]` : x positions of sources
+* `ageom[i].s[:z]` : z positions of sources
+* `ageom[i].r[:x]` : x positions of receivers
+* `ageom[i].r[:z]` : z positions of receivers
 * `ageom[i].ns` : number of sources 
 * `ageom[i].nr` : number of receivers
 
@@ -40,12 +40,16 @@ Choose `attrib::Symbol`
 * `=:vsp` vertical seismic profiling;
 * `=:rvsp`  reverse vertical seismic profiling;
 * `=:downhole` downhole sources and receivers.
+
+
+TODO: need to work on a gallery of 3D acquisitions.
 """
 AGeom=Array{AGeomss,1}
 
 
 
 function Array{AGeomss,1}(mgrid::AbstractArray{T}, attrib::Symbol, ss::SSrcs=SSrcs(1), r::Recs=Recs(10)) where {T<:StepRangeLen}
+	@assert length(mgrid)==2
 	otx=(0.9*mgrid[2][1]+0.1*mgrid[2][end]); ntx=(0.1*mgrid[2][1]+0.9*mgrid[2][end]);
 	otwx=(0.95*mgrid[2][1]+0.05*mgrid[2][end]); ntwx=(0.05*mgrid[2][1]+0.95*mgrid[2][end]);
 	otz=(0.9*mgrid[1][1]+0.1*mgrid[1][end]); ntz=(0.1*mgrid[1][1]+0.9*mgrid[1][end]);

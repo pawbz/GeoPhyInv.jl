@@ -13,8 +13,8 @@
 end
 
 @recipe function scatter(ageom::AGeom, ::SSrcs)
-	sx = vcat([ag.sx for ag in ageom]...)
-	sz = vcat([ag.sz for ag in ageom]...)
+	sx = vcat([ag.s[:x] for ag in ageom]...)
+	sz = vcat([ag.s[:z] for ag in ageom]...)
 	legend --> false
 	markersize --> 7
 	markercolor := :red
@@ -23,8 +23,8 @@ end
 end
 
 @recipe function scatter(ageom::AGeom, ::Recs)
-	rx = vcat([ag.rx for ag in ageom]...)
-	rz = vcat([ag.rz for ag in ageom]...)
+	rx = vcat([ag.r[:x] for ag in ageom]...)
+	rz = vcat([ag.r[:z] for ag in ageom]...)
 	markersize --> 7
 	legend --> false
 	markercolor := :blue
@@ -110,15 +110,15 @@ Plot time-domain data of type `Data.TD`
 		end
 	else
 		if(:r ∈ fields)
-			rxpos = [ageom.rx[iss] for iss in ssvec]
-			rzpos = [ageom.rz[iss] for iss in ssvec]
+			rxpos = [ageom.r[:x][iss] for iss in ssvec]
+			rzpos = [ageom.r[:z][iss] for iss in ssvec]
 			rx=vcat(rxpos...); rz=vcat(rzpos...)
 		else
 			b=nothing
 		end
 		if(:s ∈ fields)
-			sxpos = [ageom.sx[iss] for iss in ssvec]
-			szpos = [ageom.sz[iss] for iss in ssvec]
+			sxpos = [ageom.s[:x][iss] for iss in ssvec]
+			szpos = [ageom.s[:z][iss] for iss in ssvec]
 			sx=vcat(sxpos...); sz=vcat(szpos...)
 		else
 			a=nothing

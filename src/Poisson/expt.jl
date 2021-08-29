@@ -119,8 +119,8 @@ function record!(data::Data.TD, snaps, mgrid)
 	dat=data.d[iss,ifield]
 	for ir = 1:nr[iss]
 		din=view(dat,:,ir)
-		irx=argmin(abs.(mgrid[2].-data.ageom.rx[iss][ir]))
-		irz=argmin(abs.(mgrid[1].-data.ageom.rz[iss][ir]))
+		irx=argmin(abs.(mgrid[2].-data.ageom.r[:x][iss][ir]))
+		irz=argmin(abs.(mgrid[1].-data.ageom.r[:z][iss][ir]))
 		for it in 1:length(data.tgrid)
 			din[it]=snaps[irz,irx,it]
 		end

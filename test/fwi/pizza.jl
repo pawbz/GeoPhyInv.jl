@@ -6,7 +6,7 @@ medium_true=Medium(:pizza)
 
 
 # ### SeisInvExpt
-pa=SeisInvExpt(Fdtd(), LS(), :pizza);
+pa=SeisInvExpt(FdtdAcou(), LS(), :pizza);
 
 # ### Initial plotting
 #md p1=heatmap(pa.mediumm, :vp, title="Initial vp")

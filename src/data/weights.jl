@@ -32,8 +32,8 @@ function TD_weight!(
 	nt = length(dw.tgrid)
 	fields=dw.fields
 	nss=dw.ageom.nss
-	rx=dw.ageom.rx; rz=dw.ageom.rz
-	sx=dw.ageom.sx; sz=dw.ageom.sz
+	rx=dw.ageom.r[:x]; rz=dw.ageom.r[:z]
+	sx=dw.ageom.s[:x]; sz=dw.ageom.s[:z]
 	nr=dw.ageom.nr; ns=dw.ageom.ns
 
 	itlim = sort(broadcast(indmin,[abs.(dw.tgrid-tlim[i]) for i in 1:2]))

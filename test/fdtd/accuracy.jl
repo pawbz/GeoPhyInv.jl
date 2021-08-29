@@ -62,7 +62,7 @@ rec1 = GeoPhyInv.Born.mod(
 
 
 pa = SeisForwExpt(
-    Fdtd(),
+    FdtdAcou(),
     npw = 1,
     medium = medium,
     ageom = [ageom],
@@ -91,7 +91,7 @@ srcwav = SrcWav(tgrid, ageom, [:p])
 update!(srcwav, [:p], wav)
 
 pa = SeisForwExpt(
-    FdtdVisco(),
+    FdtdAcouVisco(),
     npw = 1,
     medium = medium,
     ageom = [ageom],

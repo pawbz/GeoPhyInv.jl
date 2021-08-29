@@ -6,7 +6,7 @@ Predefined gallery of `SeisInvExpt`. Choose `attrib::Symbol`
 * `=:pizza` an experiment fast enough to be run on a laptop
 * `=:downhole` sources and receivers on a drill-string 
 """
-function SeisInvExpt(attrib_mod::Union{Fdtd, FdtdBorn},attrib_inv::Union{LS,LS_prior,Migr,Migr_FD}, attrib::Symbol; 
+function SeisInvExpt(attrib_mod::Union{FdtdAcou, FdtdAcouBorn},attrib_inv::Union{LS,LS_prior,Migr,Migr_FD}, attrib::Symbol; 
 		     rfields=[:vx,:vz,:p], α=0.0, parameterization=[:χvp, :χrho, :null])
 
 	if(attrib==:pizza)

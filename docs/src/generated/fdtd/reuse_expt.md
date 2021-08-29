@@ -73,7 +73,7 @@ update!(srcwav, [:P], wav) # distribute to all supersources
 ### SeisForwExpt
 
 ```@example reuse_expt
-pa=SeisForwExpt(Fdtd(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
+pa=SeisForwExpt(FdtdAcou(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
 nothing #hide
 ```
 

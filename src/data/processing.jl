@@ -87,8 +87,8 @@ function TD_urpos(d::Array{Float64},
 
 	for ifield=1:length(fields), iss=1:acq.nss, ir=1:acq.nr[iss]
 		# find index in urpos
-		irr=find([[urpos[1][i]-acq.rz[iss][ir],
-		       urpos[2][i]-acq.rx[iss][ir]] == [0., 0.,] for i in 1:nur])
+		irr=find([[urpos[1][i]-acq.r[:z][iss][ir],
+		       urpos[2][i]-acq.r[:x][iss][ir]] == [0., 0.,] for i in 1:nur])
 
 		dout[iss, ifield][:,ir] = d[irr[1],ifield, :,iss] 
 	end

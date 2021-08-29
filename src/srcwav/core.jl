@@ -179,8 +179,8 @@ function SrcWav_uspos(src::Vector{SrcWav}, acq::Vector{AGeom})
 	# fill source wavelets when necessary
 	for ip=1:np
 		for ifield=1:length(src[ip].fields), iss=1:src[ip].nss, is=1:acq[ip].ns[iss]
-			is0=findall([[uspos[1][i]-acq[ip].sz[iss][is],
-		      uspos[2][i]-acq[ip].sx[iss][is]] == [0., 0.,] for i in 1:nus])
+			is0=findall([[uspos[1][i]-acq[ip].s[:z][iss][is],
+		      uspos[2][i]-acq[ip].s[:x][iss][is]] == [0., 0.,] for i in 1:nus])
 
 			wavout[ip][iss, ifield][:,is0] = src[ip].wav[iss, ifield][:,is] 
 		end

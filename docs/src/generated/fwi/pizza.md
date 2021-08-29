@@ -17,7 +17,7 @@ medium_true=Medium(:pizza)
 ### SeisInvExpt
 
 ```@example pizza
-pa=SeisInvExpt(Fdtd(), LS(), :pizza);
+pa=SeisInvExpt(FdtdAcou(), LS(), :pizza);
 nothing #hide
 ```
 

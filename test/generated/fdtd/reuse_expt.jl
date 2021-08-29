@@ -24,7 +24,7 @@ wav = ricker(10.0, tgrid, tpeak=0.25,); # Choose a source wavelet
 srcwav = SrcWav(tgrid, ageom, [:P]) # initialize
 update!(srcwav, [:P], wav) # distribute to all supersources
 
-pa=SeisForwExpt(Fdtd(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
+pa=SeisForwExpt(FdtdAcou(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
 
 @time update!(pa);
 d1=copy(pa[:data][:P])

@@ -4,7 +4,7 @@ using LinearMaps
 using Misfits
 using LinearAlgebra
 
-pa=SeisInvExpt(FdtdBorn(), LS(), :pizza, rfields=[:P, :vz]); # use linearized modeling attribute
+pa=SeisInvExpt(FdtdAcouBorn(), LS(), :pizza, rfields=[:P, :vz]); # use linearized modeling attribute
 F=LinearMap(pa); # generate LinearMap
 
 x1=randn(size(F,2)); # random input 1

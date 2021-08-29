@@ -58,15 +58,14 @@ end
 	mp=pap.memory_pml[:dvxdx]
 	dvdx!(dvdx,vx,mp,pac.pml[:b_x],pac.pml[:a_x],pac.pml[:k_xI],pac.fc[:δx24I],pac.ic[:nz],pac.ic[:nx])
 end
-@parallel function dvdx!(dvdx,vx,mp,pml1,pml2,pml3,fc1,nz,nx)
-	@all(dvdx)=@d_xa(vx) * fc1
-	# for ix=3:nx-1 # ix=1,2,nx are useless, rigid boundary conditions apply on ix=3,nx-1
-	# @simd for iz=1:nz
-	# 	@inbounds dvdx[iz,ix] = (27.e0*vx[iz,ix]-27.e0*vx[iz,ix-1]-vx[iz,ix+1]+vx[iz,ix-2]) * fc1
-	# 	@inbounds mp[iz,ix] = pml1[ix] * mp[iz,ix] + pml2[ix] * dvdx[iz,ix] # pml 
-	# 	@inbounds dvdx[iz,ix] = muladd(dvdx[iz,ix] , pml3[ix] , mp[iz,ix]) # pml
-	# end
-	# end
+@inbounds @fastmath function dvdx!(dvdx,vx,mp,pml1,pml2,pml3,fc1,nz,nx)
+	for ix=3:nx-1 # ix=1,2,nx are useless, rigid boundary conditions apply on ix=3,nx-1
+	@simd for iz=1:nz
+		@inbounds dvdx[iz,ix] = (27.e0*vx[iz,ix]-27.e0*vx[iz,ix-1]-vx[iz,ix+1]+vx[iz,ix-2]) * fc1
+		@inbounds mp[iz,ix] = pml1[ix] * mp[iz,ix] + pml2[ix] * dvdx[iz,ix] # pml 
+		@inbounds dvdx[iz,ix] = muladd(dvdx[iz,ix] , pml3[ix] , mp[iz,ix]) # pml
+	end
+	end
 end
 
 
@@ -76,19 +75,18 @@ end
 	mp=pap.memory_pml[:dvzdz]
 	dvdz!(dvdz,vz,mp,pac.pml[:b_z],pac.pml[:a_z],pac.pml[:k_zI],pac.fc[:δz24I],pac.ic[:nz],pac.ic[:nx])
 end
-@parallel function dvdz!(dvdz,vz,mp,pml1,pml2,pml3,fc1,nz,nx)
-	@all(dvdz)=@d_xa(vz) * fc1
-	# for ix=1:nx
-	# @simd for iz=3:nz-1 # iz=1,2 are usless, boundary conditions on iz=3,nz-1
-	# 	@inbounds dvdz[iz,ix] = (27.e0*vz[iz,ix]-27.e0*vz[iz-1,ix]-vz[iz+1,ix]+vz[iz-2,ix]) * fc1
-	# 	@inbounds mp[iz,ix] = pml1[iz] * mp[iz,ix] + pml2[iz] * dvdz[iz,ix] # pml
-	# 	@inbounds dvdz[iz,ix] = muladd(dvdz[iz,ix] , pml3[iz] , mp[iz,ix]) # pml
-	# end
-	# end
+@inbounds @fastmath function dvdz!(dvdz,vz,mp,pml1,pml2,pml3,fc1,nz,nx)
+	for ix=1:nx
+	@simd for iz=3:nz-1 # iz=1,2 are usless, boundary conditions on iz=3,nz-1
+		@inbounds dvdz[iz,ix] = (27.e0*vz[iz,ix]-27.e0*vz[iz-1,ix]-vz[iz+1,ix]+vz[iz-2,ix]) * fc1
+		@inbounds mp[iz,ix] = pml1[iz] * mp[iz,ix] + pml2[iz] * dvdz[iz,ix] # pml
+		@inbounds dvdz[iz,ix] = muladd(dvdz[iz,ix] , pml3[iz] , mp[iz,ix]) # pml
+	end
+	end
 end
 
 # no attenuation (no memory in stress-strain relation)
-@inbounds @fastmath function update_p!(pap,pac,::T) where {T<:Union{Fdtd,FdtdBorn}}
+@inbounds @fastmath function update_p!(pap,pac,::T) where {T<:Union{FdtdAcou,FdtdAcouBorn}}
 	dvdx=pap.w2[:dx][:vx]
 	dvdz=pap.w2[:dz][:vz]
 	p=pap.w2[:t][:p]
@@ -103,7 +101,7 @@ end
 	end
 end
 
-@inbounds @fastmath function update_p!(pap,pac,::T) where {T<:Union{FdtdVisco}}
+@inbounds @fastmath function update_p!(pap,pac,::T) where {T<:Union{FdtdAcouVisco}}
 	dvdx=pap.w2[:dx][:vx]
 	dvdz=pap.w2[:dz][:vz]
 	p=pap.w2[:t][:p]
@@ -113,7 +111,7 @@ end
 	prvzvx!(p,pp,r,rp,dvdz,dvdx,pac.mod[:ttI],pac.mod3[:memcoeff1],pac.mod3[:memcoeff2],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx],pac.ic[:nsls])
 end
 # viscoacoustic modeling (memory in stress-strain relation)
-@inbounds @fastmath function prvzvx!(p,pp,r,rp,dvdx,dvdz,mod,mod31,mod32,fc1,nz,nx,nsls)#pw,dpdxw,dpdzw,modttI,nz,nx,δt, ::FdtdVisco)
+@inbounds @fastmath function prvzvx!(p,pp,r,rp,dvdx,dvdz,mod,mod31,mod32,fc1,nz,nx,nsls)#pw,dpdxw,dpdzw,modttI,nz,nx,δt, ::FdtdAcouVisco)
 	for ix=1:nx  # see limits above
 	@simd for iz=1:nz
 
