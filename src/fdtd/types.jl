@@ -40,11 +40,11 @@ end
 Modelling parameters common for all supersources
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
-* `gradient::Vector{Float64}=Medium(model.mgrid)` : gradient model modified only if `gmodel_flag`
+* `gradient::Vector{Float64}=Medium(medium.mgrid)` : gradient medium modified only if `gmodel_flag`
 * `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
-* `illum::Array{Float64,2}=zeros(length(model.mgrid[1]), length(model.mgrid[2]))` : source energy if `illum_flag`
+* `illum::Array{Float64,2}=zeros(length(medium.mgrid[1]), length(medium.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
-* `snaps::Array{Float64,4}=zeros(length(model.mgrid[1]),length(model.mgrid[2]),length(tsnaps),ageom[1].nss)` :snapshots saved at `tsnaps`
+* `snaps::Array{Float64,4}=zeros(length(medium.mgrid[1]),length(medium.mgrid[2]),length(tsnaps),ageom[1].nss)` :snapshots saved at `tsnaps`
 
 # Return (in order)
 
@@ -58,8 +58,8 @@ mutable struct P_common{T}
 	jobname::Symbol
 	attrib_mod::T
 	activepw::Vector{Int64}
-	exmodel::Medium
-	model::Medium
+	exmedium::Medium
+	medium::Medium
 	ageom::Vector{AGeom}
 	srcwav::Vector{SrcWav}
 	abs_trbl::Vector{Symbol}
