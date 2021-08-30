@@ -1020,13 +1020,13 @@ function pml_variables(
 		δt::Float64, 
 		δx::Float64, mesh_na_pml::Int64, 
 		velmax::Float64, velmin::Float64, 
-		freqmin::Float64, freqmax::Float64,  # should replace this average with peak frequency
+		freqpeak::Float64,
 	        flags::Vector{Bool}
 		)
 
 	NPOWER = 2.e0
 	K_MAX_PML = 1.e0 # from Gedney page 8.11
-	ALPHA_MAX_PML = 2.e0 * pi * ((freqmin + freqmax))/4.e0 # from Festa and Vilotte
+	ALPHA_MAX_PML = pi * freqpeak # from Festa and Vilotte
 
 	# thickness of the PML layer in meters
 	thickness_PML_x = mesh_na_pml * δx
@@ -1068,7 +1068,7 @@ function pml_variables(
 				d_x[ix] = d0_x * abscissa_normalized.^NPOWER
 				# this taken from Gedney page 8.2
 				k_x[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized.^NPOWER
-				alpha_x[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.1e0 * ALPHA_MAX_PML
+				alpha_x[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
 			end
 
 			# define damping profile at half the grid points
@@ -1078,7 +1078,7 @@ function pml_variables(
 				d_x_half[ix] = d0_x * abscissa_normalized.^NPOWER
 				# this taken from Gedney page 8.2
 				k_x_half[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized.^NPOWER
-				alpha_x_half[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.1e0 * ALPHA_MAX_PML
+				alpha_x_half[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
 			end
 		end
 
@@ -1092,7 +1092,7 @@ function pml_variables(
 				d_x[ix] = d0_x * abscissa_normalized^NPOWER
 				# this taken from Gedney page 8.2
 				k_x[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized^NPOWER
-				alpha_x[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.1e0 * ALPHA_MAX_PML
+				alpha_x[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
 			end
 
 			# define damping profile at half the grid points
@@ -1102,7 +1102,7 @@ function pml_variables(
 				d_x_half[ix] = d0_x * abscissa_normalized^NPOWER
 				# this taken from Gedney page 8.2
 				k_x_half[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized^NPOWER
-				alpha_x_half[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.1e0 * ALPHA_MAX_PML
+				alpha_x_half[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
 			end
 
 		end
@@ -1125,9 +1125,9 @@ function pml_variables(
 
 
 
-	names=[:a,:b,:kI,:a_half,:b_half,:k_halfI]
+	names=[:a,:b,:kI,:a_half,:b_half,:k_halfI,:d_x,:d_x_half,:alpha_x,:alpha_x_half]
 	# return [d_x, d_x_half, alpha_x, alpha_x_half]
-	return NamedArray([a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI], names)
+	return NamedArray([a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI,d_x, d_x_half, alpha_x,alpha_x_half], names)
 end
 
 
