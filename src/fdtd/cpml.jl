@@ -117,9 +117,9 @@ function pml_coeff(mgrid, # 1D grid
 
 
 
-	names=[:a,:b,:kI,:a_half,:b_half,:k_halfI,:d_x,:d_x_half,:alpha_x,:alpha_x_half]
+	names=[:a,:b,:kI,:a_half,:b_half,:k_halfI]
 	# return [d_x, d_x_half, alpha_x, alpha_x_half]
-	return NamedArray([a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI,d_x, d_x_half, alpha_x,alpha_x_half], names)
+	return NamedArray([a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI], names)
 end
 
 
@@ -128,16 +128,7 @@ end
 Generate a NamedArray with PML coefficients for all the dimensions that are then stored in the FDTD structs.
 """
 function get_pml(mgrid, abs_trbl, args...)
-	names=[:z,:y,:x][1:length(mgrid)]
-	pnames=broadcast(x->Symbol("pml",string(x)), names)
-	for (i,dim) in enumerate(names) 
-		d1=Symbol(string(dim),"min")
-		d2=Symbol(string(dim),"max")
-		pn=pnames[i]
-		@eval $pn=pml_coeff(mgrid[i], [any(abs_trbl .== d1), any(abs_trbl .== d2)], args...)
-	end
-	# pml_variables
-	pml_names=vcat([:a_x,:b_x,:k_xI,:a_x_half,:b_x_half,:k_x_halfI], [:a_z,:b_z,:k_zI,:a_z_half,:b_z_half,:k_z_halfI])
-	@eval pml=NamedArray([$(pnames...)], pnames)
-	return pml
+	names=dim_names(length(mgrid))
+	return NamedArray([pml_coeff(mgrid[i], [any(abs_trbl .== Symbol(string(dim),"min")), any(abs_trbl .== Symbol(string(dim),"max"))], args...) 
+		for (i,dim) in enumerate(names)], names)
 end

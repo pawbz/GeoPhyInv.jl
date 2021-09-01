@@ -28,7 +28,7 @@ Randomly place a given number of source and receivers in a `mgrid`.
 """
 function AGeomss(mgrid::AbstractArray{T}, s::Srcs, r::Recs) where {T<:StepRangeLen}
 	nd=length(mgrid)
-	names=[:z,:y,:x][1:nd]
+	names=dim_names(nd)
 	mins=[m[1] for m in mgrid]
 	maxs=[m[end] for m in mgrid]
 	return AGeomss(
@@ -214,7 +214,7 @@ function Base.in(ageom::AGeom, mgrid::AbstractVector{T}) where {T<:StepRangeLen}
 	for iss=1:length(ageom)
 		nd=ndims(ageom[iss])
 		@assert nd==length(mgrid)
-		names=[:z,:y,:x][1:nd]
+		names=dim_names(nd)
 		checkvec[iss] = any(
 		      hcat(
 			   [ vcat((((ageom[iss].s[dn] .- mgrid[id][1]).*(mgrid[id][end] .- ageom[iss].s[dn])) .< 0.0),

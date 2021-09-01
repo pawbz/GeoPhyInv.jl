@@ -20,17 +20,17 @@
 """
 2-D acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct FdtdAcou <: FdtdOld end
+struct FdtdAcou end
 
 """
 2-D ViscoAcoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct FdtdAcouVisco <: FdtdOld end
+struct FdtdAcouVisco  end
 
 """
 2-D Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct FdtdAcouBorn <: FdtdOld end
+struct FdtdAcouBorn  end
 
 # union of old stuff without using ParallelStencils (should eventually remove this)
 FdtdOld=Union{FdtdAcou,FdtdAcouVisco,FdtdAcouBorn}
@@ -194,7 +194,7 @@ function PFdtd(attrib_mod;
 	#verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
 
 
-	check_fd_stability(vpmin, vpmax, step(medium.mgrid[2]), step(medium.mgrid[1]), freqmin, freqmax, step(tgridmod), verbose)
+	check_fd_stability(medium.bounds, medium.mgrid, tgrid, freqmin, freqmax, verbose, 5, 0.5)
 
 
 	# where to store the boundary values (careful, born scaterrers cannot be inside these!?)
@@ -222,8 +222,12 @@ function PFdtd(attrib_mod;
 
 	fc=get_fc(medium,tgrid,attrib_mod)
 
+	mod,δmod=get_mod(exmedium,attrib_mod)
+
+	δmodall = zeros(2*nzd*nxd)
+
 	# PML
-	pml=get_pml(exmedium.mgrid,abs_trbl,δt,npml-3,vpmin,velmax,freqpeak)
+	pml=get_pml(exmedium.mgrid,abs_trbl,step(tgrid),npml-3,vpmin,vpmax,freqpeak)
 
 	# initialize gradient arrays
 	gradient=zeros(2*nzd*nxd)
@@ -313,7 +317,7 @@ function get_fc(medium,tgrid,::FdtdOld)
 	δx, δz = step(medium.mgrid[2]), step(medium.mgrid[1])
 	δx24I, δz24I = inv(δx * 24.0), inv(δz * 24.0)
 	δxI, δzI = inv(δx), inv(δz)
-	δt = step(tgridmod)
+	δt = step(tgrid)
 	δtI = inv(δt)
 
 	fc=NamedArray( [δt, δxI, δzI, δtI, δx24I, δz24I], ([:δt, :δxI, :δzI, :δtI, :δx24I, :δz24I],))
@@ -323,21 +327,20 @@ end
 """
 extract vectors used 
 """
-function get_mod(::FdtdOld)
+function get_mod(medium,::FdtdOld)
+	nz,nx=length.(medium.mgrid)
+
 
 	"density values on vx and vz stagerred grids"
-	modrr=copy(exmedium[:rhoI])
+	modrr=copy(medium[:rhoI])
 	modrrvx = get_rhovxI(modrr)
 	modrrvz = get_rhovzI(modrr)
 
-	modttI = copy(exmedium[:K]) 
-	modtt = copy(exmedium[:KI])
-
-
+	modttI = copy(medium[:K]) 
+	modtt = copy(medium[:KI])
 	
 	# medium perturbation vectors are required on full space
 	δmodtt = zeros(nz, nx)
-	δmodall = zeros(2*nzd*nxd)
 	δmodrr = zeros(nz, nx)
 	δmodrrvx = zeros(nz, nx)
 	δmodrrvz = zeros(nz, nx)
@@ -346,6 +349,7 @@ function get_mod(::FdtdOld)
 	mod=NamedArray([modtt, modttI,modrr,modrrvx,modrrvz], ([:tt,:ttI,:rr,:rrvx,:rrvz],))
 	δmod=NamedArray([δmodtt,δmodrr,δmodrrvx,δmodrrvz], ([:tt,:rr,:rrvx,:rrvz],))
 
+	return mod,δmod
 
 end
 
@@ -355,7 +359,7 @@ Create modeling parameters for each worker.
 Each worker performs the modeling of supersources in `sschunks`.
 The parameters common to all workers are stored in `pac`.
 """
-function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac<:P_common{FdtdOld})
+function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::T) where T<:P_common{<:FdtdOld}
 	nx=pac.ic[:nx]; nz=pac.ic[:nz]; npw=pac.ic[:npw]
 
 	born_svalue_stack = zeros(nz, nx)
@@ -380,15 +384,15 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac<:P_common{FdtdOld})
 	return P_x_worker_x_pw(ss,w2,w3,memory_pml,born_svalue_stack)
 end
 
-function Vector{P_x_worker_x_pw}(sschunks::UnitRange{Int64},pac::P_common,attrib_mod)
-	return [P_x_worker_x_pw(ipw,sschunks,pac,attrib_mod) for ipw in 1:pac.ic[:npw]]
+function Vector{P_x_worker_x_pw}(sschunks::UnitRange{Int64},pac::P_common)
+	return [P_x_worker_x_pw(ipw,sschunks,pac) for ipw in 1:pac.ic[:npw]]
 end
 
 """
 Create modeling parameters for each supersource. 
 Every worker mediums one or more supersources.
 """
-function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{FdtdOld})
+function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{<:FdtdOld}
 
 	rfields=pac.rfields
 	sfields=pac.sfields

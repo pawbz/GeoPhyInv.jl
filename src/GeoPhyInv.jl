@@ -36,6 +36,21 @@ using CUDA
 using HDF5
 
 
+"""
+Return axis names of 1D, 2D or 3D fields
+"""
+function dim_names(N)
+	if(N==3)
+		return [:z,:y,:x]
+	elseif(N==2)
+		return [:z,:x]
+	elseif(N==1)
+		return [:z]
+	else
+		error("invalid dim num")
+	end
+end
+
 
 # check whether 2D or 3D, and initialize ParallelStencils accordingly
 const use_gpu=false
@@ -45,8 +60,8 @@ ParallelStencil.@reset_parallel_stencil()
 
 
 
-# this is extensively used to stack arrays
-# define a specific namedarray
+# This is extensively used to group arrays
+
 NamedStack{T}=NamedArray{T,1,Array{T,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 
 
@@ -110,7 +125,7 @@ export update!, Medium
 export ricker, ormsby 
 export Srcs, Recs, SSrcs
 export AGeom, AGeomss
-export update!, SeisForwExpt, SeisInvExpt, Fdtd, FdtdAcouBorn, FdtdAcouVisco, LS, LS_prior, Migr, Migr_FD
+export update!, SeisForwExpt, SeisInvExpt, FdtdAcou, FdtdAcouBorn, FdtdAcouVisco, LS, LS_prior, Migr, Migr_FD
 
 # export the Expt for Poisson
 const PoissonExpt=GeoPhyInv.Poisson.ParamExpt

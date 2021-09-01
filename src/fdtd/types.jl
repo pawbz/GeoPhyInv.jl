@@ -83,6 +83,7 @@ mutable struct P_x_worker_x_pw{T1}
 	born_svalue_stack::Matrix{Float64} # used for born modeling # only used for 2-D simulation
 end
 
+P_x_worker=Vector{P_x_worker_x_pw}
 
 function initialize!(pap::P_x_worker)
 	reset_w2!(pap)
@@ -207,7 +208,6 @@ end
 """
 A single struct combining parameters for all workers.
 """
-P_x_worker=Vector{P_x_worker_x_pw}
 mutable struct PFdtd{T}
 	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
 	p::DistributedArrays.DArray{P_x_worker,1,P_x_worker} # distributed parameters among workers

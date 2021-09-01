@@ -56,7 +56,7 @@ end
 	dvdx=pap.w2[:dx][:vx]
 	vx=pap.w2[:t][:vx]
 	mp=pap.memory_pml[:dvxdx]
-	dvdx!(dvdx,vx,mp,pac.pml[:b_x],pac.pml[:a_x],pac.pml[:k_xI],pac.fc[:δx24I],pac.ic[:nz],pac.ic[:nx])
+	dvdx!(dvdx,vx,mp,pac.pml[:x][:b],pac.pml[:x][:a],pac.pml[:x][:kI],pac.fc[:δx24I],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function dvdx!(dvdx,vx,mp,pml1,pml2,pml3,fc1,nz,nx)
 	for ix=3:nx-1 # ix=1,2,nx are useless, rigid boundary conditions apply on ix=3,nx-1
@@ -73,7 +73,7 @@ end
 	dvdz=pap.w2[:dz][:vz]
 	vz=pap.w2[:t][:vz]
 	mp=pap.memory_pml[:dvzdz]
-	dvdz!(dvdz,vz,mp,pac.pml[:b_z],pac.pml[:a_z],pac.pml[:k_zI],pac.fc[:δz24I],pac.ic[:nz],pac.ic[:nx])
+	dvdz!(dvdz,vz,mp,pac.pml[:z][:b],pac.pml[:z][:a],pac.pml[:z][:kI],pac.fc[:δz24I],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function dvdz!(dvdz,vz,mp,pml1,pml2,pml3,fc1,nz,nx)
 	for ix=1:nx
@@ -148,7 +148,7 @@ end
 	dpdx=pap.w2[:dx][:p]
 	p=pap.w2[:tp][:p]
 	mp=pap.memory_pml[:dpdx]
-	dpdx!(dpdx,p,mp,pac.pml[:b_x_half],pac.pml[:a_x_half],pac.pml[:k_x_halfI],pac.fc[:δx24I],pac.ic[:nz],pac.ic[:nx])
+	dpdx!(dpdx,p,mp,pac.pml[:x][:b_half],pac.pml[:x][:a_half],pac.pml[:x][:k_halfI],pac.fc[:δx24I],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function dpdx!(dpdx,p,mp,pml1,pml2,pml3,fc1,nz,nx)
 	for ix=2:nx-2
@@ -167,7 +167,7 @@ end
 	dpdz=pap.w2[:dz][:p]
 	p=pap.w2[:tp][:p]
 	mp=pap.memory_pml[:dpdz]
-	dpdz!(dpdz,p,mp,pac.pml[:b_z_half],pac.pml[:a_z_half],pac.pml[:k_z_halfI],pac.fc[:δz24I],pac.ic[:nz],pac.ic[:nx])
+	dpdz!(dpdz,p,mp,pac.pml[:z][:b_half],pac.pml[:z][:a_half],pac.pml[:z][:k_halfI],pac.fc[:δz24I],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function dpdz!(dpdz,p,mp,pml1,pml2,pml3,fc1,nz,nx)
 	for ix=1:nx
