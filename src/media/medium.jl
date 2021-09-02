@@ -177,7 +177,6 @@ function bounds(mod::AbstractArray, frac::Real=0.1)
 end
 
 
-update!(mod::Medium, mod0::Medium)=update!(mod, names(mod0.bounds)[1], mod0.bounds)
 
 function update!(mod::Medium, fields::AbstractVector{Symbol}, bounds)
 	@assert !(bounds===nothing)
@@ -380,23 +379,46 @@ end
 
 include("chainrule.jl")
 
+
 """
 Interpolate, extrapolate or truncate model to a new grid.
-Returns 
+Check for memory allocations, specially when using Interpolations library.
+Does this library contain inplace methods?
+"""
+function update!(modex::Medium{N},mod::Medium{N}) where N
+	for m in names(mod.m)[1]
+		itp = extrapolate(interpolate(Tuple(mod.mgrid), mod[m], Gridded(Linear())),Interpolations.Flat())
+		copyto!(modex[m],itp[mgrid...])
+	end
+	update!(modex,0.1)
+	return modex
+end
+
+"""
+Similar to previous method, but with initialization.
 """
 function update(mod::Medium, mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}})
 	modex=Medium(mgrid,names(mod)[1]) # initialize a new medium
-	for m in names(mod.m)[1]
-		itp = LinearInterpolation(Tuple(mod.mgrid), medium[m], extrapolation_bc=Flat())
-		copyto!(modex[m],itp[mgrid...])
-	end
-	update!(modex)
-	return modex
+	update!(modex,mod)
 end
 
 
 
+function padarray!(modex::Medium{N}, mod::Medium{N}, npml) where N
+	pad=ImageFiltering.Pad(:replicate, fill(npml,ndims(mod))...)
+	for m in names(mod.m)[1]
+		m1=ImageFiltering.BorderArray(mod[m],pad)
+		copyto!(modex[m],m1)
+	end
+	update!(modex,0.1)
+	return modex
+end
 
+function padarray(mod::Medium, npml)
+	mgrid_new=[ range(mg[1] - npml*step(mg), stop=mg[end] + npml*step(mg), length=length(mg)+2*npml) for mg in mod.mgrid] 
+	modex=Medium(mgrid_new,names(mod)[1]) # initialize a new medium
+	padarray!(modex,mod,npml)
+end
 
 
 
@@ -441,185 +463,6 @@ function Medium_smooth(mod::Medium, zperc::Real, xperc::Real=zperc;
 		imfilter!(mg, m, Kernel.gaussian([znwin,xnwin]));
 	end
 	return modg
-end
-
-"""
-Return a truncated seismic model using input bounds.
-Note that there is no interpolation going on here, but only truncation, so 
-the input bounds cannot be strictly imposed.
-
-# Arguments
-* `mod::Medium` : model that is truncated
-
-# Keyword Arguments
-
-* `zmin::Real=mod.mgrid[1][1]` : 
-* `zmax::Real=mod.mgrid[1][end]` : 
-* `xmin::Real=mod.mgrid[2][1]` : 
-* `xmax::Real=mod.mgrid[2][end]` : 
-"""
-function Medium_trun(mod::Medium;
-			 zmin::Real=mod.mgrid[1][1], zmax::Real=mod.mgrid[1][end],
-			 xmin::Real=mod.mgrid[2][1], xmax::Real=mod.mgrid[2][end],
-			 )
-
-	izmin = Interpolation.indminn(mod.mgrid[1], Float64(zmin), 1)[1]
-	izmax = Interpolation.indminn(mod.mgrid[1], Float64(zmax), 1)[1]
-	ixmin = Interpolation.indminn(mod.mgrid[2], Float64(xmin), 1)[1]
-	ixmax = Interpolation.indminn(mod.mgrid[2], Float64(xmax), 1)[1]
-
-	x = mod.mgrid[2][ixmin:ixmax]
-	z = mod.mgrid[1][izmin:izmax]
-
-	# allocate model
-	mod_trun = Medium([z,x], names(mod.m)[1])
-	update!(mod_trun, mod)
-
-	for f in names(mod.m)[1]
-		m=view(mod[f],izmin:izmax, ixmin:ixmax)
-		copyto!(mod_trun[f],m)
-	end
-	return mod_trun
-
-end
-
-
-"""
-Extend a seismic model into PML layers
-"""
-function Medium_pml_pad_trun(mod::Medium, nlayer_rand, npml)
-
-	mg=mod.mgrid
-	mgex=[
-        range(mg[1][1] - npml*step(mg[1]),
-	     stop=mg[1][end] + npml*step(mg[1]), length=length(mg[1])+2*npml),
-        range(mg[2][1] - npml*step(mg[2]),
-	     stop=mg[2][end] + npml*step(mg[2]), length=length(mg[2])+2*npml)
-	]
-
-	modex=Medium(mgex, names(mod.m)[1])
-	update!(modex,mod)
-	Medium_pml_pad_trun!(modex, mod, nlayer_rand)
-
-	return modex
-end
-
-"only padding implemented"
-function Medium_pml_pad_trun!(modex::Medium, mod::Medium, nlayer_rand)
-	vp=mod[:vp];
-	rho=mod[:rho]; 
-
-	vpex=modex[:vp]; rhoex=modex[:rho];
-	pml_pad_trun!(vpex,vp,mod.bounds[:vp],nlayer_rand,50.0);	
-	pml_pad_trun!(rhoex,rho,mod.bounds[:rho],nlayer_rand,0.0)
-	if(:vs ∈ names(mod.m)[1])
-		vs=mod[:vs];
-		vsex=modex[:vs]; 
-		pml_pad_trun!(vsex,vs,mod.bounds[:vs],nlayer_rand,50.0);	
-	end
-	if(:Q ∈ names(mod.m)[1])
-		Q=mod[:Q];
-		Qex=modex[:Q]; 
-		pml_pad_trun!(Qex,Q,mod.bounds[:Q],nlayer_rand,50.0);	
-	end
-end
-
-function pml_pad_trun(mod::Array{Float64,2}, np::Int64, flag::Int64=1)
-	if(isequal(flag,1)) 
-		nz = size(mod,1); nx = size(mod,2)
-		modo = zeros(nz + 2*np, nx + 2*np)
-		pml_pad_trun!(modo,mod,1)
-	elseif(isequal(flag,-1))
-		nz = size(mod,1); nx = size(mod,2)
-		modo = zeros(nz - 2*np, nx - 2*np)
-		pml_pad_trun!(mod,modo,-1)
-	end
-	return modo
-end
-
-
-"""
-PML Extend a model on all four sides
-"""
-function pml_pad_trun!(modex::Array{Float64,2}, mod::Array{Float64,2}, bounds, nlayer_rand, var_fact=1.)
-	np=(size(modex,1)-size(mod,1) == size(modex,2)-size(mod,2)) ? 
-			div(size(modex,2)-size(mod,2),2) : error("modex size")
-	nz = size(mod,1); nx = size(mod,2)
-	#=
-	# first fill with random numbers
-	Random.seed!(1)
-	#for i in eachindex(modex)
-	#	modex[i]=rand(Distributions.Uniform(bounds...))
-	#end
-	# experiments with random boundary conditions
-	sample = v->rand(Distributions.Truncated(Distributions.Normal(mean(bounds),v),bounds[1],bounds[2]))
-	for ix in 1+np:np+nx
-		for iz in 1:np
-			v=var_fact*(np-iz)/np+1e-5
-			modex[iz,ix] = sample(v)
-		end
-		for iz in nz+1+np:size(modex,1)
-			v=var_fact*(iz-np-nz-1)/np+1e-5
-			modex[iz,ix] = sample(v)
-		end
-	end
-	for iz in 1+np:np+nz
-		for ix in 1:np
-			v=var_fact*(np-ix)/np+1e-5
-			modex[iz,ix] = sample(v)
-		end
-		for ix in nx+1+np:size(modex,2)
-			v=var_fact*(ix-np-nz-1)/np+1e-5
-			modex[iz,ix] = sample(v)
-		end
-	end
-
-	for ix in 1:np
-		for iz in 1:np
-			v=var_fact*sqrt((np-iz)^2+(np-ix)^2)/np+1e-5
-			modex[iz,ix] = sample(v)
-		end
-		for iz in nz+1+np:size(modex,1)
-			v=var_fact*sqrt((iz-np-nz-1)^2+(np-ix)^2)/np+1e-5
-			modex[iz,ix] = sample(v)
-		end
-	end
-	for ix in np+nx+1:size(modex,1)
-		for iz in 1:np
-			v=var_fact*sqrt((np-iz)^2+(ix-np-nx-1)^2)/np+1e-5
-			modex[iz,ix] = sample(v)
-		end
-		for iz in nz+1+np:size(modex,1)
-			v=var_fact*sqrt((iz-np-nz-1)^2+(ix-np-nx-1)^2)/np+1e-5
-			modex[iz,ix] = sample(v)
-		end
-	end
-
-	=#
-	for ix in 1:nx
-		for iz in 1:nz
-			modex[np+iz,np+ix]=mod[iz,ix]
-		end
-	end
-
-	# flood borders
-	for ix in 1:size(modex,2)
-		for iz in 1:np-nlayer_rand
-			modex[iz,ix] = modex[np+1-nlayer_rand,ix]
-		end
-		for iz in nz+1+np+nlayer_rand:size(modex,1)
-			modex[iz,ix] = modex[nz+np+nlayer_rand,ix];
-		end
-	end
-	for iz in 1:size(modex,1)
-		for ix in 1:np-nlayer_rand
-			modex[iz,ix] = modex[iz,np+1-nlayer_rand]
-		end
-		for ix in nx+1+np+nlayer_rand:size(modex,2)
-			modex[iz,ix] = modex[iz,nx+np+nlayer_rand]
-		end
-	end
-	return modex
 end
 
 
