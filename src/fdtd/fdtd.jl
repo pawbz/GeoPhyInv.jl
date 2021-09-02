@@ -1125,9 +1125,9 @@ function pml_variables(
 
 
 
-	names=[:a,:b,:kI,:a_half,:b_half,:k_halfI,:d_x,:d_x_half,:alpha_x,:alpha_x_half]
+	names=[:a,:b,:kI,:a_half,:b_half,:k_halfI]
 	# return [d_x, d_x_half, alpha_x, alpha_x_half]
-	return NamedArray([a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI,d_x, d_x_half, alpha_x,alpha_x_half], names)
+	return NamedArray([a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI], names)
 end
 
 
