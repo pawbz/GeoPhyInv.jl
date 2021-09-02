@@ -10,21 +10,21 @@ function update_δmods!(pac::P_common, δmod::Vector{Float64})
 	nx=pac.ic[:nx]; nz=pac.ic[:nz]
 	nznxd=prod(length.(pac.medium.mgrid))
 	copyto!(pac.δmodall, δmod)
-	fill!(pac.δmod[:tt],0.0)
-	δmodtt=view(pac.δmod[:tt],npml+1:nz-npml,npml+1:nx-npml)
+	fill!(pac.δmod[:KI],0.0)
+	δmodKI=view(pac.δmod[:KI],npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
 		# put perturbation due to KI as it is
-		δmodtt[i] = δmod[i] 
+		δmodKI[i] = δmod[i] 
 	end
-	fill!(pac.δmod[:rr],0.0)
-	δmodrr=view(pac.δmod[:rr],npml+1:nz-npml,npml+1:nx-npml)
+	fill!(pac.δmod[:rhoI],0.0)
+	δmodrr=view(pac.δmod[:rhoI],npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
 		# put perturbation due to rhoI here
 		δmodrr[i] = δmod[nznxd+i]
 	end
 	# project δmodrr onto the vz and vx grids
-	get_rhovxI!(pac.δmod[:rrvx], pac.δmod[:rr])
-	get_rhovzI!(pac.δmod[:rrvz], pac.δmod[:rr])
+	get_rhovxI!(pac.δmod[:rhovxI], pac.δmod[:rhoI])
+	get_rhovzI!(pac.δmod[:rhovzI], pac.δmod[:rhoI])
 	return nothing
 end
 
@@ -40,8 +40,8 @@ function update_δmods!(pac::P_common, medium_pert::Medium)
 	copyto!(pac.δmodall, medium_pert, [:KI, :rhoI])
 
 	for i in 1:nznxd
-		pac.δmodall[i] -= pac.mod[:tt][i] # subtracting the background medium
-		pac.δmodall[nznxd+i] -= pac.mod[:rr][i] # subtracting the background medium
+		pac.δmodall[i] -= pac.mod[:KI][i] # subtracting the background medium
+		pac.δmodall[nznxd+i] -= pac.mod[:rhoI][i] # subtracting the background medium
 	end
 	update_δmods!(pac, pac.δmodall)
 	return nothing
@@ -64,13 +64,13 @@ function update!(pac::P_common, medium::Medium)
 
 	copyto!(pac.medium, medium)
 
-	Medium_pml_pad_trun!(pac.exmedium, pac.medium, nlayer_rand)
+	padarray!(pac.exmedium, pac.medium, npml)
 
-	copyto!(pac.mod[:ttI], pac.exmedium, [:K]) 
-	copyto!(pac.mod[:tt], pac.exmedium, [:KI]) 
-	copyto!(pac.mod[:rr], pac.exmedium, [:rhoI])
-	get_rhovxI!(pac.mod[:rrvx], pac.mod[:rr])
-	get_rhovzI!(pac.mod[:rrvz], pac.mod[:rr])
+	copyto!(pac.mod[:K], pac.exmedium, [:K]) 
+	copyto!(pac.mod[:KI], pac.exmedium, [:KI]) 
+	copyto!(pac.mod[:rhoI], pac.exmedium, [:rhoI])
+	get_rhovxI!(pac.mod[:rhovxI], pac.mod[:rhoI])
+	get_rhovzI!(pac.mod[:rhovzI], pac.mod[:rhoI])
 	return nothing
 end 
 
@@ -215,7 +215,7 @@ In-place method to perform the experiment and update `pa` after wave propagation
 	end
 
 	@timeit to "update gradient" begin
-		# update gradient medium using grad_modtt_stack, grad_modrr_stack
+		# update gradient medium using grad_modKI_stack, grad_modrr_stack
 		(pa.c.gmodel_flag) && update_gradient!(pa.c)
 	end
 

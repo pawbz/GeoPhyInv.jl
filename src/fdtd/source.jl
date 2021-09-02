@@ -95,7 +95,7 @@ struct Source_B0 end
 			source_term = wavelets[it][sfield][is] * pac.fc[:δt] * pac.fc[:δxI] * pac.fc[:δzI]
 			
 			"""
-			multiplication with modttI
+			multiplication with modK
 			"""
 			p[sfield][isz1[is], isx1[is]] += 
 				source(source_term,ssprayw[1,is], pac, isz1[is], isx1[is],eval(sfield)())
@@ -138,7 +138,7 @@ end
 			source_term = wavelets[it][sfield][is] * pac.fc[:δt] * pac.fc[:δxI] * pac.fc[:δzI]
 			
 			"""
-			multiplication with modttI
+			multiplication with modK
 			"""
 			p[sfield][isz1[is], isx1[is]] += source(source_term,1.0,pac,isz1[is],isx1[is],eval(sfield)())
 		end
@@ -149,13 +149,13 @@ end
 
 
 # on pressure grid
-source(source_term, spray, pac, iz, ix, ::p) = source_term * spray * pac.mod[:ttI][iz,ix]
+source(source_term, spray, pac, iz, ix, ::p) = source_term * spray * pac.mod[:K][iz,ix]
 
 # on vx grid
-source(source_term, spray, pac, iz, ix, ::vx) = source_term * spray * pac.mod[:rrvx][iz,ix]
+source(source_term, spray, pac, iz, ix, ::vx) = source_term * spray * pac.mod[:rhovxI][iz,ix]
 
 # on vz grid
-source(source_term, spray, pac, iz, ix, ::vz) = source_term * spray * pac.mod[:rrvz][iz,ix]
+source(source_term, spray, pac, iz, ix, ::vz) = source_term * spray * pac.mod[:rhovzI][iz,ix]
 
 
 

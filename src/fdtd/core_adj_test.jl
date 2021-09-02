@@ -45,20 +45,20 @@ function testing2(nx,nz)
 #	p=zeros(nz,nx,3)
 #	p[div(nz,2),div(nx,2),1]=1.0
 	p=Random.randn(nz,nx,3)
-	modrrvz=Random.randn(nz,nx)
-	modrrvx=Random.randn(nz,nx)
-	modttI=Random.randn(nz,nx)
+	modrhovzI=Random.randn(nz,nx)
+	modrhovxI=Random.randn(nz,nx)
+	modK=Random.randn(nz,nx)
 	a_x=Random.randn(nz,nx)
 
 
-	pout=advance_sample(ntimes, p, modrrvx, modrrvz, modttI)
+	pout=advance_sample(ntimes, p, modrhovxI, modrhovzI, modK)
 #	println(pout[:,:,1])
 
 
 	pout2=randn(nz,nx,3)
 
 
-	p2=advance_sample(ntimes, pout2, modrrvx, modrrvz, modttI)
+	p2=advance_sample(ntimes, pout2, modrhovxI, modrhovzI, modK)
 
 	i=3
 	@test dot(pout2[:,:,i],pout[:,:,i]) ≈ dot(p[:,:,i],p2[:,:,i])

@@ -39,16 +39,17 @@ using HDF5
 """
 Return axis names of 1D, 2D or 3D fields
 """
-function dim_names(N)
+function dim_names(N,prefix="",suffix="")
 	if(N==3)
-		return [:z,:y,:x]
+		names=[:z,:y,:x]
 	elseif(N==2)
-		return [:z,:x]
+		names=[:z,:x]
 	elseif(N==1)
-		return [:z]
+		names=[:z]
 	else
 		error("invalid dim num")
 	end
+	return [Symbol(prefix, string(m), suffix) for m in names]
 end
 
 # check whether 2D or 3D, and initialize ParallelStencils accordingly

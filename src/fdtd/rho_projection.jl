@@ -42,32 +42,32 @@ function get_rhovzI!(rhovzI, rhoI::Array{Float64})
 	return nothing
 end # get_rhovzI
 
-function grad_modrr_sprayrr!(grad_modrr_stack,grad_modrrvx_stack,grad_modrrvz_stack)
+function grad_modrr_sprayrr!(grad_modrr_stack,grad_modrhovxI_stack,grad_modrhovzI_stack)
 	@simd for i in eachindex(grad_modrr_stack)
-		@inbounds grad_modrr_stack[i] = (grad_modrrvx_stack[i] + grad_modrrvz_stack[i]) * (0.5)
+		@inbounds grad_modrr_stack[i] = (grad_modrhovxI_stack[i] + grad_modrhovzI_stack[i]) * (0.5)
 	end
 end
 
-function grad_modrr_sprayrrvx!(grad_modrr_stack,grad_modrrvx_stack)
+function grad_modrr_sprayrhovxI!(grad_modrr_stack,grad_modrhovxI_stack)
 	for ix=1:size(grad_modrr_stack,2)-1
 		for iz=1:size(grad_modrr_stack,1)
-			@inbounds grad_modrr_stack[iz,ix+1] +=  0.5e0 * grad_modrrvx_stack[iz,ix]
+			@inbounds grad_modrr_stack[iz,ix+1] +=  0.5e0 * grad_modrhovxI_stack[iz,ix]
 		end
 	end
 	nx=size(grad_modrr_stack,2)
 	# circular boundary 
 	for iz=1:size(grad_modrr_stack,1)
-		@inbounds grad_modrr_stack[iz,1] +=  0.5e0 * grad_modrrvx_stack[iz,nx]
+		@inbounds grad_modrr_stack[iz,1] +=  0.5e0 * grad_modrhovxI_stack[iz,nx]
 	end
 end
-function grad_modrr_sprayrrvz!(grad_modrr_stack,grad_modrrvz_stack)
+function grad_modrr_sprayrhovzI!(grad_modrr_stack,grad_modrhovzI_stack)
 	nz=size(grad_modrr_stack,1)
 	for ix=1:size(grad_modrr_stack,2)
 		for iz=1:size(grad_modrr_stack,1)-1
-			@inbounds grad_modrr_stack[iz+1,ix] +=  0.5e0 * grad_modrrvz_stack[iz,ix]
+			@inbounds grad_modrr_stack[iz+1,ix] +=  0.5e0 * grad_modrhovzI_stack[iz,ix]
 		end
 		# circular boundary
-		grad_modrr_stack[1,ix] +=  0.5e0 * grad_modrrvz_stack[nz,ix]
+		grad_modrr_stack[1,ix] +=  0.5e0 * grad_modrhovzI_stack[nz,ix]
 	end
 end
 

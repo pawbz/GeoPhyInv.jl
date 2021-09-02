@@ -68,7 +68,7 @@ function mod(medium::Medium;
 		δx = step(mesh_x)
 		δz = step(mesh_z)
 
-		δmodtt = medium_pert[:KI] - (vp0 * vp0 * rho0)^(-1)
+		δmodKI = medium_pert[:KI] - (vp0 * vp0 * rho0)^(-1)
 		δmodrr = medium_pert[:rhoI] - (rho0)^(-1)
 	end
 
@@ -109,9 +109,9 @@ function mod(medium::Medium;
 					term = complex(0., 0.)
 					for ix=1:nx
 						@simd for iz=1:nz
-							if(δmodtt[iz,ix] ≠ 0.0)
+							if(δmodKI[iz,ix] ≠ 0.0)
 								term += (G0_homo_acou(sx[is]-mesh_x[ix], sz[is]-mesh_z[iz], k, rho0)[1] 
-									 * G0_homo_acou(rx[ir]-mesh_x[ix], rz[ir]-mesh_z[iz], k, rho0)[1] .* ω .* ω .* δmodtt[iz,ix]) * δx * δz
+									 * G0_homo_acou(rx[ir]-mesh_x[ix], rz[ir]-mesh_z[iz], k, rho0)[1] .* ω .* ω .* δmodKI[iz,ix]) * δx * δz
 								# factor due to integration
 							end
 						end

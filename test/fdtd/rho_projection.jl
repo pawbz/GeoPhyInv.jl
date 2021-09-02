@@ -15,8 +15,8 @@ nyp=zeros(nz, nx);
 
 
 GeoPhyInv.grad_modrr_sprayrr!(nyp, myp1, myp2)
-GeoPhyInv.grad_modrr_sprayrrvx!(nyp, myp1)
-GeoPhyInv.grad_modrr_sprayrrvz!(nyp, myp2)
+GeoPhyInv.grad_modrr_sprayrhovxI!(nyp, myp1)
+GeoPhyInv.grad_modrr_sprayrhovzI!(nyp, myp2)
 
 # dot product test
 @test LinearAlgebra.dot(vcat(my1,my2), vcat(myp1,myp2)) ≈ LinearAlgebra.dot(ny, nyp)

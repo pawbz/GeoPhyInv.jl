@@ -143,30 +143,30 @@ mutable struct P_common{T, T1, T2}
 	fc::NamedStack{Float64}
 	ic::NamedStack{Int64}
 	pml::NamedStack{NamedStack{T2}} # e.g., pml[:x][:a], pml[:z][:b]
-	mod::NamedStack{T1} # e.g., mod[:tt], mod[:ttI]
+	mod::NamedStack{T1} # e.g., mod[:KI], mod[:K]
 	mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
 	#=
-	modtt::Matrix{Float64}
-	modttI::Matrix{Float64} # just storing inv(modtt) for speed
+	modKI::Matrix{Float64}
+	modK::Matrix{Float64} # just storing inv(modKI) for speed
 	modrr::Matrix{Float64}
-	modrrvx::Matrix{Float64}
-	modrrvz::Matrix{Float64}
+	modrhovxI::Matrix{Float64}
+	modrhovzI::Matrix{Float64}
 	=#
 	δmod::NamedStack{Matrix{Float64}}
 	δmodall::Vector{Float64}
 	#=
-	δmodtt::Matrix{Float64}
+	δmodKI::Matrix{Float64}
 	δmodrr::Matrix{Float64} 
-	δmodrrvx::Matrix{Float64}
-	δmodrrvz::Matrix{Float64}
+	δmodrhovxI::Matrix{Float64}
+	δmodrhovzI::Matrix{Float64}
 	δmod::Vector{Float64} # perturbation vector (KI, rhoI)
 	=#
 	gradient::Vector{Float64}  # output gradient vector w.r.t (KI, rhoI)
 	grad_mod::NamedStack{SharedArrays.SharedArray{Float64,2}}
 	#=
-	grad_modtt_stack::SharedArrays.SharedArray{Float64,2} # contains gmodtt
-	grad_modrrvx_stack::SharedArrays.SharedArray{Float64,2}
-	grad_modrrvz_stack::SharedArrays.SharedArray{Float64,2}
+	grad_modKI_stack::SharedArrays.SharedArray{Float64,2} # contains gmodKI
+	grad_modrhovxI_stack::SharedArrays.SharedArray{Float64,2}
+	grad_modrhovzI_stack::SharedArrays.SharedArray{Float64,2}
 	grad_modrr_stack::Array{Float64,2}
 	=#
 	illum_flag::Bool
@@ -194,9 +194,9 @@ end
 function initialize!(pac::P_common)
 	fill!(pac.gradient,0.0)
 	fill!.(pac.grad_mod,0.0)
-	# fill!(pac.grad_mod[:rrvx],0.0)
-	# fill!(pac.grad_mod[:rrvz],0.0)
-	# fill!(pac.grad_mod[:rr],0.0)
+	# fill!(pac.grad_mod[:rhovxI],0.0)
+	# fill!(pac.grad_mod[:rhovzI],0.0)
+	# fill!(pac.grad_mod[:rhoI],0.0)
 	fill!(pac.illum_stack,0.0)
 	for dat in pac.data
 		fill!(dat, 0.0)

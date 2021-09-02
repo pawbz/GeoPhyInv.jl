@@ -12,81 +12,81 @@
 	dpdz1=pap[1].w2[:dz][:p]
 	dpdz2=pap[2].w2[:dz][:p]
 
-	gtt=pap[1].ss[issp].grad_mod[:tt]
-	grrvx=pap[1].ss[issp].grad_mod[:rrvx]
-	grrvz=pap[1].ss[issp].grad_mod[:rrvz]
+	gKI=pap[1].ss[issp].grad_mod[:KI]
+	grhovxI=pap[1].ss[issp].grad_mod[:rhovxI]
+	grhovzI=pap[1].ss[issp].grad_mod[:rhovzI]
 
-	gmodtt!(gtt,p1,p1p,p1pp,p2p,pac.ic[:nx],pac.ic[:nz],fc1)
-	gmodrrvx!(grrvx,dpdx1,dpdx2,pac.ic[:nx],pac.ic[:nz])
-	gmodrrvz!(grrvz,dpdz1,dpdz2,pac.ic[:nx],pac.ic[:nz])
+	gmodKI!(gKI,p1,p1p,p1pp,p2p,pac.ic[:nx],pac.ic[:nz],fc1)
+	gmodrhovxI!(grhovxI,dpdx1,dpdx2,pac.ic[:nx],pac.ic[:nz])
+	gmodrhovzI!(grhovzI,dpdz1,dpdz2,pac.ic[:nx],pac.ic[:nz])
 end
 
-@inbounds @fastmath function gmodtt!(gtt,p1,p1p,p1pp,p2p,nx,nz,δtI)
+@inbounds @fastmath function gmodKI!(gKI,p1,p1p,p1pp,p2p,nx,nz,δtI)
 	for ix=1:nx
 		@simd for iz=1:nz
-			# p at [it], pp at [it-1]	# dpdx and dpdz at [it]	# gradients w.r.t inverse of modtt, i.e., 1/rho/c^2 
-			@inbounds gtt[iz,ix] += ((-1.0 * (p1pp[iz, ix] + p1[iz, ix] - 2.0 * p1p[iz, ix]) * δtI * δtI) *  p2p[iz,ix])
+			# p at [it], pp at [it-1]	# dpdx and dpdz at [it]	# gradients w.r.t inverse of modKI, i.e., 1/rho/c^2 
+			@inbounds gKI[iz,ix] += ((-1.0 * (p1pp[iz, ix] + p1[iz, ix] - 2.0 * p1p[iz, ix]) * δtI * δtI) *  p2p[iz,ix])
 		end
 	end
 end
 
 
-@inbounds @fastmath function gmodrrvx!(grrvx,dpdx1,dpdx2,nx,nz)
+@inbounds @fastmath function gmodrhovxI!(grhovxI,dpdx1,dpdx2,nx,nz)
 	for ix=1:nx
 		@simd for iz=1:nz
 			# gradient w.r.t. inverse of rho on vx and vz grids
-			@inbounds grrvx[iz,ix] += (- dpdx2[iz,ix,1]*dpdx1[iz,ix,1])
+			@inbounds grhovxI[iz,ix] += (- dpdx2[iz,ix,1]*dpdx1[iz,ix,1])
 		end
 	end
 
 end
-@inbounds @fastmath function gmodrrvz!(grrvz,dpdz1,dpdz2,nx,nz)
+@inbounds @fastmath function gmodrhovzI!(grhovzI,dpdz1,dpdz2,nx,nz)
 	for ix=1:nx
 		@simd for iz=1:nz
 			# gradient w.r.t. inverse of rho on vx and vz grids
-			@inbounds grrvz[iz,ix] += (- dpdz2[iz,ix,1]*dpdz1[iz,ix,1])
+			@inbounds grhovzI[iz,ix] += (- dpdz2[iz,ix,1]*dpdz1[iz,ix,1])
 		end
 	end
 end
 
 @inbounds @fastmath function scale_gradient!(issp::Int64,pap,δ)
-	gtt=pap[1].ss[issp].grad_mod[:tt]
-	grrvx=pap[1].ss[issp].grad_mod[:rrvx]
-	grrvz=pap[1].ss[issp].grad_mod[:rrvz]
+	gKI=pap[1].ss[issp].grad_mod[:KI]
+	grhovxI=pap[1].ss[issp].grad_mod[:rhovxI]
+	grhovzI=pap[1].ss[issp].grad_mod[:rhovzI]
 	"gradient is formed by intergration over time, hence multiply with δt, but why not?"
 	"I don't completely understand where the factors δx and δz are coming from..."
 	"probably the source term should not be multiplied by δxI and δzI during adjoint propagation"
-	rmul!(gtt,δ)
-	rmul!(grrvx,δ)
-	rmul!(grrvz,δ)
+	rmul!(gKI,δ)
+	rmul!(grhovxI,δ)
+	rmul!(grhovzI,δ)
 end
 
 
 
 
 function grad_modrr!(pac)
-	grad_modrr_sprayrr!(pac.grad_mod[:rr],pac.grad_mod[:rrvx],pac.grad_mod[:rrvz])
-	grad_modrr_sprayrrvx!(pac.grad_mod[:rr],pac.grad_mod[:rrvx])
-	grad_modrr_sprayrrvz!(pac.grad_mod[:rr],pac.grad_mod[:rrvz])
+	grad_modrr_sprayrr!(pac.grad_mod[:rhoI],pac.grad_mod[:rhovxI],pac.grad_mod[:rhovzI])
+	grad_modrr_sprayrhovxI!(pac.grad_mod[:rhoI],pac.grad_mod[:rhovxI])
+	grad_modrr_sprayrhovzI!(pac.grad_mod[:rhoI],pac.grad_mod[:rhovzI])
 end
 
 function stack_grads!(pac, pap)
 	# theses are SharedArrays
-	gmodtt=pac.grad_mod[:tt]
-	gmodrrvx=pac.grad_mod[:rrvx]
-	gmodrrvz=pac.grad_mod[:rrvz]
+	gmodKI=pac.grad_mod[:KI]
+	gmodrhovxI=pac.grad_mod[:rhovxI]
+	gmodrhovzI=pac.grad_mod[:rhovzI]
 	for issp in 1:length(pap[1].ss)
-		gs=pap[1].ss[issp].grad_mod[:tt]
-		for i in eachindex(gmodtt)
-			gmodtt[i]+=gs[i]  # only update gmodtt
+		gs=pap[1].ss[issp].grad_mod[:KI]
+		for i in eachindex(gmodKI)
+			gmodKI[i]+=gs[i]  # only update gmodKI
 		end
-		gs=pap[1].ss[issp].grad_mod[:rrvx]
-		for i in eachindex(gmodrrvx)
-			gmodrrvx[i]+=gs[i]
+		gs=pap[1].ss[issp].grad_mod[:rhovxI]
+		for i in eachindex(gmodrhovxI)
+			gmodrhovxI[i]+=gs[i]
 		end
-		gs=pap[1].ss[issp].grad_mod[:rrvz]
-		for i in eachindex(gmodrrvz)
-			gmodrrvz[i]+=gs[i]
+		gs=pap[1].ss[issp].grad_mod[:rhovzI]
+		for i in eachindex(gmodrhovzI)
+			gmodrhovzI[i]+=gs[i]
 		end
 	end
 end
@@ -95,16 +95,16 @@ function update_gradient!(pac)
 	nx, nz=pac.ic[:nx], pac.ic[:nz]
 	nznxd = prod(length.(pac.model.mgrid))
 
-	# combine rrvx and rrvz
+	# combine rhovxI and rhovzI
 	grad_modrr!(pac)
 
 	gradient=pac.gradient
 	# truncate
-	gmodtt=view(pac.grad_mod[:tt],npml+1:nz-npml,npml+1:nx-npml)
-	gmodrr=view(pac.grad_mod[:rr],npml+1:nz-npml,npml+1:nx-npml)
+	gmodKI=view(pac.grad_mod[:KI],npml+1:nz-npml,npml+1:nx-npml)
+	gmodrr=view(pac.grad_mod[:rhoI],npml+1:nz-npml,npml+1:nx-npml)
 	for i in 1:nznxd
 		# parameterization is  [:KI, :ρI, :null]
-		gradient[i]=gmodtt[i]  # update gmodtt
+		gradient[i]=gmodKI[i]  # update gmodKI
 		gradient[nznxd+i]=gmodrr[i]  # update gmodrr
 	end
 end

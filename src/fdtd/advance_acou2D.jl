@@ -91,7 +91,7 @@ end
 	dvdz=pap.w2[:dz][:vz]
 	p=pap.w2[:t][:p]
 	pp=pap.w2[:tp][:p]
-	pvzvx!(p,pp,dvdz,dvdx,pac.mod[:ttI],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx])
+	pvzvx!(p,pp,dvdz,dvdx,pac.mod[:K],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function pvzvx!(p,pp,dvdz,dvdx,mod,fc1,nz,nx)
 	for ix=1:nx  # see limits above
@@ -108,10 +108,10 @@ end
 	pp=pap.w2[:tp][:p]
 	r=pap.w3[:t][:r]
 	rp=pap.w3[:tp][:r]
-	prvzvx!(p,pp,r,rp,dvdz,dvdx,pac.mod[:ttI],pac.mod3[:memcoeff1],pac.mod3[:memcoeff2],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx],pac.ic[:nsls])
+	prvzvx!(p,pp,r,rp,dvdz,dvdx,pac.mod[:K],pac.mod3[:memcoeff1],pac.mod3[:memcoeff2],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx],pac.ic[:nsls])
 end
 # viscoacoustic modeling (memory in stress-strain relation)
-@inbounds @fastmath function prvzvx!(p,pp,r,rp,dvdx,dvdz,mod,mod31,mod32,fc1,nz,nx,nsls)#pw,dpdxw,dpdzw,modttI,nz,nx,δt, ::FdtdAcouVisco)
+@inbounds @fastmath function prvzvx!(p,pp,r,rp,dvdx,dvdz,mod,mod31,mod32,fc1,nz,nx,nsls)#pw,dpdxw,dpdzw,modK,nz,nx,δt, ::FdtdAcouVisco)
 	for ix=1:nx  # see limits above
 	@simd for iz=1:nz
 
@@ -184,7 +184,7 @@ end
 	dpdx=pap.w2[:dx][:p]
 	vx=pap.w2[:t][:vx]
 	vxp=pap.w2[:tp][:vx]
-	vx!(vx,vxp,dpdx,pac.mod[:rrvx],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx])
+	vx!(vx,vxp,dpdx,pac.mod[:rhovxI],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function vx!(vx,vxp,dpdx,mod,fc1,nz,nx)
 	for ix=1:nx # see dpdxw computation above
@@ -199,7 +199,7 @@ end
 	dpdz=pap.w2[:dz][:p]
 	vz=pap.w2[:t][:vz]
 	vzp=pap.w2[:tp][:vz]
-	vz!(vz,vzp,dpdz,pac.mod[:rrvz],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx])
+	vz!(vz,vzp,dpdz,pac.mod[:rhovzI],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function vz!(vz,vzp,dpdz,mod,fc1,nz,nx)
 	for ix=1:nx
@@ -294,7 +294,7 @@ end
 """
 advance by one time step for adjoint test
 """
-function advance_sample(ntimes, p, modrrvx, modrrvz, modttI)
+function advance_sample(ntimes, p, modrhovxI, modrhovzI, modK)
 	nz=size(p,1)
 	nx=size(p,2)
 	# boundary conditions
@@ -319,9 +319,9 @@ function advance_sample(ntimes, p, modrrvx, modrrvz, modttI)
 	a_z=zeros(nz);	a_z_half=zeros(nz)
 	b_z=zeros(nz);	b_z_half=zeros(nz)
 
-	modrrvx=ones(nz,nx)
-	modrrvz=ones(nz,nx)
-	modttI=ones(nz,nx)
+	modrhovxI=ones(nz,nx)
+	modrhovzI=ones(nz,nx)
+	modK=ones(nz,nx)
 
 	pw=zeros(nz,nx,3)
 	#input
@@ -348,8 +348,8 @@ function advance_sample(ntimes, p, modrrvx, modrrvz, modttI)
 		advance_kernel!(pw, dpdxw, dpdzw, δx24I, δz24I,
 			 memory_dp_dxw,memory_dp_dzw,
 			 b_x_half,b_z_half,a_x_half,a_z_half,k_x_halfI,k_z_halfI,
-			 nx,nz,δt,modrrvx,modrrvz,memory_dvx_dxw,memory_dvz_dzw,
-			 b_x,b_z,a_x,a_z,k_xI,k_zI,modttI)
+			 nx,nz,δt,modrhovxI,modrhovzI,memory_dvx_dxw,memory_dvz_dzw,
+			 b_x,b_z,a_x,a_z,k_xI,k_zI,modK)
 	end
 
 

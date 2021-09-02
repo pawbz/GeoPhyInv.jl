@@ -6,8 +6,8 @@ function add_born_sources!(issp::Int64, pac, pap)
 	δxI=pac.fc[:δxI]; δzI=pac.fc[:δzI]; 
 	δt=pac.fc[:δt]
 	δtI=pac.fc[:δtI]
-	δmodtt=pac.δmod[:tt]; modttI=pac.mod[:ttI];
-	δmodrrvx=pac.δmod[:rrvx]; δmodrrvz=pac.δmod[:rrvz]
+	δmodKI=pac.δmod[:KI]; modK=pac.mod[:K];
+	δmodrhovxI=pac.δmod[:rhovxI]; δmodrhovzI=pac.δmod[:rhovzI]
 	nx=pac.ic[:nx]; nz=pac.ic[:nz]
 
 	born_svalue_stack=pap[1].born_svalue_stack
@@ -27,44 +27,44 @@ function add_born_sources!(issp::Int64, pac, pap)
 	# lambdaI scatterrer source term at [it-1]
 	# p is at [it], pp is at [it-1], ppp is at [it-2]
 	# dpdx is at [it-1] and dpdz is at [it-1]
-	# modrrvx scatterrer source term at [it-1]
-	# modrrvz scatterrer source term at [it-1]
+	# modrhovxI scatterrer source term at [it-1]
+	# modrhovzI scatterrer source term at [it-1]
 
 	# compute strength of secondary sources to δmod
-	born_stacktt!(born_svalue_stack,p1,p1p,p1pp,δmodtt,nx,nz,δtI,δt)
-	born_stackrrvx!(born_svalue_stack,dpdx1,δmodrrvx,nx,nz,δx24I,δt)
-	born_stackrrvz!(born_svalue_stack,dpdz1,δmodrrvz,nx,nz,δz24I,δt)
-	born_stack!(p2,born_svalue_stack,modttI,nx,nz,δt)
+	born_stackKI!(born_svalue_stack,p1,p1p,p1pp,δmodKI,nx,nz,δtI,δt)
+	born_stackrhovxI!(born_svalue_stack,dpdx1,δmodrhovxI,nx,nz,δx24I,δt)
+	born_stackrhovzI!(born_svalue_stack,dpdz1,δmodrhovzI,nx,nz,δz24I,δt)
+	born_stack!(p2,born_svalue_stack,modK,nx,nz,δt)
 end
-@inbounds @fastmath function born_stacktt!(born_svalue_stack,p1,p1p,p1pp,δmodtt,nx,nz,δtI,δt)
+@inbounds @fastmath function born_stackKI!(born_svalue_stack,p1,p1p,p1pp,δmodKI,nx,nz,δtI,δt)
 	for ix=1:nx
 		@simd for iz=1:nz
-			born_svalue_stack[iz,ix] += δt * ((-1.0 * (p1pp[iz,ix] + p1[iz,ix] - 2.0 * p1p[iz,ix]) * δmodtt[iz,ix] * δtI * δtI)) 
+			born_svalue_stack[iz,ix] += δt * ((-1.0 * (p1pp[iz,ix] + p1[iz,ix] - 2.0 * p1p[iz,ix]) * δmodKI[iz,ix] * δtI * δtI)) 
 		end
 	end
 end
-@inbounds @fastmath function born_stackrrvx!(born_svalue_stack,dpdx1,δmodrrvx,nx,nz,δx24I,δt)
+@inbounds @fastmath function born_stackrhovxI!(born_svalue_stack,dpdx1,δmodrhovxI,nx,nz,δx24I,δt)
 	for ix=3:nx-1
 		@simd for iz=1:nz
 			born_svalue_stack[iz,ix] += 
-				δt * ((27.e0*dpdx1[iz,ix] * δmodrrvx[iz,ix] -27.e0*dpdx1[iz,ix-1] * δmodrrvx[iz,ix-1] -dpdx1[iz,ix+1] * δmodrrvx[iz,ix+1] +dpdx1[iz,ix-2] * δmodrrvx[iz,ix-2] ) * (δx24I)) 
+				δt * ((27.e0*dpdx1[iz,ix] * δmodrhovxI[iz,ix] -27.e0*dpdx1[iz,ix-1] * δmodrhovxI[iz,ix-1] -dpdx1[iz,ix+1] * δmodrhovxI[iz,ix+1] +dpdx1[iz,ix-2] * δmodrhovxI[iz,ix-2] ) * (δx24I)) 
 		end
 	end
 
 end
-@inbounds @fastmath function born_stackrrvz!(born_svalue_stack,dpdz1,δmodrrvz,nx,nz,δz24I,δt)
+@inbounds @fastmath function born_stackrhovzI!(born_svalue_stack,dpdz1,δmodrhovzI,nx,nz,δz24I,δt)
 	for ix=1:nx
 		@simd for iz=3:nz-1
 			born_svalue_stack[iz,ix] += 
-				δt * ((27.e0*dpdz1[iz,ix] * δmodrrvz[iz,ix] -27.e0*dpdz1[iz-1,ix] * δmodrrvz[iz-1,ix] -dpdz1[iz+1,ix] * δmodrrvz[iz+1,ix] +dpdz1[iz-2,ix] * δmodrrvz[iz-2,ix] ) * (δz24I))  
+				δt * ((27.e0*dpdz1[iz,ix] * δmodrhovzI[iz,ix] -27.e0*dpdz1[iz-1,ix] * δmodrhovzI[iz-1,ix] -dpdz1[iz+1,ix] * δmodrhovzI[iz+1,ix] +dpdz1[iz-2,ix] * δmodrhovzI[iz-2,ix] ) * (δz24I))  
 		end
 	end
 end
 # add secondary sources to second pw
-@inbounds @fastmath function born_stack!(p2,born_svalue_stack,modttI,nx,nz,δt)
+@inbounds @fastmath function born_stack!(p2,born_svalue_stack,modK,nx,nz,δt)
 	for ix=1:nx
 		@simd for iz=1:nz
-			p2[iz,ix] += born_svalue_stack[iz,ix] * modttI[iz,ix] * δt  #* δxI * δzI 
+			p2[iz,ix] += born_svalue_stack[iz,ix] * modK[iz,ix] * δt  #* δxI * δzI 
 		end
 	end
 end

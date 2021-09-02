@@ -199,41 +199,33 @@ function PFdtd(attrib_mod;
 	bindices=get_boundary_indices(medium.mgrid,attrib_mod)
 
 	# extend mediums in the PML layers
-	exmedium = Medium_pml_pad_trun(medium, nlayer_rand, npml);
+	exmedium = padarray(medium, npml);
 	if(typeof(attrib_mod)==FdtdAcouBorn)
 		(npw≠2) && error("born modeling needs npw=2")
 	end
 
-	#create some aliases
-	nz, nx = length.(exmedium.mgrid)
-	nzd, nxd = length.(medium.mgrid)
-	nt=length(tgridmod)
+	mod=NamedArray([zeros(length.(exmedium.mgrid)...) for name in get_medium_names(attrib_mod)],
+			get_medium_names(attrib_mod))
+	δmod=deepcopy(mod)
 
-	fc=get_fc(medium,tgrid,attrib_mod)
-
-	mod,δmod=get_mod(exmedium,attrib_mod)
-
-	δmodall = zeros(2*nzd*nxd)
+	δmodall=zeros(2*prod(length.(medium.mgrid)))
 
 	# PML
 	pml=get_pml(exmedium.mgrid,abs_trbl,step(tgrid),npml-3,vpmin,vpmax,freqpeak)
 
 	# initialize gradient arrays
-	gradient=zeros(2*nzd*nxd)
-	grad_modtt_stack=SharedMatrix{Float64}(zeros(nz,nx))
-	# these are full size, as rhoI -> rhovx and rhovz is also full size
-	grad_modrrvx_stack=SharedMatrix{Float64}(zeros(nz,nx))
-	grad_modrrvz_stack=SharedMatrix{Float64}(zeros(nz,nx))
-	grad_modrr_stack=SharedMatrix{Float64}(zeros(nz,nx))
+	gradient=zeros(2*prod(length.(medium.mgrid)))
 
-	grad_mod=NamedArray([grad_modtt_stack, grad_modrrvx_stack, grad_modrrvz_stack,grad_modrr_stack], 
-	    ([:tt,:rrvx,:rrvz,:rr],))
-	illum_stack=SharedMatrix{Float64}(zeros(nzd, nxd))
+	# shared arrays required to reduce all the gradient from individual workers
+	grad_mod=NamedArray([SharedMatrix{Float64}(zeros(length.(exmedium.mgrid)...)) 
+			for name in get_medium_names(attrib_mod)], get_medium_names(attrib_mod))
+
+	illum_stack=SharedMatrix{Float64}(zeros(length.(medium.mgrid)...))
 
 	itsnaps = [argmin(abs.(tgridmod .- tsnaps[i])) for i in 1:length(tsnaps)]
 
 	nrmat=[ageom[ipw][iss].nr for ipw in 1:npw, iss in 1:nss]
-	datamat=SharedArray{Float64}(nt,maximum(nrmat),nss)
+	datamat=SharedArray{Float64}(length(tgrid),maximum(nrmat),nss)
 	data=[Records(tgridmod,ageom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
 
 	# default is all prpagating wavefields are active
@@ -256,8 +248,8 @@ function PFdtd(attrib_mod;
 	    exmedium,medium,
 	    ageom,srcwav,abs_trbl,sfields,isfields,sflags,
 	    rfields,rflags,
-	    fc,
-	    NamedArray([nx,nz,nt,nsls,npw],([:nx,:nz,:nt,:nsls,:npw],)),
+	    get_fc(medium,tgrid),
+	    get_ic(medium,tgrid,nsls,npw),
 	    pml,
 	    mod,
 	    NamedArray([memcoeff1,memcoeff2],([:memcoeff1,:memcoeff2],)),
@@ -275,6 +267,9 @@ function PFdtd(attrib_mod;
 	    data,
 	    verbose)	
 
+
+	# update medium in pac
+	update!(pac,exmedium)	    
 	# dividing the supersources to workers
 	if(nworker===nothing)
 		nworker = min(nss, Distributed.nworkers())
@@ -293,54 +288,36 @@ function PFdtd(attrib_mod;
 end
 
 """
-get some integer constants to store them in pac, e.g., model sizes
+Get some integer constants to store them in pac, e.g., model sizes. ``
+The idea is to use them later for a cleaner code.
 """
-function get_ic(medium,tgrid,::Union{FdtdAcou,FdtdAcouBorn,FdtdAcouVisco})
-	
+function get_ic(medium,tgrid,nsls,npw)
+	n=ndims(medium)
+	return NamedArray(vcat(length.(medium.mgrid),[length(tgrid),nsls,npw]),vcat(dim_names(n,"n"),[:nt,:nsls,:npw]))
 end
 
 """
-get some floats constants to store then in pac, e.g, spatial sampling
+Get some floats constants to store then in pac, e.g, spatial sampling.
+The idea is to use them later inside the loops for faster modelling.
 """
-function get_fc(medium,tgrid,::FdtdOld)
-	δx, δz = step(medium.mgrid[2]), step(medium.mgrid[1])
-	δx24I, δz24I = inv(δx * 24.0), inv(δz * 24.0)
-	δxI, δzI = inv(δx), inv(δz)
+function get_fc(medium,tgrid)
+	n=ndims(medium)
+	δs = step.(medium.mgrid)
+	δs24I = inv.(δs) .* 24.0
+	δsI = inv.(δs)
 	δt = step(tgrid)
 	δtI = inv(δt)
 
-	fc=NamedArray( [δt, δxI, δzI, δtI, δx24I, δz24I], ([:δt, :δxI, :δzI, :δtI, :δx24I, :δz24I],))
+	return NamedArray(vcat([δt, δtI],δs,δsI,δs24I),vcat([:δt,:δI],dim_names(n,"δ"),dim_names(n,"δ","I"),dim_names(n,"\delta","24I")))
+end
+
+function get_medium_names(::FdtdOld)
+	"bulk modulus, and density values on vx and vz stagerred grids"
+	return 	[:KI,:K,:rhoI,:rhovxI,:rhovzI]
 end
 
 
-"""
-extract vectors used 
-"""
-function get_mod(medium,::FdtdOld)
-	nz,nx=length.(medium.mgrid)
 
-
-	"density values on vx and vz stagerred grids"
-	modrr=copy(medium[:rhoI])
-	modrrvx = get_rhovxI(modrr)
-	modrrvz = get_rhovzI(modrr)
-
-	modttI = copy(medium[:K]) 
-	modtt = copy(medium[:KI])
-	
-	# medium perturbation vectors are required on full space
-	δmodtt = zeros(nz, nx)
-	δmodrr = zeros(nz, nx)
-	δmodrrvx = zeros(nz, nx)
-	δmodrrvz = zeros(nz, nx)
-
-	# model arrays inside 
-	mod=NamedArray([modtt, modttI,modrr,modrrvx,modrrvz], ([:tt,:ttI,:rr,:rrvx,:rrvz],))
-	δmod=NamedArray([δmodtt,δmodrr,δmodrrvx,δmodrrvz], ([:tt,:rr,:rrvx,:rrvz],))
-
-	return mod,δmod
-
-end
 
 
 """
@@ -397,9 +374,9 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{<:Fdtd
 	records = NamedArray([zeros(nt,pac.ageom[ipw][iss].nr) for i in 1:length(rfields)], (rfields,))
 
 	# gradient outputs
-	grad_modtt = zeros(nz, nx)
-	grad_modrrvx = zeros(nz, nx)
-	grad_modrrvz = zeros(nz, nx)
+	grad_modKI = zeros(nz, nx)
+	grad_modrhovxI = zeros(nz, nx)
+	grad_modrhovzI = zeros(nz, nx)
 
 
 	# saving illum
@@ -438,8 +415,8 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{<:Fdtd
 	rindices=NamedArray([zeros(Int64,ageom[ipw][iss].nr) for i in coords], (coords,))
 
 	pass=P_x_worker_x_pw_x_ss(iss,wavelets,ssprayw,records,rinterpolatew,
-			   sindices,rindices, boundary,snaps,illum,# grad_modtt,grad_modrrvx,grad_modrrvz)
-			   NamedArray([grad_modtt,grad_modrrvx,grad_modrrvz],([:tt,:rrvx,:rrvz],)))
+			   sindices,rindices, boundary,snaps,illum,# grad_modKI,grad_modrhovxI,grad_modrhovzI)
+			   NamedArray([grad_modKI,grad_modrhovxI,grad_modrhovzI],([:KI,:rhovxI,:rhovzI],)))
 
     # update acquisition
 	update!(pass,ipw,iss,ageom[ipw][iss],pac)
