@@ -1,6 +1,6 @@
 module IO
 
-#import GeoPhyInv.Data
+#import GeoPhyInv.Records
 
 mutable struct SegyHeader
 	tracl::Int32
@@ -208,7 +208,7 @@ end
 
 """
 Read an input SeismicUnix file and output 
-the time-domain data as `Data.TD`.
+the time-domain data as `Records.TD`.
 
 # Arguments
 * `fname::AbstractString` : name of the SeismicUnix file
@@ -301,7 +301,7 @@ function writesu(fname, d, h_segy::Vector{SegyHeader}=[InitSegyHeader() for irec
 	close(stream)
 end
 
-#function TD(d::Data.TD, attrib=:su)
+#function TD(d::Records.TD, attrib=:su)
 #	
 #	nrecords = sum(d.ageom.nr)
 #	nss = d.ageom.nss

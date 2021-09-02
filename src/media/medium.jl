@@ -55,7 +55,7 @@ include("gallery.jl")
 
 
 """
-Data type to represent a seismic model.
+Records type to represent a seismic model.
 A contrast function for a model m is given by ``χ(m) = \frac{m}{m0}-1``.
 
 # Fields

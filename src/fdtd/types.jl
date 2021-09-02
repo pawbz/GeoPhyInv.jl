@@ -112,7 +112,7 @@ Modelling parameters common for all supersources
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
 * `gradient::Vector{Float64}=Medium(medium.mgrid)` : gradient medium modified only if `gmodel_flag`
-* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
+* `TDout::Vector{Records.TD}=[Records.TD_zeros(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
 * `illum::Array{Float64,2}=zeros(length(medium.mgrid[1]), length(medium.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
 * `snaps::Array{Float64,4}=zeros(length(medium.mgrid[1]),length(medium.mgrid[2]),length(tsnaps),ageom[1].nss)` :snapshots saved at `tsnaps`
@@ -185,7 +185,7 @@ mutable struct P_common{T, T1, T2}
 	isz0::Int64
 	=#
 	datamat::SharedArrays.SharedArray{Float64,3}
-	data::Vector{Data}
+	data::Vector{Records}
 	# attenuation related parameters
 	verbose::Bool
 end 

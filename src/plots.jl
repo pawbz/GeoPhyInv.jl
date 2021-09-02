@@ -81,10 +81,10 @@ end
 
 
 #=
-Plot time-domain data of type `Data.TD`
+Plot time-domain data of type `Records.TD`
 
 # Arguments
-* `td::Vector{Data.TD}` : time-domain data to be compared
+* `td::Vector{Records.TD}` : time-domain data to be compared
 
 # Keyword Arguments
 * `ssvec::Vector{Vector{Int64}}=fill([1], length(td))` : supersource vector to be plotted

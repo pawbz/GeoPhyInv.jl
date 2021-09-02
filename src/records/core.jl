@@ -2,7 +2,7 @@
 """
 A mutable type that bundles multi-component records at multiple receivers.
 ```julia
-data=Data(tgrid, ageom, [:p, :vx])
+data=Records(tgrid, ageom, [:p, :vx])
 
 ```
 Here, we initialized records, of `:p` and `:vx` fields, in time domain for receivers and supersources in `ageom`.
@@ -14,7 +14,7 @@ Here, we initialized records, of `:p` and `:vx` fields, in time domain for recei
 * `data.grid` : returns `tgrid` 
 As mutable objects in Julia are like containers that might hold different values over time, `data` can be modified.
 """
-Data=Array{NamedD{Recs},1}
+Records=Array{NamedD{Recs},1}
 
 
 function Array{NamedD{Recs},1}(grid::StepRangeLen, ageom::AGeom, fields::Vector{Symbol}) 

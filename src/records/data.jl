@@ -24,7 +24,7 @@ using DSP
 using Random
 
 """
-Time domain representation of Seismic Data.
+Time domain representation of Seismic Records.
 
 # Fields
 
@@ -58,7 +58,7 @@ TD(tgrid,  r::Recs=Recs(1), fields=[:P])=zero(TD, tgrid, s, fields)
 
 
 
-Data=Array{NamedD,1}
+Records=Array{NamedD,1}
 
 
 """

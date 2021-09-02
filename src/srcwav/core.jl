@@ -89,7 +89,7 @@ the model has `nλ` wavelengths.
 * `wav_func::Function=(fqdom, tgrid)->Utils.Wavelets.ricker(fqdom,tgrid)` : which wavelet to generate, see Utils.Wavelets.jl
 * `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the model, use this fraction to increase of reduce the maximum time
 """
-function update!(s::Datat, 
+function update!(s::Recordst, 
 		fields::Vector{Symbol},
 		mod::Medium, 
 		nλ::Int64,

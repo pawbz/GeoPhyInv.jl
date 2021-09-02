@@ -3,7 +3,7 @@ struct FGσ end
 
 # type for doing a SE expt
 mutable struct ParamExpt{T}
-#	paTD::Data.P_misfit #  to measure data misfit
+#	paTD::Records.P_misfit #  to measure data misfit
 #	ageom::AGeom # mainly positions of receivers are used from here, for the source see P
 	σ::Matrix{T} # see Niels et al.
 	Q::Matrix{T} # Q*k/η (see Niels et al.)
@@ -12,8 +12,8 @@ mutable struct ParamExpt{T}
 	data::Array{T,2}
 	data_obs::Array{T,2}
 	data_misfit::Array{T,1}
-#	datP::Data.TD
-#	datLP::Data.TD
+#	datP::Records.TD
+#	datLP::Records.TD
 	ψ::Vector{T} # state variable, we are going to record this state data=ACQ*ψ  
 	ψ0::Vector{T} # background state variable, only used for born modelling
 	adjsrc::Vector{T}
@@ -62,9 +62,9 @@ function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=no
 
 	Q= k .* Qv ./ η # combine all these
 
-#	dobs=Data.TD_zeros([:P],tgrid,ageom)
+#	dobs=Records.TD_zeros([:P],tgrid,ageom)
 	#Random.randn!(dobs) # dummy dobs, update later
-#	paTD=Data.P_misfit(Data.TD_zeros([:P],tgrid,ageom),dobs);
+#	paTD=Records.P_misfit(Records.TD_zeros([:P],tgrid,ageom),dobs);
 
 	paQ=Param(mgrid, Q)
 	paσ=Param(mgrid, σ)
@@ -112,7 +112,7 @@ end
 
 #=
 # given snapshots, record a data obj TD
-function record!(data::Data.TD, snaps, mgrid)
+function record!(data::Records.TD, snaps, mgrid)
 	ifield=1;
 	iss=1;
 	nr=data.ageom.nr

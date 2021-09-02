@@ -99,7 +99,7 @@ include("database/core.jl")
 include("srcwav/core.jl")
 
 include("Coupling.jl")
-include("data/core.jl")
+include("records/core.jl")
 
 
 # Pressure and velocity fields (used for multiple dispatch)
@@ -109,7 +109,7 @@ struct vz end
 
 
 
-#include("Data/Data.jl")
+#include("Records/Records.jl")
 include("Born/Born.jl")
 include("fdtd/fdtd.jl")
 
@@ -119,7 +119,7 @@ include("Poisson/Poisson.jl")
 include("plots.jl")
 
 # export stuff from GeoPhyInv
-export Data
+export Records
 export SrcWav
 export update!, Medium
 export ricker, ormsby 

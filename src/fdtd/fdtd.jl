@@ -15,8 +15,12 @@
 # * optimized memory allocation: Oct 2017
 
 # 
-
-
+function AA(use_gpu,n)
+	# ParallelStencil.@reset_parallel_stencil()
+	# use_gpu ? 
+	# @init_parallel_stencil(CUDA, Float64, 2) :
+	@init_parallel_stencil(Threads, Float64, 2)
+end
 """
 2-D acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
@@ -180,7 +184,6 @@ function PFdtd(attrib_mod;
 	#
 	fill(nss, npw) != [length(ageom[ip]) for ip=1:npw] ? error("different supersources") : nothing
 
-
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
 	# find maximum and minimum frequencies in the source wavelets
@@ -193,9 +196,7 @@ function PFdtd(attrib_mod;
 	vpmax = maximum(broadcast(maximum,[medium.bounds[:vp]]))
 	#verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
 
-
 	check_fd_stability(medium.bounds, medium.mgrid, tgrid, freqmin, freqmax, verbose, 5, 0.5)
-
 
 	# where to store the boundary values (careful, born scaterrers cannot be inside these!?)
 	ibx0=npml-2; ibx1=length(medium.mgrid[2])+npml+3
@@ -245,7 +246,7 @@ function PFdtd(attrib_mod;
 
 	nrmat=[ageom[ipw][iss].nr for ipw in 1:npw, iss in 1:nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),nss)
-	data=[Data(tgridmod,ageom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
+	data=[Records(tgridmod,ageom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
 
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
@@ -461,7 +462,7 @@ end
 
 include("source.jl")
 include("receiver.jl")
-include("advance_acou.jl")
+include("advance_acou2D.jl")
 include("rho_projection.jl")
 include("gradient.jl")
 include("born.jl")
@@ -474,14 +475,14 @@ include("gallery.jl")
 #	for iprop in 1:pac.ic[:npw]
 #		if(pac.rflags[iprop] ≠ 0)
 #			ipropout += 1
-##			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, ageom[iprop],
+##			Records.TD_resamp!(pac.data[ipropout], Records.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, ageom[iprop],
 ##				ageom_urpos[1].nr[1],
 ##				(ageom_urpos[1].r[:z][1], ageom_urpos[1].r[:x][1])
 ##				)) 
 #		end
 #	end
 	# return without resampling for testing
-	#return [Data.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
+	#return [Records.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
 	#		       tgridmod, ageom[1]) for iprop in 1:npw]
 
 function stack_illums!(pac::P_common, pap::P_x_worker)
