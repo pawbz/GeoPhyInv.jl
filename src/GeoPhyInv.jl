@@ -53,8 +53,7 @@ end
 
 
 # check whether 2D or 3D, and initialize ParallelStencils accordingly
-const use_gpu=false
-ParallelStencil.@reset_parallel_stencil()
+@init_parallel_stencil(Threads, Float64, 3)
 # use_gpu ? @init_parallel_stencil(CUDA, Float64, 3) : @init_parallel_stencil(Threads, Float64, 3)
 # use_gpu ? @init_parallel_stencil(CUDA, Float64, 2) : @init_parallel_stencil(Threads, Float64, 2)
 
@@ -125,7 +124,7 @@ export update!, Medium
 export ricker, ormsby 
 export Srcs, Recs, SSrcs
 export AGeom, AGeomss
-export update!, SeisForwExpt, SeisInvExpt, FdtdAcou, FdtdAcouBorn, FdtdAcouVisco, LS, LS_prior, Migr, Migr_FD
+export update!, SeisForwExpt, SeisInvExpt, FdtdAcou, FdtdElastic, FdtdAcouBorn, FdtdAcouVisco, LS, LS_prior, Migr, Migr_FD
 
 # export the Expt for Poisson
 const PoissonExpt=GeoPhyInv.Poisson.ParamExpt

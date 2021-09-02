@@ -106,11 +106,7 @@ pa = SeisForwExpt(
 );
 
 
-
-
 @time update!(pa);
-
-
 
 
 

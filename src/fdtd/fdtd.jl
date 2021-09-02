@@ -15,12 +15,8 @@
 # * optimized memory allocation: Oct 2017
 
 # 
-function AA(use_gpu,n)
-	# ParallelStencil.@reset_parallel_stencil()
-	# use_gpu ? 
-	# @init_parallel_stencil(CUDA, Float64, 2) :
-	@init_parallel_stencil(Threads, Float64, 2)
-end
+struct FdtdElastic end
+
 """
 2-D acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
@@ -91,17 +87,17 @@ finite-difference modeling.
 * `rflags=1` : receiver related flags 
   * `=0` receivers do not record (or) inactive receivers
   * `=1` receivers are active only for the second propagating wavefield
-* `rfields=[:P]` : multi-component receiver flag. Choose `Vector{Symbol}`
-  * `=[:P]` record pressure 
+* `rfields=[:p]` : multi-component receiver flag. Choose `Vector{Symbol}`
+  * `=[:p]` record pressure 
   * `=[:vx]` record horizontal component of particle velocity  
   * `=[:vz]` record vertical component of particle velocity  
-  * `=[:P, :vx]` record both pressure and velocity 
+  * `=[:p, :vx]` record both pressure and velocity 
 * `tsnaps` : store snaps at these modeling times (defaults to half time)
   * `=[0.1,0.2,0.3]` record at these instances of tgrid
 * `snaps_flag::Bool=false` : return snapshots or not
 * `verbose::Bool=false` : verbose flag
 """
-SeisForwExpt(attrib_mod::Union{FdtdAcou,FdtdAcouBorn,FdtdAcouVisco},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
+SeisForwExpt(attrib_mod::Union{FdtdAcou,FdtdElastic,FdtdAcouBorn,FdtdAcouVisco},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
 
 
 """
@@ -165,7 +161,12 @@ function PFdtd(attrib_mod;
 	#        return
 	#endif
 
+	# necessary that nss and fields should be same for all nprop
+	nss = length(ageom[1]);
+	sfields=[names(srcwav[ipw][1].d)[1] for ipw in 1:npw]
+
 	# all the propagating wavefields should have same supersources? check that?
+	fill(nss, npw) != [length(ageom[ip]) for ip=1:npw] ? error("different supersources") : nothing
 
 	# check dimension of model
 
@@ -177,12 +178,8 @@ function PFdtd(attrib_mod;
 	length(srcwav) != npw ? error("srcwav size") : nothing
 	all([issimilar(ageom[ip],srcwav[ip]) for ip=1:npw]) ? nothing : error("ageom and srcwav mismatch") 
 
-	# necessary that nss and fields should be same for all nprop
-	nss = length(ageom[1]);
-	sfields=[names(srcwav[ipw][1].d)[1] for ipw in 1:npw]
 	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
 	#
-	fill(nss, npw) != [length(ageom[ip]) for ip=1:npw] ? error("different supersources") : nothing
 
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
@@ -198,17 +195,8 @@ function PFdtd(attrib_mod;
 
 	check_fd_stability(medium.bounds, medium.mgrid, tgrid, freqmin, freqmax, verbose, 5, 0.5)
 
-	# where to store the boundary values (careful, born scaterrers cannot be inside these!?)
-	ibx0=npml-2; ibx1=length(medium.mgrid[2])+npml+3
-	ibz0=npml-2; ibz1=length(medium.mgrid[1])+npml+3
-#	ibx0=npml+1; ibx1=length(medium.mgrid[2])+npml
-#	ibz0=npml+1; ibz1=length(medium.mgrid[1])+npml
-#	println("**** Boundary Storage Changed **** ")
-
-	# for snaps
-	isx0, isz0=npml, npml
-
-	bindices=NamedArray([ibx0,ibx1,ibz0,ibz1,isx0,isz0],([:bx0,:bx1,:bz0,:bz1,:sx0,:sz0],))
+	# indices where the fields are stored for backpropagation (used for RTM and FWI)
+	bindices=get_boundary_indices(medium.mgrid,attrib_mod)
 
 	# extend mediums in the PML layers
 	exmedium = Medium_pml_pad_trun(medium, nlayer_rand, npml);
