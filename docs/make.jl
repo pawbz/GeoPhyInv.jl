@@ -18,7 +18,7 @@ makedocs(
 	    "Medium" => "generated/media/doc.md",
 	    "AGeom" => "generated/ageom/doc.md",
 	    "SrcWav" => "generated/srcwav/doc.md",
-	    "Data" => "generated/data/doc.md",
+	    "Records" => "generated/data/doc.md",
 	    "SeisForwExpt" => Any[
 				  "Description" => "generated/fdtd/doc.md",
 				  "Tutorial I" => "generated/fdtd/create_snaps.md",

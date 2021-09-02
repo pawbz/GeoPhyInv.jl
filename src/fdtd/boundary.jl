@@ -1,4 +1,24 @@
 
+function get_boundary_indices(mgrid,::FdtdOld)
+	# where to store the boundary values (careful, born scaterrers cannot be inside these!?)
+	ibx0=npml-2; ibx1=length(mgrid[2])+npml+3
+	ibz0=npml-2; ibz1=length(mgrid[1])+npml+3
+#	ibx0=npml+1; ibx1=length(mgrid[2])+npml
+#	ibz0=npml+1; ibz1=length(mgrid[1])+npml
+#	println("**** Boundary Storage Changed **** ")
+
+	# for snaps
+	isx0, isz0=npml, npml
+
+	return NamedArray([ibx0,ibx1,ibz0,ibz1,isx0,isz0],([:bx0,:bx1,:bz0,:bz1,:sx0,:sz0],))
+	
+end
+
+function get_boundary_indices(mgrid,::FdtdElastic)
+	return NamedArray([1],[:a]) # some dummy, update later	
+end
+
+
 
 @inbounds @fastmath function boundary_force_snap_p!(issp::Int64,pac,pap)
 	ps=pap[1].w2[:t][:p]

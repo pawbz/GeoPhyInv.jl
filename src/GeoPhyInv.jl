@@ -36,17 +36,31 @@ using CUDA
 using HDF5
 
 
+"""
+Return axis names of 1D, 2D or 3D fields
+"""
+function dim_names(N)
+	if(N==3)
+		return [:z,:y,:x]
+	elseif(N==2)
+		return [:z,:x]
+	elseif(N==1)
+		return [:z]
+	else
+		error("invalid dim num")
+	end
+end
+
 
 # check whether 2D or 3D, and initialize ParallelStencils accordingly
-const use_gpu=false
-ParallelStencil.@reset_parallel_stencil()
+@init_parallel_stencil(Threads, Float64, 3)
 # use_gpu ? @init_parallel_stencil(CUDA, Float64, 3) : @init_parallel_stencil(Threads, Float64, 3)
 # use_gpu ? @init_parallel_stencil(CUDA, Float64, 2) : @init_parallel_stencil(Threads, Float64, 2)
 
 
 
-# this is extensively used to stack arrays
-# define a specific namedarray
+# This is extensively used to group arrays
+
 NamedStack{T}=NamedArray{T,1,Array{T,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 
 
@@ -84,7 +98,7 @@ include("database/core.jl")
 include("srcwav/core.jl")
 
 include("Coupling.jl")
-include("data/core.jl")
+include("records/core.jl")
 
 
 # Pressure and velocity fields (used for multiple dispatch)
@@ -94,7 +108,7 @@ struct vz end
 
 
 
-#include("Data/Data.jl")
+#include("Records/Records.jl")
 include("Born/Born.jl")
 include("fdtd/fdtd.jl")
 
@@ -104,13 +118,13 @@ include("Poisson/Poisson.jl")
 include("plots.jl")
 
 # export stuff from GeoPhyInv
-export Data
+export Records
 export SrcWav
 export update!, Medium
 export ricker, ormsby 
 export Srcs, Recs, SSrcs
 export AGeom, AGeomss
-export update!, SeisForwExpt, SeisInvExpt, Fdtd, FdtdAcouBorn, FdtdAcouVisco, LS, LS_prior, Migr, Migr_FD
+export update!, SeisForwExpt, SeisInvExpt, FdtdAcou, FdtdElastic, FdtdAcouBorn, FdtdAcouVisco, LS, LS_prior, Migr, Migr_FD
 
 # export the Expt for Poisson
 const PoissonExpt=GeoPhyInv.Poisson.ParamExpt

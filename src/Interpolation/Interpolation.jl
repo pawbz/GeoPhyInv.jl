@@ -117,10 +117,9 @@ function interp_spray!(y::Vector{T}, yi::Vector{T}, pa::Kernel_2D{T}, attrib, nm
 end
 
 
-include("Misc.jl")
-
-include("Core.jl")
-include("Weights.jl")
+include("misc.jl")
+include("core.jl")
+include("weights.jl")
 
 
 

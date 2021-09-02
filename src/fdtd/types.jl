@@ -1,9 +1,9 @@
-
-
+# Define high-level structs and their zero initializations 
 
 
 """
-Modelling parameters per every supersource for each worker
+Struct for modelling parameters specific to each supersource. 
+Each worker needs a vector of this struct, as it models multiple superspources. 
 """
 mutable struct P_x_worker_x_pw_x_ss
 	iss::Int64
@@ -19,29 +19,100 @@ mutable struct P_x_worker_x_pw_x_ss
 	grad_mod::NamedStack{Matrix{Float64}} # w.r.t different coeffs
 end
 
+function iszero_boundary(pa)
+	result=false
+	@sync begin
+		for (ip, p) in enumerate(procs(pa.p))
+			@async remotecall_wait(p) do 
+				pap=localpart(pa.p)
+				for issp in 1:length(pap.ss)
+					pass=pap.ss[issp]
+					for i in 1:length(pass.boundary)
+						result = result | iszero(pass.boundary[i])
+					end
+				end
+			end
+		end
+	end
+	return result
+end
+function initialize_boundary!(pa)
+	# zero out results stored per worker
+	for ipw in 1:pa.c.ic[:npw]
+		@sync begin
+			for (ip, p) in enumerate(procs(pa.p))
+				@async remotecall_wait(p) do 
+					pap=localpart(pa.p)[ipw]
+					for issp in 1:length(pap.ss)
+						pass=pap.ss[issp]
+						for i in 1:length(pass.boundary)
+							fill!(pass.boundary[i],0.0)
+						end
+					end
+				end
+			end
+		end
+	end
+end
 
 """
-PFdtdeters per every worker, not necessarily for every supersource.
-Note that a single worker can take care of multiple supersources.
+Initialize between each simulation
 """
-mutable struct P_x_worker_x_pw
-	ss::Vector{P_x_worker_x_pw_x_ss}
+function initialize!(pa::P_x_worker_x_pw_x_ss)
+	fill!.(pa.records,0.0)
+	fill!(pa.snaps,0.0)
+	fill!(pa.illum,0.0)
+	fill!.(pa.grad_mod,0.0)
+end
+
+
+"""
+Parameters specific to each worker, not necessarily for every supersource.
+This struct contains velocity and stress fields simulated by each worker.
+Again, note that a single worker can take care of multiple supersources.
+* T1==Matrix{Float64} for 2D simulation
+"""
+mutable struct P_x_worker_x_pw{T1}
+	ss::Vector{P_x_worker_x_pw_x_ss} # supersource specific arrays
 	# 2D arrays of p, vx, vz, their previous snapshots, and 
 	# x derivatives of p, vx, vz
 	# z derivatives of p, vx, vz
-	w2::NamedStack{NamedStack{Matrix{Float64}}} # p, vx, vz
-	w3::NamedStack{NamedStack{Array{Float64,3}}} # required for attenuation, where third dimension is nsls
-	memory_pml::NamedStack{Matrix{Float64}} # PML related (stored dpdx, dpdz, dvxdx, dvzdz)
-	born_svalue_stack::Matrix{Float64} # used for born modeling 
+	w2::NamedStack{NamedStack{T1}} # p, vx, vz
+	w3::NamedStack{NamedStack{Array{Float64,3}}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
+	memory_pml::NamedStack{T1} # memory variables for CPML 
+	born_svalue_stack::Matrix{Float64} # used for born modeling # only used for 2-D simulation
 end
 
+P_x_worker=Vector{P_x_worker_x_pw}
+
+function initialize!(pap::P_x_worker)
+	reset_w2!(pap)
+	for pap_x_pw in pap
+		initialize!.(pap_x_pw.ss)
+	end
+
+end
+
+# reset wavefields for every worker
+function reset_w2!(pap::P_x_worker)
+	for pap_x_pw in pap
+		fill!(pap_x_pw.born_svalue_stack,0.0)
+		for w in pap_x_pw.w2
+			fill!.(w,0.0)
+		end
+		for w in pap_x_pw.w3
+			fill!.(w,0.0)
+		end
+		fill!.(pap_x_pw.memory_pml,0.0)
+	end
+end
 
 """
 Modelling parameters common for all supersources
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
 * `gradient::Vector{Float64}=Medium(medium.mgrid)` : gradient medium modified only if `gmodel_flag`
-* `TDout::Vector{Data.TD}=[Data.TD_zeros(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
+* `TDout::Vector{Records.TD}=[Records.TD_zeros(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
 * `illum::Array{Float64,2}=zeros(length(medium.mgrid[1]), length(medium.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
 * `snaps::Array{Float64,4}=zeros(length(medium.mgrid[1]),length(medium.mgrid[2]),length(tsnaps),ageom[1].nss)` :snapshots saved at `tsnaps`
@@ -53,8 +124,9 @@ Modelling parameters common for all supersources
 * final conditions of the first propagating wavefield as `Array{Float64,4}` (use for back propagation)
 * gradient model as `Medium`
 * stored snaps shots at tsnaps as Array{Float64,4} 
+
 """
-mutable struct P_common{T}
+mutable struct P_common{T, T1, T2}
 	jobname::Symbol
 	attrib_mod::T
 	activepw::Vector{Int64}
@@ -70,23 +142,9 @@ mutable struct P_common{T}
 	rflags::Vector{Int64}
 	fc::NamedStack{Float64}
 	ic::NamedStack{Int64}
-	pml::NamedStack{Vector{Float64}}
-	#=
-	a_x::Vector{Float64}
-	b_x::Vector{Float64}
-	k_xI::Vector{Float64}
-	a_x_half::Vector{Float64}
-	b_x_half::Vector{Float64}
-	k_x_halfI::Vector{Float64} 
-	a_z::Vector{Float64}
-	b_z::Vector{Float64}
-	k_zI::Vector{Float64}
-	a_z_half::Vector{Float64}
-	b_z_half::Vector{Float64}
-	k_z_halfI::Vector{Float64}
-	=#
-	mod::NamedStack{Matrix{Float64}}
-	mod3::NamedStack{Array{Float64,3}}
+	pml::NamedStack{NamedStack{T2}} # e.g., pml[:x][:a], pml[:z][:b]
+	mod::NamedStack{T1} # e.g., mod[:tt], mod[:ttI]
+	mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
 	#=
 	modtt::Matrix{Float64}
 	modttI::Matrix{Float64} # just storing inv(modtt) for speed
@@ -127,13 +185,29 @@ mutable struct P_common{T}
 	isz0::Int64
 	=#
 	datamat::SharedArrays.SharedArray{Float64,3}
-	data::Vector{Data}
+	data::Vector{Records}
 	# attenuation related parameters
 	verbose::Bool
 end 
 
 
-P_x_worker=Vector{P_x_worker_x_pw}
+function initialize!(pac::P_common)
+	fill!(pac.gradient,0.0)
+	fill!.(pac.grad_mod,0.0)
+	# fill!(pac.grad_mod[:rrvx],0.0)
+	# fill!(pac.grad_mod[:rrvz],0.0)
+	# fill!(pac.grad_mod[:rr],0.0)
+	fill!(pac.illum_stack,0.0)
+	for dat in pac.data
+		fill!(dat, 0.0)
+	end
+	fill!(pac.datamat,0.0)
+end
+
+
+"""
+A single struct combining parameters for all workers.
+"""
 mutable struct PFdtd{T}
 	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
 	p::DistributedArrays.DArray{P_x_worker,1,P_x_worker} # distributed parameters among workers

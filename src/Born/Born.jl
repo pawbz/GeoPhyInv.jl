@@ -2,7 +2,7 @@ module Born
 
 import GeoPhyInv: AGeom, SrcWav
 import GeoPhyInv: Medium, complexK
-import GeoPhyInv.Data
+import GeoPhyInv.Records
 using SpecialFunctions
 using Statistics
 using FFTW
@@ -75,7 +75,7 @@ function mod(medium::Medium;
 	
 
 	nss = length(ageom)
-	data=Data(tgridmod, ageom, [:p])
+	data=Records(tgridmod, ageom, [:p])
 
 	for iss in 1:nss, ifield in 1:length(data[iss].d)
 		sx = ageom[iss].s[:x]

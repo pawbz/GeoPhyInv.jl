@@ -31,7 +31,7 @@ mutable struct Medium{N} # N is 2 for 2D, and 3 for 3D
 	fc::NamedArrays.NamedArray{Float64,1,Array{Float64,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 	# store some integer constants
 	ic::NamedArrays.NamedArray{Int64,1,Array{Int64,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
-	# store 3D arrays, if any
+	# store 3D arrays, if any (currently used for attenuation, when N=2)
 	m3::NamedStack{Array{Float64,3}}
 end
 
@@ -55,7 +55,7 @@ include("gallery.jl")
 
 
 """
-Data type to represent a seismic model.
+Records type to represent a seismic model.
 A contrast function for a model m is given by ``χ(m) = \frac{m}{m0}-1``.
 
 # Fields
@@ -379,6 +379,24 @@ function update!(mod::Medium, fields::Vector{Symbol};
 end
 
 include("chainrule.jl")
+
+"""
+Interpolate, extrapolate or truncate model to a new grid.
+Returns 
+"""
+function update(mod::Medium, mgrid::Vector{StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}})
+	modex=Medium(mgrid,names(mod)[1]) # initialize a new medium
+	for m in names(mod.m)[1]
+		itp = LinearInterpolation(Tuple(mod.mgrid), medium[m], extrapolation_bc=Flat())
+		copyto!(modex[m],itp[mgrid...])
+	end
+	update!(modex)
+	return modex
+end
+
+
+
+
 
 
 

@@ -15,25 +15,25 @@
 # * optimized memory allocation: Oct 2017
 
 # 
-
+struct FdtdElastic end
 
 """
 2-D acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
 struct FdtdAcou end
 
-
 """
 2-D ViscoAcoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct FdtdAcouVisco end
-
+struct FdtdAcouVisco  end
 
 """
 2-D Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct FdtdAcouBorn end
+struct FdtdAcouBorn  end
 
+# union of old stuff without using ParallelStencils (should eventually remove this)
+FdtdOld=Union{FdtdAcou,FdtdAcouVisco,FdtdAcouBorn}
 
 global const npml = 50
 global const nlayer_rand = 0
@@ -87,102 +87,17 @@ finite-difference modeling.
 * `rflags=1` : receiver related flags 
   * `=0` receivers do not record (or) inactive receivers
   * `=1` receivers are active only for the second propagating wavefield
-* `rfields=[:P]` : multi-component receiver flag. Choose `Vector{Symbol}`
-  * `=[:P]` record pressure 
+* `rfields=[:p]` : multi-component receiver flag. Choose `Vector{Symbol}`
+  * `=[:p]` record pressure 
   * `=[:vx]` record horizontal component of particle velocity  
   * `=[:vz]` record vertical component of particle velocity  
-  * `=[:P, :vx]` record both pressure and velocity 
+  * `=[:p, :vx]` record both pressure and velocity 
 * `tsnaps` : store snaps at these modeling times (defaults to half time)
   * `=[0.1,0.2,0.3]` record at these instances of tgrid
 * `snaps_flag::Bool=false` : return snapshots or not
 * `verbose::Bool=false` : verbose flag
 """
-SeisForwExpt(attrib_mod::Union{FdtdAcou,FdtdAcouBorn,FdtdAcouVisco},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
-
-
-function initialize!(pap::P_x_worker)
-	reset_w2!(pap)
-	for pap_x_pw in pap
-		initialize!.(pap_x_pw.ss)
-	end
-
-end
-
-# reset wavefields for every worker
-function reset_w2!(pap::P_x_worker)
-	for pap_x_pw in pap
-		fill!(pap_x_pw.born_svalue_stack,0.0)
-		for w in pap_x_pw.w2
-			fill!.(w,0.0)
-		end
-		for w in pap_x_pw.w3
-			fill!.(w,0.0)
-		end
-		fill!.(pap_x_pw.memory_pml,0.0)
-	end
-end
-
-function initialize!(pa::P_x_worker_x_pw_x_ss)
-	fill!.(pa.records,0.0)
-	fill!(pa.snaps,0.0)
-	fill!(pa.illum,0.0)
-	fill!.(pa.grad_mod,0.0)
-	# fill!(pa.grad_mod[:rrvx],0.0)
-	# fill!(pa.grad_mod[:rrvz],0.0)
-
-end
-
-function iszero_boundary(pa)
-	result=false
-	@sync begin
-		for (ip, p) in enumerate(procs(pa.p))
-			@async remotecall_wait(p) do 
-				pap=localpart(pa.p)
-				for issp in 1:length(pap.ss)
-					pass=pap.ss[issp]
-					for i in 1:length(pass.boundary)
-						result = result | iszero(pass.boundary[i])
-					end
-				end
-			end
-		end
-	end
-	return result
-end
-		
-
-function initialize_boundary!(pa)
-	# zero out results stored per worker
-	for ipw in 1:pa.c.ic[:npw]
-		@sync begin
-			for (ip, p) in enumerate(procs(pa.p))
-				@async remotecall_wait(p) do 
-					pap=localpart(pa.p)[ipw]
-					for issp in 1:length(pap.ss)
-						pass=pap.ss[issp]
-						for i in 1:length(pass.boundary)
-							fill!(pass.boundary[i],0.0)
-						end
-					end
-				end
-			end
-		end
-	end
-end
-
-function initialize!(pac::P_common)
-	fill!(pac.gradient,0.0)
-	fill!.(pac.grad_mod,0.0)
-	# fill!(pac.grad_mod[:rrvx],0.0)
-	# fill!(pac.grad_mod[:rrvz],0.0)
-	# fill!(pac.grad_mod[:rr],0.0)
-	fill!(pac.illum_stack,0.0)
-	for dat in pac.data
-		fill!(dat, 0.0)
-	end
-	fill!(pac.datamat,0.0)
-end
-
+SeisForwExpt(attrib_mod::Union{FdtdAcou,FdtdElastic,FdtdAcouBorn,FdtdAcouVisco},args1...;args2...)=PFdtd(attrib_mod,args1...;args2...)
 
 
 """
@@ -196,15 +111,15 @@ Primary method to generate Expt variable when FdtdAcou() and FdtdAcouBorn() are 
   * `=-1` use stored values in `boundary` for back propagation
 * `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
 * `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
-* `abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left]` : use absorbing PML boundary conditions or not
-  * `=[:top, :bottom]` apply PML conditions only at the top and bottom of the medium 
-  * `=[:bottom, :right, :left]` top is reflecting
+* `abs_trbl::Vector{Symbol}=[:zmin, :zmax, :xmax, :xmin]` : use absorbing PML boundary conditions or not
+  * `=[:zmin, :zmax]` apply PML conditions only at the top and bottom of the medium 
+  * `=[:zmax, :xmax, :xmin]` top is reflecting
 """
 function PFdtd(attrib_mod;
 	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
 	medium::Medium=nothing,
-	abs_trbl::Vector{Symbol}=[:top, :bottom, :right, :left],
+	abs_trbl::Vector{Symbol}=[:zmin, :zmax, :xmax, :xmin],
 	tgrid::StepRangeLen=nothing,
 	ageom::Union{AGeom,Vector{AGeom}}=nothing,
 	srcwav::Union{SrcWav,Vector{SrcWav}}=nothing,
@@ -246,7 +161,12 @@ function PFdtd(attrib_mod;
 	#        return
 	#endif
 
+	# necessary that nss and fields should be same for all nprop
+	nss = length(ageom[1]);
+	sfields=[names(srcwav[ipw][1].d)[1] for ipw in 1:npw]
+
 	# all the propagating wavefields should have same supersources? check that?
+	fill(nss, npw) != [length(ageom[ip]) for ip=1:npw] ? error("different supersources") : nothing
 
 	# check dimension of model
 
@@ -258,40 +178,25 @@ function PFdtd(attrib_mod;
 	length(srcwav) != npw ? error("srcwav size") : nothing
 	all([issimilar(ageom[ip],srcwav[ip]) for ip=1:npw]) ? nothing : error("ageom and srcwav mismatch") 
 
-	# necessary that nss and fields should be same for all nprop
-	nss = length(ageom[1]);
-	sfields=[names(srcwav[ipw][1].d)[1] for ipw in 1:npw]
 	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
 	#
-	fill(nss, npw) != [length(ageom[ip]) for ip=1:npw] ? error("different supersources") : nothing
-
 
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
 	# find maximum and minimum frequencies in the source wavelets
 	freqmin = Utils.findfreq(srcwav[1][1].d[1][:,1],srcwav[1][1].grid,attrib=:min) 
 	freqmax = Utils.findfreq(srcwav[1][1].d[1][:,1],srcwav[1][1].grid,attrib=:max) 
+	freqpeak = Utils.findfreq(srcwav[1][1].d[1][:,1],srcwav[1][1].grid,attrib=:peak) 
 
 	# minimum and maximum velocities
 	vpmin = minimum(broadcast(minimum,[medium.bounds[:vp]]))
 	vpmax = maximum(broadcast(maximum,[medium.bounds[:vp]]))
 	#verbose && println("\t> minimum and maximum velocities:\t",vpmin,"\t",vpmax)
 
+	check_fd_stability(medium.bounds, medium.mgrid, tgrid, freqmin, freqmax, verbose, 5, 0.5)
 
-	check_fd_stability(vpmin, vpmax, step(medium.mgrid[2]), step(medium.mgrid[1]), freqmin, freqmax, step(tgridmod), verbose)
-
-
-	# where to store the boundary values (careful, born scaterrers cannot be inside these!?)
-	ibx0=npml-2; ibx1=length(medium.mgrid[2])+npml+3
-	ibz0=npml-2; ibz1=length(medium.mgrid[1])+npml+3
-#	ibx0=npml+1; ibx1=length(medium.mgrid[2])+npml
-#	ibz0=npml+1; ibz1=length(medium.mgrid[1])+npml
-#	println("**** Boundary Storage Changed **** ")
-
-	# for snaps
-	isx0, isz0=npml, npml
-
-	bindices=NamedArray([ibx0,ibx1,ibz0,ibz1,isx0,isz0],([:bx0,:bx1,:bz0,:bz1,:sx0,:sz0],))
+	# indices where the fields are stored for backpropagation (used for RTM and FWI)
+	bindices=get_boundary_indices(medium.mgrid,attrib_mod)
 
 	# extend mediums in the PML layers
 	exmedium = Medium_pml_pad_trun(medium, nlayer_rand, npml);
@@ -304,19 +209,16 @@ function PFdtd(attrib_mod;
 	nzd, nxd = length.(medium.mgrid)
 	nt=length(tgridmod)
 
-	mesh_x, mesh_z = exmedium.mgrid[2], exmedium.mgrid[1]
-
 	fc=get_fc(medium,tgrid,attrib_mod)
 
-	# pml_variables
-	pml_names=vcat([:a_x,:b_x,:k_xI,:a_x_half,:b_x_half,:k_x_halfI], [:a_z,:b_z,:k_zI,:a_z_half,:b_z_half,:k_z_halfI])
-	pml=NamedArray(vcat(
-		pml_variables(nx, δt, δx, npml-3, vpmax, vpmin, freqmin, freqmax, 
-	       [any(abs_trbl .== :left), any(abs_trbl .== :right)]), 
-		pml_variables(nz, δt, δz, npml-3, vpmax, vpmin, freqmin, freqmax,
-	       [any(abs_trbl .== :top), any(abs_trbl .== :bottom)])),
-		(pml_names,))
+	mod,δmod=get_mod(exmedium,attrib_mod)
 
+	δmodall = zeros(2*nzd*nxd)
+
+	# PML
+	pml=get_pml(exmedium.mgrid,abs_trbl,step(tgrid),npml-3,vpmin,vpmax,freqpeak)
+
+	# initialize gradient arrays
 	gradient=zeros(2*nzd*nxd)
 	grad_modtt_stack=SharedMatrix{Float64}(zeros(nz,nx))
 	# these are full size, as rhoI -> rhovx and rhovz is also full size
@@ -332,18 +234,19 @@ function PFdtd(attrib_mod;
 
 	nrmat=[ageom[ipw][iss].nr for ipw in 1:npw, iss in 1:nss]
 	datamat=SharedArray{Float64}(nt,maximum(nrmat),nss)
-	data=[Data(tgridmod,ageom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
+	data=[Records(tgridmod,ageom[ip],rfields) for ip in 1:length(findall(!iszero, rflags))]
 
 	# default is all prpagating wavefields are active
 	activepw=[ipw for ipw in 1:npw]
 	
+	# inititalize viscoelastic/ viscoacoustic parameters here
 	if(typeof(attrib_mod)==FdtdAcouVisco)
 		nsls=Int32(3)
 		exmedium.ic=vcat(exmedium.ic,NamedArray([nsls], ([:nsls],)))
 		exmedium.fc=vcat(exmedium.fc,NamedArray(2*pi .* [freqmin, freqmax], ([:freqmin,:freqmax],)))
 		memcoeff1, memcoeff2=get_memcoeff(exmedium)
 	else
-		# dummy
+		# dont need visco parameters
 		nsls=Int32(0) 
 		memcoeff1=zeros(1,1,1)
 		memcoeff2=zeros(1,1,1)
@@ -399,11 +302,11 @@ end
 """
 get some floats constants to store then in pac, e.g, spatial sampling
 """
-function get_fc(medium,tgrid,::Union{FdtdAcou,FdtdAcouBorn,FdtdAcouVisco})
+function get_fc(medium,tgrid,::FdtdOld)
 	δx, δz = step(medium.mgrid[2]), step(medium.mgrid[1])
 	δx24I, δz24I = inv(δx * 24.0), inv(δz * 24.0)
 	δxI, δzI = inv(δx), inv(δz)
-	δt = step(tgridmod)
+	δt = step(tgrid)
 	δtI = inv(δt)
 
 	fc=NamedArray( [δt, δxI, δzI, δtI, δx24I, δz24I], ([:δt, :δxI, :δzI, :δtI, :δx24I, :δz24I],))
@@ -413,21 +316,20 @@ end
 """
 extract vectors used 
 """
-function get_mod()
+function get_mod(medium,::FdtdOld)
+	nz,nx=length.(medium.mgrid)
+
 
 	"density values on vx and vz stagerred grids"
-	modrr=copy(exmedium[:rhoI])
+	modrr=copy(medium[:rhoI])
 	modrrvx = get_rhovxI(modrr)
 	modrrvz = get_rhovzI(modrr)
 
-	modttI = copy(exmedium[:K]) 
-	modtt = copy(exmedium[:KI])
-
-
+	modttI = copy(medium[:K]) 
+	modtt = copy(medium[:KI])
 	
 	# medium perturbation vectors are required on full space
 	δmodtt = zeros(nz, nx)
-	δmodall = zeros(2*nzd*nxd)
 	δmodrr = zeros(nz, nx)
 	δmodrrvx = zeros(nz, nx)
 	δmodrrvz = zeros(nz, nx)
@@ -436,6 +338,7 @@ function get_mod()
 	mod=NamedArray([modtt, modttI,modrr,modrrvx,modrrvz], ([:tt,:ttI,:rr,:rrvx,:rrvz],))
 	δmod=NamedArray([δmodtt,δmodrr,δmodrrvx,δmodrrvz], ([:tt,:rr,:rrvx,:rrvz],))
 
+	return mod,δmod
 
 end
 
@@ -445,7 +348,7 @@ Create modeling parameters for each worker.
 Each worker performs the modeling of supersources in `sschunks`.
 The parameters common to all workers are stored in `pac`.
 """
-function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::P_common)
+function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::T) where T<:P_common{<:FdtdOld}
 	nx=pac.ic[:nx]; nz=pac.ic[:nz]; npw=pac.ic[:npw]
 
 	born_svalue_stack = zeros(nz, nx)
@@ -471,126 +374,14 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::P_common)
 end
 
 function Vector{P_x_worker_x_pw}(sschunks::UnitRange{Int64},pac::P_common)
-	return [P_x_worker_x_pw(ipw, sschunks,pac) for ipw in 1:pac.ic[:npw]]
-end
-
-
-"""
-update the perturbation vector using the perturbed medium
-in this case, medium will be treated as the background medium 
-* `δmod` is [δKI, δrhoI]
-"""
-function update_δmods!(pac::P_common, δmod::Vector{Float64})
-	nx=pac.ic[:nx]; nz=pac.ic[:nz]
-	nznxd=prod(length.(pac.medium.mgrid))
-	copyto!(pac.δmodall, δmod)
-	fill!(pac.δmod[:tt],0.0)
-	δmodtt=view(pac.δmod[:tt],npml+1:nz-npml,npml+1:nx-npml)
-	for i in 1:nznxd
-		# put perturbation due to KI as it is
-		δmodtt[i] = δmod[i] 
-	end
-	fill!(pac.δmod[:rr],0.0)
-	δmodrr=view(pac.δmod[:rr],npml+1:nz-npml,npml+1:nx-npml)
-	for i in 1:nznxd
-		# put perturbation due to rhoI here
-		δmodrr[i] = δmod[nznxd+i]
-	end
-	# project δmodrr onto the vz and vx grids
-	get_rhovxI!(pac.δmod[:rrvx], pac.δmod[:rr])
-	get_rhovzI!(pac.δmod[:rrvz], pac.δmod[:rr])
-	return nothing
-end
-
-"""
-This method should be executed only after the updating the main medium.
-Update the `δmods` when a perturbed `medium_pert` is input.
-The medium through which the waves are propagating 
-is assumed to be the background medium.
-"""
-function update_δmods!(pac::P_common, medium_pert::Medium)
-	nznxd=prod(length.(pac.medium.mgrid))
-	fill!(pac.δmodall,0.0)
-	copyto!(pac.δmodall, medium_pert, [:KI, :rhoI])
-
-	for i in 1:nznxd
-		pac.δmodall[i] -= pac.mod[:tt][i] # subtracting the background medium
-		pac.δmodall[nznxd+i] -= pac.mod[:rr][i] # subtracting the background medium
-	end
-	update_δmods!(pac, pac.δmodall)
-	return nothing
-end
-
-"""
-```julia
-update!(pa,medium_new)
-```
-Update `pa` with a new bundle of medium parameters `medium_new`, without additional memory allocation.
-This routine is used during inversion, where medium parameters are iteratively updated. 
-The ability to iteratively run the forward mediuming task (with no additional memory allocation) on  
-various subsurface mediums is necessary while implementing inversion 
-algorithms.
-"""
-function update!(pa::PFdtd, medium::Medium)
-	return update!(pa.c, medium)
-end
-function update!(pac::P_common, medium::Medium)
-
-	copyto!(pac.medium, medium)
-
-	Medium_pml_pad_trun!(pac.exmedium, pac.medium, nlayer_rand)
-
-	copyto!(pac.mod[:ttI], pac.exmedium, [:K]) 
-	copyto!(pac.mod[:tt], pac.exmedium, [:KI]) 
-	copyto!(pac.mod[:rr], pac.exmedium, [:rhoI])
-	get_rhovxI!(pac.mod[:rrvx], pac.mod[:rr])
-	get_rhovzI!(pac.mod[:rrvz], pac.mod[:rr])
-	return nothing
-end 
-
-"""
-```julia
-update!(pa,srcwav_new,sflags)
-```
-Update `pa` with a new bundle of source wavelets `srcwav_new`, without additional memory allocation.
-Optionally, `sflags` can be changed. 
-"""
-function update!(pa::PFdtd, srcwav::SrcWav, sflags::Any=nothing)
-	update_srcwav!(pa,[srcwav],sflags)
-end
-function update_srcwav!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags=nothing)
-	# update srcwav in pa.c
-	(length(srcwav) ≠ pa.c.ic[:npw]) && error("cannot update")
-	for i in 1:length(srcwav)
-		copyto!(pa.c.srcwav[i], srcwav[i])
-	end
-	if(!(sflags===nothing))
-		copyto!(pa.c.sflags, sflags)
-	end
-
-	for ipw in 1:pa.c.ic[:npw]
-		# fill_wavelets for each supersource
-		@sync begin
-			for (ip, p) in enumerate(procs(pa.p))
-				@async remotecall_wait(p) do 
-					pap=localpart(pa.p)[ipw]
-					for is in 1:length(pap.ss)
-						iss=pap.ss[is].iss
-						wavelets=pap.ss[is].wavelets
-						broadcast(x->fill!.(x,0.0), wavelets)
-						fill_wavelets!(ipw, iss, wavelets, pa.c.srcwav, pa.c.sflags)
-					end
-				end
-			end
-		end
-	end
+	return [P_x_worker_x_pw(ipw,sschunks,pac) for ipw in 1:pac.ic[:npw]]
 end
 
 """
 Create modeling parameters for each supersource. 
 Every worker mediums one or more supersources.
 """
-function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common)
+function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{<:FdtdOld}
 
 	rfields=pac.rfields
 	sfields=pac.sfields
@@ -655,58 +446,11 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common)
 	return pass
 end
 
-function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
-	@assert ageomss.ns == pac.ageom[ipw][iss].ns
-	@assert ageomss.nr == pac.ageom[ipw][iss].nr
 
-	mesh_x, mesh_z = pac.exmedium.mgrid[2], pac.exmedium.mgrid[1]
-	ssprayw=pass.ssprayw
-	rinterpolatew=pass.rinterpolatew
-	fill!(ssprayw,0.0)
-	fill!(rinterpolatew,0.0)
-	sindices=pass.sindices
-	rindices=pass.rindices
-
-	for is=1:ageomss.ns
-		weights=ssprayw
-		Interpolation.get_spray_weights!(view(weights, :,is),  
-			    view(sindices[:x1],is), view(sindices[:x2],is),
-			    view(sindices[:z1],is), view(sindices[:z2],is),
-			    mesh_x, mesh_z, ageomss.s[:x][is], ageomss.s[:z][is])
-	end
-	for ir=1:ageomss.nr
-		weights=rinterpolatew
-		Interpolation.get_interpolate_weights!(view(weights, :,ir),
-			  view(rindices[:x1],ir), view(rindices[:x2],ir),
-			  view(rindices[:z1],ir), view(rindices[:z2],ir),
-			  mesh_x, mesh_z, ageomss.r[:x][ir], ageomss.r[:z][ir])
-	end
-
-end
-
-# if just one propagating field
-update!(pa::PFdtd, ageom::AGeom)=update!(pa,[ageom])
-
-function update!(pa::PFdtd, ageom::Vector{AGeom})
-	for ipw in 1:pa.c.ic[:npw]
-		copyto!(pa.c.ageom[ipw], ageom[ipw])
-		@sync begin
-			for (ip, p) in enumerate(procs(pa.p))
-				@async remotecall_wait(p) do 
-					pap=localpart(pa.p)[ipw]
-					for is in 1:length(pap.ss)
-						iss=pap.ss[is].iss
-						update!(localpart(pap).ss[is],ipw,iss,ageom[ipw][iss],pa.c)
-					end
-				end
-			end
-		end
-	end
-end
 
 include("source.jl")
 include("receiver.jl")
-include("core_acou.jl")
+include("advance_acou2D.jl")
 include("rho_projection.jl")
 include("gradient.jl")
 include("born.jl")
@@ -714,129 +458,19 @@ include("boundary.jl")
 include("gallery.jl")
 
 
-"""
-```julia
-update!(pa)
-```
-In-place method to perform the experiment and update `pa` after wave propagation. After update, see
-`pa[:data]` and `pa[:snaps]`.
-"""
-@fastmath function update!(pa::PFdtd)
-
-	global to
-
-	reset_timer!(to)
-
-	@timeit to "initialize!" begin
-		# zero out all the results stored in pa.c
-		initialize!(pa.c) 
-	
-		# zero out results stored per worker
-		@sync begin
-			for (ip, p) in enumerate(procs(pa.p))
-				@async remotecall_wait(p) do 
-					initialize!(localpart(pa.p))
-				end
-			end
-		end
-	end
-
-
-	@timeit to "mod_x_proc!" begin
-		# all localparts of DArray are input to this method
-		# parallelization over shots
-		@sync begin
-			for (ip, p) in enumerate(procs(pa.p))
-				@async remotecall_wait(p) do 
-					mod_x_proc!(pa.c, localpart(pa.p))
-				end
-			end
-		end
-	end
-
-	@timeit to "stack_grads!" begin
-		# stack gradients and illum over sources
-		@sync begin
-			for (ip, p) in enumerate(procs(pa.p))
-				@sync remotecall_wait(p) do 
-					(pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
-					(pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
-				end
-			end
-		end
-	end
-
-	@timeit to "update gradient" begin
-		# update gradient medium using grad_modtt_stack, grad_modrr_stack
-		(pa.c.gmodel_flag) && update_gradient!(pa.c)
-	end
-
-
-	@timeit to "record data" begin
-	for ipw in pa.c.activepw
-		if(pa.c.rflags[ipw] ≠ 0) # record only if rflags is non-zero
-			for rfield in pa.c.rfields
-
-				fill!(pa.c.datamat, 0.0)
-				@sync begin
-					for (ip, p) in enumerate(procs(pa.p))
-						@sync remotecall_wait(p) do 
-							update_datamat!(rfield, ipw, pa.c, localpart(pa.p))
-						end
-					end
-				end
-				update_data!(rfield, ipw, pa.c)
-			end
-		end
-	end
-	end
-	if(pa.c.verbose)
-		show(to)	
-		println("  ")
-	end
-	return nothing
-end
-
-function update_datamat!(rfield, ipw, pac::P_common, pap::P_x_worker)
-	datamat=pac.datamat
-	pass=pap[ipw].ss
-	for issp in 1:length(pass)
-		iss=pass[issp].iss
-		records=pass[issp].records
-		for ir in 1:pac.ageom[ipw][iss].nr
-			for it in 1:pac.ic[:nt]
-				datamat[it,ir,iss]=records[rfield][it,ir]
-			end
-		end
-        end
-end
-
-function update_data!(rfield, ipw, pac::P_common)
-	datamat=pac.datamat
-	for iss in 1:length(pac.ageom[1])
-		data=pac.data[ipw][iss].d[rfield]
-		for ir in 1:pac.ageom[ipw][iss].nr
-			for it in 1:pac.ic[:nt]
-				data[it,ir]=datamat[it,ir,iss]
-			end
-		end
-	end
-end
-
-
 # update TDout after forming a vector and resampling
 #	ipropout=0;
 #	for iprop in 1:pac.ic[:npw]
 #		if(pac.rflags[iprop] ≠ 0)
 #			ipropout += 1
-##			Data.TD_resamp!(pac.data[ipropout], Data.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, ageom[iprop],
+##			Records.TD_resamp!(pac.data[ipropout], Records.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, ageom[iprop],
 ##				ageom_urpos[1].nr[1],
 ##				(ageom_urpos[1].r[:z][1], ageom_urpos[1].r[:x][1])
 ##				)) 
 #		end
 #	end
 	# return without resampling for testing
-	#return [Data.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
+	#return [Records.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
 	#		       tgridmod, ageom[1]) for iprop in 1:npw]
 
 function stack_illums!(pac::P_common, pap::P_x_worker)
@@ -855,7 +489,7 @@ end
 # modelling for each worker
 function mod_x_proc!(pac::P_common, pap::P_x_worker) 
 	# source_loop
-	for issp in 1:length(pap[1].ss) # note, all fields have same sources
+	for issp in 1:length(pap[1].ss) # note, all npw have same sources
 		reset_w2!(pap)
 
 		iss=pap[1].ss[issp].iss # same note as above
@@ -940,7 +574,7 @@ end # mod_x_shot
 	end
 end
 
-``
+
 @fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::P_common,pap::P_x_worker)
 	isx0=pac.bindices[:sx0]
 	isz0=pac.bindices[:sz0]
@@ -955,181 +589,8 @@ end
 
 
 
-
-
-"""
-* `H : number of grid points inside wavelength
-	* choose 5 for 4th order scheme?
-* `epsilon` : Courant number
-"""
-function check_fd_stability(bounds, mgrid, tgrid, freqmin, freqmax, verbose=true, H=5, epsilon=0.5)
-
-	δ=step.(mgrid)
-	δt=step(tgrid)
-
-	if(:vs ∈ names(bounds)[1])
-		vmin=bounds[:vs][1] # vs condition overrides 
-		vmax=sqrt(bounds[:vp][2]^2 + bounds[:vs][2]^2) # see Virieux (1986)
-
-	else
-		vmin=bounds[:vp][1]
-		vmax=bounds[:vp][2]
-	end
-
-	# check spatial sampling, i.e., number of grid points in minimum wavelength
-	if(:vs ∈ names(bounds)[1])
-		δs_temp=round(vmin/H/freqmax,digits=2); 
-	else
-		δs_temp=round(vmin/H/freqmax,digits=2);
-	end
-	δs_max = maximum(δ)
-	str1=@sprintf("%0.2e",δs_max)
-	str2=@sprintf("%0.2e",δs_temp)
-	if(str1 ≠ str2)
-		if(all(δs_max .> δs_temp)) 
-			@warn "decrease maximum spatial sampling ($str1) below $str2"
-		else
-			if(verbose)
-				@info "spatial sampling ($str1) can be as high as $str2"
-			end
-		end
-	end
-
-	# check time sampling, i.e., Courant criteria 
-	δs_min = minimum(δ)
-	δt_temp=epsilon*δs_min/vmax
-	str1=@sprintf("%0.2e", δt)
-	str2=@sprintf("%0.2e", δt_temp)
-	if(str1 ≠ str2)
-		if(all(δt .> δt_temp))
-			@warn "decrease time sampling ($str1) below $str2"
-		else
-			if(verbose)
-				@info "time sampling ($str1) can be as high as $str2"
-			end
-		end
-	end
-end
-
-"""
-Generate vectors related to PML boundaries, e.g., damping profiles.
-This function outputs a_x, b_x, and k_x variables in eq. 25-26 from Komatitsch 2007 (Geophysics).
-"""
-function pml_variables(
-		nx::Int64, 
-		δt::Float64, 
-		δx::Float64, mesh_na_pml::Int64, 
-		velmax::Float64, velmin::Float64, 
-		freqpeak::Float64,
-	        flags::Vector{Bool}
-		)
-
-	NPOWER = 2.e0
-	K_MAX_PML = 1.e0 # from Gedney page 8.11
-	ALPHA_MAX_PML = pi * freqpeak # from Festa and Vilotte
-
-	# thickness of the PML layer in meters
-	thickness_PML_x = mesh_na_pml * δx
-
-	"reflection coefficient (INRIA report section 6.1) http://hal.inria.fr/docs/00/07/32/19/PDF/RR-3471.pdf"
-	Rcoef = 0.001e0
-
-	#! check that NPOWER is okay
-	#if(NPOWER < 1) stop "NPOWER must be greater than 1"
-
-	# compute d0 from INRIA report section 6.1 http://hal.inria.fr/docs/00/07/32/19/PDF/RR-3471.pdf
-	d0_x = - (NPOWER + 1) * (velmax+velmin)/2.0 * log(Rcoef) / (2.e0 * thickness_PML_x)
-
-
-	d_x=zeros(nx);	d_x_half=zeros(nx)
-	k_x=ones(nx);	k_xI=ones(nx)
-	k_x_half=ones(nx);	k_x_halfI=ones(nx)
-	alpha_x=zeros(nx);	alpha_x_half=zeros(nx)
-	a_x=zeros(nx);	a_x_half=zeros(nx)
-	b_x=zeros(nx);	b_x_half=zeros(nx)
-
-
-	"damping in the X direction"
-	"origin of the PML layer (position of right edge minus thickness, in meters)"
-	xoriginleft = thickness_PML_x
-	xoriginright = (nx-1)*δx - thickness_PML_x
-
-	for ix=1:nx
-		# abscissa of current grid point along the damping profile
-		xval = δx * real(ix-1)
-
-		#---------- left edge
-		if(flags[1]) 
-
-			# define damping profile at the grid points
-			abscissa_in_PML = xoriginleft - xval
-			if(abscissa_in_PML >= 0.0) 
-				abscissa_normalized = abscissa_in_PML / thickness_PML_x
-				d_x[ix] = d0_x * abscissa_normalized.^NPOWER
-				# this taken from Gedney page 8.2
-				k_x[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized.^NPOWER
-				alpha_x[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
-			end
-
-			# define damping profile at half the grid points
-			abscissa_in_PML = xoriginleft - (xval + δx/2.e0)
-			if(abscissa_in_PML >= 0.0) 
-				abscissa_normalized = abscissa_in_PML / thickness_PML_x
-				d_x_half[ix] = d0_x * abscissa_normalized.^NPOWER
-				# this taken from Gedney page 8.2
-				k_x_half[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized.^NPOWER
-				alpha_x_half[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
-			end
-		end
-
-		#---------- right edge
-		if(flags[2]) 
-
-			# define damping profile at the grid points
-			abscissa_in_PML = xval - xoriginright
-			if(abscissa_in_PML >= 0.0) 
-				abscissa_normalized = abscissa_in_PML / thickness_PML_x
-				d_x[ix] = d0_x * abscissa_normalized^NPOWER
-				# this taken from Gedney page 8.2
-				k_x[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized^NPOWER
-				alpha_x[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
-			end
-
-			# define damping profile at half the grid points
-			abscissa_in_PML = xval + δx/2.e0 - xoriginright
-			if(abscissa_in_PML >= 0.0) 
-				abscissa_normalized = abscissa_in_PML / thickness_PML_x
-				d_x_half[ix] = d0_x * abscissa_normalized^NPOWER
-				# this taken from Gedney page 8.2
-				k_x_half[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized^NPOWER
-				alpha_x_half[ix] = ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
-			end
-
-		end
-#
-		# just in case, for -5 at the end
-		(alpha_x[ix] < 0.0) ? alpha_x[ix] = 0.0 : nothing
-		(alpha_x_half[ix] < 0.0) ? alpha_x_half[ix] = 0.0 : nothing
-
-		# see equation 25 Komatitsch, 2007, get b_x and a_x (need k_x, alpha_x, and d_x before this )
-		b_x[ix] = exp(- (d_x[ix] / k_x[ix] + alpha_x[ix]) * δt) 
-		b_x_half[ix] = exp(- (d_x_half[ix] / k_x_half[ix] + alpha_x_half[ix]) * δt)
-
-		# this to avoid division by zero outside the PML
-		(abs(d_x[ix]) > 1.e-6) ? a_x[ix] = d_x[ix] * (b_x[ix] - 1.e0) / (k_x[ix] * (d_x[ix] + k_x[ix] * alpha_x[ix])) : nothing
-		(abs(d_x_half[ix]) > 1.e-6) ? a_x_half[ix] = d_x_half[ix] * (b_x_half[ix] - 1.e0) / (k_x_half[ix] * (d_x_half[ix] + k_x_half[ix] * alpha_x_half[ix])) : nothing
-
-	end
-	copyto!(k_xI, inv.(k_x))
-	copyto!(k_x_halfI, inv.(k_x_half))
-
-
-
-	names=[:a,:b,:kI,:a_half,:b_half,:k_halfI]
-	# return [d_x, d_x_half, alpha_x, alpha_x_half]
-	return NamedArray([a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI], names)
-end
-
-
+include("cpml.jl")
+include("stability.jl")
+include("updates.jl")
 include("getprop.jl")
 

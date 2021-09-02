@@ -23,6 +23,16 @@ function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 		model=Medium(mgrid,[:vp,:rho])
 		update!(model,[:vp,:rho],[vp0,rho0])
 		fill!(model)
+	elseif((attrib == :elastic_homo1))
+		vp0 = [3000., 3500.] # bounds for vp
+		vs0 = [1900, 2000] # bounds for vs
+		rho0 = [1000., 2000.] # density bounds
+		mgrid=fill(range(-500, stop=500, length=255), 3);
+		vp0 = [1500., 3500.] # bounds for vp
+		rho0 = [1500., 3500.] # density bounds
+		model=Medium(mgrid,[:vp,:vs,:rho])
+		update!(model,[:vp,:vs,:rho],[vp0,vs0,rho0])
+		fill!(model)
 	elseif((attrib==:pizza))
 		vp0 = [1700., 2300.] # bounds for vp
 		rho0 = [1700., 2300.] # density bounds
