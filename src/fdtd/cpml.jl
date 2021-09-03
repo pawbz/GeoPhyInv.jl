@@ -33,12 +33,12 @@ function pml_coeff(mgrid, # 1D grid
 	d0_x = - (NPOWER + 1) * (velmax+velmin)/2.0 * log(Rcoef) / (2.e0 * thickness_PML_x)
 
 
-	d_x=zeros(nx);	d_x_half=zeros(nx)
-	k_x=ones(nx);	k_xI=ones(nx)
-	k_x_half=ones(nx);	k_x_halfI=ones(nx)
-	alpha_x=zeros(nx);	alpha_x_half=zeros(nx)
-	a_x=zeros(nx);	a_x_half=zeros(nx)
-	b_x=zeros(nx);	b_x_half=zeros(nx)
+	d_x=Data.Array(zeros(nx)); d_x_half=zero(d_x)
+	k_x=zero(d_x);	k_xI=zero(d_x); fill!(k_x,1); fill!(k_xI,1)
+	k_x_half=zero(d_x);	k_x_halfI=zero(d_x); fill!(k_x_half,1); fill!(k_x_halfI,1)
+	alpha_x=zero(d_x);	alpha_x_half=zero(d_x)
+	a_x=zero(d_x);	a_x_half=zero(d_x)
+	b_x=zero(d_x);	b_x_half=zero(d_x)
 
 
 	"damping in the X direction"

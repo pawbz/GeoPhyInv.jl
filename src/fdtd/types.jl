@@ -72,15 +72,15 @@ This struct contains velocity and stress fields simulated by each worker.
 Again, note that a single worker can take care of multiple supersources.
 * T1==Matrix{Float64} for 2D simulation
 """
-mutable struct P_x_worker_x_pw{T1}
+mutable struct P_x_worker_x_pw{T1,T2,N}
 	ss::Vector{P_x_worker_x_pw_x_ss} # supersource specific arrays
 	# 2D arrays of p, vx, vz, their previous snapshots, and 
 	# x derivatives of p, vx, vz
 	# z derivatives of p, vx, vz
-	w2::NamedStack{NamedStack{T1}} # p, vx, vz
-	w3::NamedStack{NamedStack{Array{Float64,3}}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
-	memory_pml::NamedStack{T1} # memory variables for CPML 
-	born_svalue_stack::Matrix{Float64} # used for born modeling # only used for 2-D simulation
+	w1::NamedStack{NamedStack{T1}} # p, vx, vz
+	w2::NamedStack{NamedStack{T2}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
+	memory_pml::NamedStack{NamedStack{T1}} # memory variables for CPML 
+	born_svalue_stack::Array{Float64,N} # used for born modeling # only used for 2-D simulation
 end
 
 P_x_worker=Vector{P_x_worker_x_pw}
@@ -97,10 +97,10 @@ end
 function reset_w2!(pap::P_x_worker)
 	for pap_x_pw in pap
 		fill!(pap_x_pw.born_svalue_stack,0.0)
-		for w in pap_x_pw.w2
+		for w in pap_x_pw.w1
 			fill!.(w,0.0)
 		end
-		for w in pap_x_pw.w3
+		for w in pap_x_pw.w2
 			fill!.(w,0.0)
 		end
 		fill!.(pap_x_pw.memory_pml,0.0)
@@ -126,7 +126,7 @@ Modelling parameters common for all supersources
 * stored snaps shots at tsnaps as Array{Float64,4} 
 
 """
-mutable struct P_common{T, T1, T2}
+mutable struct P_common{T, Tmod1, Tmod2, Tpml, N}
 	jobname::Symbol
 	attrib_mod::T
 	activepw::Vector{Int64}
@@ -142,8 +142,8 @@ mutable struct P_common{T, T1, T2}
 	rflags::Vector{Int64}
 	fc::NamedStack{Float64}
 	ic::NamedStack{Int64}
-	pml::NamedStack{NamedStack{T2}} # e.g., pml[:x][:a], pml[:z][:b]
-	mod::NamedStack{T1} # e.g., mod[:KI], mod[:K]
+	pml::NamedStack{NamedStack{Tpml}} # e.g., pml[:x][:a], pml[:z][:b]
+	mod::NamedStack{Tmod1} # e.g., mod[:KI], mod[:K]
 	mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
 	#=
 	modKI::Matrix{Float64}
@@ -152,7 +152,7 @@ mutable struct P_common{T, T1, T2}
 	modrhovxI::Matrix{Float64}
 	modrhovzI::Matrix{Float64}
 	=#
-	δmod::NamedStack{Matrix{Float64}}
+	δmod::NamedStack{Tmod2}
 	δmodall::Vector{Float64}
 	#=
 	δmodKI::Matrix{Float64}
@@ -162,7 +162,7 @@ mutable struct P_common{T, T1, T2}
 	δmod::Vector{Float64} # perturbation vector (KI, rhoI)
 	=#
 	gradient::Vector{Float64}  # output gradient vector w.r.t (KI, rhoI)
-	grad_mod::NamedStack{SharedArrays.SharedArray{Float64,2}}
+	grad_mod::NamedStack{SharedArrays.SharedArray{Float64,N}}
 	#=
 	grad_modKI_stack::SharedArrays.SharedArray{Float64,2} # contains gmodKI
 	grad_modrhovxI_stack::SharedArrays.SharedArray{Float64,2}
@@ -170,7 +170,7 @@ mutable struct P_common{T, T1, T2}
 	grad_modrr_stack::Array{Float64,2}
 	=#
 	illum_flag::Bool
-	illum_stack::SharedArrays.SharedArray{Float64,2}
+	illum_stack::SharedArrays.SharedArray{Float64,N}
 	backprop_flag::Int64
 	snaps_flag::Bool
 	itsnaps::Vector{Int64}

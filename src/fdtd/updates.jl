@@ -60,12 +60,9 @@ algorithms.
 function update!(pa::PFdtd, medium::Medium)
 	return update!(pa.c, medium)
 end
-function update!(pac::P_common, medium::Medium)
-
+function update!(pac::T, medium::Medium) where T<: P_common{<:FdtdOld}
 	copyto!(pac.medium, medium)
-
 	padarray!(pac.exmedium, pac.medium, npml)
-
 	copyto!(pac.mod[:K], pac.exmedium, [:K]) 
 	copyto!(pac.mod[:KI], pac.exmedium, [:KI]) 
 	copyto!(pac.mod[:rhoI], pac.exmedium, [:rhoI])
@@ -73,6 +70,16 @@ function update!(pac::P_common, medium::Medium)
 	get_rhovzI!(pac.mod[:rhovzI], pac.mod[:rhoI])
 	return nothing
 end 
+function update!(pac::T, medium::Medium) where T<: P_common{FdtdElastic}
+	copyto!(pac.medium, medium)
+	padarray!(pac.exmedium, pac.medium, npml)
+	copyto!(pac.mod[:mu], pac.exmedium, [:mu]) 
+	copyto!(pac.mod[:lambda], pac.exmedium, [:lambda]) 
+	copyto!(pac.mod[:M], pac.exmedium, [:M]) 
+	copyto!(pac.mod[:rho], pac.exmedium, [:rho])
+	return nothing
+end 
+
 
 """
 ```julia
@@ -244,6 +251,84 @@ In-place method to perform the experiment and update `pa` after wave propagation
 	end
 	return nothing
 end
+
+# modelling for each worker
+function mod_x_proc!(pac::P_common, pap::P_x_worker) 
+	# source_loop
+	for issp in 1:length(pap[1].ss) # note, all npw have same sources
+		reset_w2!(pap)
+
+		iss=pap[1].ss[issp].iss # same note as above
+
+		# only for first propagating wavefield, i.e., pap[1]
+		if(pac.backprop_flag==-1)
+			"initial conditions from boundary for first propagating field only"
+			boundary_force_snap_p!(issp,pac,pap)
+			boundary_force_snap_vxvz!(issp,pac,pap)
+		end
+
+		prog = Progress(pac.ic[:nt], dt=1, desc="\tmodeling supershot $iss/$(length(pac.ageom[1])) ", 
+		  		color=:white) 
+		# time_loop
+		"""
+		* don't use shared arrays inside this time loop, for speed when using multiple procs
+		"""
+		for it=1:pac.ic[:nt]
+
+			pac.verbose && next!(prog, :white)
+
+			advance!(pac,pap)
+		
+			# force p[1] on boundaries, only for ipw=1
+			(pac.backprop_flag==-1) && boundary_force!(it,issp,pac,pap)
+	 
+			add_source!(it, issp, iss, pac, pap, Source_B1())
+
+			# no born flag for adjoint modelling
+			if(!pac.gmodel_flag)
+				(typeof(pac.attrib_mod)==FdtdAcouBorn) && add_born_sources!(issp, pac, pap)
+			end
+
+			# record boundaries after time reversal already
+			(pac.backprop_flag==1) && boundary_save!(pac.ic[:nt]-it+1,issp,pac,pap)
+
+			record!(it, issp, iss, pac, pap, Receiver_B1())
+
+			(pac.gmodel_flag) && compute_gradient!(issp, pac, pap)
+
+			(pac.illum_flag) && compute_illum!(issp, pap)
+
+			if(pac.snaps_flag)
+				iitsnaps=findall(x->==(x,it),pac.itsnaps)
+				for itsnap in iitsnaps
+					snaps_save!(itsnap,issp,pac,pap)
+				end
+			end
+
+		end # time_loop
+		"now pressure is at [nt], velocities are at [nt-1/2]"	
+
+		"one more propagating step to save pressure at [nt+1] -- for time revarsal"
+		advance!(pac,pap)
+
+		"save last snap of pressure field"
+		(pac.backprop_flag==1) && boundary_save_snap_p!(issp,pac,pap)
+
+		"one more propagating step to save velocities at [nt+3/2] -- for time reversal"
+		advance!(pac,pap)
+
+		"save last snap of velocity fields with opposite sign for adjoint propagation"
+		(pac.backprop_flag==1) && boundary_save_snap_vxvz!(issp,pac,pap)
+
+		"scale gradients for each issp"
+		(pac.gmodel_flag) && scale_gradient!(issp, pap, step(pac.medium.mgrid[2])*step(pac.medium.mgrid[1]))
+		
+
+	end # source_loop
+end # mod_x_shot
+
+
+
 
 function update_datamat!(rfield, ipw, pac::P_common, pap::P_x_worker)
 	datamat=pac.datamat

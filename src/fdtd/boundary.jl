@@ -21,24 +21,24 @@ end
 
 
 @inbounds @fastmath function boundary_force_snap_p!(issp::Int64,pac,pap)
-	ps=pap[1].w2[:t][:p]
+	ps=pap[1].w1[:t][:p]
 	boundary=pap[1].ss[issp].boundary[5]
 	bs=view(boundary,:,:,1)
 	copyto!(ps,bs)
 end
 @inbounds @fastmath function boundary_force_snap_vxvz!(issp::Int64,pac,pap)
 	# initial conditions from boundary for first propagating field only
-	ps=pap[1].w2[:t][:vx]
+	ps=pap[1].w1[:t][:vx]
 	boundary=pap[1].ss[issp].boundary[5]
 	bs=view(boundary,:,:,2)
 	copyto!(ps,bs)
-	ps=pap[1].w2[:t][:vz]
+	ps=pap[1].w1[:t][:vz]
 	bs=view(boundary,:,:,3)
 	copyto!(ps,bs)
 end
 @fastmath @inbounds function boundary_force!(it::Int64,issp::Int64,pac,pap)
 	boundary=pap[1].ss[issp].boundary
-	p=pap[1].w2[:t]
+	p=pap[1].w1[:t]
 	ibx0=pac.bindices[:bx0]; ibz0=pac.bindices[:bz0]; ibx1=pac.bindices[:bx1]; ibz1=pac.bindices[:bz1]
 	boundaryf_l!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
 	boundaryf_r!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
@@ -80,7 +80,7 @@ end
 
 
 @inbounds @fastmath function boundary_save_snap_p!(issp::Int64,pac,pap)
-	ps=pap[1].w2[:t][:p]
+	ps=pap[1].w1[:t][:p]
 	boundary=pap[1].ss[issp].boundary[5]
 	bs=view(boundary,:,:,1)
 	copyto!(bs, ps)
@@ -89,18 +89,18 @@ end
 	boundary=pap[1].ss[issp].boundary[5]
 	#vx
 	bs=view(boundary,:,:,2)
-	ps=pap[1].w2[:t][:vx]
+	ps=pap[1].w1[:t][:vx]
 	copyto!(bs, ps)
 	rmul!(bs,-1.)
 	# vz
 	bs=view(boundary,:,:,3)
-	ps=pap[1].w2[:t][:vz]
+	ps=pap[1].w1[:t][:vz]
 	copyto!(bs, ps)
 	rmul!(bs,-1.)
 end
 @fastmath @inbounds function boundary_save!(it::Int64,issp::Int64,pac,pap)
 	boundary=pap[1].ss[issp].boundary
-	p=pap[1].w2[:t]
+	p=pap[1].w1[:t]
 	ibx0=pac.bindices[:bx0]; ibz0=pac.bindices[:bz0]; ibx1=pac.bindices[:bx1]; ibz1=pac.bindices[:bz1]
 	boundarys_l!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)
 	boundarys_r!(it,ibx0,ibx1,ibz0,ibz1,p,boundary)

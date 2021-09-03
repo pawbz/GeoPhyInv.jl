@@ -14,6 +14,7 @@ using Distributed
 using DistributedArrays
 using SharedArrays
 using ParallelStencil
+using ParallelStencil.FiniteDifferences3D
 using Printf
 using DataFrames
 using SparseArrays
@@ -36,28 +37,24 @@ using CUDA
 using HDF5
 
 
-"""
-Return axis names of 1D, 2D or 3D fields
-"""
-function dim_names(N,prefix="",suffix="")
-	if(N==3)
-		names=[:z,:y,:x]
-	elseif(N==2)
-		names=[:z,:x]
-	elseif(N==1)
-		names=[:z]
-	else
-		error("invalid dim num")
-	end
-	return [Symbol(prefix, string(m), suffix) for m in names]
-end
 
+USE_GPU=true
+@static if USE_GPU
+    @init_parallel_stencil(CUDA, Float64, 3);
+else
+    @init_parallel_stencil(Threads, Float64, 3);
+end
+# import ..USE_GPU
+# import ..NDIMS
 # check whether 2D or 3D, and initialize ParallelStencils accordingly
 # ParallelStencil.@reset_parallel_stencil()
-# @init_parallel_stencil(Threads, Float64, 3)
-# use_gpu ? @init_parallel_stencil(CUDA, Float64, 3) : @init_parallel_stencil(Threads, Float64, 3)
+# USE_GPU ? @init_parallel_stencil(CUDA, Float64, NDIMS) : @init_parallel_stencil(Threads, Float64, NDIMS)
+# @static @init_parallel_stencil(CUDA, Float64, 3)
 # use_gpu ? @init_parallel_stencil(CUDA, Float64, 2) : @init_parallel_stencil(Threads, Float64, 2)
 
+# import ParallelStencil.FiniteDifferences3D
+# import ParallelStencil.Data
+# import ParallelStencil.FiniteDifferences3D
 
 
 # This is extensively used to group arrays
@@ -67,6 +64,9 @@ NamedStack{T}=NamedArray{T,1,Array{T,1},Tuple{OrderedCollections.OrderedDict{Sym
 
 # create a timer object, used throughout this package, see TimerOutputs.jl
 global const to = TimerOutput();
+
+# define structs for wavefields in 2D/3D
+include("fields.jl")
 
 # include modules (note: due to dependencies, order is important!)
 include("Interpolation/Interpolation.jl")
@@ -102,10 +102,6 @@ include("Coupling.jl")
 include("records/core.jl")
 
 
-# Pressure and velocity fields (used for multiple dispatch)
-struct p end
-struct vx end
-struct vz end
 
 
 

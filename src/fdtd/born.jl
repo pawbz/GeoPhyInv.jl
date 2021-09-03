@@ -12,14 +12,14 @@ function add_born_sources!(issp::Int64, pac, pap)
 
 	born_svalue_stack=pap[1].born_svalue_stack
 
-	p1=pap[1].w2[:t][:p]
-	p2=pap[2].w2[:t][:p]
-	p1p=pap[1].w2[:tp][:p]
-	p1pp=pap[1].w2[:tpp][:p]
-	dpdx1=pap[1].w2[:dx][:p]
-	dpdx2=pap[2].w2[:dx][:p]
-	dpdz1=pap[1].w2[:dz][:p]
-	dpdz2=pap[2].w2[:dz][:p]
+	p1=pap[1].w1[:t][:p]
+	p2=pap[2].w1[:t][:p]
+	p1p=pap[1].w1[:tp][:p]
+	p1pp=pap[1].w1[:tpp][:p]
+	dpdx1=pap[1].w1[:dx][:p]
+	dpdx2=pap[2].w1[:dx][:p]
+	dpdz1=pap[1].w1[:dz][:p]
+	dpdz2=pap[2].w1[:dz][:p]
 
 	# secondary sources for Born modeling
 	# adding born sources from pressure(:,:,1) to pressure(:,:,2)

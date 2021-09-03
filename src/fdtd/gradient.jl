@@ -1,16 +1,16 @@
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
 @inbounds @fastmath function compute_gradient!(issp::Int64, pac, pap)
 	# aliases
-	p1=pap[1].w2[:t][:p]
-	p1p=pap[1].w2[:tp][:p]
-	p1pp=pap[1].w2[:tpp][:p]
-	p2p=pap[2].w2[:tp][:p]
+	p1=pap[1].w1[:t][:p]
+	p1p=pap[1].w1[:tp][:p]
+	p1pp=pap[1].w1[:tpp][:p]
+	p2p=pap[2].w1[:tp][:p]
 	fc1=pac.fc[:δtI]
 
-	dpdx1=pap[1].w2[:dx][:p]
-	dpdx2=pap[2].w2[:dx][:p]
-	dpdz1=pap[1].w2[:dz][:p]
-	dpdz2=pap[2].w2[:dz][:p]
+	dpdx1=pap[1].w1[:dx][:p]
+	dpdx2=pap[2].w1[:dx][:p]
+	dpdz1=pap[1].w1[:dz][:p]
+	dpdz2=pap[2].w1[:dz][:p]
 
 	gKI=pap[1].ss[issp].grad_mod[:KI]
 	grhovxI=pap[1].ss[issp].grad_mod[:rhovxI]

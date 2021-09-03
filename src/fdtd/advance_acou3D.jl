@@ -7,15 +7,15 @@
 	return nothing
 end
 
-function advance_kernel!(pap,pac,attrib_mod)
+function advance_kernel!(pap,pac)
 	#compute dpdx and dpdz at [it-1] for all propagating fields
-	update_dpdx!(pap,pac,attrib_mod)
-	update_dpdz!(pap,pac,attrib_mod)
+	update_dpdx!(pap,pac)
+	update_dpdz!(pap,pac)
 
 	#update velocity at [it-1/2] using 
 	#velocity at [it-3/2] and dpdx and dpdz at [it-1] 
-	update_vx!(pap,pac,attrib_mod)
-	update_vz!(pap,pac,attrib_mod)
+	update_vx!(pap,pac)
+	update_vz!(pap,pac)
 
 	#rigid boundary conditions (not currently implemented, need to do adjoint test)
 	#such that:
@@ -27,12 +27,12 @@ function advance_kernel!(pap,pac,attrib_mod)
 #	rigid_boundary_bottom!(p,nx,nz)
 
 
-	update_dvdx!(pap,pac,attrib_mod)
-	update_dvdz!(pap,pac,attrib_mod)
+	update_dvdx!(pap,pac)
+	update_dvdz!(pap,pac)
 
 	#compute pressure at [it] using p at [it-1] and dvxdx
 	#and dvzdz at [it-1/2]
-	update_p!(pap,pac,attrib_mod)
+	update_p!(pap,pac)
 
 end
 
@@ -40,7 +40,7 @@ end
 Exchange pointers (i.e., set names of NamedArray) instead of copying arrays around
 """
 function pppppp!(pap, attrib_mod)
-	w2=pap.w2
+	w2=pap.w1
 	names_old=names(w2)[1]
 	names_new=vcat(circshift(names_old[1:3],-1), names_old[4:end])
 	setnames!(w2, names_new, 1)
@@ -52,9 +52,9 @@ end
 
 
 # 
-@inbounds @fastmath function update_dvdx!(pap,pac,attrib_mod)#
-	dvdx=pap.w2[:dx][:vx]
-	vx=pap.w2[:t][:vx]
+@inbounds @fastmath function update_dvdx!(pap,pac)#
+	dvdx=pap.w1[:dx][:vx]
+	vx=pap.w1[:t][:vx]
 	mp=pap.memory_pml[:dvxdx]
 	dvdx!(dvdx,vx,mp,pac.pml[:x][:b],pac.pml[:x][:a],pac.pml[:x][:kI],pac.fc[:δx24I],pac.ic[:nz],pac.ic[:nx])
 end
@@ -70,9 +70,9 @@ end
 end
 
 
-@inbounds @fastmath function update_dvdz!(pap,pac,attrib_mod)#
-	dvdz=pap.w2[:dz][:vz]
-	vz=pap.w2[:t][:vz]
+@inbounds @fastmath function update_dvdz!(pap,pac)#
+	dvdz=pap.w1[:dz][:vz]
+	vz=pap.w1[:t][:vz]
 	mp=pap.memory_pml[:dvzdz]
 	dvdz!(dvdz,vz,mp,pac.pml[:b_half],pac.pml[:z][:a],pac.pml[:z][:kI],pac.fc[:δz24I],pac.ic[:nz],pac.ic[:nx])
 end
@@ -89,10 +89,10 @@ end
 
 # no attenuation (no memory in stress-strain relation)
 @inbounds @fastmath function update_p!(pap,pac,::T) where {T<:Union{Fdtd,FdtdAcouBorn}}
-	dvdx=pap.w2[:dx][:vx]
-	dvdz=pap.w2[:dz][:vz]
-	p=pap.w2[:t][:p]
-	pp=pap.w2[:tp][:p]
+	dvdx=pap.w1[:dx][:vx]
+	dvdz=pap.w1[:dz][:vz]
+	p=pap.w1[:t][:p]
+	pp=pap.w1[:tp][:p]
 	pvzvx!(p,pp,dvdz,dvdx,pac.mod[:K],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function pvzvx!(p,pp,dvdz,dvdx,mod,fc1,nz,nx)
@@ -104,12 +104,12 @@ end
 end
 
 @inbounds @fastmath function update_p!(pap,pac,::T) where {T<:Union{FdtdAcouVisco}}
-	dvdx=pap.w2[:dx][:vx]
-	dvdz=pap.w2[:dz][:vz]
-	p=pap.w2[:t][:p]
-	pp=pap.w2[:tp][:p]
-	r=pap.w3[:t][:r]
-	rp=pap.w3[:tp][:r]
+	dvdx=pap.w1[:dx][:vx]
+	dvdz=pap.w1[:dz][:vz]
+	p=pap.w1[:t][:p]
+	pp=pap.w1[:tp][:p]
+	r=pap.w2[:t][:r]
+	rp=pap.w2[:tp][:r]
 	prvzvx!(p,pp,r,rp,dvdz,dvdx,pac.mod[:K],pac.mod3[:memcoeff1],pac.mod3[:memcoeff2],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx],pac.ic[:nsls])
 end
 # viscoacoustic modeling (memory in stress-strain relation)
@@ -146,9 +146,9 @@ end
 # update for ix=[3,...,nx-2]
 # ix=1,2 are virtual nodes (apply rigid boundary condition later)
 # ix=nx-1,nx are virtual nodes (apply rigid boundary condition later)
-@inbounds @fastmath function update_dpdx!(pap,pac,attrib_mod)#
-	dpdx=pap.w2[:dx][:p]
-	p=pap.w2[:tp][:p]
+@inbounds @fastmath function update_dpdx!(pap,pac)#
+	dpdx=pap.w1[:dx][:p]
+	p=pap.w1[:tp][:p]
 	mp=pap.memory_pml[:dpdx]
 	dpdx!(dpdx,p,mp,pac.pml[:x][:b_half],pac.pml[:x][:a_half],pac.pml[:x][:k_halfI],pac.fc[:δx24I],pac.ic[:nz],pac.ic[:nx])
 end
@@ -165,9 +165,9 @@ end
 # update for iz=[2,...,nz-2]
 # iz=1,2 are virtual node
 # iz=nz-1,nz are virtual nodes
-@inbounds @fastmath function update_dpdz!(pap,pac,attrib_mod)#
-	dpdz=pap.w2[:dz][:p]
-	p=pap.w2[:tp][:p]
+@inbounds @fastmath function update_dpdz!(pap,pac)#
+	dpdz=pap.w1[:dz][:p]
+	p=pap.w1[:tp][:p]
 	mp=pap.memory_pml[:dpdz]
 	dpdz!(dpdz,p,mp,pac.pml[:z][:b_half],pac.pml[:z][:a_half],pac.pml[:z][:k_halfI],pac.fc[:δz24I],pac.ic[:nz],pac.ic[:nx])
 end
@@ -182,10 +182,10 @@ end
 end
 
 # dpdx is previously computed from [2,...,nx-2]
-@inbounds @fastmath function update_vx!(pap,pac,attrib_mod)#
-	dpdx=pap.w2[:dx][:p]
-	vx=pap.w2[:t][:vx]
-	vxp=pap.w2[:tp][:vx]
+@inbounds @fastmath function update_vx!(pap,pac)#
+	dpdx=pap.w1[:dx][:p]
+	vx=pap.w1[:t][:vx]
+	vxp=pap.w1[:tp][:vx]
 	vx!(vx,vxp,dpdx,pac.mod[:rhovxI],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function vx!(vx,vxp,dpdx,mod,fc1,nz,nx)
@@ -197,10 +197,10 @@ end
 end
 
 # dpdz is previously computed from [2,...,nz-2]
-@inbounds @fastmath function update_vz!(pap,pac,attrib_mod)#
-	dpdz=pap.w2[:dz][:p]
-	vz=pap.w2[:t][:vz]
-	vzp=pap.w2[:tp][:vz]
+@inbounds @fastmath function update_vz!(pap,pac)#
+	dpdz=pap.w1[:dz][:p]
+	vz=pap.w1[:t][:vz]
+	vzp=pap.w1[:tp][:vz]
 	vz!(vz,vzp,dpdz,pac.mod[:rhovzI],pac.fc[:δt],pac.ic[:nz],pac.ic[:nx])
 end
 @inbounds @fastmath function vz!(vz,vzp,dpdz,mod,fc1,nz,nx)

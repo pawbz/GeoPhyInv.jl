@@ -119,7 +119,7 @@ function PFdtd(attrib_mod;
 	jobname::Symbol=:forward_propagation,
 	npw::Int64=1, 
 	medium::Medium=nothing,
-	abs_trbl::Vector{Symbol}=[:zmin, :zmax, :xmax, :xmin],
+	abs_trbl::Vector{Symbol}=[:zmin, :zmax, :ymin, :ymax, :xmax, :xmin],
 	tgrid::StepRangeLen=nothing,
 	ageom::Union{AGeom,Vector{AGeom}}=nothing,
 	srcwav::Union{SrcWav,Vector{SrcWav}}=nothing,
@@ -217,10 +217,10 @@ function PFdtd(attrib_mod;
 	gradient=zeros(2*prod(length.(medium.mgrid)))
 
 	# shared arrays required to reduce all the gradient from individual workers
-	grad_mod=NamedArray([SharedMatrix{Float64}(zeros(length.(exmedium.mgrid)...)) 
+	grad_mod=NamedArray([SharedArray{Float64}(zeros(length.(exmedium.mgrid)...)) 
 			for name in get_medium_names(attrib_mod)], get_medium_names(attrib_mod))
 
-	illum_stack=SharedMatrix{Float64}(zeros(length.(medium.mgrid)...))
+	illum_stack=SharedArray{Float64}(zeros(length.(medium.mgrid)...))
 
 	itsnaps = [argmin(abs.(tgridmod .- tsnaps[i])) for i in 1:length(tsnaps)]
 
@@ -248,8 +248,8 @@ function PFdtd(attrib_mod;
 	    exmedium,medium,
 	    ageom,srcwav,abs_trbl,sfields,isfields,sflags,
 	    rfields,rflags,
-	    get_fc(medium,tgrid),
-	    get_ic(medium,tgrid,nsls,npw),
+	    get_fc(exmedium,tgrid),
+	    get_ic(exmedium,tgrid,nsls,npw),
 	    pml,
 	    mod,
 	    NamedArray([memcoeff1,memcoeff2],([:memcoeff1,:memcoeff2],)),
@@ -269,7 +269,9 @@ function PFdtd(attrib_mod;
 
 
 	# update medium in pac
-	update!(pac,exmedium)	    
+	update!(pac,medium)	
+	
+	
 	# dividing the supersources to workers
 	if(nworker===nothing)
 		nworker = min(nss, Distributed.nworkers())
@@ -308,7 +310,7 @@ function get_fc(medium,tgrid)
 	δt = step(tgrid)
 	δtI = inv(δt)
 
-	return NamedArray(vcat([δt, δtI],δs,δsI,δs24I),vcat([:δt,:δI],dim_names(n,"δ"),dim_names(n,"δ","I"),dim_names(n,"\delta","24I")))
+	return NamedArray(vcat([δt, δtI],δs,δsI,δs24I),vcat([:δt,:δI],dim_names(n,"δ"),dim_names(n,"δ","I"),dim_names(n,"δ","24I")))
 end
 
 function get_medium_names(::FdtdOld)
@@ -316,39 +318,96 @@ function get_medium_names(::FdtdOld)
 	return 	[:KI,:K,:rhoI,:rhovxI,:rhovzI]
 end
 
+function get_medium_names(::FdtdElastic)
+	"bulk modulus, and density values on vx and vz stagerred grids"
+	return 	[:lambda,:M,:mu,:rho]
+end
+
 
 
 
 
 """
-Create modeling parameters for each worker.
+Create field arrays for each worker.
 Each worker performs the modeling of supersources in `sschunks`.
 The parameters common to all workers are stored in `pac`.
 """
-function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64},pac::T) where T<:P_common{<:FdtdOld}
-	nx=pac.ic[:nx]; nz=pac.ic[:nz]; npw=pac.ic[:npw]
+function P_x_worker_x_pw(ipw,sschunks::UnitRange{Int64},pac::T) where T<:P_common{<:FdtdOld}
+	N=ndims(pac.medium)
+	n=length.(pac.exmedium.mgrid)
+	# npw=pac.ic[:npw]
 
-	born_svalue_stack = zeros(nz, nx)
+	born_svalue_stack = zeros(n...)
 
-	fields=[:p,:vx,:vz]
-
-	w2=NamedArray([NamedArray([zeros(nz,nx) for i in fields], (fields,)) for i in 1:5], ([:t, :tp, :tpp, :dx, :dz],))
-
-	if(typeof(pac.attrib_mod)==FdtdAcouVisco)
-		w3=NamedArray([NamedArray([zeros(pac.ic[:nsls],nz,nx) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
-	else
-		# dummy
-		w3=NamedArray([NamedArray([zeros(1,1,1) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
+	fields=Dict()
+	dnames=dim_names(N,"d") # derivatives
+	vnames=dim_names(N,"v") # velocity
+	fields[:t]=vcat([:p],vnames) # :p, :vx, :vy, :vz
+	fields[:tp]=vcat([:p],vnames) # all fields in previous time step
+	fields[:tpp]=[:p]
+	# derivatives for pressure and velocities
+	for (i,x) in enumerate(dim_names(N))
+		fields[dnames[i]]=vcat([:p],filter(y->contains(string(y),string(x)),vnames))
 	end
 
-	pml_fields=[:dvxdx, :dvzdz, :dpdz, :dpdx]
+	w1=NamedArray([NamedArray(fill(zeros(n...),length(fields[key])), (fields[key],)) for key in keys(fields)], Symbol.(collect(keys(fields))))
 
-	memory_pml=NamedArray([zeros(nz,nx) for i in pml_fields], (pml_fields,))
+	if((typeof(pac.attrib_mod)==FdtdAcouVisco) && N==2)
+		w2=NamedArray([NamedArray([zeros(pac.ic[:nsls],nz,nx) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
+	else
+		# dummy
+		w2=NamedArray([NamedArray([zeros(1,1,1) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
+	end
+
+	# memory fields for all derivatives
+	memory_pml=NamedArray([NamedArray(fill(zeros(n...), length(fields[d])), fields[d]) for d in dnames], dnames)
 
 	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
 
-	return P_x_worker_x_pw(ss,w2,w3,memory_pml,born_svalue_stack)
+	return P_x_worker_x_pw(ss,w1,w2,memory_pml,born_svalue_stack)
 end
+
+function P_x_worker_x_pw(ipw,sschunks::UnitRange{Int64},pac::P_common{FdtdElastic})
+	N=ndims(pac.medium)
+	n=length.(pac.exmedium.mgrid)
+	# npw=pac.ic[:npw]
+
+	born_svalue_stack = zeros(n...)
+
+	fields=Dict()
+	dnames=dim_names(N,"d") # derivatives
+	vnames=dim_names(N,"v") # velocity
+	taunames=dim_names(N,"tau";order=2)
+	fields[:t]=vcat(taunames,vnames) # :tau, :vx, :vy, :vz
+	# fields[:tp]=[] # use later when gradients are implemented (not saving now)
+	# fields[:tpp]=[] #
+	# derivatives for pressure and velocities
+	for (i,x) in enumerate(dim_names(N))
+		tn=filter(y->contains(string(y),string(x)),taunames)
+		fields[dnames[i]]=vcat(tn,vnames)
+	end
+	function get_size(field,key)
+		if(key==:t)
+			
+	end
+
+	w1=NamedArray([NamedArray([Data.Array(zeros(get_size(field,key)...)) for field in fields[key]], fields[key]) for key in keys(fields)], Symbol.(collect(keys(fields))))
+
+	# dummy
+	w2=NamedArray([NamedArray([zeros(1,1,1) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
+
+	# memory fields for all derivatives
+	memory_pml=NamedArray([NamedArray(fill(Data.Array(zeros(n...)), length(fields[d])), fields[d]) for d in dnames], dnames)
+
+	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
+
+	return P_x_worker_x_pw(ss,w1,w2,memory_pml,born_svalue_stack)
+end
+
+
+
+
+
 
 function Vector{P_x_worker_x_pw}(sschunks::UnitRange{Int64},pac::P_common)
 	return [P_x_worker_x_pw(ipw,sschunks,pac) for ipw in 1:pac.ic[:npw]]
@@ -418,16 +477,84 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{<:Fdtd
 			   sindices,rindices, boundary,snaps,illum,# grad_modKI,grad_modrhovxI,grad_modrhovzI)
 			   NamedArray([grad_modKI,grad_modrhovxI,grad_modrhovzI],([:KI,:rhovxI,:rhovzI],)))
 
-    # update acquisition
+	# update acquisition
 	update!(pass,ipw,iss,ageom[ipw][iss],pac)
 	return pass
 end
+
+"""
+Create modeling parameters for each supersource. 
+Every worker mediums one or more supersources.
+"""
+function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{FdtdElastic}
+
+	rfields=pac.rfields
+	sfields=pac.sfields
+	nt=pac.ic[:nt]
+	ageom=pac.ageom
+	srcwav=pac.srcwav
+	sflags=pac.sflags
+
+	# records_output, distributed array among different procs
+	records = NamedArray([zeros(nt,pac.ageom[ipw][iss].nr) for i in 1:length(rfields)], (rfields,))
+
+	# gradient outputs
+	grad_modlambda = zeros(1, 1)
+
+
+	# saving illum
+	# illum =  (pac.illum_flag) ? zeros(nz, nx) : zeros(1,1)
+	illum=zeros(1,1)
+
+	# snaps = (pac.snaps_flag) ? zeros(nzd,nxd,length(pac.itsnaps)) : zeros(1,1,1)
+	snaps=zeros(1,1,1)
+
+	# source wavelets
+	wavelets = [NamedArray([zeros(pac.ageom[ipw][iss].ns) for i in 1:length(sfields[ipw])],(sfields[ipw],)) for it in 1:nt]
+	fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
+
+	# storing boundary values for back propagation
+	# nz1, nx1=length.(pac.medium.mgrid)
+	# if(pac.backprop_flag ≠ 0)
+	# 	boundary=[zeros(3,nx1+6,nt),
+	# 	  zeros(nz1+6,3,nt),
+	# 	  zeros(3,nx1+6,nt),
+	# 	  zeros(nz1+6,3,nt),
+	# 	  zeros(nz1+2*npml,nx1+2*npml,3)]
+	# else
+		boundary=[zeros(1,1,1) for ii in 1:5]
+	# end
+
+	coords=[:x1,:x2,:z1,:z2]
+
+	is=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
+	# source_spray_weights per supersource
+	ssprayw = zeros(4,ageom[ipw][iss].ns)
+	# denomsI = zeros(ageom[ipw][iss].ns)
+
+	sindices=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
+	
+	# receiver interpolation weights per sequential source
+	rinterpolatew = zeros(4,ageom[ipw][iss].nr)
+	# denomrI = zeros(ageom[ipw][iss].nr)
+	rindices=NamedArray([zeros(Int64,ageom[ipw][iss].nr) for i in coords], (coords,))
+
+	pass=P_x_worker_x_pw_x_ss(iss,wavelets,ssprayw,records,rinterpolatew,
+			   sindices,rindices, boundary,snaps,illum,# grad_modKI,grad_modrhovxI,grad_modrhovzI)
+			   NamedArray([grad_modlambda],([:lambda],)))
+
+	# update acquisition
+	# update!(pass,ipw,iss,ageom[ipw][iss],pac)
+	return pass
+end
+
 
 
 
 include("source.jl")
 include("receiver.jl")
 include("advance_acou2D.jl")
+include("advance_elastic3D.jl")
 include("rho_projection.jl")
 include("gradient.jl")
 include("born.jl")
@@ -463,88 +590,11 @@ end
 
 
 
-# modelling for each worker
-function mod_x_proc!(pac::P_common, pap::P_x_worker) 
-	# source_loop
-	for issp in 1:length(pap[1].ss) # note, all npw have same sources
-		reset_w2!(pap)
-
-		iss=pap[1].ss[issp].iss # same note as above
-
-		# only for first propagating wavefield, i.e., pap[1]
-		if(pac.backprop_flag==-1)
-			"initial conditions from boundary for first propagating field only"
-			boundary_force_snap_p!(issp,pac,pap)
-			boundary_force_snap_vxvz!(issp,pac,pap)
-		end
-
-		prog = Progress(pac.ic[:nt], dt=1, desc="\tmodeling supershot $iss/$(length(pac.ageom[1])) ", 
-		  		color=:white) 
-		# time_loop
-		"""
-		* don't use shared arrays inside this time loop, for speed when using multiple procs
-		"""
-		for it=1:pac.ic[:nt]
-
-			pac.verbose && next!(prog, :white)
-
-			advance!(pac,pap)
-		
-			# force p[1] on boundaries, only for ipw=1
-			(pac.backprop_flag==-1) && boundary_force!(it,issp,pac,pap)
-	 
-			add_source!(it, issp, iss, pac, pap, Source_B1())
-
-			# no born flag for adjoint modelling
-			if(!pac.gmodel_flag)
-				(typeof(pac.attrib_mod)==FdtdAcouBorn) && add_born_sources!(issp, pac, pap)
-			end
-
-			# record boundaries after time reversal already
-			(pac.backprop_flag==1) && boundary_save!(pac.ic[:nt]-it+1,issp,pac,pap)
-
-			record!(it, issp, iss, pac, pap, Receiver_B1())
-
-			(pac.gmodel_flag) && compute_gradient!(issp, pac, pap)
-
-			(pac.illum_flag) && compute_illum!(issp, pap)
-
-			if(pac.snaps_flag)
-				iitsnaps=findall(x->==(x,it),pac.itsnaps)
-				for itsnap in iitsnaps
-					snaps_save!(itsnap,issp,pac,pap)
-				end
-			end
-
-		end # time_loop
-		"now pressure is at [nt], velocities are at [nt-1/2]"	
-
-		"one more propagating step to save pressure at [nt+1] -- for time revarsal"
-		advance!(pac,pap)
-
-		"save last snap of pressure field"
-		(pac.backprop_flag==1) && boundary_save_snap_p!(issp,pac,pap)
-
-		"one more propagating step to save velocities at [nt+3/2] -- for time reversal"
-		advance!(pac,pap)
-
-		"save last snap of velocity fields with opposite sign for adjoint propagation"
-		(pac.backprop_flag==1) && boundary_save_snap_vxvz!(issp,pac,pap)
-
-		"scale gradients for each issp"
-		(pac.gmodel_flag) && scale_gradient!(issp, pap, step(pac.medium.mgrid[2])*step(pac.medium.mgrid[1]))
-		
-
-	end # source_loop
-end # mod_x_shot
-
-
-
 
 # Need illumination to estimate the approximate diagonal of Hessian
 @inbounds @fastmath function compute_illum!(issp::Int64,  pap::P_x_worker)
 	# saving illumination to be used as preconditioner 
-	p=pap[1].w2[:t][:p]
+	p=pap[1].w1[:t][:p]
 	illum=pap[1].ss[issp].illum
 	for i in eachindex(illum)
 		illum[i] += abs2(p[i])
@@ -555,7 +605,7 @@ end
 @fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::P_common,pap::P_x_worker)
 	isx0=pac.bindices[:sx0]
 	isz0=pac.bindices[:sz0]
-	p=pap[1].w2[:t][:p]
+	p=pap[1].w1[:t][:p]
 	snaps=pap[1].ss[issp].snaps
 	for ix=1:size(snaps,2)
 		@simd for iz=1:size(snaps,1)
