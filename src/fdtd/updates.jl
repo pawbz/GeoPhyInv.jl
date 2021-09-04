@@ -123,27 +123,23 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
 	@assert ageomss.ns == pac.ageom[ipw][iss].ns
 	@assert ageomss.nr == pac.ageom[ipw][iss].nr
 
-	mesh_x, mesh_z = pac.exmedium.mgrid[2], pac.exmedium.mgrid[1]
 	ssprayw=pass.ssprayw
 	rinterpolatew=pass.rinterpolatew
-	fill!(ssprayw,0.0)
-	fill!(rinterpolatew,0.0)
+	fill!.(ssprayw,0.0)
+	fill!.(rinterpolatew,0.0)
 	sindices=pass.sindices
 	rindices=pass.rindices
 
 	for is=1:ageomss.ns
-		weights=ssprayw
-		Interpolation.get_spray_weights!(view(weights, :,is),  
-			    view(sindices[:x1],is), view(sindices[:x2],is),
-			    view(sindices[:z1],is), view(sindices[:z2],is),
-			    mesh_x, mesh_z, ageomss.s[:x][is], ageomss.s[:z][is])
+		w=ssprayw[is]
+		ww,sindices[is]=Interpolation.get_spray_weights(pac.exmedium.mgrid, [s[is] for s in ageomss.s])  
+		copyto!(w,ww)
+
 	end
 	for ir=1:ageomss.nr
-		weights=rinterpolatew
-		Interpolation.get_interpolate_weights!(view(weights, :,ir),
-			  view(rindices[:x1],ir), view(rindices[:x2],ir),
-			  view(rindices[:z1],ir), view(rindices[:z2],ir),
-			  mesh_x, mesh_z, ageomss.r[:x][ir], ageomss.r[:z][ir])
+		w=rinterpolatew[ir]
+		ww,rindices[ir]=Interpolation.get_spray_weights(pac.exmedium.mgrid, [s[is] for s in ageomss.s])  
+		copyto!(w,ww)
 	end
 
 end

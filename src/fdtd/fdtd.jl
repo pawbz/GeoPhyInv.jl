@@ -368,36 +368,20 @@ function P_x_worker_x_pw(ipw,sschunks::UnitRange{Int64},pac::T) where T<:P_commo
 end
 
 function P_x_worker_x_pw(ipw,sschunks::UnitRange{Int64},pac::P_common{FdtdElastic})
-	N=ndims(pac.medium)
 	n=length.(pac.exmedium.mgrid)
 	# npw=pac.ic[:npw]
 
 	born_svalue_stack = zeros(n...)
 
-	fields=Dict()
-	dnames=dim_names(N,"d") # derivatives
-	vnames=dim_names(N,"v") # velocity
-	taunames=dim_names(N,"tau";order=2)
-	fields[:t]=vcat(taunames,vnames) # :tau, :vx, :vy, :vz
-	# fields[:tp]=[] # use later when gradients are implemented (not saving now)
-	# fields[:tpp]=[] #
-	# derivatives for pressure and velocities
-	for (i,x) in enumerate(dim_names(N))
-		tn=filter(y->contains(string(y),string(x)),taunames)
-		fields[dnames[i]]=vcat(tn,vnames)
-	end
-	function get_size(field,key)
-		if(key==:t)
-			
-	end
-
-	w1=NamedArray([NamedArray([Data.Array(zeros(get_size(field,key)...)) for field in fields[key]], fields[key]) for key in keys(fields)], Symbol.(collect(keys(fields))))
+	fields=Fields()
+	w1=NamedArray([zeros(f(),pac.attrib_mod,n...) for f in fields], Symbol.(fields))
 
 	# dummy
 	w2=NamedArray([NamedArray([zeros(1,1,1) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
 
 	# memory fields for all derivatives
-	memory_pml=NamedArray([NamedArray(fill(Data.Array(zeros(n...)), length(fields[d])), fields[d]) for d in dnames], dnames)
+	dfields=Fields("d")
+	memory_pml=NamedArray([zeros(f(),pac.attrib_mod,n...) for f in dfields], Symbol.(dfields))
 
 	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
 
@@ -487,6 +471,7 @@ Create modeling parameters for each supersource.
 Every worker mediums one or more supersources.
 """
 function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{FdtdElastic}
+	N=ndims(pac.medium)
 
 	rfields=pac.rfields
 	sfields=pac.sfields
@@ -525,19 +510,11 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{FdtdEl
 		boundary=[zeros(1,1,1) for ii in 1:5]
 	# end
 
-	coords=[:x1,:x2,:z1,:z2]
-
-	is=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
-	# source_spray_weights per supersource
-	ssprayw = zeros(4,ageom[ipw][iss].ns)
-	# denomsI = zeros(ageom[ipw][iss].ns)
-
-	sindices=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
-	
-	# receiver interpolation weights per sequential source
-	rinterpolatew = zeros(4,ageom[ipw][iss].nr)
-	# denomrI = zeros(ageom[ipw][iss].nr)
-	rindices=NamedArray([zeros(Int64,ageom[ipw][iss].nr) for i in coords], (coords,))
+	# initialize source_spray_weights per supersource and receiver interpolation weights per sequential source
+	ssprayw = fill(zeros(2^N),ageom[ipw][iss].ns)
+	sindices=fill(CartesianIndices(Tuple(fill(1:2,3))),ageom[ipw][iss].ns)
+	rinterpolatew = fill(zeros(2^N),ageom[ipw][iss].nr)
+	rindices=fill(CartesianIndices(Tuple(fill(1:2,3))),ageom[ipw][iss].nr)
 
 	pass=P_x_worker_x_pw_x_ss(iss,wavelets,ssprayw,records,rinterpolatew,
 			   sindices,rindices, boundary,snaps,illum,# grad_modKI,grad_modrhovxI,grad_modrhovzI)

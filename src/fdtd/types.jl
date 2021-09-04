@@ -5,14 +5,14 @@
 Struct for modelling parameters specific to each supersource. 
 Each worker needs a vector of this struct, as it models multiple superspources. 
 """
-mutable struct P_x_worker_x_pw_x_ss
+mutable struct P_x_worker_x_pw_x_ss{N,T}
 	iss::Int64
 	wavelets::Vector{NamedStack{Vector{Float64}}} # [ .. for it in 1:nt]
-	ssprayw::Matrix{Float64}
+	ssprayw::Vector{T}
 	records::NamedStack{Matrix{Float64}}
-	rinterpolatew::Matrix{Float64}
-	sindices::NamedStack{Vector{Int64}} # contains [:x1,:x2,:z1,:z2]
-	rindices::NamedStack{Vector{Int64}}
+	rinterpolatew::Vector{T}
+	sindices::Vector{CartesianIndices{N, Tuple{UnitRange{Int64}, UnitRange{Int64}}}} # contains indices for each source 	
+	rindices::Vector{CartesianIndices{N, Tuple{UnitRange{Int64}, UnitRange{Int64}}}} # contains indices for each receiver
     	boundary::Vector{Array{Float64,3}}
 	snaps::Array{Float64,3}
 	illum::Matrix{Float64}

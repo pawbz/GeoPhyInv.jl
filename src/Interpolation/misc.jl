@@ -5,7 +5,7 @@ Return n indices in order
 Cannot find a julia method which does, this.
 If a faster method is found, replace it later.
 """
-function indminn!(ivec, x::AbstractVector{Float64}, val::Float64)
+function indminn!(ivec, x, val)
 	# using enumerate to avoid indexing
 	n=length(ivec)
 	if(length(x)<n)
@@ -37,7 +37,7 @@ function indminimum(x, val, imask=[])
 	return min_i
 end
 
-function indminn(x::AbstractVector{Float64}, val::Float64, n::Int64=1)
+function indminn(x, val, n)
 	ivec=fill(0,n)
 	indminn!(ivec,x,val)
 	return ivec
