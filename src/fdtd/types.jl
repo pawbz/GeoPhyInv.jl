@@ -5,14 +5,14 @@
 Struct for modelling parameters specific to each supersource. 
 Each worker needs a vector of this struct, as it models multiple superspources. 
 """
-mutable struct P_x_worker_x_pw_x_ss{N,T}
+mutable struct P_x_worker_x_pw_x_ss{N}
 	iss::Int64
 	wavelets::Vector{NamedStack{Vector{Float64}}} # [ .. for it in 1:nt]
-	ssprayw::Vector{T}
+	ssprayw::Vector{Vector{Float64}}
 	records::NamedStack{Matrix{Float64}}
-	rinterpolatew::Vector{T}
-	sindices::Vector{CartesianIndices{N, Tuple{UnitRange{Int64}, UnitRange{Int64}}}} # contains indices for each source 	
-	rindices::Vector{CartesianIndices{N, Tuple{UnitRange{Int64}, UnitRange{Int64}}}} # contains indices for each receiver
+	rinterpolatew::Vector{Vector{Float64}}
+	sindices::Vector{<:CartesianIndices{N}} # contains indices for each source 	
+	rindices::Vector{<:CartesianIndices{N}} # contains indices for each receiver
     	boundary::Vector{Array{Float64,3}}
 	snaps::Array{Float64,3}
 	illum::Matrix{Float64}
@@ -72,14 +72,14 @@ This struct contains velocity and stress fields simulated by each worker.
 Again, note that a single worker can take care of multiple supersources.
 * T1==Matrix{Float64} for 2D simulation
 """
-mutable struct P_x_worker_x_pw{T1,T2,N}
-	ss::Vector{P_x_worker_x_pw_x_ss} # supersource specific arrays
+mutable struct P_x_worker_x_pw{N}
+	ss::Vector{P_x_worker_x_pw_x_ss{N}} # supersource specific arrays
 	# 2D arrays of p, vx, vz, their previous snapshots, and 
 	# x derivatives of p, vx, vz
 	# z derivatives of p, vx, vz
-	w1::NamedStack{NamedStack{T1}} # p, vx, vz
-	w2::NamedStack{NamedStack{T2}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
-	memory_pml::NamedStack{NamedStack{T1}} # memory variables for CPML 
+	w1::NamedStack{NamedStack{Data.Array{N}}} # p, vx, vz
+	w2::NamedStack{NamedStack{Data.Array{N}}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
+	memory_pml::NamedStack{Data.Array{N}} # memory variables for CPML 
 	born_svalue_stack::Array{Float64,N} # used for born modeling # only used for 2-D simulation
 end
 
@@ -126,7 +126,7 @@ Modelling parameters common for all supersources
 * stored snaps shots at tsnaps as Array{Float64,4} 
 
 """
-mutable struct P_common{T, Tmod1, Tmod2, Tpml, N}
+mutable struct P_common{T, N}
 	jobname::Symbol
 	attrib_mod::T
 	activepw::Vector{Int64}
@@ -142,8 +142,8 @@ mutable struct P_common{T, Tmod1, Tmod2, Tpml, N}
 	rflags::Vector{Int64}
 	fc::NamedStack{Float64}
 	ic::NamedStack{Int64}
-	pml::NamedStack{NamedStack{Tpml}} # e.g., pml[:x][:a], pml[:z][:b]
-	mod::NamedStack{Tmod1} # e.g., mod[:KI], mod[:K]
+	pml::NamedStack{NamedStack{Data.Array{1}}} # e.g., pml[:x][:a], pml[:z][:b]
+	mod::NamedStack{Array{Float64,N}} # e.g., mod[:KI], mod[:K]
 	mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
 	#=
 	modKI::Matrix{Float64}
@@ -152,7 +152,7 @@ mutable struct P_common{T, Tmod1, Tmod2, Tpml, N}
 	modrhovxI::Matrix{Float64}
 	modrhovzI::Matrix{Float64}
 	=#
-	δmod::NamedStack{Tmod2}
+	δmod::NamedStack{Array{Float64,N}}
 	δmodall::Vector{Float64}
 	#=
 	δmodKI::Matrix{Float64}
@@ -208,9 +208,9 @@ end
 """
 A single struct combining parameters for all workers.
 """
-mutable struct PFdtd{T}
+mutable struct PFdtd{T,N}
 	sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
-	p::DistributedArrays.DArray{P_x_worker,1,P_x_worker} # distributed parameters among workers
-	c::P_common{T} # common parameters
+	p::DistributedArrays.DArray{Vector{P_x_worker_x_pw{N}},1,Vector{P_x_worker_x_pw{N}}} # distributed parameters among workers
+	c::P_common{T,N} # common parameters
 end
 

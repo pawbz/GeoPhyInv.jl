@@ -52,7 +52,7 @@ end
     # p=pap.w1
     # pt=p[:t]
 
-@all(dvx_dx) = @d_xa(vx) #/ dx # at [ix,iy,iz]
+@all(dvx_dx) = @d_za(vx) #/ dx # at [ix,iy,iz]
     # @all(pap.w1[:dx][:vx]) = @d_xa(p[:t][:vx]) / dx # at [ix,iy,iz]
     # @all(pap.w1[:dy][:vy]) = @d_ya(p[:t][:vy]) / dy # at      "
     # @all(pap.w1[:dy][:vy]) = @d_za(p[:t][:vz]) / dz # at      "
@@ -151,7 +151,7 @@ end
 
 
 function advance_kernel!(pap, pac::T) where T<:P_common{FdtdElastic}
-	@parallel compute_dv!(pap.w1[:dx][:vx],pap.w1[:t][:vx])
+	@parallel compute_dv!(pap.w1[:t][:dvxdx],pap.w1[:t][:vx])
 	# @parallel (1:size(p[:dx][:vx],1),1:size(p[:dx][:vx],2),1:size(p[:dx][:vx],3)) memoryx!(memory_p[:dx][:vx],p[:dx][:vx],pmlx[:a],pmlx[:b],pmlx[:kI])
 	# @parallel (1:size(p[:dy][:vy],1),1:size(p[:dy][:vy],2),1:size(p[:dy][:vy],3)) memoryx!(memory_p[:dy][:vy],p[:dy][:vy],pmlx[:a],pmlx[:b],pmlx[:kI])
 	# @parallel (1:size(p[:dy][:vy],1),1:size(p[:dy][:vy],2),1:size(p[:dy][:vy],3)) memoryx!(memory_p[:dy][:vy],p[:dy][:vy],pmlx[:a],pmlx[:b],pmlx[:kI])

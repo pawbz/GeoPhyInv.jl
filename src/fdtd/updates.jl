@@ -132,13 +132,13 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
 
 	for is=1:ageomss.ns
 		w=ssprayw[is]
-		ww,sindices[is]=Interpolation.get_spray_weights(pac.exmedium.mgrid, [s[is] for s in ageomss.s])  
+		sindices[is],ww=Interpolation.get_interpolate_weights(pac.exmedium.mgrid, [s[is] for s in ageomss.s])  
 		copyto!(w,ww)
 
 	end
 	for ir=1:ageomss.nr
 		w=rinterpolatew[ir]
-		ww,rindices[ir]=Interpolation.get_spray_weights(pac.exmedium.mgrid, [s[is] for s in ageomss.s])  
+		rindices[ir],ww=Interpolation.get_interpolate_weights(pac.exmedium.mgrid, [r[ir] for r in ageomss.r])  
 		copyto!(w,ww)
 	end
 

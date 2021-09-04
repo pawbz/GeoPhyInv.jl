@@ -43,7 +43,6 @@ end
 
 
 Base.zeros(::tauxx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
-Base.zeros(::tauxx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
 Base.zeros(::tauyy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
 Base.zeros(::tauzz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
 Base.zeros(::tauxy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz - 2, ny - 1, nx - 1))
@@ -65,7 +64,7 @@ Base.zeros(::dvzdx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz - 1, ny - 2
 Base.zeros(::dvzdy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz - 1, ny - 1, nx - 2))
 
 Base.zeros(::dtauxxdx, ::FdtdElastic, nz, ny, nx) =
-    Data.Array(zeros(nz - 2, ny - 2, nx - 1))
+    (println([nz,nx,ny]);Data.Array(zeros(nz - 2, ny - 2, nx - 1)))
 Base.zeros(::dtauyydy, ::FdtdElastic, nz, ny, nx) =
     Data.Array(zeros(nz - 2, ny - 1, nx - 2))
 Base.zeros(::dtauzzdz, ::FdtdElastic, nz, ny, nx) =
@@ -88,8 +87,8 @@ for f in Fields("p")
     Base.zeros(::f, ::FdtdElastic, args...) = Data.Array(zeros(fill(1, length(args))...))
 end
 # remove stress 
-for f in Fields("tau")
-    Base.zeros(::f, ::FdtdAcou, args...) = Data.Array(zeros(fill(1, length(args))...))
-end
+# for f in Fields("tau")
+    # Base.zeros(::f, ::FdtdAcou, args...) = Data.Array(zeros(fill(1, length(args))...))
+# end
 
 

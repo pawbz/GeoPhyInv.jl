@@ -15,22 +15,6 @@
 # * optimized memory allocation: Oct 2017
 
 # 
-struct FdtdElastic end
-
-"""
-2-D acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
-"""
-struct FdtdAcou end
-
-"""
-2-D ViscoAcoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
-"""
-struct FdtdAcouVisco  end
-
-"""
-2-D Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
-"""
-struct FdtdAcouBorn  end
 
 # union of old stuff without using ParallelStencils (should eventually remove this)
 FdtdOld=Union{FdtdAcou,FdtdAcouVisco,FdtdAcouBorn}
@@ -133,6 +117,8 @@ function PFdtd(attrib_mod;
 	snaps_flag::Bool=false,
 	verbose::Bool=false,
 	nworker=nothing)
+
+	N=ndims(medium)
 
 	# convert to vectors 
 	if(typeof(ageom)==AGeom); ageom=[ageom]; end
@@ -284,7 +270,7 @@ function PFdtd(attrib_mod;
 	end
 
 	# a distributed array of P_x_worker --- note that the parameters for each super source are efficiently distributed here
-	papa=ddata(T=P_x_worker, init=I->P_x_worker(sschunks[I...][1],pac), pids=work);
+	papa=ddata(T=Vector{P_x_worker_x_pw{N}}, init=I->P_x_worker(sschunks[I...][1],pac), pids=work);
 
 	return PFdtd(sschunks, papa, pac)
 end
@@ -294,8 +280,8 @@ Get some integer constants to store them in pac, e.g., model sizes. ``
 The idea is to use them later for a cleaner code.
 """
 function get_ic(medium,tgrid,nsls,npw)
-	n=ndims(medium)
-	return NamedArray(vcat(length.(medium.mgrid),[length(tgrid),nsls,npw]),vcat(dim_names(n,"n"),[:nt,:nsls,:npw]))
+	N=ndims(medium)
+	return NamedArray(vcat(length.(medium.mgrid),[length(tgrid),nsls,npw]),vcat(dim_names(N,"n"),[:nt,:nsls,:npw]))
 end
 
 """
@@ -303,14 +289,14 @@ Get some floats constants to store then in pac, e.g, spatial sampling.
 The idea is to use them later inside the loops for faster modelling.
 """
 function get_fc(medium,tgrid)
-	n=ndims(medium)
+	N=ndims(medium)
 	δs = step.(medium.mgrid)
 	δs24I = inv.(δs) .* 24.0
 	δsI = inv.(δs)
 	δt = step(tgrid)
 	δtI = inv(δt)
 
-	return NamedArray(vcat([δt, δtI],δs,δsI,δs24I),vcat([:δt,:δI],dim_names(n,"δ"),dim_names(n,"δ","I"),dim_names(n,"δ","24I")))
+	return NamedArray(vcat([δt, δtI],δs,δsI,δs24I),vcat([:δt,:δI],dim_names(N,"δ"),dim_names(N,"δ","I"),dim_names(N,"δ","24I")))
 end
 
 function get_medium_names(::FdtdOld)
@@ -373,15 +359,15 @@ function P_x_worker_x_pw(ipw,sschunks::UnitRange{Int64},pac::P_common{FdtdElasti
 
 	born_svalue_stack = zeros(n...)
 
-	fields=Fields()
-	w1=NamedArray([zeros(f(),pac.attrib_mod,n...) for f in fields], Symbol.(fields))
+	fields=nameof.(Fields())
+	w1=NamedArray([NamedArray([zeros(eval(f)(),pac.attrib_mod,n...) for f in fields], Symbol.(fields))],[:t])
 
 	# dummy
-	w2=NamedArray([NamedArray([zeros(1,1,1) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
+	w2=NamedArray([NamedArray([@zeros(1,1,1) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
 
 	# memory fields for all derivatives
-	dfields=Fields("d")
-	memory_pml=NamedArray([zeros(f(),pac.attrib_mod,n...) for f in dfields], Symbol.(dfields))
+	dfields=nameof.(Fields("d"))
+	memory_pml=NamedArray([zeros(eval(f)(),pac.attrib_mod,10,10,10) for f in dfields], Symbol.(dfields))
 
 	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
 
@@ -451,6 +437,8 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{<:Fdtd
 	# denomsI = zeros(ageom[ipw][iss].ns)
 
 	sindices=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
+
+
 	
 	# receiver interpolation weights per sequential source
 	rinterpolatew = zeros(4,ageom[ipw][iss].nr)
@@ -521,7 +509,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{FdtdEl
 			   NamedArray([grad_modlambda],([:lambda],)))
 
 	# update acquisition
-	# update!(pass,ipw,iss,ageom[ipw][iss],pac)
+	update!(pass,ipw,iss,ageom[ipw][iss],pac)
 	return pass
 end
 

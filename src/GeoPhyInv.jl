@@ -31,6 +31,7 @@ using Test
 using AxisArrays
 using Distributions
 using StatsBase
+using InteractiveUtils
 using RecipesBase
 using FFTW
 using CUDA
@@ -64,6 +65,25 @@ NamedStack{T}=NamedArray{T,1,Array{T,1},Tuple{OrderedCollections.OrderedDict{Sym
 
 # create a timer object, used throughout this package, see TimerOutputs.jl
 global const to = TimerOutput();
+
+
+struct FdtdElastic end
+
+"""
+2-D acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
+"""
+struct FdtdAcou end
+
+"""
+2-D ViscoAcoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
+"""
+struct FdtdAcouVisco  end
+
+"""
+2-D Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
+"""
+struct FdtdAcouBorn  end
+
 
 # define structs for wavefields in 2D/3D
 include("fields.jl")
