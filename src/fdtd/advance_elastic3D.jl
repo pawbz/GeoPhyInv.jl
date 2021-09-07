@@ -19,9 +19,9 @@ end
 @parallel function compute_dtau!(tauxx::Data.Array, tauyy::Data.Array, tauzz::Data.Array, tauxy::Data.Array, tauxz::Data.Array, tauyz::Data.Array, 
     dtauxx_dx, dtauxy_dx, dtauxz_dx, dtauyy_dy, dtauxy_dy, dtauyz_dy, dtauzz_dz, dtauyz_dz, dtauxz_dz, dx::Data.Number, dy::Data.Number, dz::Data.Number)
 
-    @all(dtauxx_dx) = @d_xi(tauxx) / dx # at [ix+1/2,iy+1,iz+1]
-    @all(dtauxy_dx) = @d_xa(tauxy) / dx # at [ix+1,iy+1/2,iz+1]
-    @all(dtauxz_dx) = @d_xa(tauxz) / dx # at [ix+1,iy+1,iz+1/2]
+    @all(dtauxx_dx) = @d_zi(tauxx) / dx # at [ix+1/2,iy+1,iz+1]
+    @all(dtauxy_dx) = @d_za(tauxy) / dx # at [ix+1,iy+1/2,iz+1]
+    @all(dtauxz_dx) = @d_za(tauxz) / dx # at [ix+1,iy+1,iz+1/2]
 
 
     @all(dtauyy_dy) = @d_yi(tauyy) / dy # at [ix+1,iy+1/2,iz+1]
@@ -29,9 +29,9 @@ end
     @all(dtauyz_dy) = @d_ya(tauyz) / dy # at [ix+1,iy+1,iz+1/2]
 
 
-    @all(dtauzz_dz) = @d_zi(tauzz) / dz # at [ix+1,iy+1,iz+1/2]
-    @all(dtauxz_dz) = @d_za(tauxz) / dz # at [ix+1/2,iy+1,iz+1]
-    @all(dtauyz_dz) = @d_za(tauyz) / dz # at [ix+1,iy+1/2,iz+1]
+    @all(dtauzz_dz) = @d_xi(tauzz) / dz # at [ix+1,iy+1,iz+1/2]
+    @all(dtauxz_dz) = @d_xa(tauxz) / dz # at [ix+1/2,iy+1,iz+1]
+    @all(dtauyz_dz) = @d_xa(tauyz) / dz # at [ix+1,iy+1/2,iz+1]
 
     return
 end
@@ -52,19 +52,19 @@ end
     # p=pap.w1
     # pt=p[:t]
 
-@all(dvx_dx) = @d_za(vx) #/ dx # at [ix,iy,iz]
-    # @all(pap.w1[:dx][:vx]) = @d_xa(p[:t][:vx]) / dx # at [ix,iy,iz]
+@all(dvx_dx) = @d_za(vx) / dx # at [ix,iy,iz]
+    # @all(pap.w1[:dx][:vx]) = @d_za(p[:t][:vx]) / dx # at [ix,iy,iz]
     # @all(pap.w1[:dy][:vy]) = @d_ya(p[:t][:vy]) / dy # at      "
-    # @all(pap.w1[:dy][:vy]) = @d_za(p[:t][:vz]) / dz # at      "
+    # @all(pap.w1[:dy][:vy]) = @d_xa(p[:t][:vz]) / dz # at      "
 
 
 #     @all(p[:dy][:vx]) = @d_yi(pt[:vx]) / dy # at [ix+1/2,iy+1/2,iz+1]
-#     @all(p[:dz][:vx]) = @d_zi(pt[:vx]) / dz # at [ix+1/2,iy+1,iz+1/2]
+#     @all(p[:dz][:vx]) = @d_xi(pt[:vx]) / dz # at [ix+1/2,iy+1,iz+1/2]
 
-#     @all(p[:dz][:vy]) = @d_zi(pt[:vy]) / dz # at [ix+1,iy+1/2,iz+1/2]
-#     @all(p[:dx][:vy]) = @d_xi(pt[:vy]) / dx # at [ix+1/2,iy+1/2,iz+1]
+#     @all(p[:dz][:vy]) = @d_xi(pt[:vy]) / dz # at [ix+1,iy+1/2,iz+1/2]
+#     @all(p[:dx][:vy]) = @d_zi(pt[:vy]) / dx # at [ix+1/2,iy+1/2,iz+1]
 
-#     @all(p[:dx][:vz]) = @d_xi(pt[:vz]) / dx # at [ix+1/2,iy+1,iz+1/2]
+#     @all(p[:dx][:vz]) = @d_zi(pt[:vz]) / dx # at [ix+1/2,iy+1,iz+1/2]
 #     @all(p[:dy][:vz]) = @d_yi(pt[:vz]) / dy # at [ix+1,iy+1/2,iz+1/2]
 
 
