@@ -83,9 +83,9 @@ mutable struct P_x_worker_x_pw{N}
 	born_svalue_stack::Array{Float64,N} # used for born modeling # only used for 2-D simulation
 end
 
-P_x_worker=Vector{P_x_worker_x_pw}
+# P_x_worker=Vector{P_x_worker_x_pw}
 
-function initialize!(pap::P_x_worker)
+function initialize!(pap::Vector{P_x_worker_x_pw{N}}) where N
 	reset_w2!(pap)
 	for pap_x_pw in pap
 		initialize!.(pap_x_pw.ss)
@@ -94,7 +94,7 @@ function initialize!(pap::P_x_worker)
 end
 
 # reset wavefields for every worker
-function reset_w2!(pap::P_x_worker)
+function reset_w2!(pap::Vector{P_x_worker_x_pw{N}}) where N
 	for pap_x_pw in pap
 		fill!(pap_x_pw.born_svalue_stack,0.0)
 		for w in pap_x_pw.w1
@@ -136,14 +136,13 @@ mutable struct P_common{T, N}
 	srcwav::Vector{SrcWav}
 	abs_trbl::Vector{Symbol}
 	sfields::Vector{Vector{Symbol}}
-	isfields::Vector{Vector{Int64}}
 	sflags::Vector{Int64} 
 	rfields::Vector{Symbol}
 	rflags::Vector{Int64}
 	fc::NamedStack{Float64}
 	ic::NamedStack{Int64}
 	pml::NamedStack{NamedStack{Data.Array{1}}} # e.g., pml[:x][:a], pml[:z][:b]
-	mod::NamedStack{Array{Float64,N}} # e.g., mod[:KI], mod[:K]
+	mod::NamedStack{Data.Array{N}} # e.g., mod[:KI], mod[:K]
 	mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
 	#=
 	modKI::Matrix{Float64}

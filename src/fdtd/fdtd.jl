@@ -164,8 +164,6 @@ function PFdtd(attrib_mod;
 	length(srcwav) != npw ? error("srcwav size") : nothing
 	all([issimilar(ageom[ip],srcwav[ip]) for ip=1:npw]) ? nothing : error("ageom and srcwav mismatch") 
 
-	isfields = [Array{Int}(undef,length(sfields[ipw])) for ipw in 1:npw]
-	#
 
 	#(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
@@ -190,9 +188,10 @@ function PFdtd(attrib_mod;
 		(npw≠2) && error("born modeling needs npw=2")
 	end
 
-	mod=NamedArray([zeros(length.(exmedium.mgrid)...) for name in get_medium_names(attrib_mod)],
+	mod=NamedArray([Data.Array(zeros(length.(exmedium.mgrid)...)) for name in get_medium_names(attrib_mod)],
 			get_medium_names(attrib_mod))
-	δmod=deepcopy(mod)
+	δmod=NamedArray([zeros(length.(exmedium.mgrid)...) for name in get_medium_names(attrib_mod)],
+			get_medium_names(attrib_mod))
 
 	δmodall=zeros(2*prod(length.(medium.mgrid)))
 
@@ -232,7 +231,7 @@ function PFdtd(attrib_mod;
 
 	pac=P_common(jobname,attrib_mod,activepw,
 	    exmedium,medium,
-	    ageom,srcwav,abs_trbl,sfields,isfields,sflags,
+	    ageom,srcwav,abs_trbl,sfields,sflags,
 	    rfields,rflags,
 	    get_fc(exmedium,tgrid),
 	    get_ic(exmedium,tgrid,nsls,npw),
@@ -270,7 +269,7 @@ function PFdtd(attrib_mod;
 	end
 
 	# a distributed array of P_x_worker --- note that the parameters for each super source are efficiently distributed here
-	papa=ddata(T=Vector{P_x_worker_x_pw{N}}, init=I->P_x_worker(sschunks[I...][1],pac), pids=work);
+	papa=ddata(T=Vector{P_x_worker_x_pw{N}}, init=I->Vector{P_x_worker_x_pw{N}}(sschunks[I...][1],pac), pids=work);
 
 	return PFdtd(sschunks, papa, pac)
 end
@@ -290,13 +289,13 @@ The idea is to use them later inside the loops for faster modelling.
 """
 function get_fc(medium,tgrid)
 	N=ndims(medium)
-	δs = step.(medium.mgrid)
-	δs24I = inv.(δs) .* 24.0
-	δsI = inv.(δs)
-	δt = step(tgrid)
-	δtI = inv(δt)
+	ds = step.(medium.mgrid)
+	ds24I = inv.(ds) .* 24.0
+	dsI = inv.(ds)
+	dt = step(tgrid)
+	dtI = inv(dt)
 
-	return NamedArray(vcat([δt, δtI],δs,δsI,δs24I),vcat([:δt,:δI],dim_names(N,"δ"),dim_names(N,"δ","I"),dim_names(N,"δ","24I")))
+	return NamedArray(vcat([dt, dtI],ds,dsI,ds24I),vcat([:dt,:dtI],dim_names(N,"d"),dim_names(N,"d","I"),dim_names(N,"d","24I")))
 end
 
 function get_medium_names(::FdtdOld)
@@ -542,7 +541,7 @@ include("gallery.jl")
 	#return [Records.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
 	#		       tgridmod, ageom[1]) for iprop in 1:npw]
 
-function stack_illums!(pac::P_common, pap::P_x_worker)
+function stack_illums!(pac::P_common, pap::Vector{P_x_worker_x_pw{N}}) where N
 	nx, nz=pac.ic[:nx], pac.ic[:nz]
 	illums=pac.illum_stack
 	pass=pap[1].ss
@@ -557,7 +556,7 @@ end
 
 
 # Need illumination to estimate the approximate diagonal of Hessian
-@inbounds @fastmath function compute_illum!(issp::Int64,  pap::P_x_worker)
+@inbounds @fastmath function compute_illum!(issp::Int64,  pap::Vector{P_x_worker_x_pw{N}}) where N
 	# saving illumination to be used as preconditioner 
 	p=pap[1].w1[:t][:p]
 	illum=pap[1].ss[issp].illum
@@ -567,7 +566,7 @@ end
 end
 
 
-@fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::P_common,pap::P_x_worker)
+@fastmath @inbounds function snaps_save!(itsnap::Int64,issp::Int64,pac::P_common,pap::Vector{P_x_worker_x_pw{N}}) where N
 	isx0=pac.bindices[:sx0]
 	isz0=pac.bindices[:sz0]
 	p=pap[1].w1[:t][:p]

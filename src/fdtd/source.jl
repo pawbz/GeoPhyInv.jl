@@ -77,13 +77,9 @@ struct Source_B0 end
 	for ipw in pac.activepw
 		p=pap[ipw].w1[:t];
 		wavelets=pap[ipw].ss[issp].wavelets
-		isx1=pap[ipw].ss[issp].sindices[:x1]
-		isx2=pap[ipw].ss[issp].sindices[:x2]
-		isz1=pap[ipw].ss[issp].sindices[:z1]
-		isz2=pap[ipw].ss[issp].sindices[:z2]
+		sindices=pap[ipw].ss[issp].sindices
 		ssprayw=pap[ipw].ss[issp].ssprayw
 		sfields=pac.sfields[ipw]
-		isfields=pac.isfields[ipw]
 	if(pac.sflags[ipw] ≠ 0) # only if sflags is non-zero
 		for sfield in sfields
 		@simd for is = 1:ageom[ipw][iss].ns
@@ -92,19 +88,11 @@ struct Source_B0 end
 			until [it-1]
 			division of source term with δx and δz (see Jan's fdelmodc manual)
 			"""
-			source_term = wavelets[it][sfield][is] * pac.fc[:δt] * pac.fc[:δxI] * pac.fc[:δzI]
+			source_term = wavelets[it][sfield][is] * pac.fc[:dt] * pac.fc[:dxI] * pac.fc[:dzI]
 			
-			"""
-			multiplication with modK
-			"""
-			p[sfield][isz1[is], isx1[is]] += 
-				source(source_term,ssprayw[1,is], pac, isz1[is], isx1[is],eval(sfield)())
-			p[sfield][isz1[is], isx2[is]] += 
-				source(source_term,ssprayw[2,is], pac, isz1[is], isx2[is],eval(sfield)())
-			p[sfield][isz2[is], isx1[is]] += 
-				source(source_term,ssprayw[3,is], pac, isz2[is], isx1[is],eval(sfield)())
-			p[sfield][isz2[is], isx2[is]] += 
-				source(source_term,ssprayw[4,is], pac, isz2[is], isx2[is],eval(sfield)())
+			for (i,si) in enumerate(sindices[is])
+				p[sfield][si] = p[sfield][si] + source(source_term,ssprayw[is][i],pac,si,eval(sfield)())
+			end
 		end
 		end
 	end
@@ -123,7 +111,6 @@ end
 		p=pap[ipw].w1[:t];
 		wavelets=pap[ipw].ss[issp].wavelets
 		sfields=pac.sfields[ipw]
-		isfields=pac.isfields[ipw]
 		isx1=pap[ipw].ss[issp].sindices[:x1]
 		isz1=pap[ipw].ss[issp].sindices[:z1]
 		ssprayw=pap[ipw].ss[issp].ssprayw
@@ -148,14 +135,17 @@ end
 end
 
 
+# multiplication with modK
 # on pressure grid
-source(source_term, spray, pac, iz, ix, ::p) = source_term * spray * pac.mod[:K][iz,ix]
+source(source_term, spray, pac, si, ::p) = source_term * spray * pac.mod[:K][si]
 
 # on vx grid
-source(source_term, spray, pac, iz, ix, ::vx) = source_term * spray * pac.mod[:rhovxI][iz,ix]
+source(source_term, spray, pac, si, ::vx) = source_term * spray * pac.mod[:rhovxI][si]
 
 # on vz grid
-source(source_term, spray, pac, iz, ix, ::vz) = source_term * spray * pac.mod[:rhovzI][iz,ix]
+source(source_term, spray, pac, si, ::vz) = source_term * spray * pac.mod[:rhovzI][si]
 
 
 
+# testing source on tauxx (need to check it)
+source(source_term, spray, pac, si, ::tauxx) = source_term * spray

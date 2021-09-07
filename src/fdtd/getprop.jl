@@ -41,7 +41,7 @@ function Base.show(io::Base.IO, pa::PFdtd)
 	println("pa[:srcwav]")
 end
 
-Base.show(io::Base.IO, pa::P_x_worker)=nothing
+Base.show(io::Base.IO, pa::Vector{P_x_worker_x_pw{N}}) where N=nothing
 Base.show(io::Base.IO, pa::P_x_worker_x_pw)=nothing
 Base.show(io::Base.IO, pa::P_x_worker_x_pw_x_ss)=nothing
 
