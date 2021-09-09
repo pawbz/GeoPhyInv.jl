@@ -19,7 +19,7 @@
 # union of old stuff without using ParallelStencils (should eventually remove this)
 FdtdOld=Union{FdtdAcou,FdtdAcouVisco,FdtdAcouBorn}
 
-global const npml = 50
+global const npml = 20
 global const nlayer_rand = 0
 
 include("types.jl")
@@ -269,7 +269,7 @@ function PFdtd(attrib_mod;
 	end
 
 	# a distributed array of P_x_worker --- note that the parameters for each super source are efficiently distributed here
-	papa=ddata(T=Vector{P_x_worker_x_pw{N}}, init=I->Vector{P_x_worker_x_pw{N}}(sschunks[I...][1],pac), pids=work);
+	papa=ddata(T=Vector{P_x_worker_x_pw{N}}, init=I->Vector{P_x_worker_x_pw}(sschunks[I...][1],pac), pids=work);
 
 	return PFdtd(sschunks, papa, pac)
 end
@@ -366,7 +366,7 @@ function P_x_worker_x_pw(ipw,sschunks::UnitRange{Int64},pac::P_common{FdtdElasti
 
 	# memory fields for all derivatives
 	dfields=nameof.(Fields("d"))
-	memory_pml=NamedArray([zeros(eval(f)(),pac.attrib_mod,10,10,10) for f in dfields], Symbol.(dfields))
+	memory_pml=NamedArray([zeros(eval(f)(),pac.attrib_mod,n...) for f in dfields], Symbol.(dfields))
 
 	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
 

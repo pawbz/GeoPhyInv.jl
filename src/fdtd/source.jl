@@ -149,3 +149,4 @@ source(source_term, spray, pac, si, ::vz) = source_term * spray * pac.mod[:rhovz
 
 # testing source on tauxx (need to check it)
 source(source_term, spray, pac, si, ::tauxx) = source_term * spray
+source(source_term, spray, pac, si, ::tauyy) = source_term * spray * 10^14
