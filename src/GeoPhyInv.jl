@@ -85,6 +85,8 @@ struct FdtdAcouVisco  end
 struct FdtdAcouBorn  end
 
 
+global const npml = 20
+
 # define structs for wavefields in 2D/3D
 include("fields.jl")
 

@@ -19,7 +19,6 @@
 # union of old stuff without using ParallelStencils (should eventually remove this)
 FdtdOld=Union{FdtdAcou,FdtdAcouVisco,FdtdAcouBorn}
 
-global const npml = 20
 global const nlayer_rand = 0
 
 include("types.jl")
@@ -366,7 +365,10 @@ function P_x_worker_x_pw(ipw,sschunks::UnitRange{Int64},pac::P_common{FdtdElasti
 
 	# memory fields for all derivatives
 	dfields=nameof.(Fields("d"))
-	memory_pml=NamedArray([zeros(eval(f)(),pac.attrib_mod,n...) for f in dfields], Symbol.(dfields))
+	# memory_pml=NamedArray([zeros(eval(f)(),pac.attrib_mod,n...,false) for f in dfields], Symbol.(dfields))
+	memory_pml=NamedArray([zeros(eval(f)(),pac.attrib_mod,n...,pml=true) for f in dfields], Symbol.(dfields))
+	# println(typeof(w1),"\n",typeof(memory_pml), "\n", size.(memory_pml))
+	# wwfgr
 
 	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
 

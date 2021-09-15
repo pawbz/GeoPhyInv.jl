@@ -17,12 +17,12 @@ end
 # [ix,iy,iz-1/2]       --> vz
 
 @parallel function compute_dtau!(
-    tauxx::Data.Array,
-    tauyy::Data.Array,
-    tauzz::Data.Array,
-    tauxy::Data.Array,
-    tauxz::Data.Array,
-    tauyz::Data.Array,
+    tauxx,
+    tauyy,
+    tauzz,
+    tauxy,
+    tauxz,
+    tauyz,
     dtauxxdx,
     dtauxydx,
     dtauxzdx,
@@ -151,34 +151,50 @@ end
 end
 
 
-for dim in [:z, :y, :x]
-    fname = Symbol("memory", string(dim), "!")
+for (idim, dim) in zip([:1, :2, :3], [:z, :y, :x])
     i = Symbol("i", string(dim))
-    @eval @parallel_indices (iz, iy, ix) function $fname(
-        memory::Data.Array,
-        d::Data.Array,
-        a,
-        b,
-        kI,
-    )
-        memory[iz, iy, ix] = b[$i] * memory[iz, iy, ix] + a[$i] * d[iz, iy, ix]
-        d[iz, iy, ix] = d[iz, iy, ix] * kI[$i] + memory[iz, iy, ix]
-        return
-    end
-    fname = Symbol("memory1", string(dim), "!")
-    @eval @parallel_indices (iz, iy, ix) function $fname(
-        memory::Data.Array,
-        d::Data.Array,
-        a,
-        b,
-        kI,
-    )
-        memory[iz, iy, ix] = b[$i+1] * memory[iz, iy, ix] + a[$i+1] * d[iz, iy, ix]
-        d[iz, iy, ix] = d[iz, iy, ix] * kI[$i+1] + memory[iz, iy, ix]
-        return
-    end
-    fname = Symbol("dirichlet", string(dim), "!")
     is = [:iz, :iy, :ix]
+    ismoff = replace(is, i => :($i + moff))
+    isdoff = replace(is, i => :(doff + $i))
+    for (fname, fnamenp, idoff) in zip(
+        [Symbol("memory", string(dim), "!"), Symbol("memory1", string(dim), "!")],
+        [Symbol("memorynp", string(dim), "!"), Symbol("memorynp1", string(dim), "!")],
+        [:($i + doff), :($i + doff + 1)],
+    )
+        @eval @parallel_indices (iz, iy, ix) function $fnamenp(
+            memory,
+            d,
+            a,
+            b,
+            kI,
+            moff,
+            doff,
+        )
+            memory[$(ismoff...)] =
+                b[$idoff] * memory[$(ismoff...)] + a[$idoff] * d[$(isdoff...)]
+            d[$(isdoff...)] = d[$(isdoff...)] * kI[$idoff] + memory[$(ismoff...)]
+            return
+        end
+        @eval function $fname(memory, d, a, b, kI)
+            sm = collect(size(memory))
+            setindex!(sm, npml, $idim)
+            # first npml points
+            @parallel map(x -> (:)(1, x), Tuple(sm)) $fnamenp(memory, d, a, b, kI, 0, 0)
+            # last npml points independent of d
+            @parallel map(x -> (:)(1, x), Tuple(sm)) $fnamenp(
+                memory,
+                d,
+                a,
+                b,
+                kI,
+                npml,
+                getindex(size(d), $idim) - npml,
+            )
+        end
+    end
+
+    # velocity-free boundary conditions    
+    fname = Symbol("dirichlet", string(dim), "!")
 
     is1, is2, is3 = [replace(is, i => ii) for ii in [:1, :2, :3]]
     isn = replace(is, i => :n)
@@ -207,7 +223,7 @@ end
 
 
 
-function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic}}
+function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
     w1t = pap.w1[:t]
     mw = pap.memory_pml
     pml = pac.pml
@@ -233,71 +249,35 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic}}
         pac.fc[:dzI],
     )
 
-    @parallel (
-        1:size(w1t[:dtauxxdx], 1),
-        1:size(w1t[:dtauxxdx], 2),
-        1:size(w1t[:dtauxxdx], 3),
-    ) memoryx!(
+    memoryx!(
         mw[:dtauxxdx],
         w1t[:dtauxxdx],
         pml[:x][:a_half],
         pml[:x][:b_half],
         pml[:x][:k_halfI],
     )
-    @parallel (
-        1:size(w1t[:dtauxydx], 1),
-        1:size(w1t[:dtauxydx], 2),
-        1:size(w1t[:dtauxydx], 3),
-    ) memory1x!(mw[:dtauxydx], w1t[:dtauxydx], pml[:x][:a], pml[:x][:b], pml[:x][:kI])
-    @parallel (
-        1:size(w1t[:dtauxzdx], 1),
-        1:size(w1t[:dtauxzdx], 2),
-        1:size(w1t[:dtauxzdx], 3),
-    ) memory1x!(mw[:dtauxzdx], w1t[:dtauxzdx], pml[:x][:a], pml[:x][:b], pml[:x][:kI])
+    memory1x!(mw[:dtauxydx], w1t[:dtauxydx], pml[:x][:a], pml[:x][:b], pml[:x][:kI])
+    memory1x!(mw[:dtauxzdx], w1t[:dtauxzdx], pml[:x][:a], pml[:x][:b], pml[:x][:kI])
 
-    @parallel (
-        1:size(w1t[:dtauyydy], 1),
-        1:size(w1t[:dtauyydy], 2),
-        1:size(w1t[:dtauyydy], 3),
-    ) memoryy!(
+    memoryy!(
         mw[:dtauyydy],
         w1t[:dtauyydy],
         pml[:y][:a_half],
         pml[:y][:b_half],
         pml[:y][:k_halfI],
     )
-    @parallel (
-        1:size(w1t[:dtauxydy], 1),
-        1:size(w1t[:dtauxydy], 2),
-        1:size(w1t[:dtauxydy], 3),
-    ) memory1y!(mw[:dtauxydy], w1t[:dtauxydy], pml[:y][:a], pml[:y][:b], pml[:y][:kI])
-    @parallel (
-        1:size(w1t[:dtauyzdy], 1),
-        1:size(w1t[:dtauyzdy], 2),
-        1:size(w1t[:dtauyzdy], 3),
-    ) memory1y!(mw[:dtauyzdy], w1t[:dtauyzdy], pml[:y][:a], pml[:y][:b], pml[:y][:kI])
+    memory1y!(mw[:dtauxydy], w1t[:dtauxydy], pml[:y][:a], pml[:y][:b], pml[:y][:kI])
+    memory1y!(mw[:dtauyzdy], w1t[:dtauyzdy], pml[:y][:a], pml[:y][:b], pml[:y][:kI])
 
-    @parallel (
-        1:size(w1t[:dtauzzdz], 1),
-        1:size(w1t[:dtauzzdz], 2),
-        1:size(w1t[:dtauzzdz], 3),
-    ) memoryz!(
+    memoryz!(
         mw[:dtauzzdz],
         w1t[:dtauzzdz],
         pml[:z][:a_half],
         pml[:z][:b_half],
         pml[:z][:k_halfI],
     )
-    @parallel (
-        1:size(w1t[:dtauyzdz], 1),
-        1:size(w1t[:dtauyzdz], 2),
-        1:size(w1t[:dtauyzdz], 3),
-    ) memory1z!(mw[:dtauyzdz], w1t[:dtauyzdz], pml[:z][:a], pml[:z][:b], pml[:z][:kI])
-    @parallel (
-        1:size(w1t[:dtauxzdz], 1),
-        1:size(w1t[:dtauxzdz], 2),
-        1:size(w1t[:dtauxzdz], 3),
-    ) memory1z!(mw[:dtauxzdz], w1t[:dtauxzdz], pml[:z][:a], pml[:z][:b], pml[:z][:kI])
+    memory1z!(mw[:dtauyzdz], w1t[:dtauyzdz], pml[:z][:a], pml[:z][:b], pml[:z][:kI])
+    memory1z!(mw[:dtauxzdz], w1t[:dtauxzdz], pml[:z][:a], pml[:z][:b], pml[:z][:kI])
 
     @parallel compute_v!(
         w1t[:vx],
@@ -351,71 +331,17 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic}}
         pac.fc[:dyI],
         pac.fc[:dzI],
     )
-    @parallel (1:size(w1t[:dvxdx], 1), 1:size(w1t[:dvxdx], 2), 1:size(w1t[:dvxdx], 3)) memoryx!(
-        mw[:dvxdx],
-        w1t[:dvxdx],
-        pml[:x][:a],
-        pml[:x][:b],
-        pml[:x][:kI],
-    )
-    @parallel (1:size(w1t[:dvydy], 1), 1:size(w1t[:dvydy], 2), 1:size(w1t[:dvydy], 3)) memoryy!(
-        mw[:dvydy],
-        w1t[:dvydy],
-        pml[:y][:a],
-        pml[:y][:b],
-        pml[:y][:kI],
-    )
-    @parallel (1:size(w1t[:dvzdz], 1), 1:size(w1t[:dvzdz], 2), 1:size(w1t[:dvzdz], 3)) memoryz!(
-        mw[:dvzdz],
-        w1t[:dvzdz],
-        pml[:z][:a],
-        pml[:z][:b],
-        pml[:z][:kI],
-    )
+    memoryx!(mw[:dvxdx], w1t[:dvxdx], pml[:x][:a], pml[:x][:b], pml[:x][:kI])
+    memoryy!(mw[:dvydy], w1t[:dvydy], pml[:y][:a], pml[:y][:b], pml[:y][:kI])
+    memoryz!(mw[:dvzdz], w1t[:dvzdz], pml[:z][:a], pml[:z][:b], pml[:z][:kI])
 
-    @parallel (1:size(w1t[:dvxdy], 1), 1:size(w1t[:dvxdy], 2), 1:size(w1t[:dvxdy], 3)) memoryy!(
-        mw[:dvxdy],
-        w1t[:dvxdy],
-        pml[:y][:a_half],
-        pml[:y][:b_half],
-        pml[:y][:k_halfI],
-    )
-    @parallel (1:size(w1t[:dvxdz], 1), 1:size(w1t[:dvxdz], 2), 1:size(w1t[:dvxdz], 3)) memoryz!(
-        mw[:dvxdz],
-        w1t[:dvxdz],
-        pml[:z][:a_half],
-        pml[:z][:b_half],
-        pml[:z][:k_halfI],
-    )
-    @parallel (1:size(w1t[:dvydx], 1), 1:size(w1t[:dvydx], 2), 1:size(w1t[:dvydx], 3)) memoryx!(
-        mw[:dvydx],
-        w1t[:dvydx],
-        pml[:x][:a_half],
-        pml[:x][:b_half],
-        pml[:x][:k_halfI],
-    )
+    memoryy!(mw[:dvxdy], w1t[:dvxdy], pml[:y][:a_half], pml[:y][:b_half], pml[:y][:k_halfI])
+    memoryz!(mw[:dvxdz], w1t[:dvxdz], pml[:z][:a_half], pml[:z][:b_half], pml[:z][:k_halfI])
+    memoryx!(mw[:dvydx], w1t[:dvydx], pml[:x][:a_half], pml[:x][:b_half], pml[:x][:k_halfI])
 
-    @parallel (1:size(w1t[:dvydz], 1), 1:size(w1t[:dvydz], 2), 1:size(w1t[:dvydz], 3)) memoryz!(
-        mw[:dvydz],
-        w1t[:dvydz],
-        pml[:z][:a_half],
-        pml[:z][:b_half],
-        pml[:z][:k_halfI],
-    )
-    @parallel (1:size(w1t[:dvzdx], 1), 1:size(w1t[:dvzdx], 2), 1:size(w1t[:dvzdx], 3)) memoryx!(
-        mw[:dvzdx],
-        w1t[:dvzdx],
-        pml[:x][:a_half],
-        pml[:x][:b_half],
-        pml[:x][:k_halfI],
-    )
-    @parallel (1:size(w1t[:dvzdy], 1), 1:size(w1t[:dvzdy], 2), 1:size(w1t[:dvzdy], 3)) memoryy!(
-        mw[:dvzdy],
-        w1t[:dvzdy],
-        pml[:y][:a_half],
-        pml[:y][:b_half],
-        pml[:y][:k_halfI],
-    )
+    memoryz!(mw[:dvydz], w1t[:dvydz], pml[:z][:a_half], pml[:z][:b_half], pml[:z][:k_halfI])
+    memoryx!(mw[:dvzdx], w1t[:dvzdx], pml[:x][:a_half], pml[:x][:b_half], pml[:x][:k_halfI])
+    memoryy!(mw[:dvzdy], w1t[:dvzdy], pml[:y][:a_half], pml[:y][:b_half], pml[:y][:k_halfI])
 
     @parallel compute_tauii!(
         w1t[:tauxx],
@@ -442,5 +368,5 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic}}
         pac.mod[:mu],
     )
 
-    
+
 end
