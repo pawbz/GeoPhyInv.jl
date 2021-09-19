@@ -388,7 +388,7 @@ Does this library contain inplace methods?
 function update!(modex::Medium{N},mod::Medium{N}) where N
 	for m in names(mod.m)[1]
 		itp = extrapolate(interpolate(Tuple(mod.mgrid), mod[m], Gridded(Linear())),Interpolations.Flat())
-		copyto!(modex[m],itp[mgrid...])
+		copyto!(modex[m],itp[modex.mgrid...])
 	end
 	update!(modex,0.1)
 	return modex

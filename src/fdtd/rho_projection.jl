@@ -3,12 +3,12 @@
 """
 Project density on to a staggerred grid using simple interpolation
 """
-function get_rhovxI(rhoI::Array{Float64})
+function get_rhovxI(rhoI::AbstractArray{Float64})
 	rhovxI = zero(rhoI);
 	get_rhovxI!(rhovxI, rhoI)
 	return rhovxI
 end
-function get_rhovxI!(rhovxI, rhoI::Array{Float64})
+function get_rhovxI!(rhovxI, rhoI::AbstractArray{Float64})
 	for ix = 1:size(rhoI, 2)-1
 		for iz = 1:size(rhoI,1)
 			rhovxI[iz, ix] = 0.5e0 *(rhoI[iz,ix+1] + rhoI[iz,ix])
@@ -25,12 +25,12 @@ end # get_rhovxI
 """
 Project density on to a staggerred grid using simple interpolation
 """
-function get_rhovzI(rhoI::Array{Float64})
+function get_rhovzI(rhoI::AbstractArray{Float64})
 	rhovzI = zero(rhoI);
 	get_rhovzI!(rhovzI, rhoI)
 	return rhovzI
 end
-function get_rhovzI!(rhovzI, rhoI::Array{Float64})
+function get_rhovzI!(rhovzI, rhoI::AbstractArray{Float64})
 	nz=size(rhoI, 1)
 	for ix = 1: size(rhoI, 2)
 		for iz = 1: size(rhoI, 1)-1

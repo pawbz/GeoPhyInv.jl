@@ -22,7 +22,7 @@ abstract type Fields end
 Return a list of fields which contain `s`.
 Retruns all the fields defined here by default.
 """
-Fields(s = "") = filter(x -> contains(string(x), string(s)), subtypes(Fields))
+Fields(s = "") = filter(x -> contains(string(x), string(s)), nameof.(subtypes(Fields)))
 
 # define pressure for acoustic 
 struct p <: Fields end
@@ -41,7 +41,49 @@ for (i, x) in enumerate(dim_names(3))
     end
 end
 
+#-------------------------------------------------------
+# Acoustic
+#-------------------------------------------------------
+Base.zeros(::p, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx))
+Base.zeros(::p, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
+Base.zeros(::dpdx, ::FdtdAcou, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, pml ? 2 * npml : nx - 1))
+Base.zeros(::dpdx, ::FdtdAcou, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, ny - 2, pml ? 2 * npml : nx - 1))
+Base.zeros(::dpdz, ::FdtdAcou, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 1, nx - 2))
+Base.zeros(::dpdz, ::FdtdAcou, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 1, ny - 2, nx - 2))
+Base.zeros(::dpdy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, pml ? 2 * npml : ny - 1, nx - 2))
+Base.zeros(::vx, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx + 1))
+Base.zeros(::vz, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz + 1, nx))
+Base.zeros(::vx, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + 1))
+Base.zeros(::vz, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz + 1, ny, nx))
+Base.zeros(::vy, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny + 1, nx))
+Base.zeros(::dvxdx, ::FdtdAcou, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(nz, pml ? 2 * npml : nx))
+Base.zeros(::dvzdz, ::FdtdAcou, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz, nx))
+Base.zeros(::dvxdx, ::FdtdAcou, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz, ny, pml ? 2 * npml : nx))
+Base.zeros(::dvzdz, ::FdtdAcou, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz, ny, nx))
+Base.zeros(::dvydy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz, pml ? 2 * npml : ny, nx))
+Base.zeros(::dvxdz, ::FdtdAcou, nz, nx; pml::Bool = false) = Data.Array(zeros(1, 1))
+Base.zeros(::dvzdx, ::FdtdAcou, nz, nx; pml::Bool = false) = Data.Array(zeros(1, 1))
+Base.zeros(::dvxdz, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
+Base.zeros(::dvydx, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
+Base.zeros(::dvzdx, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
+Base.zeros(::dvydz, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
+Base.zeros(::dvxdy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
+Base.zeros(::dvzdy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
 
+
+#-------------------------------------------------------
+# Elastic
+#-------------------------------------------------------
 Base.zeros(::tauxx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
 Base.zeros(::tauyy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
 Base.zeros(::tauzz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
@@ -49,46 +91,86 @@ Base.zeros(::tauxy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz - 2, ny - 1
 Base.zeros(::tauxz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz - 1, ny - 2, nx - 1))
 Base.zeros(::tauyz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz - 1, ny - 1, nx - 2))
 
+Base.zeros(::tauxx, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx))
+Base.zeros(::tauzz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx))
+Base.zeros(::tauxz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz - 1, nx - 1))
+
 Base.zeros(::vx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + 1))
 Base.zeros(::vy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny + 1, nx))
 Base.zeros(::vz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz + 1, ny, nx))
 
-Base.zeros(::dvxdx, ::FdtdElastic, nz, ny, nx; pml::Bool=false) = Data.Array(zeros(nz, ny, pml ? 2*npml : nx))
-Base.zeros(::dvydy, ::FdtdElastic, nz, ny, nx; pml::Bool=false) = Data.Array(zeros(nz, pml ? 2*npml : ny, nx))
-Base.zeros(::dvzdz, ::FdtdElastic, nz, ny, nx; pml::Bool=false) = Data.Array(zeros(pml ? 2*npml : nz, ny, nx))
-Base.zeros(::dvxdy, ::FdtdElastic, nz, ny, nx; pml::Bool=false) = Data.Array(zeros(nz - 2, pml ? 2*npml : ny - 1, nx - 1))
-Base.zeros(::dvxdz, ::FdtdElastic, nz, ny, nx; pml::Bool=false) = Data.Array(zeros(pml ? 2*npml : nz - 1, ny - 2, nx - 1))
-Base.zeros(::dvydx, ::FdtdElastic, nz, ny, nx; pml::Bool=false) = Data.Array(zeros(nz - 2, ny - 1, pml ? 2*npml : nx - 1))
-Base.zeros(::dvydz, ::FdtdElastic, nz, ny, nx; pml::Bool=false) = Data.Array(zeros(pml ? 2*npml : nz - 1, ny - 1, nx - 2))
-Base.zeros(::dvzdx, ::FdtdElastic, nz, ny, nx; pml::Bool=false) = Data.Array(zeros(nz - 1, ny - 2, pml ? 2*npml : nx - 1))
-Base.zeros(::dvzdy, ::FdtdElastic, nz, ny, nx; pml::Bool=false) = Data.Array(zeros(nz - 1, pml ? 2*npml : ny - 1, nx - 2))
+Base.zeros(::vx, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx + 1))
+Base.zeros(::vz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz + 1, nx))
 
-Base.zeros(::dtauxxdx, ::FdtdElastic, nz, ny, nx; pml::Bool=false) =
-    Data.Array(zeros(nz - 2, ny - 2, pml ? 2*npml : nx - 1))
-Base.zeros(::dtauyydy, ::FdtdElastic, nz, ny, nx; pml::Bool=false) =
-    Data.Array(zeros(nz - 2, pml ? 2*npml : ny - 1, nx - 2))
-Base.zeros(::dtauzzdz, ::FdtdElastic, nz, ny, nx; pml::Bool=false) =
-    Data.Array(zeros(pml ? 2*npml : nz - 1, ny - 2, nx - 2))
-Base.zeros(::dtauxydx, ::FdtdElastic, nz, ny, nx; pml::Bool=false) =
-    Data.Array(zeros(nz - 2, ny - 1, pml ? 2*npml : nx - 2))
-Base.zeros(::dtauxydy, ::FdtdElastic, nz, ny, nx; pml::Bool=false) =
-    Data.Array(zeros(nz - 2, pml ? 2*npml : ny - 2, nx - 1))
-Base.zeros(::dtauxzdx, ::FdtdElastic, nz, ny, nx; pml::Bool=false) =
-    Data.Array(zeros(nz - 1, ny - 2, pml ? 2*npml : nx - 2))
-Base.zeros(::dtauxzdz, ::FdtdElastic, nz, ny, nx; pml::Bool=false) =
-    Data.Array(zeros(pml ? 2*npml : nz - 2, ny - 2, nx - 1))
-Base.zeros(::dtauyzdy, ::FdtdElastic, nz, ny, nx; pml::Bool=false) =
-    Data.Array(zeros(nz - 1, pml ? 2*npml : ny - 2, nx - 2))
-Base.zeros(::dtauyzdz, ::FdtdElastic, nz, ny, nx; pml::Bool=false) =
-    Data.Array(zeros(pml ? 2*npml : nz - 2, ny - 1, nx - 2))
+Base.zeros(::dvxdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz, ny, pml ? 2 * npml : nx))
+Base.zeros(::dvydy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz, pml ? 2 * npml : ny, nx))
+Base.zeros(::dvzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz, ny, nx))
+Base.zeros(::dvxdy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, pml ? 2 * npml : ny - 1, nx - 1))
+Base.zeros(::dvxdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 1, ny - 2, nx - 1))
+Base.zeros(::dvydx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, ny - 1, pml ? 2 * npml : nx - 1))
+Base.zeros(::dvydz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 1, ny - 1, nx - 2))
+Base.zeros(::dvzdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 1, ny - 2, pml ? 2 * npml : nx - 1))
+Base.zeros(::dvzdy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 1, pml ? 2 * npml : ny - 1, nx - 2))
+
+Base.zeros(::dvxdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(nz, pml ? 2 * npml : nx))
+Base.zeros(::dvzdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz, nx))
+Base.zeros(::dvxdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 1, nx - 1))
+Base.zeros(::dvzdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 1, pml ? 2 * npml : nx - 1))
+
+Base.zeros(::dtauxxdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, ny - 2, pml ? 2 * npml : nx - 1))
+Base.zeros(::dtauyydy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, pml ? 2 * npml : ny - 1, nx - 2))
+Base.zeros(::dtauzzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 1, ny - 2, nx - 2))
+Base.zeros(::dtauxydx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, ny - 1, pml ? 2 * npml : nx - 2))
+Base.zeros(::dtauxydy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, pml ? 2 * npml : ny - 2, nx - 1))
+Base.zeros(::dtauxzdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 1, ny - 2, pml ? 2 * npml : nx - 2))
+Base.zeros(::dtauxzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 2, ny - 2, nx - 1))
+Base.zeros(::dtauyzdy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 1, pml ? 2 * npml : ny - 2, nx - 2))
+Base.zeros(::dtauyzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 2, ny - 1, nx - 2))
+
+Base.zeros(::dtauxxdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 2, pml ? 2 * npml : nx - 1))
+Base.zeros(::dtauzzdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 1, nx - 2))
+Base.zeros(::dtauxzdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(nz - 1, pml ? 2 * npml : nx - 2))
+Base.zeros(::dtauxzdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
+    Data.Array(zeros(pml ? 2 * npml : nz - 2, nx - 1))
 
 # Dont need pressure for FdtdElastic, so no initialization
 for f in Fields("p")
-    @eval Base.zeros(::$f, ::FdtdElastic, args1...; args2...) = Data.Array(zeros(fill(1, length(args1))...))
+    @eval Base.zeros(::$f, ::FdtdElastic, args1...; args2...) =
+        Data.Array(zeros(fill(1, length(args1))...))
 end
-# remove stress 
-# for f in Fields("tau")
-    # Base.zeros(::f, ::FdtdAcou, args...) = Data.Array(zeros(fill(1, length(args))...))
-# end
+# remove stress from acoustic simulations
+for f in Fields("tau")
+    @eval Base.zeros(::$f, ::FdtdAcou, args1...; args2...) =
+        Data.Array(zeros(fill(1, length(args1))...))
+end
+# no "y" for 2D simulations
+for f in Fields("y")
+    @eval Base.zeros(::$f, attrib_mod, nz, nx; args...) = Data.Array(zeros(fill(1, 2)...))
+end
 
 

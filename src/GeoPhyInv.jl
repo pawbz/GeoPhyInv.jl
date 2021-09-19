@@ -1,5 +1,6 @@
 module GeoPhyInv
-
+const NDIMS=3
+const USE_GPU=true
 
 # load all necessary packages
 using Misfits
@@ -14,7 +15,20 @@ using Distributed
 using DistributedArrays
 using SharedArrays
 using ParallelStencil
-using ParallelStencil.FiniteDifferences3D
+@static if(NDIMS==2) 
+	using ParallelStencil.FiniteDifferences2D
+
+	# dummy aliases while parsing 3D code
+	var"@d_zi" = var"@d_yi"
+	var"@d_za" = var"@d_ya"
+	var"@av_zi" = var"@av_yi"
+	var"@av_xzi" = var"@av_xi"
+	var"@av_xyi" = var"@av_xi"
+	var"@av_yzi" = var"@av_xi"
+
+	else
+		using ParallelStencil.FiniteDifferences3D
+	end
 using Printf
 using DataFrames
 using SparseArrays
@@ -39,11 +53,10 @@ using HDF5
 
 
 
-USE_GPU=true
 @static if USE_GPU
-    @init_parallel_stencil(CUDA, Float64, 3);
+    @init_parallel_stencil(CUDA, Float64, NDIMS);
 else
-    @init_parallel_stencil(Threads, Float64, 3);
+    @init_parallel_stencil(Threads, Float64, NDIMS);
 end
 # import ..USE_GPU
 # import ..NDIMS

@@ -10,7 +10,7 @@ As of now, only seismic models are predefined in this package. Choose `attrib::S
 * `=:acou_homo1` : a test homogeneous acoustic model
 * `=:acou_homo2` : a test homogeneous acoustic model, but with coarser spatial sampling (faster testing)
 * `=:marmousi2` : marmousi2 model with lower resolution; useful for surface seismic experiments
-* `=:pizza` : `:acous_homo2` with some perturbations 
+* `=:pizza` : `:acou_homo2` with some perturbations 
 """
 function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 	bfrac=0.1; 
@@ -119,9 +119,7 @@ function Medium(attrib::Symbol, δ::Real=0.0; verbose=false)
 		return model
 	elseif(δ > 0.0)
 		mgrid_out=broadcast(x->range(x[1],stop=x[end],step=δ),model.mgrid)
-		model_out=Medium_zeros(mgrid_out)
-		update!(model_out,model)
-		Models.interp_spray!(model, model_out, :interp, :B1)
+		model_out=update(model,mgrid_out)
 		verbose && Models.print(model_out,string(attrib))
 		return model_out
 	else

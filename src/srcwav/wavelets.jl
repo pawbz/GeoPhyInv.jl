@@ -189,17 +189,17 @@ The model has `nλ` wavelengths, and the maximum modeling time is determined by 
 """
 function get_fqdom_tgrid( mod::Medium, nλ::Int, tmaxfrac::Real, epsilon)
 
-	x=mod.mgrid[2]; z=mod.mgrid[1]
+	# maximum distance (diagnol) the wave travels
+	d = sqrt(sum([(m[1]-m[end])^2 for m in mod.mgrid]))
+
 	# dominant wavelength using mod dimensions
-	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nλ)
+	λdom=d*inv(real(nλ))
+
 	# average P velocity
 	vavg=mod.ref[:vp]
 
 	fqdom = vavg/λdom
 
-	# maximum distance the wave travels
-	d = sqrt((x[1]-x[end]).^2+(z[1]-z[end]).^2)
-	
 	# use two-way maximum distance to get tmax
 	tmax=2.0*d*inv(vavg)*tmaxfrac
 

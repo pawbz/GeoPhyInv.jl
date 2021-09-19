@@ -5,12 +5,12 @@
 	* choose 5 for 4th order scheme?
 * `epsilon` : Courant number
 """
-function check_fd_stability(bounds, mgrid, tgrid, freqmin, freqmax, verbose=true, H=5, epsilon=0.5)
+function check_fd_stability(bounds, mgrid, tgrid, freqmin, freqmax, attrib_mod, verbose=true, H=5, epsilon=0.5)
 
 	δ=step.(mgrid)
 	δt=step(tgrid)
 
-	if(:vs ∈ names(bounds)[1])
+	if(isa(attrib_mod, FdtdElastic))
 		vmin=bounds[:vs][1] # vs condition overrides 
 		vmax=sqrt(bounds[:vp][2]^2 + bounds[:vs][2]^2) # see Virieux (1986)
 
@@ -20,7 +20,7 @@ function check_fd_stability(bounds, mgrid, tgrid, freqmin, freqmax, verbose=true
 	end
 
 	# check spatial sampling, i.e., number of grid points in minimum wavelength
-	if(:vs ∈ names(bounds)[1])
+	if(isa(attrib_mod, FdtdElastic))
 		δs_temp=round(vmin/H/freqmax,digits=2); 
 	else
 		δs_temp=round(vmin/H/freqmax,digits=2);

@@ -20,7 +20,8 @@ function Base.iszero(mod::Medium)
 	if (any(broadcast(iszero,mod.bounds)) && any(broadcast(iszero,mod.ref)))
 		return true
 	else
-		for field in [:vp,:rho,:vs]
+		# vp and rho cannot be zero
+		for field in [:vp,:rho]
 			if(field ∈ names(mod.m)[1])
 				if(any(iszero.(mod[field])))
 					return true
