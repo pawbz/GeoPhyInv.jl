@@ -63,7 +63,7 @@ function update!(pa::PFdtd, medium::Medium)
 end
 function update!(pac::T, medium::Medium) where {T<:P_common{FdtdAcou}}
     copyto!(pac.medium, medium)
-    padarray!(pac.exmedium, pac.medium, npml)
+    padarray!(pac.exmedium, pac.medium, npml, pac.pml_edges)
     copyto!(pac.mod[:K], pac.exmedium, [:K])
     copyto!(pac.mod[:KI], pac.exmedium, [:KI])
     copyto!(pac.mod[:rhoI], pac.exmedium, [:rhoI])
@@ -73,7 +73,7 @@ function update!(pac::T, medium::Medium) where {T<:P_common{FdtdAcou}}
 end
 function update!(pac::T, medium::Medium) where {T<:P_common{FdtdElastic}}
     copyto!(pac.medium, medium)
-    padarray!(pac.exmedium, pac.medium, npml)
+    padarray!(pac.exmedium, pac.medium, npml, pac.pml_edges)
     copyto!(pac.mod[:mu], pac.exmedium, [:mu])
     copyto!(pac.mod[:lambda], pac.exmedium, [:lambda])
     copyto!(pac.mod[:M], pac.exmedium, [:M])
@@ -89,10 +89,10 @@ update!(pa,srcwav_new,sflags)
 Update `pa` with a new bundle of source wavelets `srcwav_new`, without additional memory allocation.
 Optionally, `sflags` can be changed. 
 """
-function update!(pa::PFdtd, srcwav::SrcWav, sflags::Any = nothing)
-    update_srcwav!(pa, [srcwav], sflags)
+function update!(pa::PFdtd, srcwav::SrcWav, sflags::Any = nothing; verbose = false)
+    update!(pa, [srcwav], sflags)
 end
-function update_srcwav!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing)
+function update!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing; verbose = false)
     # update srcwav in pa.c
     (length(srcwav) ≠ pa.c.ic[:npw]) && error("cannot update")
     for i = 1:length(srcwav)
@@ -101,8 +101,10 @@ function update_srcwav!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing)
     if (!(sflags === nothing))
         copyto!(pa.c.sflags, sflags)
     end
-
     for ipw = 1:pa.c.ic[:npw]
+        freqmin = 0
+        freqmax = Inf
+        freqpeaks = []
         # fill_wavelets for each supersource
         @sync begin
             for (ip, p) in enumerate(procs(pa.p))
@@ -112,10 +114,31 @@ function update_srcwav!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing)
                         iss = pap.ss[is].iss
                         wavelets = pap.ss[is].wavelets
                         broadcast(x -> fill!.(x, 0.0), wavelets)
-                        fill_wavelets!(ipw, iss, wavelets, pa.c.srcwav, pa.c.sflags)
+                        fmin, fmax, fpeak =
+                            fill_wavelets!(ipw, iss, wavelets, pa.c.srcwav, pa.c.sflags)
+                        freqmin = max(freqmin, fmin)
+                        freqmax = min(freqmax, fmax)
+                        push!(freqpeaks, fpeak)
                     end
                 end
             end
+        end
+        freqpeak = Statistics.mean(freqpeaks)
+        # store frequency (in Hz) bounds for first propagating wavefield
+        if (ipw == 1)
+            pa.c.fc = vcat(
+                pa.c.fc,
+                NamedArray(
+                    [freqmin, freqmax, freqpeak],
+                    ([:freqmin, :freqmax, :freqpeak],),
+                ),
+            )
+        end
+        if (verbose)
+            freqmin = @sprintf("%0.2e", freqmin)
+            freqmax = @sprintf("%0.2e", freqmax)
+            freqpeak = @sprintf("%0.2e", freqpeak)
+            @info "frequency bounds for propagating wavefield $ipw are: [$freqmin, $freqmax], with peak at: $freqpeak"
         end
     end
 end
@@ -307,7 +330,7 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N}}) where {N}
 
             (pac.illum_flag) && compute_illum!(issp, pap)
 
-            if (pac.snaps_flag)
+            if (eval(pac.snaps_field) <: Fields)
                 iitsnaps = findall(x -> ==(x, it), pac.itsnaps)
                 for itsnap in iitsnaps
                     snaps_save!(itsnap, issp, pac, pap)

@@ -14,7 +14,7 @@ for field in [:p, :vx,:vz]
 
 	for sflags in [[1,-1],[2,-2]]
 		pa=SeisForwExpt(FdtdAcou(),npw=1, tgrid=tgrid,
-		#	abs_trbl=[:null],
+		#	pml_edges=[:null],
 			gmodel_flag=false,
 			sflags=[sflags[1]],
 			snaps_flag=true,
@@ -28,7 +28,7 @@ for field in [:p, :vx,:vz]
 
 		# change source flag and update wavelets in pa
 		pa.c.sflags=[sflags[2]];
-		GeoPhyInv.update_srcwav!(pa,[srcwav])
+		GeoPhyInv.update!(pa,[srcwav])
 		pa.c.backprop_flag=-1 # do backpropagation
 
 		update!(pa)

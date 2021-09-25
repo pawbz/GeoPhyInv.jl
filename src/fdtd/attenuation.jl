@@ -25,3 +25,4 @@ function get_memcoeff(mod::Medium)
 
 	return memcoeff1, memcoeff2
 end
+

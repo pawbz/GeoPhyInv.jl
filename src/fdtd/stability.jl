@@ -5,13 +5,18 @@
 	* choose 5 for 4th order scheme?
 * `epsilon` : Courant number
 """
-function check_fd_stability(bounds, mgrid, tgrid, freqmin, freqmax, attrib_mod, verbose=true, H=5, epsilon=0.5)
+function check_stability(pa::PFdtd, verbose=true; H=5, epsilon=inv(sqrt(ndims(pa.c.medium))))
+	mgrid=pa.c.medium.mgrid
+	freqmin=pa.c.fc[:freqmin]
+	freqmax=pa.c.fc[:freqmax]
+	attrib_mod=pa.c.attrib_mod
+	bounds=pa.c.medium.bounds
 
 	δ=step.(mgrid)
-	δt=step(tgrid)
+	δt=pa.c.fc[:dt]
 
 	if(isa(attrib_mod, FdtdElastic))
-		vmin=bounds[:vs][1] # vs condition overrides 
+		vmin=minimum(filter(x->x ≠ 0, pa.c.medium[:vs])) # vs condition overrides (other than zero?)
 		vmax=sqrt(bounds[:vp][2]^2 + bounds[:vs][2]^2) # see Virieux (1986)
 
 	else

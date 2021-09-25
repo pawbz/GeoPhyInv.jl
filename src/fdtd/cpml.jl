@@ -1,20 +1,19 @@
 """
 Generate coefficients related to PML boundaries, e.g., damping profiles.
-This function outputs a_x, b_x, and k_x variables in eq. 25-26 from Komatitsch 2007 (Geophysics).
+This function outputs a, b, and k variables in eq. 25-26 from Komatitsch 2007 (Geophysics).
 
 	TODO
 * At the moment, K=1, and is dummy, unlike in the case of EM when it was useful. Removing K and K_inv might save us memory when using GPUs.
-* Restrict the sizes of these coefficients only to the PML region while still writing optimized loops?
 """
-function pml_coeff(
+function update_pml!(
+    pml::NamedVector{T},
     mgrid, # 1D grid
     flags::Vector{Bool},
     δt::Float64,
     np::Int64,
-    velmax::Float64,
-    velmin::Float64,
-    freqpeak::Float64,
-)
+    velavg::Float64,
+    freqpeak::Float64, # dominant frequency in Hz
+) where {T<:Data.Array}
 
     δx = step(mgrid)
     nx = length(mgrid)
@@ -24,7 +23,7 @@ function pml_coeff(
     ALPHA_MAX_PML = pi * freqpeak # from Festa and Vilotte
 
     # thickness of the PML layer in meters
-    thickness_PML_x = np * δx
+    thickness_PML = np * δx
 
     "reflection coefficient (INRIA report section 6.1) http://hal.inria.fr/docs/00/07/32/19/PDF/RR-3471.pdf"
     Rcoef = 0.001e0
@@ -33,31 +32,26 @@ function pml_coeff(
     #if(NPOWER < 1) stop "NPOWER must be greater than 1"
 
     # compute d0 from INRIA report section 6.1 http://hal.inria.fr/docs/00/07/32/19/PDF/RR-3471.pdf
-    d0_x = -(NPOWER + 1) * (velmax + velmin) / 2.0 * log(Rcoef) / (2.e0 * thickness_PML_x)
+    d0 = -(NPOWER + 1) * (velavg) * log(Rcoef) / (2.e0 * thickness_PML)
 
-
-    d_x = Data.Array(zeros(nx))
-    d_x_half = zero(d_x)
-    k_x = zero(d_x)
-    k_xI = zero(d_x)
-    fill!(k_x, 1)
-    fill!(k_xI, 1)
-    k_x_half = zero(d_x)
-    k_x_halfI = zero(d_x)
-    fill!(k_x_half, 1)
-    fill!(k_x_halfI, 1)
-    alpha_x = zero(d_x)
-    alpha_x_half = zero(d_x)
-    a_x = zero(d_x)
-    a_x_half = zero(d_x)
-    b_x = zero(d_x)
-    b_x_half = zero(d_x)
+    k = zeros(nx)
+    k_half = zero(k)
+    fill!(k, 1)
+    fill!(k_half, 1)
+    d = zeros(nx)
+    d_half = zero(d)
+    alpha = zero(d)
+    alpha_half = zero(d)
+    a=zero(d)
+    b=zero(d)
+    a_half=zero(d)
+    b_half=zero(d)
 
 
     "damping in the X direction"
     "origin of the PML layer (position of right edge minus thickness, in meters)"
-    xoriginleft = thickness_PML_x
-    xoriginright = (nx - 1) * δx - thickness_PML_x
+    xoriginleft = thickness_PML
+    xoriginright = (nx - 1) * δx - thickness_PML
 
     for ix = 1:nx
         # abscissa of current grid point along the damping profile
@@ -69,22 +63,22 @@ function pml_coeff(
             # define damping profile at the grid points
             abscissa_in_PML = xoriginleft - xval
             if (abscissa_in_PML >= 0.0)
-                abscissa_normalized = abscissa_in_PML / thickness_PML_x
-                d_x[ix] = d0_x * abscissa_normalized .^ NPOWER
+                abscissa_normalized = abscissa_in_PML / thickness_PML
+                d[ix] = d0 * abscissa_normalized .^ NPOWER
                 # this taken from Gedney page 8.2
-                k_x[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized .^ NPOWER
-                alpha_x[ix] =
+                k[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized .^ NPOWER
+                alpha[ix] =
                     ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
             end
 
             # define damping profile at half the grid points
             abscissa_in_PML = xoriginleft - (xval + δx / 2.e0)
             if (abscissa_in_PML >= 0.0)
-                abscissa_normalized = abscissa_in_PML / thickness_PML_x
-                d_x_half[ix] = d0_x * abscissa_normalized .^ NPOWER
+                abscissa_normalized = abscissa_in_PML / thickness_PML
+                d_half[ix] = d0 * abscissa_normalized .^ NPOWER
                 # this taken from Gedney page 8.2
-                k_x_half[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized .^ NPOWER
-                alpha_x_half[ix] =
+                k_half[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized .^ NPOWER
+                alpha_half[ix] =
                     ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
             end
         end
@@ -95,80 +89,114 @@ function pml_coeff(
             # define damping profile at the grid points
             abscissa_in_PML = xval - xoriginright
             if (abscissa_in_PML >= 0.0)
-                abscissa_normalized = abscissa_in_PML / thickness_PML_x
-                d_x[ix] = d0_x * abscissa_normalized^NPOWER
+                abscissa_normalized = abscissa_in_PML / thickness_PML
+                d[ix] = d0 * abscissa_normalized^NPOWER
                 # this taken from Gedney page 8.2
-                k_x[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized^NPOWER
-                alpha_x[ix] =
+                k[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized^NPOWER
+                alpha[ix] =
                     ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
             end
 
             # define damping profile at half the grid points
             abscissa_in_PML = xval + δx / 2.e0 - xoriginright
             if (abscissa_in_PML >= 0.0)
-                abscissa_normalized = abscissa_in_PML / thickness_PML_x
-                d_x_half[ix] = d0_x * abscissa_normalized^NPOWER
+                abscissa_normalized = abscissa_in_PML / thickness_PML
+                d_half[ix] = d0 * abscissa_normalized^NPOWER
                 # this taken from Gedney page 8.2
-                k_x_half[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized^NPOWER
-                alpha_x_half[ix] =
+                k_half[ix] = 1.e0 + (K_MAX_PML - 1.e0) * abscissa_normalized^NPOWER
+                alpha_half[ix] =
                     ALPHA_MAX_PML * (1.e0 - abscissa_normalized) + 0.01e0 * ALPHA_MAX_PML
             end
 
         end
         #
         # just in case, for -5 at the end
-        (alpha_x[ix] < 0.0) ? alpha_x[ix] = 0.0 : nothing
-        (alpha_x_half[ix] < 0.0) ? alpha_x_half[ix] = 0.0 : nothing
+        (alpha[ix] < 0.0) ? alpha[ix] = 0.0 : nothing
+        (alpha_half[ix] < 0.0) ? alpha_half[ix] = 0.0 : nothing
 
-        # see equation 25 Komatitsch, 2007, get b_x and a_x (need k_x, alpha_x, and d_x before this )
-        b_x[ix] = exp(-(d_x[ix] / k_x[ix] + alpha_x[ix]) * δt)
-        b_x_half[ix] = exp(-(d_x_half[ix] / k_x_half[ix] + alpha_x_half[ix]) * δt)
+        # see equation 25 Komatitsch, 2007, get b and a (need k, alpha, and d before this )
+        b[ix] = exp(-(d[ix] / k[ix] + alpha[ix]) * δt)
+        b_half[ix] = exp(-(d_half[ix] / k_half[ix] + alpha_half[ix]) * δt)
 
         # this to avoid division by zero outside the PML
-        (abs(d_x[ix]) > 1.e-6) ?
-        a_x[ix] =
-            d_x[ix] * (b_x[ix] - 1.e0) / (k_x[ix] * (d_x[ix] + k_x[ix] * alpha_x[ix])) :
-        nothing
-        (abs(d_x_half[ix]) > 1.e-6) ?
-        a_x_half[ix] =
-            d_x_half[ix] * (b_x_half[ix] - 1.e0) /
-            (k_x_half[ix] * (d_x_half[ix] + k_x_half[ix] * alpha_x_half[ix])) : nothing
+        (abs(d[ix]) > 1.e-6) ?
+        a[ix] = d[ix] * (b[ix] - 1.e0) / (k[ix] * (d[ix] + k[ix] * alpha[ix])) : nothing
+        (abs(d_half[ix]) > 1.e-6) ?
+        a_half[ix] =
+            d_half[ix] * (b_half[ix] - 1.e0) /
+            (k_half[ix] * (d_half[ix] + k_half[ix] * alpha_half[ix])) : nothing
 
     end
-    copyto!(k_xI, inv.(k_x))
-    copyto!(k_x_halfI, inv.(k_x_half))
+    copyto!(pml[:kI], inv.(k))
+    copyto!(pml[:k_halfI], inv.(k_half))
+    copyto!(pml[:a],a)
+    copyto!(pml[:b],b)
+    copyto!(pml[:a_half],a_half)
+    copyto!(pml[:b_half],b_half)
 
-
-
-    names = [:a, :b, :kI, :a_half, :b_half, :k_halfI]
-    # return [d_x, d_x_half, alpha_x, alpha_x_half]
-    return NamedArray([a_x, b_x, k_xI, a_x_half, b_x_half, k_x_halfI], names)
 end
-
 
 
 """
 Generate a NamedArray with PML coefficients for all the dimensions that are then stored in the FDTD structs.
 """
-function get_pml(mgrid, abs_trbl, args...)
-    names = dim_names(length(mgrid))
+function get_pml(mgrid)
+    dnames = dim_names(length(mgrid))
+    pnames = [:a, :b, :kI, :a_half, :b_half, :k_halfI]
     return NamedArray(
         [
-            pml_coeff(
-                mgrid[i],
-                [
-                    any(abs_trbl .== Symbol(string(dim), "min")),
-                    any(abs_trbl .== Symbol(string(dim), "max")),
-                ],
-                args...,
-            ) for (i, dim) in enumerate(names)
+            NamedArray(
+                Data.Array.([
+                    zeros(ni),
+                    zeros(ni),
+                    ones(ni),
+                    zeros(ni),
+                    zeros(ni),
+                    ones(ni),
+                ]),
+                pnames,
+            ) for ni in length.(mgrid)
         ],
-        names,
+        dnames,
+    )
+end
+
+"""
+Just a loop over dims of pml
+"""
+function update_pml!(
+    pml::NamedVector{T},
+    mgrid,
+    pml_edges::Vector{Symbol},
+    args...,
+) where {T<:NamedVector}
+    for (i, dim) in enumerate(dim_names(length(mgrid)))
+        update_pml!(
+            pml[dim],
+            mgrid[i],
+            [
+                any(pml_edges .== Symbol(string(dim), "min")),
+                any(pml_edges .== Symbol(string(dim), "max")),
+            ],
+            args...,
+        )
+    end
+end
+
+function update_pml!(pac)
+    update_pml!(
+        pac.pml,
+        pac.exmedium.mgrid,
+        pac.pml_edges,
+        pac.fc[:dt],
+        npml-3,
+        Statistics.mean(pac.exmedium.bounds[:vp]),
+        pac.fc[:freqpeak],
     )
 end
 
 
-for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
+for dimnames in [zip([:1, :2, :3], dim_names(3)), zip([:1, :2], dim_names(2))]
     is = broadcast(x -> Symbol(string("i", x)), getindex.(collect(dimnames), 2))
     ist = Meta.parse(string("(", [string(s, ",") for s in is]..., ")"))
     N = Meta.parse(string(length(is)))

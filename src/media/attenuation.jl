@@ -5,7 +5,6 @@ then Q is given by Re(K(ω))/Im(K(ω))
 * 
 """
 function get_relaxation_times(Q, nsls, fmin, fmax)
-    nz,nx=size(Q)
 	tau_epsilon=zeros(nsls, size(Q)...)
 	tau_sigma=zeros(nsls, size(Q)...)
 

@@ -121,7 +121,7 @@ function spread(n, p0::Vector{T1}, rad::T2, phi::Vector{T4}, theta::Vector{T3}=[
 	phi=spread(n, [phi[1]],[phi[2]], rand_flag)
 	theta=spread(n, [theta[1]],[theta[2]], rand_flag)
 	nd=length(p0)
-	p=fill(zeros(n),nd)
+	p=[zeros(n) for i in 1:nd]
 
 	for i in 1:n
 		p[1][i]=p0[1]+rad*cos(phi[i])

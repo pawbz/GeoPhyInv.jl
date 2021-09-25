@@ -1,4 +1,6 @@
-
+"""
+Use input srcwav to fill wavelets and returns frequency bounds.
+"""
 function fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
 
     nt = size(wavelets, 1)
@@ -6,6 +8,9 @@ function fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
     ns = srcwav[ipw][iss][:ns]
     δt = step(srcwav[ipw][iss].grid)
 
+    freqmin = 0.0
+    freqpeaks= []
+    freqmax = Inf
     for sfield in sfields
         for is = 1:ns
             snt = length(srcwav[ipw][1].grid)
@@ -64,8 +69,19 @@ function fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
                     wavelets[1:nt_diff+1][sfield][is] = wavelets[nt_diff+2][sfield][is]
                 end
             end
+            w = [wavelets[it][sfield][is] for it = 1:nt]
+            freqmax = min(
+                GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib = :max),
+                freqmax,
+            )
+            freqmin = max(
+                GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib = :min),
+                freqmin,
+            )
+            push!(freqpeaks,GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib = :peak))
         end
     end
+    return freqmin, freqmax, Statistics.mean(freqpeaks)
 end
 
 struct Source_B1 end
@@ -93,7 +109,9 @@ struct Source_B0 end
                     division of source term with δx and δz (see Jan's fdelmodc manual)
                     """
                     source_term =
-                        wavelets[it][sfield][is] * pac.fc[:dt] * pac.fc[:dxI] * pac.fc[:dzI]
+                        wavelets[it][sfield][is] *
+                        pac.fc[:dt] *
+                        prod(inv.(step.(pac.medium.mgrid)))
 
                     for (i, si) in enumerate(sindices[is])
                         p[sfield][si] +=
@@ -108,16 +126,21 @@ end
 
 # multiplication with modK
 # on pressure grid
-source(source_term, spray, pac::P_common{FdtdAcou}, si, ::p) = source_term * spray * pac.mod[:K][si]
+source(source_term, spray, pac::P_common{FdtdAcou}, si, ::p) =
+    source_term * spray * pac.mod[:K][si]
 
 # on vx grid
 source(source_term, spray, pac::P_common{FdtdAcou}, si, ::vx) = source_term * spray #* pac.mod[:rhovxI][si]
+source(source_term, spray, pac::P_common{FdtdElastic}, si, ::vx) = source_term * spray #* pac.mod[:rhovxI][si]
 
 # on vz grid
 source(source_term, spray, pac::P_common{FdtdAcou}, si, ::vz) = source_term * spray #* pac.mod[:rhovzI][si]
+source(source_term, spray, pac::P_common{FdtdElastic}, si, ::vz) = source_term * spray #* pac.mod[:rhovzI][si]
 
 
 
 # testing source on tauxx (need to check it)
-source(source_term, spray, pac::P_common{FdtdElastic}, si, ::tauxx) = source_term * spray * 10^14
-source(source_term, spray, pac::P_common{FdtdElastic}, si, ::tauyy) = source_term * spray * 10^14
+source(source_term, spray, pac::P_common{FdtdElastic}, si, ::tauxx) =
+    source_term * spray * 10^14
+source(source_term, spray, pac::P_common{FdtdElastic}, si, ::tauyy) =
+    source_term * spray * 10^14

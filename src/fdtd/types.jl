@@ -14,7 +14,7 @@ mutable struct P_x_worker_x_pw_x_ss{N}
     sindices::Vector{<:CartesianIndices{N}} # contains indices for each source 	
     rindices::Vector{<:CartesianIndices{N}} # contains indices for each receiver
     boundary::Vector{Array{Float64,3}}
-    snaps::Array{Float64,3}
+    snaps::NamedVector{Array{Float64,N}, Vector{Array{Float64,N}}, Tuple{OrderedDict{String, Int64}}}
     illum::Matrix{Float64}
     grad_mod::NamedStack{Matrix{Float64}} # w.r.t different coeffs
 end
@@ -60,7 +60,7 @@ Initialize between each simulation
 """
 function initialize!(pa::P_x_worker_x_pw_x_ss)
     fill!.(pa.records, 0.0)
-    fill!(pa.snaps, 0.0)
+    fill!.(pa.snaps, 0.0)
     fill!(pa.illum, 0.0)
     fill!.(pa.grad_mod, 0.0)
 end
@@ -115,7 +115,7 @@ Modelling parameters common for all supersources
 * `TDout::Vector{Records.TD}=[Records.TD_zeros(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
 * `illum::Array{Float64,2}=zeros(length(medium.mgrid[1]), length(medium.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
-* `snaps::Array{Float64,4}=zeros(length(medium.mgrid[1]),length(medium.mgrid[2]),length(tsnaps),ageom[1].nss)` :snapshots saved at `tsnaps`
+* `snaps::NamedArray{Array{Float64}}` :snapshots saved at `tsnaps`
 
 # Return (in order)
 
@@ -134,7 +134,7 @@ mutable struct P_common{T,N}
     medium::Medium
     ageom::Vector{AGeom}
     srcwav::Vector{SrcWav}
-    abs_trbl::Vector{Symbol}
+    pml_edges::Vector{Symbol}
     sfields::Vector{Vector{Symbol}}
     sflags::Vector{Int64}
     rfields::Vector{Symbol}
@@ -171,8 +171,8 @@ mutable struct P_common{T,N}
     illum_flag::Bool
     illum_stack::SharedArrays.SharedArray{Float64,N}
     backprop_flag::Int64
-    snaps_flag::Bool
-    itsnaps::Vector{Int64}
+    snaps_field::Symbol
+    itsnaps::NamedVector{Int64, Vector{Int64}, Tuple{OrderedCollections.OrderedDict{String, Int64}}} 
     gmodel_flag::Bool
     bindices::NamedStack{Int64}
     #=

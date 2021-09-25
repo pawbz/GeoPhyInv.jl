@@ -1,5 +1,5 @@
 module GeoPhyInv
-const NDIMS=3
+const NDIMS=2
 const USE_GPU=true
 
 # load all necessary packages

@@ -1,4 +1,4 @@
- function advance!(pac::T, pap) where {T<:P_common{<:FdtdElastic}}
+function advance!(pac::T, pap) where {T<:P_common{<:FdtdElastic}}
     for ipw in pac.activepw
         # store p for the last two steps
         # pppppp!(pap[ipw],pac.attrib_mod)
@@ -152,16 +152,7 @@ end
 end
 
 
-@parallel function compute_dv!(
-    vx::Data.Array{2},
-    vz,
-    dvxdx,
-    dvzdz,
-    dvxdz,
-    dvzdx,
-    dxI,
-    dzI,
-)
+@parallel function compute_dv!(vx::Data.Array{2}, vz, dvxdx, dvzdz, dvxdz, dvzdx, dxI, dzI)
     @all(dvxdx) = @d_za(vx) * dxI # at [ix,iz]
     @all(dvzdz) = @d_xa(vz) * dzI # at      "
 
@@ -175,7 +166,17 @@ end
 
 
 
-@parallel function compute_tauii!(tauxx::Data.Array{3}, tauyy, tauzz, dvxdx, dvydy, dvzdz, dt, M, lambda)
+@parallel function compute_tauii!(
+    tauxx::Data.Array{3},
+    tauyy,
+    tauzz,
+    dvxdx,
+    dvydy,
+    dvzdz,
+    dt,
+    M,
+    lambda,
+)
 
     @all(tauxx) =
         @all(tauxx) -
@@ -192,11 +193,9 @@ end
 
 @parallel function compute_tauii!(tauxx::Data.Array{2}, tauzz, dvxdx, dvzdz, dt, M, lambda)
     @all(tauxx) =
-        @all(tauxx) -
-        dt * ((@all(M) * @all(dvxdx)) + (@all(lambda) * (@all(dvzdz))))
+        @all(tauxx) - dt * ((@all(M) * @all(dvxdx)) + (@all(lambda) * (@all(dvzdz))))
     @all(tauzz) =
-        @all(tauzz) -
-        dt * ((@all(M) * @all(dvzdz)) + (@all(lambda) * (@all(dvxdx))))
+        @all(tauzz) - dt * ((@all(M) * @all(dvzdz)) + (@all(lambda) * (@all(dvxdx))))
 
     return
 end
@@ -219,14 +218,28 @@ end
 
     return
 end
-@parallel function compute_tauij!(
-    tauxz::Data.Array{2},
-    dvxdz,
-    dvzdx,
-    dt,
-    mu,
-)
+@parallel function compute_tauij!(tauxz::Data.Array{2}, dvxdz, dvzdx, dt, mu)
     @all(tauxz) = @all(tauxz) - dt * (@av(mu) * (@all(dvxdz) + @all(dvzdx)))
+    return
+end
+
+
+
+
+@parallel_indices (iy, ix) function free_surface!(tau::Data.Array{3}, iz_free)
+    tau[iz_free, iy, ix] = 0.0
+    return
+end
+@parallel_indices (iy, ix) function free_surface_mirror!(tau::Data.Array{3}, iz_free)
+    tau[iz_free-1, iy, ix] = -1 * tau[iz_free, iy, ix]
+    return
+end
+@parallel_indices (ix) function free_surface!(tau::Data.Array{2}, iz_free)
+    tau[iz_free, ix] = 0.0
+    return
+end
+@parallel_indices (ix) function free_surface_mirror!(tau::Data.Array{2}, iz_free)
+    tau[iz_free-1, ix] = -1 * tau[iz_free, ix]
     return
 end
 
@@ -378,6 +391,14 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pac.mod[:mu],
     )
 
+    if (pac.ic[:iz_free] ≠ 0)
+        @parallel (1:size(w1t[:tauzz], 2), size(w1t[:tauzz], 3)) free_surface_mirror!(
+            w1t[:tauzz],
+            pac.ic[:iz_free] + 1,
+        )
+        @parallel (1:size(w1t[:tauxz], 2), size(w1t[:tauxz], 3)) free_surface!(w1t[:tauxz], pac.ic[:iz_free])
+        @parallel (1:size(w1t[:tauyz], 2), size(w1t[:tauyz], 3)) free_surface!(w1t[:tauyz], pac.ic[:iz_free])
+    end
 
 end
 
@@ -443,21 +464,9 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
     memoryx!(mw[:dvxdx], w1t[:dvxdx], pml[:x][:a], pml[:x][:b], pml[:x][:kI])
     memoryz!(mw[:dvzdz], w1t[:dvzdz], pml[:z][:a], pml[:z][:b], pml[:z][:kI])
 
-    memoryz!(
-        mw[:dvxdz],
-        w1t[:dvxdz],
-        pml[:z][:a_half],
-        pml[:z][:b_half],
-        pml[:z][:k_halfI],
-    )
+    memoryz!(mw[:dvxdz], w1t[:dvxdz], pml[:z][:a_half], pml[:z][:b_half], pml[:z][:k_halfI])
 
-    memoryx!(
-        mw[:dvzdx],
-        w1t[:dvzdx],
-        pml[:x][:a_half],
-        pml[:x][:b_half],
-        pml[:x][:k_halfI],
-    )
+    memoryx!(mw[:dvzdx], w1t[:dvzdx], pml[:x][:a_half], pml[:x][:b_half], pml[:x][:k_halfI])
 
     @parallel compute_tauii!(
         w1t[:tauxx],
@@ -475,5 +484,11 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pac.fc[:dt],
         pac.mod[:mu],
     )
+
+
+    if (pac.ic[:izfree] ≠ 0)
+        @parallel (1:size(w1t[:tauzz], 2)) free_surface_mirror!(w1t[:tauzz], pac.ic[:izfree] + 1)
+        @parallel (1:size(w1t[:tauxz], 2)) free_surface!(w1t[:tauxz], pac.ic[:izfree])
+    end
 
 end

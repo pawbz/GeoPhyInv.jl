@@ -165,7 +165,7 @@ use this fraction to increase of reduce the maximum time
 # Keyword Arguments
 * all the keywords arguments of the `ricker` method can be used.
 """
-function ricker(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0, epsilon=0.5; args... )
+function ricker(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0, epsilon=inv(sqrt(ndims(mod))); args... )
 	@assert(!iszero(mod))
 	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac, epsilon)
 	wav=ricker(fqdom, tgrid; args...)
@@ -206,7 +206,7 @@ function get_fqdom_tgrid( mod::Medium, nλ::Int, tmaxfrac::Real, epsilon)
 	# choose sampling interval to obey max freq of source wavelet
 	δmin = minimum(step.(mod.mgrid))
 	vmax=try
-		sqrt(bounds[:vp][2]^2 + bounds[:vs][2]^2) # see Virieux (1986)
+		sqrt(mod.bounds[:vp][2]^2 + mod.bounds[:vs][2]^2) # see Virieux (1986)
 	catch
 		mod.bounds[:vp][2]
 	end
