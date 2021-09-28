@@ -3,9 +3,10 @@
 """
 Mutable type for storing medium parameters.
 ```julia
-mod=Medium(mgrid, names=[:vp,:rho])
+mod=Medium(mgrid, names=[:vp,:vs,:rho]) # initiate elastic medium
+mod=Medium(mgrid, names=[:vp,:rho]) # initiate acoustic medium
 ```
-This initializes a subsurface model with `:vp` and `:rho` parameters. Print the
+This initializes a subsurface model with `:vp`, `:rho` and `:vs` parameters. Print the
 names of the medium parameters stored in `mod`.
 ```julia
 names(mod)
@@ -14,9 +15,12 @@ names(mod)
 ## Indexing
 * `mod.mgrid` : returns the spatial-grid bundle
 * `mod[:vp]` : P-wave velocity
+* `mod[:vs]` : S-wave velocity
 * `mod[:rho]` : mass density
 * `mod[:Zp]` : P-wave impedance 
 * `mod[:K]` : bulk modulus (unrelaxed when considering attenuation) 
+* `mod[:M]` : P-wave modulus
+* `mod[:mu]` : shear modulus
 * `mod[:Q]` : quality factor (relaxation times are optimized to be constant over all frequencies; see Robertsson, et. al, 1994)
 * `mod.ref` : reference medium parameters 
 * `mod.bounds` : bounds of medium parameters

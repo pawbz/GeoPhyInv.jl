@@ -43,9 +43,9 @@ end
 
 
 # without attenuation 
-medium = Medium(:acou_homo1);
+medium = Medium(:acou_homo1, 5);
 ageom = AGeom(medium.mgrid, :xwell);
-tgrid = range(0.0, stop = 2.0, length = 1000)
+tgrid = range(0.0, stop = 2.0, length = 2000)
 wav = ricker(10.0, tgrid, tpeak = 0.25);
 srcwav = SrcWav(tgrid, ageom, [:p])
 update!(srcwav, [:p], wav)
@@ -81,45 +81,45 @@ pa = SeisForwExpt(
 check()
 
 
-@info "testing with attenuation" 
-medium = Medium(:acou_homo1);
-medium = Medium(medium.mgrid, [:vp, :rho, :Q])
-update!(medium, [:vp, :rho, :Q], [[1500, 2500], [1500, 2500], [10, 10]])
-fill!(medium)
+# @info "testing with attenuation" 
+# medium = Medium(:acou_homo1);
+# medium = Medium(medium.mgrid, [:vp, :rho, :Q])
+# update!(medium, [:vp, :rho, :Q], [[1500, 2500], [1500, 2500], [10, 10]])
+# fill!(medium)
 
-ageom = AGeom(medium.mgrid, :xwell);
-tgrid = range(0.0, stop = 2.0, length = 1000)
-wav = ricker(10.0, tgrid, tpeak = 0.25);
-srcwav = SrcWav(tgrid, ageom, [:p])
-update!(srcwav, [:p], wav)
+# ageom = AGeom(medium.mgrid, :xwell);
+# tgrid = range(0.0, stop = 2.0, length = 1000)
+# wav = ricker(10.0, tgrid, tpeak = 0.25);
+# srcwav = SrcWav(tgrid, ageom, [:p])
+# update!(srcwav, [:p], wav)
 
-pa = SeisForwExpt(
-    FdtdAcouVisco(),
-    npw = 1,
-    medium = medium,
-    ageom = [ageom],
-    srcwav = [srcwav],
-    sflags = [2],
-    rflags = [1],
-    tgrid = tgrid,
-    verbose = true,
-);
-
-
-@time update!(pa);
+# pa = SeisForwExpt(
+#     FdtdAcouVisco(),
+#     npw = 1,
+#     medium = medium,
+#     ageom = [ageom],
+#     srcwav = [srcwav],
+#     sflags = [2],
+#     rflags = [1],
+#     tgrid = tgrid,
+#     verbose = true,
+# );
 
 
-
-vp0 = mean(medium[:vp])
-rho0 = mean(medium[:rho])
-rec1 = GeoPhyInv.Born.mod(
-    pa.c.exmedium,
-    medium_pert = pa.c.exmedium,
-    ageom = ageom,
-    srcwav = srcwav,
-    tgridmod = tgrid,
-    src_flag = 2,
-)
+# @time update!(pa);
 
 
-check()
+
+# vp0 = mean(medium[:vp])
+# rho0 = mean(medium[:rho])
+# rec1 = GeoPhyInv.Born.mod(
+#     pa.c.exmedium,
+#     medium_pert = pa.c.exmedium,
+#     ageom = ageom,
+#     srcwav = srcwav,
+#     tgridmod = tgrid,
+#     src_flag = 2,
+# )
+
+
+# check()

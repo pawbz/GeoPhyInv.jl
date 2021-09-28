@@ -14,7 +14,11 @@ mutable struct P_x_worker_x_pw_x_ss{N}
     sindices::Vector{<:CartesianIndices{N}} # contains indices for each source 	
     rindices::Vector{<:CartesianIndices{N}} # contains indices for each receiver
     boundary::Vector{Array{Float64,3}}
-    snaps::NamedVector{Array{Float64,N}, Vector{Array{Float64,N}}, Tuple{OrderedDict{String, Int64}}}
+    snaps::NamedVector{
+        Array{Float64,N},
+        Vector{Array{Float64,N}},
+        Tuple{OrderedDict{String,Int64}},
+    }
     illum::Matrix{Float64}
     grad_mod::NamedStack{Matrix{Float64}} # w.r.t different coeffs
 end
@@ -72,20 +76,20 @@ This struct contains velocity and stress fields simulated by each worker.
 Again, note that a single worker can take care of multiple supersources.
 * T1==Matrix{Float64} for 2D simulation
 """
-mutable struct P_x_worker_x_pw{N}
+mutable struct P_x_worker_x_pw{N,B}
     ss::Vector{P_x_worker_x_pw_x_ss{N}} # supersource specific arrays
     # 2D arrays of p, vx, vz, their previous snapshots, and 
     # x derivatives of p, vx, vz
     # z derivatives of p, vx, vz
-    w1::NamedStack{NamedStack{Data.Array{N}}} # p, vx, vz
-    w2::NamedStack{NamedStack{Data.Array{N}}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
-    memory_pml::NamedStack{Data.Array{N}} # memory variables for CPML 
+    w1::NamedStack{NamedStack{Data.Array{N,B}}} # p, vx, vz
+    w2::NamedStack{NamedStack{Data.Array{N,B}}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
+    memory_pml::NamedStack{Data.Array{N,B}} # memory variables for CPML 
     born_svalue_stack::Array{Float64,N} # used for born modeling # only used for 2-D simulation
 end
 
 # P_x_worker=Vector{P_x_worker_x_pw}
 
-function initialize!(pap::Vector{P_x_worker_x_pw{N}}) where {N}
+function initialize!(pap::Vector{P_x_worker_x_pw{N,B}}) where {N,B}
     reset_w2!(pap)
     for pap_x_pw in pap
         initialize!.(pap_x_pw.ss)
@@ -94,7 +98,7 @@ function initialize!(pap::Vector{P_x_worker_x_pw{N}}) where {N}
 end
 
 # reset wavefields for every worker
-function reset_w2!(pap::Vector{P_x_worker_x_pw{N}}) where {N}
+function reset_w2!(pap::Vector{P_x_worker_x_pw{N,B}}) where {N,B}
     for pap_x_pw in pap
         fill!(pap_x_pw.born_svalue_stack, 0.0)
         for w in pap_x_pw.w1
@@ -126,7 +130,7 @@ Modelling parameters common for all supersources
 * stored snaps shots at tsnaps as Array{Float64,4} 
 
 """
-mutable struct P_common{T,N}
+mutable struct P_common{T,N,B}
     jobname::Symbol
     attrib_mod::T
     activepw::Vector{Int64}
@@ -141,8 +145,8 @@ mutable struct P_common{T,N}
     rflags::Vector{Int64}
     fc::NamedStack{Float64}
     ic::NamedStack{Int64}
-    pml::NamedStack{NamedStack{Data.Array{1}}} # e.g., pml[:x][:a], pml[:z][:b]
-    mod::NamedStack{Data.Array{N}} # e.g., mod[:KI], mod[:K]
+    pml::NamedStack{NamedStack{Data.Array{1,B}}} # e.g., pml[:x][:a], pml[:z][:b]
+    mod::NamedStack{Data.Array{N,B}} # e.g., mod[:KI], mod[:K]
     mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
     #=
     	modKI::Matrix{Float64}
@@ -172,7 +176,11 @@ mutable struct P_common{T,N}
     illum_stack::SharedArrays.SharedArray{Float64,N}
     backprop_flag::Int64
     snaps_field::Symbol
-    itsnaps::NamedVector{Int64, Vector{Int64}, Tuple{OrderedCollections.OrderedDict{String, Int64}}} 
+    itsnaps::NamedVector{
+        Int64,
+        Vector{Int64},
+        Tuple{OrderedCollections.OrderedDict{String,Int64}},
+    }
     gmodel_flag::Bool
     bindices::NamedStack{Int64}
     #=
@@ -207,9 +215,9 @@ end
 """
 A single struct combining parameters for all workers.
 """
-mutable struct PFdtd{T,N}
+mutable struct PFdtd{T,N,B}
     sschunks::Vector{UnitRange{Int64}} # how supersources are distributed among workers
-    p::DistributedArrays.DArray{Vector{P_x_worker_x_pw{N}},1,Vector{P_x_worker_x_pw{N}}} # distributed parameters among workers
+    p::DistributedArrays.DArray{Vector{P_x_worker_x_pw{N,B}},1,Vector{P_x_worker_x_pw{N,B}}} # distributed parameters among workers
     c::P_common{T,N} # common parameters
 end
 

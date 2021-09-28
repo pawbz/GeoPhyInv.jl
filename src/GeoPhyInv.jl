@@ -1,5 +1,5 @@
 module GeoPhyInv
-const NDIMS=2
+const NDIMS=3
 const USE_GPU=true
 
 # load all necessary packages
@@ -71,7 +71,7 @@ end
 # import ParallelStencil.FiniteDifferences3D
 
 
-# This is extensively used to group arrays
+# This is extensively used to group arrays with Symbol names
 
 NamedStack{T}=NamedArray{T,1,Array{T,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 
@@ -138,9 +138,6 @@ include("records/core.jl")
 
 
 
-
-
-#include("Records/Records.jl")
 include("Born/Born.jl")
 include("fdtd/fdtd.jl")
 

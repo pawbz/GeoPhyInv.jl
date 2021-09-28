@@ -1,4 +1,4 @@
-
+using LinearAlgebra
 
 nz=43; nx=35
 ny=randn(nz, nx);

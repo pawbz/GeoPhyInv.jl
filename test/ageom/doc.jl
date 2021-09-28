@@ -15,7 +15,7 @@ using SparseArrays
 mgrid2 = [range(0.0, stop = 10.0, step = 0.1), range(0.0, stop = 30.0, step = 0.2)];
 
 # Then initialize an acquisition on `mgrid`, where the positions will be randomly chosen.
-ageom = AGeom(mgrid2, SSrcs(10), Srcs(10), Recs(10));
+ageom2 = AGeom(mgrid2, SSrcs(10), Srcs(10), Recs(10));
 
 # Similarly, we can do it for 3D too.
 mgrid3 = fill(range(-10, stop=10, step=0.01),3);
@@ -40,7 +40,7 @@ update!(ageom2[1], Recs(), [0, 0], [10, 20]);
 update!(ageom2, SSrcs(), [0, 1], [10, 20]);
 
 # It is easy to combine supersources. Now `ageom2` has 20 supersources.
-ageom2_new = vcat(ageom, ageom);
+ageom2_new = vcat(ageom2, ageom2);
 
 # # Methods 
 #md # ```@docs

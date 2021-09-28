@@ -1,12 +1,12 @@
 ```@meta
-EditURL = "<unknown>/srcwav/doc.jl"
+EditURL = "<unknown>/GeoPhyInv/test/srcwav/doc.jl"
 ```
 
-```@example doc
+````@example doc
 using GeoPhyInv
 using LinearAlgebra
 using Random
-```
+````
 
 # Intro
 
@@ -17,58 +17,58 @@ SrcWav
 # Examples
 Define an acquisition geometry.
 
-```@example doc
+````@example doc
 mgrid = [range(0.0, stop=10.,step=0.1), range(0.0, stop=30.,step=0.2)];
 ageom=AGeom(mgrid, SSrcs(10), Srcs(10), Recs(10));
 nothing #hide
-```
+````
 
 Need a time grid.
 
-```@example doc
+````@example doc
 tgrid=range(0, stop=1.0, step=0.1);
 nothing #hide
-```
+````
 
-Lets initialize records for `:P` field.
+Lets initialize records for `:p` field.
 
-```@example doc
-srcwav=SrcWav(tgrid, ageom, [:P]);
+````@example doc
+srcwav=SrcWav(tgrid, ageom, [:p]);
 nothing #hide
-```
+````
 
 Fill the `:P` field of 3rd supersource with random numbers.
 
-```@example doc
-Random.randn!(srcwav[3][:P]);
+````@example doc
+Random.randn!(srcwav[3][:p]);
 nothing #hide
-```
+````
 
 Often we want to populate the same source wavelet to all
 the supersources and sources.
 
-```@example doc
+````@example doc
 x=randn(length(tgrid));
-update!(srcwav, [:P,], x);
+update!(srcwav, [:p,], x);
 nothing #hide
-```
+````
 
 Populate two different wavelets for first and second supersources.
 
-```@example doc
+````@example doc
 x1=randn(length(tgrid));
 x2=randn(length(tgrid));
-update!(srcwav[1], [:P,], x1);
-update!(srcwav[2], [:P,], x2);
+update!(srcwav[1], [:p,], x1);
+update!(srcwav[2], [:p,], x2);
 nothing #hide
-```
+````
 
 Scale `srcwav` by a scalar overwriting it in-place.
 
-```@example doc
+````@example doc
 rmul!(srcwav, 2.0);
 nothing #hide
-```
+````
 
 # Methods
 Most of the methods listed below are also applicable to individual elements of `srcwav`.

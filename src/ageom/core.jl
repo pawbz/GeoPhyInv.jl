@@ -2,40 +2,40 @@
 Acquisition geometry for each supersource.
 """
 mutable struct AGeomss
-	s::NamedStack{Vector{Float64}} # x, y, z coordinates
-	r::NamedStack{Vector{Float64}} # x, y, z coordinates
-	# sx::Vector{Float64}
-	# sz::Vector{Float64}
-	# rx::Vector{Float64}
-	# rz::Vector{Float64}
-	ns::Int64 # change to +ve only integer later
-	nr::Int64 # change to +ve only integer later
-	"adding conditions that are to be false while construction"
-	AGeomss(s,r,ns,nr) = 
-		(
-		any(names(s)[1] != names(r)[1]) |
-		any( [length(ss) != ns for ss in s] ) | 
-		any( [length(rr) != nr for rr in r] )  
-		) ?
-		error("AGeomss construct") : new(s, r, ns, nr)
+    s::NamedStack{Vector{Float64}} # x, y, z coordinates
+    r::NamedStack{Vector{Float64}} # x, y, z coordinates
+    # sx::Vector{Float64}
+    # sz::Vector{Float64}
+    # rx::Vector{Float64}
+    # rz::Vector{Float64}
+    ns::Int64 # change to +ve only integer later
+    nr::Int64 # change to +ve only integer later
+    "adding conditions that are to be false while construction"
+    AGeomss(s, r, ns, nr) =
+        (
+            any(names(s)[1] != names(r)[1]) |
+            any([length(ss) != ns for ss in s]) |
+            any([length(rr) != nr for rr in r])
+        ) ? error("AGeomss construct") : new(s, r, ns, nr)
 end # type
 
 include("gallery.jl")
- 
+
 
 """
 Randomly place a given number of source and receivers in a `mgrid`.
 """
 function AGeomss(mgrid::AbstractArray{T}, s::Srcs, r::Recs) where {T<:StepRangeLen}
-	nd=length(mgrid)
-	names=dim_names(nd)
-	mins=[m[1] for m in mgrid]
-	maxs=[m[end] for m in mgrid]
-	return AGeomss(
-		NamedArray([Random.rand(Uniform(mins[i],maxs[i]),s.n) for i in 1:nd], (names,)),
-		NamedArray([Random.rand(Uniform(mins[i],maxs[i]),r.n) for i in 1:nd], (names,)),
-		s.n,r.n
-	)
+    nd = length(mgrid)
+    names = dim_names(nd)
+    mins = [m[1] for m in mgrid]
+    maxs = [m[end] for m in mgrid]
+    return AGeomss(
+        NamedArray([Random.rand(Uniform(mins[i], maxs[i]), s.n) for i = 1:nd], (names,)),
+        NamedArray([Random.rand(Uniform(mins[i], maxs[i]), r.n) for i = 1:nd], (names,)),
+        s.n,
+        r.n,
+    )
 end
 
 """
@@ -45,8 +45,13 @@ ageom=AGeom(mgrid, SSrcs(2), [Srcs(3), Srcs(2)], [Recs(10), Recs(20)])
 Initialize an acquisition, with 2 supersources, by randomly placing a 
 sources and receivers in `mgrid`.
 """
-function Array{AGeomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Vector{Srcs}, r::Vector{Recs}) where {T<:StepRangeLen}   
-	return [AGeomss(mgrid,s[i],r[i]) for i in 1:ss.n]
+function Array{AGeomss,1}(
+    mgrid::AbstractVector{T},
+    ss::SSrcs,
+    s::Vector{Srcs},
+    r::Vector{Recs},
+) where {T<:StepRangeLen}
+    return [AGeomss(mgrid, s[i], r[i]) for i = 1:ss.n]
 end
 
 """
@@ -56,23 +61,32 @@ ageom=AGeom(mgrid, SSrcs(10), Srcs(10), Recs(20))
 Initialize an acquisition, with 10 supersources, by randomly placing a 
 sources and receivers in `mgrid`. All the supersources have same source and receiver positions.
 """
-function Array{AGeomss,1}(mgrid::AbstractVector{T}, ss::SSrcs, s::Srcs, r::Recs)  where {T<:StepRangeLen}   
-	return Array{AGeomss,1}(mgrid, ss, fill(s,ss.n), fill(r,ss.n))
+function Array{AGeomss,1}(
+    mgrid::AbstractVector{T},
+    ss::SSrcs,
+    s::Srcs,
+    r::Recs,
+) where {T<:StepRangeLen}
+    return Array{AGeomss,1}(mgrid, ss, fill(s, ss.n), fill(r, ss.n))
 end
 
-function Base.isequal(ageom1::AGeomss, ageom2::AGeomss, attrib=:all)
-	@assert dims(ageom1) == dims(ageom2) "attempt to compare acquisitions of different dimensions"
-	names = [:sx, :sz, :ns]
-	recfnames = [:rx, :rz, :nr]
-	src=all([(isequal(ageom1.s[name],ageom2.s[name])) for name in names(ageom1.s)[1]]) & (ageom1.ns==ageom2.ns) 
-	rec=all([(isequal(getfield(ageom1, name),getfield(ageom2, name))) for name in recfnames]) & (ageom1.nr==ageom2.nr) 
-	if(attrib == :sources)
-		return src
-	elseif(attrib == :receivers)
-		return rec 
-	else
-		return src & rec 
-	end
+function Base.isequal(ageom1::AGeomss, ageom2::AGeomss, attrib = :all)
+    @assert dims(ageom1) == dims(ageom2) "attempt to compare acquisitions of different dimensions"
+    names = [:sx, :sz, :ns]
+    recfnames = [:rx, :rz, :nr]
+    src =
+        all([(isequal(ageom1.s[name], ageom2.s[name])) for name in names(ageom1.s)[1]]) & (ageom1.ns == ageom2.ns)
+    rec =
+        all([
+            (isequal(getfield(ageom1, name), getfield(ageom2, name))) for name in recfnames
+        ]) & (ageom1.nr == ageom2.nr)
+    if (attrib == :sources)
+        return src
+    elseif (attrib == :receivers)
+        return rec
+    else
+        return src & rec
+    end
 end
 
 """
@@ -81,58 +95,101 @@ isequal(ageom1, ageom2)
 ```
 Assert if `ageom1` equals `ageom2`.
 """
-function Base.isequal(ageom1::AGeom, ageom2::AGeom, attrib=:all)
-	return (length(ageom1)==length(ageom2)) ? all([isequal(ageom1[iss],ageom2[iss]) for iss in 1:length(ageom1)]) : false
+function Base.isequal(ageom1::AGeom, ageom2::AGeom, attrib = :all)
+    return (length(ageom1) == length(ageom2)) ?
+           all([isequal(ageom1[iss], ageom2[iss], attrib) for iss = 1:length(ageom1)]) :
+           false
 end
 
 function Base.show(io::Base.IO, ageomss::AGeomss)
-	print(io, "\t> acquisition with ",ageomss.ns," source(s) and ",ageomss.nr, " receiver(s)")
+    println(
+        io,
+        string(
+            "> ",
+			ndims(ageomss),
+			"-D acquisition with ",
+            ageomss.ns,
+            " source(s) and ",
+            ageomss.nr,
+            " receiver(s)",
+        ),
+    )
+end
+
+function Base.show(io::Base.IO, ageom::AGeom)
+    println(
+        io,
+        string(
+            "> ",
+			ndims(ageom),
+			"-D acquisition with ",
+            getfield.(ageom, :ns),
+            " source(s) and ",
+            getfield.(ageom, :nr),
+            " receiver(s)",
+        ),
+    )
 end
 
 function Base.ndims(ageomss::AGeomss)
-	return length(ageomss.s)
+    return length(ageomss.s)
 end
 
 function Base.ndims(ageom::Array{AGeomss,1})
-	nd=ndims.(ageom)
-	@assert all(y->y==nd[1],nd)
-	return nd[1]
+    nd = ndims.(ageom)
+    @assert all(y -> y == nd[1], nd)
+    return nd[1]
 end
 
 """
 Output `n` interpolated 2-D points between `p1` and `p2`. 
 """
-function spread(n, p1::Vector{T1}, p2::Vector{T2}, rand_flag::Bool=false) where {T1<:Real,T2<:Real}
-	@assert (length(p1)==length(p2)) # check if 2D or 3D
-	nd=length(p1)
-	if(n==1)
-		return Tuple([[p1[i]] for i in 1:nd])
-	else
-		knots = ([1,n],)
-		itp = [Interpolations.interpolate(knots, [p1[i],p2[i]],  Gridded(Linear())) for i in 1:nd]
-		return Tuple([[it(i) for i in 1:n] for it in itp])
-	end
+function spread(
+    n,
+    p1::Vector{T1},
+    p2::Vector{T2},
+    rand_flag::Bool = false,
+) where {T1<:Real,T2<:Real}
+    @assert (length(p1) == length(p2)) # check if 2D or 3D
+    nd = length(p1)
+    if (n == 1)
+        return Tuple([[p1[i]] for i = 1:nd])
+    else
+        knots = ([1, n],)
+        itp = [
+            Interpolations.interpolate(knots, [Float64(p1[i]), Float64(p2[i])], Gridded(Linear())) for
+            i = 1:nd
+        ]
+        return Tuple([[it(i) for i = 1:n] for it in itp])
+    end
 end
 
 """
 theta=0 means in x-z plane
 """
-function spread(n, p0::Vector{T1}, rad::T2, phi::Vector{T4}, theta::Vector{T3}=[0,0], rand_flag::Bool=false)  where {T1<:Real,T2<:Real,T3<:Real,T4<:Real}  
-	phi=spread(n, [phi[1]],[phi[2]], rand_flag)
-	theta=spread(n, [theta[1]],[theta[2]], rand_flag)
-	nd=length(p0)
-	p=[zeros(n) for i in 1:nd]
+function spread(
+    n,
+    p0::Vector{T1},
+    rad::T2,
+    phi::Vector{T4},
+    theta::Vector{T3} = [0, 0],
+    rand_flag::Bool = false,
+) where {T1<:Real,T2<:Real,T3<:Real,T4<:Real}
+    phi = spread(n, [phi[1]], [phi[2]], rand_flag)[1]
+    theta = spread(n, [theta[1]], [theta[2]], rand_flag)[1]
+    nd = length(p0)
+    p = [zeros(n) for i = 1:nd]
 
-	for i in 1:n
-		p[1][i]=p0[1]+rad*cos(phi[i])
-		if(nd>1)
-			p[2][i]=p0[2]+rad*sin(phi[i])*sin(theta[i])
-		end
-		if(nd>2)
-			p[3][i]=p0[3]+rad*sin(phi[i])*cos(theta[i])
-		end
-	end
-	return Tuple(p)
+    for i = 1:n
+        p[1][i] = p0[1] + rad * cos(phi[i])
+        if (nd > 1)
+            p[2][i] = p0[2] + rad * sin(phi[i]) * sin(theta[i])
+        end
+        if (nd > 2)
+            p[3][i] = p0[3] + rad * sin(phi[i]) * cos(theta[i])
+        end
+    end
+    return Tuple(p)
 end
 
 """
@@ -148,11 +205,11 @@ Update source geometry for the second supersource, with 10 sources placed equidi
 and angles `angles=[0,2pi]`.
 """
 function update!(ageomss::AGeomss, ::Srcs, args...) where {T<:Real}
-	p=spread(ageomss.ns,args...)
-	for id in 1:ndims(ageomss)
-		copyto!(ageomss.s[id],p[id])
-	end
-	return ageomss
+    p = spread(ageomss.ns, args...)
+    for id = 1:ndims(ageomss)
+        copyto!(ageomss.s[id], p[id])
+    end
+    return ageomss
 end
 
 """
@@ -162,12 +219,12 @@ update!(ageom[1], Recs(10), args...)
 Similar to updating source positions, but for receivers.
 """
 function update!(ageomss::AGeomss, ::Recs, args...)
-	p=spread(ageomss.nr,args...)
-	z,x=spread(ageomss.nr,args...)
-	for id in ndims(ageomss)
-		copyto!(ageomss.r[id],p[id])
-	end
-	return ageomss
+    p = spread(ageomss.nr, args...)
+    z, x = spread(ageomss.nr, args...)
+    for id in ndims(ageomss)
+        copyto!(ageomss.r[id], p[id])
+    end
+    return ageomss
 end
 
 """
@@ -178,12 +235,12 @@ update!(ageom, SSrcs(), p0, rad, angles)
 Update all source positions in each supersources. 
 """
 function update!(ageom::AGeom, ::SSrcs, args...)
-	p=spread(length(ageom),args...)
-	pz=collect(zip(p...))
-	for iss in 1:length(ageom)
-		update!(ageom[iss], Srcs(), collect(pz[iss]), collect(pz[iss]))    
-	end
-	return ageom
+    p = spread(length(ageom), args...)
+    pz = collect(zip(p...))
+    for iss = 1:length(ageom)
+        update!(ageom[iss], Srcs(), collect(pz[iss]), collect(pz[iss]))
+    end
+    return ageom
 end
 
 """
@@ -194,10 +251,10 @@ update!(ageom, Recs(), p0, rad, angles)
 Update receiver positions for all supersources.
 """
 function update!(ageom::AGeom, ::Recs, args...)
-	for iss in 1:length(ageom)
-		update!(ageom[iss], Recs(), args...)
-	end
-	return ageom
+    for iss = 1:length(ageom)
+        update!(ageom[iss], Recs(), args...)
+    end
+    return ageom
 end
 
 
@@ -208,23 +265,37 @@ in(ageom, mgrid)
 ```
 Assert if all the sources and receivers in `AGeom` are within bounds of `mgrid`.
 """
-function Base.in(ageom::AGeom, mgrid::AbstractVector{T}) where {T<:StepRangeLen}     
-	# xmin, zmin, xmax, zmax = mgrid[2][1], mgrid[1][1], mgrid[2][end], mgrid[1][end]
-	checkvec=fill(false, length(ageom))
-	for iss=1:length(ageom)
-		nd=ndims(ageom[iss])
-		@assert nd==length(mgrid)
-		names=dim_names(nd)
-		checkvec[iss] = any(
-		      hcat(
-			   [ vcat((((ageom[iss].s[dn] .- mgrid[id][1]).*(mgrid[id][end] .- ageom[iss].s[dn])) .< 0.0),
-			   (((ageom[iss].r[dn] .- mgrid[id][1]).*(mgrid[id][end] .- ageom[iss].r[dn])) .< 0.0),
-			   isnan.(ageom[iss].s[dn]),
-			   isnan.(ageom[iss].r[dn]))
-			   for (id,dn) in enumerate(names)]...)
-		     ) 
-	end
-	return !(any(checkvec))
+function Base.in(ageom::AGeom, mgrid::AbstractVector{T}) where {T<:StepRangeLen}
+    # xmin, zmin, xmax, zmax = mgrid[2][1], mgrid[1][1], mgrid[2][end], mgrid[1][end]
+    checkvec = fill(false, length(ageom))
+    for iss = 1:length(ageom)
+        nd = ndims(ageom[iss])
+        @assert nd == length(mgrid)
+        names = dim_names(nd)
+        checkvec[iss] = any(
+            hcat(
+                [
+                    vcat(
+                        (
+                            (
+                                (ageom[iss].s[dn] .- mgrid[id][1]) .*
+                                (mgrid[id][end] .- ageom[iss].s[dn])
+                            ) .< 0.0
+                        ),
+                        (
+                            (
+                                (ageom[iss].r[dn] .- mgrid[id][1]) .*
+                                (mgrid[id][end] .- ageom[iss].r[dn])
+                            ) .< 0.0
+                        ),
+                        isnan.(ageom[iss].s[dn]),
+                        isnan.(ageom[iss].r[dn]),
+                    ) for (id, dn) in enumerate(names)
+                ]...,
+            ),
+        )
+    end
+    return !(any(checkvec))
 end
 
 
@@ -235,16 +306,19 @@ D=A*P
 ```
 Return a sparse matrix that restricts the field `P` on `mgrid` to receiver positions, to give `D`.
 """
-function SparseArrays.SparseMatrixCSC(ageomss::AGeomss,mgrid::AbstractVector{T}) where {T<:StepRangeLen}  
-	@assert length(mgrid)==2 #  need to update this routine for 3D acq
-	nz,nx=length.(mgrid)
-	ACQ=spzeros(ageomss.nr,prod(length.(mgrid)))
-	for ir = 1:ageomss.nr
-		irx=argmin(abs.(mgrid[2].-ageomss.r[:x][ir]))
-		irz=argmin(abs.(mgrid[1].-ageomss.r[:z][ir]))
-		ACQ[ir,irz+(irx-1)*nz]=1.0
-	end
-	return ACQ
+function SparseArrays.SparseMatrixCSC(
+    ageomss::AGeomss,
+    mgrid::AbstractVector{T},
+) where {T<:StepRangeLen}
+    @assert length(mgrid) == 2 #  need to update this routine for 3D acq
+    nz, nx = length.(mgrid)
+    ACQ = spzeros(ageomss.nr, prod(length.(mgrid)))
+    for ir = 1:ageomss.nr
+        irx = argmin(abs.(mgrid[2] .- ageomss.r[:x][ir]))
+        irz = argmin(abs.(mgrid[1] .- ageomss.r[:z][ir]))
+        ACQ[ir, irz+(irx-1)*nz] = 1.0
+    end
+    return ACQ
 end
 
 

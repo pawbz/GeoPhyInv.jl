@@ -21,14 +21,14 @@ makedocs(
 	    "Records" => "generated/data/doc.md",
 	    "SeisForwExpt" => Any[
 				  "Description" => "generated/fdtd/doc.md",
-				  "Tutorial I" => "generated/fdtd/create_snaps.md",
-				  "Tutorial II" => "generated/fdtd/reuse_expt.md",
+				#   "Tutorial I" => "generated/fdtd/create_snaps.md",
+				#   "Tutorial II" => "generated/fdtd/reuse_expt.md",
 				  ],
-	    "SeisInvExpt" => Any[
-				  "Description" => "generated/fwi/doc.md",
-				  "Tutorial" => "generated/fwi/pizza.md",
-				  "Adjoint Tests" => "generated/fwi/born_tutorial.md",
-				 ],
+	    # "SeisInvExpt" => Any[
+		# 		  "Description" => "generated/fwi/doc.md",
+		# 		  "Tutorial" => "generated/fwi/pizza.md",
+		# 		  "Adjoint Tests" => "generated/fwi/born_tutorial.md",
+		# 		 ],
 	    "PoissonExpt" => Any[
 				  "Description" => "generated/Poisson/doc.md",
 				 "Tutorial" => "generated/Poisson/forw.md",

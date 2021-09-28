@@ -62,7 +62,7 @@ update!(mod, [:vp,:rho], randn_perc=1.);
 
 # # Methods 
 #md # ```@docs
-#md # Base.getindex(::Medium, ::Symbol)
+#md md # Base.getindex(::Medium, ::Symbol)
 #md # GeoPhyInv.update!(::GeoPhyInv.Medium, ::Vector{Symbol},)
 #md # Base.copyto!(x::AbstractArray, mod::Medium, fields::Vector{Symbol})  
 #md # Base.vec(mod::Medium, ::Symbol)  

@@ -1,11 +1,11 @@
 
-medium=Medium(:acou_homo1)
+medium=Medium(:acou_homo1,5)
 update!(medium, [:vp,:rho], randn_perc=0.1)
 ageom=AGeom(medium.mgrid, SSrcs(4), Srcs(1), Recs(100))
 update!(ageom, SSrcs(),[0,0],990.0,[0, 2π])
 update!(ageom, Recs(),[0,0],990.0,[0, 2π])
 
-wav, tgrid=ricker(medium, 3, 0.4)
+wav, tgrid=ricker(medium, 3, 0.8)
 
 for field in [:p, :vx,:vz]
 	println("############ Testing Backprop for source type ", field)
@@ -17,7 +17,7 @@ for field in [:p, :vx,:vz]
 		#	pml_edges=[:null],
 			gmodel_flag=false,
 			sflags=[sflags[1]],
-			snaps_flag=true,
+			# snaps_field=true,
 			verbose=true,
 			backprop_flag=1,
 			illum_flag=true,ageom=[ageom], srcwav=[srcwav],

@@ -10,6 +10,7 @@ As of now, only seismic models are predefined in this package. Choose `attrib::S
 * `=:acou_homo1` : a test homogeneous acoustic model
 * `=:acou_homo2` : a test homogeneous acoustic model, but with coarser spatial sampling (faster testing)
 * `=:marmousi2` : marmousi2 model with lower resolution; useful for surface seismic experiments
+* `=:marmousi2_small` : a smaller section of marmousi2 
 * `=:pizza` : `:acou_homo2` with some perturbations 
 """
 function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)

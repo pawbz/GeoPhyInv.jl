@@ -7,7 +7,7 @@ using Literate
 
 function run_literate(names, folder)
 	for t in names
-		fp = joinpath(folder, string(t, ".jl"))
+		fp = joinpath(@__DIR__, folder, string(t, ".jl"))
 		output_folder=joinpath(@__DIR__, "..", "docs", "src", "generated", folder) 
 		output_test_folder=joinpath(@__DIR__, "generated", folder) 
 		println(output_folder)
@@ -29,5 +29,5 @@ run_literate(["doc","forw", "test_born"], "Poisson")
 
 #run_literate(["gradient_accuracy","born_map"], "fwi")
 
-run_literate(["doc", "pizza", "born_tutorial"], "fwi")
+# run_literate(["doc", "pizza", "born_tutorial"], "fwi")
 run_literate(["doc","create_snaps","reuse_expt"], "fdtd")

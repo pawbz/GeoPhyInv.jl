@@ -29,7 +29,6 @@ nznx=prod(length.(model.mgrid))
 
 # test copyto!
 model0=similar(model);
-update!(model0, model)
 fill!(model0)
 update!(model0, [:vp,:rho], randn_perc=1e-3)
 

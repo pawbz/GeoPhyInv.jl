@@ -1,3 +1,4 @@
+using Revise
 using GeoPhyInv
 using Statistics
 using Test
@@ -21,18 +22,18 @@ ageom=AGeom(medium.mgrid,:surf, SSrcs(3), Recs(30)); # surface seismic
 
 tgrid = range(0.0,stop=1.0,length=1000) # generate a temporal grid
 wav = ricker(10.0, tgrid, tpeak=0.25,); # Choose a source wavelet
-srcwav = SrcWav(tgrid, ageom, [:P]) # initialize
-update!(srcwav, [:P], wav) # distribute to all supersources
+srcwav = SrcWav(tgrid, ageom, [:p]) # initialize
+update!(srcwav, [:p], wav) # distribute to all supersources
 
 pa=SeisForwExpt(FdtdAcou(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
 
 @time update!(pa);
-d1=copy(pa[:data][:P])
+d1=copy(pa[:data][:p])
 
 update!(pa, medium_new)
 
 @time update!(pa);
-d2=copy(pa[:data][:P])
+d2=copy(pa[:data][:p])
 
 @test d1≠d2
 

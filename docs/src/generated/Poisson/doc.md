@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "<unknown>/Poisson/doc.jl"
+EditURL = "<unknown>/GeoPhyInv/test/Poisson/doc.jl"
 ```
 
 This module represents an explicit, direct sparse 2D finite-difference Poisson solver for heterogeneous media,

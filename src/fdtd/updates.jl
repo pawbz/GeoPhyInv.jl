@@ -279,7 +279,7 @@ In-place method to perform the experiment and update `pa` after wave propagation
 end
 
 # modelling for each worker
-function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N}}) where {N}
+function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,B}
 
     # source_loop
     for issp = 1:length(pap[1].ss) # note, all npw have same sources
@@ -370,8 +370,8 @@ function update_datamat!(
     rfield,
     ipw,
     pac::P_common,
-    pap::Vector{P_x_worker_x_pw{N}},
-) where {N}
+    pap::Vector{P_x_worker_x_pw{N,B}},
+) where {N,B}
     datamat = pac.datamat
     pass = pap[ipw].ss
     for issp = 1:length(pass)

@@ -19,7 +19,7 @@
 # union of old stuff without using ParallelStencils (should eventually remove this)
 FdtdOld = Union{FdtdAcou,FdtdAcouVisco,FdtdAcouBorn}
 
-global const nlayer_rand = 0
+# global const nlayer_rand = 0
 
 include("types.jl")
 include("attenuation.jl")
@@ -197,6 +197,8 @@ function PFdtd(
     # PML
     pml = get_pml(exmedium.mgrid)
 
+    println(typeof(pml), "wefwfr\t", isa(pml,NamedStack{NamedStack{Data.Array{1, CUDA.Mem.DeviceBuffer}}}), isa(mod, NamedStack{Data.Array{N}}))
+
     # initialize gradient arrays
     gradient = zeros(2 * prod(length.(medium.mgrid)))
 
@@ -218,7 +220,7 @@ function PFdtd(
             string.(tsnaps),
         )
     else
-        snaps_field = :null
+        snaps_field = :Nothing
         itsnaps = NamedArray([0], ["0"])
     end
 
@@ -295,7 +297,7 @@ function PFdtd(
 
     # a distributed array of P_x_worker --- note that the parameters for each super source are efficiently distributed here
     papa = ddata(
-        T = Vector{P_x_worker_x_pw{N}},
+        T = Vector{P_x_worker_x_pw{N,CUDA.Mem.DeviceBuffer}},
         init = I -> Vector{P_x_worker_x_pw}(sschunks[I...][1], pac),
         pids = work,
     )
@@ -541,13 +543,14 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     # illum =  (pac.illum_flag) ? zeros(nz, nx) : zeros(1,1)
     illum = zeros(1, 1)
 
-    snaps =
-        (eval(pac.snaps_field) <: Fields) ?
-        NamedArray(
-            [Array(zeros(eval(pac.snaps_field)(), T(), n...)) for i in 1:length(pac.itsnaps)],
-            names(pac.itsnaps)[1],
-        ) : zeros(fill(1, N)...)
-
+    snaps = NamedArray(
+        [
+            (eval(pac.snaps_field) <: Fields) ?
+            Array(zeros(eval(pac.snaps_field)(), T(), n...)) : zeros(fill(1, N)...) for
+            i = 1:length(pac.itsnaps)
+        ],
+        names(pac.itsnaps)[1],
+    )
     # source wavelets
     wavelets = [
         NamedArray(
@@ -556,7 +559,6 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
         ) for it = 1:nt
     ]
     # fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
-
     # storing boundary values for back propagation
     # nz1, nx1=length.(pac.medium.mgrid)
     # if(pac.backprop_flag ≠ 0)
@@ -570,10 +572,10 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     # end
 
     # initialize source_spray_weights per supersource and receiver interpolation weights per sequential source
-    ssprayw = [zeros(2^N) for i in 1:ageom[ipw][iss].ns]
-    sindices = [CartesianIndices(Tuple(fill(1:2, N))) for i in 1:ageom[ipw][iss].ns]
-    rinterpolatew = [zeros(2^N) for i in 1:ageom[ipw][iss].nr]
-    rindices = [CartesianIndices(Tuple(fill(1:2, N))) for i in 1:ageom[ipw][iss].nr]
+    ssprayw = [zeros(2^N) for i = 1:ageom[ipw][iss].ns]
+    sindices = [CartesianIndices(Tuple(fill(1:2, N))) for i = 1:ageom[ipw][iss].ns]
+    rinterpolatew = [zeros(2^N) for i = 1:ageom[ipw][iss].nr]
+    rindices = [CartesianIndices(Tuple(fill(1:2, N))) for i = 1:ageom[ipw][iss].nr]
 
     pass = P_x_worker_x_pw_x_ss(
         iss,

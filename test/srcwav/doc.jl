@@ -19,22 +19,22 @@ ageom=AGeom(mgrid, SSrcs(10), Srcs(10), Recs(10));
 # Need a time grid.
 tgrid=range(0, stop=1.0, step=0.1);
 
-# Lets initialize records for `:P` field.
-srcwav=SrcWav(tgrid, ageom, [:P]);
+# Lets initialize records for `:p` field.
+srcwav=SrcWav(tgrid, ageom, [:p]);
 
 # Fill the `:P` field of 3rd supersource with random numbers.
-Random.randn!(srcwav[3][:P]);
+Random.randn!(srcwav[3][:p]);
 
 # Often we want to populate the same source wavelet to all
 # the supersources and sources.
 x=randn(length(tgrid));
-update!(srcwav, [:P,], x);
+update!(srcwav, [:p,], x);
 
 # Populate two different wavelets for first and second supersources.
 x1=randn(length(tgrid));
 x2=randn(length(tgrid));
-update!(srcwav[1], [:P,], x1);
-update!(srcwav[2], [:P,], x2);
+update!(srcwav[1], [:p,], x1);
+update!(srcwav[2], [:p,], x2);
 
 
 # Scale `srcwav` by a scalar overwriting it in-place.

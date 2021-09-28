@@ -79,9 +79,8 @@ function Base.ndims(mod::Medium)
 end
 
 """
-Copy for `Medium` models. The models should have same bounds and sizes.
-Doesn't allocate any memory.
-Only copy primary medium parameters
+Copy for `Medium`. The media should have same bounds and sizes.
+Doesn't allocate any memory. Note that only [:vp, :rho, :vs] fields are stored in structs.
 """
 function Base.copyto!(modo::Medium, mod::Medium)
     for name in [:vp, :vs, :rho]
@@ -91,7 +90,12 @@ function Base.copyto!(modo::Medium, mod::Medium)
     return modo
 end
 
-
+"""
+Fill medium with reference medium parameters to make it homogeneous.
+```julia
+fill!(medium)
+```
+"""
 function Base.fill!(mod::Medium)
     for s in names(mod.m)[1]
         fill!(mod.m[s], mod.ref[s])
@@ -104,7 +108,15 @@ end
 Print information about `Medium`
 """
 function Base.show(io::Base.IO, mod::Medium)
-    println(io, "> Medium")
+    println(
+        io,
+        "> ",
+        ndims(mod),
+        "-D Medium with ",
+        dim_names(ndims(mod)),
+        " in ",
+        [[m[1], m[end]] for m in mod.mgrid],
+    )
     println(io, "> number of samples:\t", length.(mod.mgrid))
     println(io, "> sampling intervals:\t", step.(mod.mgrid))
     try
@@ -409,12 +421,13 @@ end
 
 """
 Copy medium parameters from Medium `mod`, to vector `x`. Return `x`.
-copyto!(x,mod,[:vp])
+```julia
+copyto!(x,mod,[:vp, :vs])
+copyto!(x,mod,[:vp, :rho])
+```
 """
 function Base.copyto!(x::AbstractArray{T}, mod::Medium, fields::Vector{Symbol}) where {T}
-    rho = mod.m[:rho]
-    vp = mod.m[:vp]
-    nznx = length(rho)
+    nznx = prod(length.(mod.mgrid))
     (length(x) ≠ (count(fields .≠ :null) * nznx)) && error("size x")
     i0 = 0
     for field in fields
@@ -431,7 +444,9 @@ end
 
 """
 Return a vector of medium parameters `x`, from Medium `mod`.
-x=vec(mod)
+```julia
+x=vec(mod, field)
+```
 """
 function Base.vec(mod::Medium, field::Symbol)
     # allocate
