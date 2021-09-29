@@ -106,8 +106,8 @@ function Base.show(io::Base.IO, ageomss::AGeomss)
         io,
         string(
             "> ",
-			ndims(ageomss),
-			"-D acquisition with ",
+            ndims(ageomss),
+            "-D acquisition with ",
             ageomss.ns,
             " source(s) and ",
             ageomss.nr,
@@ -121,8 +121,10 @@ function Base.show(io::Base.IO, ageom::AGeom)
         io,
         string(
             "> ",
-			ndims(ageom),
-			"-D acquisition with ",
+            ndims(ageom),
+            "-D acquisition with ",
+            length(ageom),
+            " supersource(s), ",
             getfield.(ageom, :ns),
             " source(s) and ",
             getfield.(ageom, :nr),
@@ -157,8 +159,11 @@ function spread(
     else
         knots = ([1, n],)
         itp = [
-            Interpolations.interpolate(knots, [Float64(p1[i]), Float64(p2[i])], Gridded(Linear())) for
-            i = 1:nd
+            Interpolations.interpolate(
+                knots,
+                [Float64(p1[i]), Float64(p2[i])],
+                Gridded(Linear()),
+            ) for i = 1:nd
         ]
         return Tuple([[it(i) for i = 1:n] for it in itp])
     end
@@ -220,8 +225,7 @@ Similar to updating source positions, but for receivers.
 """
 function update!(ageomss::AGeomss, ::Recs, args...)
     p = spread(ageomss.nr, args...)
-    z, x = spread(ageomss.nr, args...)
-    for id in ndims(ageomss)
+    for id = 1:ndims(ageomss)
         copyto!(ageomss.r[id], p[id])
     end
     return ageomss

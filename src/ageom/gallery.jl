@@ -21,10 +21,8 @@ Let `ageom` be an instance of this type, then fields
 can be accessed using:
 
 * `ageom[i]` : acquisition for ith supersource
-* `ageom[i].s[:x]` : x positions of sources
-* `ageom[i].s[:z]` : z positions of sources
-* `ageom[i].r[:x]` : x positions of receivers
-* `ageom[i].r[:z]` : z positions of receivers
+* `ageom[i].s[p]` : position coordinates of sources where `p ∈ [:z, :x, :y]`
+* `ageom[i].r[p]` : position coordinates of receivers
 * `ageom[i].ns` : number of sources 
 * `ageom[i].nr` : number of receivers
 
@@ -32,7 +30,7 @@ can be accessed using:
 ```julia
 ageom=AGeom(mgrid, attrib, SSrcs(10), Recs(20))
 ```
-Return pre-defined acquisition geometries (with 10 sources and 20 receivers), based on `attrib`, on an input mesh `mgrid`.
+Return pre-defined acquisition geometries (in this case with 10 supersources and 20 receivers), based on `attrib`, on an input mesh `mgrid`.
 The sources and receivers positions are same for all supersources, and are not placed on the edges of the mesh.
 Choose `attrib::Symbol`
 * `=:xwell` cross-well acquisition;
@@ -42,40 +40,81 @@ Choose `attrib::Symbol`
 * `=:downhole` downhole sources and receivers.
 
 
-TODO: need to work on a gallery of 3D acquisitions.
+TODO: For 3D, just mean(ygrid) is used, need to work on more exotic gallery of 3D acquisitions.
 """
-AGeom=Array{AGeomss,1}
+AGeom = Array{AGeomss,1}
 
 
 
-function Array{AGeomss,1}(mgrid::AbstractArray{T}, attrib::Symbol, ss::SSrcs=SSrcs(1), r::Recs=Recs(10)) where {T<:StepRangeLen}
-	@assert length(mgrid)==2
-	otx=(0.9*mgrid[2][1]+0.1*mgrid[2][end]); ntx=(0.1*mgrid[2][1]+0.9*mgrid[2][end]);
-	otwx=(0.95*mgrid[2][1]+0.05*mgrid[2][end]); ntwx=(0.05*mgrid[2][1]+0.95*mgrid[2][end]);
-	otz=(0.9*mgrid[1][1]+0.1*mgrid[1][end]); ntz=(0.1*mgrid[1][1]+0.9*mgrid[1][end]);
-	otwz=(0.95*mgrid[1][1]+0.05*mgrid[1][end]); ntwz=(0.05*mgrid[1][1]+0.95*mgrid[1][end]);
-	quatx = (0.75*mgrid[2][1]+0.25*mgrid[2][end]); quatz = (0.75*mgrid[1][1]+0.25*mgrid[1][end]) 
-	tquatx = (0.25*mgrid[2][1]+0.75*mgrid[2][end]); tquatz = (0.25*mgrid[1][1]+0.75*mgrid[1][end]) 
-	halfx = 0.5*(mgrid[2][1]+mgrid[2][end]);	halfz = 0.5*(mgrid[1][1]+mgrid[1][end]);
-	ageom=AGeom(mgrid, ss, Srcs(1), r)
-	if(attrib == :xwell)
-		update!(ageom, SSrcs(), [otz,otx], [ntz,otx])
-		update!(ageom, Recs(), [otz,ntx], [ntz,ntx])
-	elseif(attrib == :surf)
-		update!(ageom, SSrcs(), [otwz,otx], [otwz,ntx])
-		update!(ageom, Recs(), [otwz,otx], [otwz,ntx])
-	elseif(attrib == :vsp)
-		update!(ageom, SSrcs(), [otwz,otx], [otwz,ntx])
-		update!(ageom, Recs(), [quatz,otx], [ntz,ntx])
-	elseif(attrib == :rvsp)
-		update!(ageom, SSrcs(), [quatz,otx], [ntz,otx])
-		update!(ageom, Recs(),  [otwz,otx], [otwzz,ntx])
-	elseif(attrib == :downhole)
-		update!(ageom, SSrc(), [quatz,quatx], [otz,quatx])
-		update!(ageom, Recs(),  [quatz,quatx], [otz,quatx])
-	else
-		error("invalid attrib")
-	end
-	return ageom
+function Array{AGeomss,1}(
+    mgrid::AbstractArray{T},
+    attrib::Symbol,
+    ss::SSrcs = SSrcs(1),
+    r::Recs = Recs(10),
+) where {T<:StepRangeLen}
+    N = length(mgrid)
+    @assert N ∈ [2, 3]
+    # ouput a coordinate given a 1-D grid usign weights a and b
+    getp(m, a = 0.5) = a * m[1] + (1 - a) * m[end]
+    function getp(m::AbstractArray{T}, a = fill(0.5, length(m))) where {T<:StepRangeLen}
+        @assert length(m) == length(a)
+        @assert all(a .> 0)
+        @assert all(a .< 1)
+        return [getp(mgrid[i], a[i]) for i = 1:length(m)]
+    end
+    ageom = AGeom(mgrid, ss, Srcs(1), r) # just use one source per supersource
+    if (attrib == :xwell)
+        sp1 = [0.9, 0.9]
+        sp2 = [0.1, 0.9]
+        rp1 = [0.9, 0.1]
+        rp2 = [0.1, 0.1]
+    elseif (attrib == :surf)
+        sp1 = [0.95, 0.9]
+        sp2 = [0.95, 0.1]
+        rp1 = [0.95, 0.9]
+        rp2 = [0.95, 0.1]
+    elseif (attrib == :vsp)
+        sp1 = [0.95, 0.9]
+        sp2 = [0.95, 0.1]
+        rp1 = [0.75, 0.9]
+        rp2 = [0.1, 0.9]
+    elseif (attrib == :rvsp)
+        sp1 = [0.75, 0.9]
+        sp2 = [0.1, 0.9]
+        rp1 = [0.95, 0.9]
+        rp2 = [0.95, 0.1]
+    elseif (attrib == :downhole)
+        sp1 = [0.75, 0.75]
+        sp2 = [0.9, 0.75]
+        rp1 = [0.75, 0.75]
+        rp2 = [0.9, 0.75]
+    elseif (attrib == :microseismic)
+        sp1 = [rand(Uniform(0.1,0.2)), rand(Uniform(0.7,0.9))]
+        sp2 = [rand(Uniform(0.1,0.2)), rand(Uniform(0.7,0.9))]
+        rp1 = [0.95, 0.9]
+        rp2 = [0.95, 0.1]
+    else
+        error("invalid attrib")
+    end
+    if (N == 2)
+        update!(ageom, SSrcs(), getp(mgrid, sp1), getp(mgrid, sp2))
+		println(ageom[1].r)
+        update!(ageom, Recs(), getp(mgrid, rp1), getp(mgrid, rp2))
+		println(ageom[1].r)
+    else # just use mean y for 3D 
+        update!(
+            ageom,
+            SSrcs(),
+            getp(mgrid, [sp1[1], 0.5, sp1[2]]),
+            getp(mgrid, [sp2[1], 0.5, sp2[2]]),
+        )
+        update!(
+            ageom,
+            Recs(),
+            getp(mgrid, [rp1[1], 0.5, rp1[2]]),
+            getp(mgrid, [rp2[1], 0.5, rp2[2]]),
+        )
+    end
+    return ageom
 end
 

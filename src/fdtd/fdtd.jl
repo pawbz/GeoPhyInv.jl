@@ -197,8 +197,6 @@ function PFdtd(
     # PML
     pml = get_pml(exmedium.mgrid)
 
-    println(typeof(pml), "wefwfr\t", isa(pml,NamedStack{NamedStack{Data.Array{1, CUDA.Mem.DeviceBuffer}}}), isa(mod, NamedStack{Data.Array{N}}))
-
     # initialize gradient arrays
     gradient = zeros(2 * prod(length.(medium.mgrid)))
 
