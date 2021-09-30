@@ -102,7 +102,7 @@ function update!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing; verbose = 
         copyto!(pa.c.sflags, sflags)
     end
     for ipw = 1:pa.c.ic[:npw]
-        freqmin = 0
+        freqmin = 0.0
         freqmax = Inf
         freqpeaks = []
         # fill_wavelets for each supersource
@@ -126,13 +126,14 @@ function update!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing; verbose = 
         freqpeak = Statistics.mean(freqpeaks)
         # store frequency (in Hz) bounds for first propagating wavefield
         if (ipw == 1)
-            pa.c.fc = vcat(
-                pa.c.fc,
-                NamedArray(
-                    [freqmin, freqmax, freqpeak],
-                    ([:freqmin, :freqmax, :freqpeak],),
-                ),
-            )
+            for (f, nf) in
+                zip([freqmin, freqmax, freqpeak], [:freqmin, :freqmax, :freqpeak])
+                if (nf ∈ names(pa.c.fc)[1])
+                    pa.c.fc[nf] = f
+                else
+                    pa.c.fc = vcat(pa.c.fc, NamedArray([f], [nf]))
+                end
+            end
         end
         if (verbose)
             freqmin = @sprintf("%0.2e", freqmin)
