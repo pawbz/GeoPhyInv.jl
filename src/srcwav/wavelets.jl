@@ -175,7 +175,7 @@ end
 """
 Same as ricker, but return ormsby...
 """
-function ormsby(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0; args... )
+function ormsby(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0, epsilon=inv(sqrt(ndims(mod))); args... )
 	@assert(!iszero(mod))
 	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac, epsilon)
 	wav=ormsby(fqdom, tgrid; args...)
