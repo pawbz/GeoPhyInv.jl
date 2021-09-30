@@ -653,6 +653,8 @@ end
 end
 
 
+
+
 """
 Save snapshots for ipw=1
 """
@@ -660,8 +662,8 @@ function snaps_save!(
     itsnap,
     issp::Int64,
     pac::P_common,
-    pap
-) 
+    pap::Vector{P_x_worker_x_pw{N,B}},
+) where {N,B}
     p = pap[1].w1[:t][pac.snaps_field]
     snaps = pap[1].ss[issp].snaps[itsnap]
     copyto!(snaps, p)

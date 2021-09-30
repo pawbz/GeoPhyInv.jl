@@ -183,7 +183,7 @@ end
         dt * ((@all(M) * @all(dvxdx)) + (@all(lambda) * (@all(dvydy) + @all(dvzdz))))
     @all(tauyy) =
         @all(tauyy) -
-        dt * ((@all(M) * @all(dvydy)) + (@all(lambda) * (@all(dvxdx) + @all(dvydy))))
+        dt * ((@all(M) * @all(dvydy)) + (@all(lambda) * (@all(dvxdx) + @all(dvzdz))))
     @all(tauzz) =
         @all(tauzz) -
         dt * ((@all(M) * @all(dvzdz)) + (@all(lambda) * (@all(dvydy) + @all(dvxdx))))
@@ -226,20 +226,20 @@ end
 
 
 
-@parallel_indices (iy, ix) function free_surface!(tau::Data.Array{3}, iz_free)
-    tau[iz_free, iy, ix] = 0.0
+@parallel_indices (iy, ix) function free_surface!(tau::Data.Array{3}, izfree)
+    tau[izfree, iy, ix] = 0.0
     return
 end
-@parallel_indices (iy, ix) function free_surface_mirror!(tau::Data.Array{3}, iz_free)
-    tau[iz_free-1, iy, ix] = -1 * tau[iz_free, iy, ix]
+@parallel_indices (iy, ix) function free_surface_mirror!(tau::Data.Array{3}, izfree)
+    tau[izfree-1, iy, ix] = -1 * tau[izfree, iy, ix]
     return
 end
-@parallel_indices (ix) function free_surface!(tau::Data.Array{2}, iz_free)
-    tau[iz_free, ix] = 0.0
+@parallel_indices (ix) function free_surface!(tau::Data.Array{2}, izfree)
+    tau[izfree, ix] = 0.0
     return
 end
-@parallel_indices (ix) function free_surface_mirror!(tau::Data.Array{2}, iz_free)
-    tau[iz_free-1, ix] = -1 * tau[iz_free, ix]
+@parallel_indices (ix) function free_surface_mirror!(tau::Data.Array{2}, izfree)
+    tau[izfree-1, ix] = -1 * tau[izfree, ix]
     return
 end
 
@@ -391,13 +391,19 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pac.mod[:mu],
     )
 
-    if (pac.ic[:iz_free] ≠ 0)
-        @parallel (1:size(w1t[:tauzz], 2), size(w1t[:tauzz], 3)) free_surface_mirror!(
+    if (pac.ic[:izfree] ≠ 0)
+        @parallel (1:size(w1t[:tauzz], 2), 1:size(w1t[:tauzz], 3)) free_surface_mirror!(
             w1t[:tauzz],
-            pac.ic[:iz_free] + 1,
+            pac.ic[:izfree] + 1,
         )
-        @parallel (1:size(w1t[:tauxz], 2), size(w1t[:tauxz], 3)) free_surface!(w1t[:tauxz], pac.ic[:iz_free])
-        @parallel (1:size(w1t[:tauyz], 2), size(w1t[:tauyz], 3)) free_surface!(w1t[:tauyz], pac.ic[:iz_free])
+        @parallel (1:size(w1t[:tauxz], 2), 1:size(w1t[:tauxz], 3)) free_surface!(
+            w1t[:tauxz],
+            pac.ic[:izfree],
+        )
+        @parallel (1:size(w1t[:tauyz], 2), 1:size(w1t[:tauyz], 3)) free_surface!(
+            w1t[:tauyz],
+            pac.ic[:izfree],
+        )
     end
 
 end
@@ -487,7 +493,10 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
 
 
     if (pac.ic[:izfree] ≠ 0)
-        @parallel (1:size(w1t[:tauzz], 2)) free_surface_mirror!(w1t[:tauzz], pac.ic[:izfree] + 1)
+        @parallel (1:size(w1t[:tauzz], 2)) free_surface_mirror!(
+            w1t[:tauzz],
+            pac.ic[:izfree] + 1,
+        )
         @parallel (1:size(w1t[:tauxz], 2)) free_surface!(w1t[:tauxz], pac.ic[:izfree])
     end
 
