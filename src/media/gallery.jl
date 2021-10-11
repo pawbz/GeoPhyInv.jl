@@ -112,12 +112,12 @@ function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)
             range(xgrid[1], stop = xgrid[end], length = size(vp, 2)),
             range(xgrid[1], stop = xgrid[end], length = size(vp, 3)),
         ]
-            model = Medium(mgrid, [:vp])
-            rho0= [1500., 2500.0];
-            update!(model, [:rho], [rho0])
-            fill!(model)
-            copyto!(model[:vp], vp)
-            update!(model, bfrac)
+        model = Medium(mgrid, [:vp, :rho])
+        rho0= [1500., 2500.0];
+        update!(model, [:rho], [rho0])
+        fill!(model)
+        copyto!(model[:vp], vp)
+        update!(model, bfrac)
             
         #
         #		vs0=Models.bounds(vs,bfrac); 
