@@ -102,6 +102,8 @@ function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)
             end
             close(file_)
         end
+        vp= permutedims(vp, [1,3,2]);
+        vp= reverse(vp, 1);
         file_= h5open(joinpath(overthrust_folder, "overthrust_mgrid.h5"), "r");
         xgrid = read(file_, "xgrid")
         ygrid = read(file_, "ygrid")
