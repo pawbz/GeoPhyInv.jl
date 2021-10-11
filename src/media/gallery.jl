@@ -91,21 +91,32 @@ function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)
 		model=update(fmodel,mgrid)
 
     elseif (attrib == :overthrust)
-        c = h5open(joinpath(overthrust_folder, "overthrust.h5"), "r") do file
-            vp = read(file, "vp")
-            xgrid = read(file, "xgrid")
-            ygrid = read(file, "ygrid")
-            zgrid = read(file, "zgrid")
-            mgrid = [
-                range(zgrid[1], stop = zgrid[end], length = size(vp, 1)),
-                range(xgrid[1], stop = xgrid[end], length = size(vp, 2)),
-                range(xgrid[1], stop = xgrid[end], length = size(vp, 3)),
-            ]
+        vp= [];
+        for i in range(1,8, step= 1)
+            print(i, "\n")
+            file_= h5open(joinpath(overthrust_folder, "overthrust_"*string(i)*".h5"), "r");
+            vp_sect= read(file_, "vp");
+            if i==1
+                vp= deepcopy(vp_sect)
+            else
+                vp= cat(vp, vp_sect, dims= 3);
+            end
+            close(file_)
+        end
+        file_= h5open(joinpath(overthrust_folder, "overthrust_mgrid.h5"), "r");
+        xgrid = read(file_, "xgrid")
+        ygrid = read(file_, "ygrid")
+        zgrid = read(file_, "zgrid")
+        close(file_)
+        mgrid = [
+            range(zgrid[1], stop = zgrid[end], length = size(vp, 1)),
+            range(xgrid[1], stop = xgrid[end], length = size(vp, 2)),
+            range(xgrid[1], stop = xgrid[end], length = size(vp, 3)),
+        ]
             model = Medium(mgrid, [:vp])
             copyto!(model[:vp], vp)
             update!(model, bfrac)
-        end
-
+            
         #
         #		vs0=Models.bounds(vs,bfrac); 
         #		rho0=Models.bounds(rho, bfrac);
