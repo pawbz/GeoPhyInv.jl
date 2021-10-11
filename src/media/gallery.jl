@@ -93,7 +93,6 @@ function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)
     elseif (attrib == :overthrust)
         vp= [];
         for i in range(1,8, step= 1)
-            print(i, "\n")
             file_= h5open(joinpath(overthrust_folder, "overthrust_"*string(i)*".h5"), "r");
             vp_sect= read(file_, "vp");
             if i==1
@@ -114,6 +113,9 @@ function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)
             range(xgrid[1], stop = xgrid[end], length = size(vp, 3)),
         ]
             model = Medium(mgrid, [:vp])
+            rho0= [1500., 2500.0];
+            update!(model, [:rho], [rho0])
+            fill!(model)
             copyto!(model[:vp], vp)
             update!(model, bfrac)
             
