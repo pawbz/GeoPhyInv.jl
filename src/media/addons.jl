@@ -59,7 +59,7 @@ function update!(
             m = medium.m[field]
             m0 = medium.ref[field]
             for i in eachindex(m)
-                m[i] = χ(χ(m[i], m0, 1) + randn() * randn_perc * 1e-2, m0, -1)
+                m[i] = χ(Float64(χ(m[i], m0, 1) + randn() * randn_perc * 1e-2), m0, -1)
             end
 
         end

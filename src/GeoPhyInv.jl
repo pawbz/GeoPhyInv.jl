@@ -1,6 +1,7 @@
 module GeoPhyInv
 const NDIMS=3
 const USE_GPU=true
+const FD_ORDER=4
 
 # load all necessary packages
 using Misfits
@@ -15,20 +16,14 @@ using Distributed
 using DistributedArrays
 using SharedArrays
 using ParallelStencil
-@static if(NDIMS==2) 
-	using ParallelStencil.FiniteDifferences2D
-
-	# dummy aliases while parsing 3D code
-	var"@d_zi" = var"@d_yi"
-	var"@d_za" = var"@d_ya"
-	var"@av_zi" = var"@av_yi"
-	var"@av_xzi" = var"@av_xi"
-	var"@av_xyi" = var"@av_xi"
-	var"@av_yzi" = var"@av_xi"
-
-	else
-		using ParallelStencil.FiniteDifferences3D
-	end
+# check whether 2D or 3D, and initialize ParallelStencils accordingly
+@static if (NDIMS == 2)
+    # using FiniteDifferences2D
+    include("fdtd/diff3D.jl")
+else
+    # using FiniteDifferences3D
+    include("fdtd/diff3D.jl")
+end
 using Printf
 using DataFrames
 using SparseArrays
@@ -52,28 +47,17 @@ using CUDA
 using HDF5
 
 
-
+# choose Float64 or Float32
 @static if USE_GPU
-    @init_parallel_stencil(CUDA, Float64, NDIMS);
+    @init_parallel_stencil(CUDA, Float32, NDIMS)
 else
-    @init_parallel_stencil(Threads, Float64, NDIMS);
+    @init_parallel_stencil(Threads, Float32, NDIMS)
 end
-# import ..USE_GPU
-# import ..NDIMS
-# check whether 2D or 3D, and initialize ParallelStencils accordingly
-# ParallelStencil.@reset_parallel_stencil()
-# USE_GPU ? @init_parallel_stencil(CUDA, Float64, NDIMS) : @init_parallel_stencil(Threads, Float64, NDIMS)
-# @static @init_parallel_stencil(CUDA, Float64, 3)
-# use_gpu ? @init_parallel_stencil(CUDA, Float64, 2) : @init_parallel_stencil(Threads, Float64, 2)
-
-# import ParallelStencil.FiniteDifferences3D
-# import ParallelStencil.Data
-# import ParallelStencil.FiniteDifferences3D
-
 
 # This is extensively used to group arrays with Symbol names
 
-NamedStack{T}=NamedArray{T,1,Array{T,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
+NamedStack{T} =
+    NamedArray{T,1,Array{T,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 
 
 # create a timer object, used throughout this package, see TimerOutputs.jl
@@ -90,12 +74,12 @@ struct FdtdAcou end
 """
 2-D ViscoAcoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct FdtdAcouVisco  end
+struct FdtdAcouVisco end
 
 """
 2-D Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct FdtdAcouBorn  end
+struct FdtdAcouBorn end
 
 
 global const npml = 20
@@ -114,17 +98,17 @@ include("srcwav/wavelets.jl")
 
 # need to define supersource, source and receiver structs and export them (necessary for multiple dispatch)
 struct Srcs
-	n::Int
+    n::Int
 end
-Srcs()=Srcs(0)
+Srcs() = Srcs(0)
 struct SSrcs
-	n::Int
+    n::Int
 end
-SSrcs()=SSrcs(0)
+SSrcs() = SSrcs(0)
 struct Recs
-	n::Int
+    n::Int
 end
-Recs()=Recs(0)
+Recs() = Recs(0)
 
 
 include("ageom/core.jl")
@@ -150,18 +134,31 @@ include("plots.jl")
 export Records
 export SrcWav
 export update!, Medium
-export ricker, ormsby 
+export ricker, ormsby
 export Srcs, Recs, SSrcs
 export AGeom, AGeomss
-export update, update!, padarray, padarray!, SeisForwExpt, SeisInvExpt, FdtdAcou, FdtdElastic, FdtdAcouBorn, FdtdAcouVisco, LS, LS_prior, Migr, Migr_FD
+export update,
+    update!,
+    padarray,
+    padarray!,
+    SeisForwExpt,
+    SeisInvExpt,
+    FdtdAcou,
+    FdtdElastic,
+    FdtdAcouBorn,
+    FdtdAcouVisco,
+    LS,
+    LS_prior,
+    Migr,
+    Migr_FD
 
 # export the Expt for Poisson
 const PoissonExpt=GeoPhyInv.Poisson.ParamExpt
 export PoissonExpt
-mod!(a::PoissonExpt,b,c)=GeoPhyInv.Poisson.mod!(a,b,c)
-mod!(a::PoissonExpt,b)=GeoPhyInv.Poisson.mod!(a,b)
-mod!(a::PoissonExpt)=GeoPhyInv.Poisson.mod!(a)
-operator_Born(a::PoissonExpt,b)=GeoPhyInv.Poisson.operator_Born(a,b)
+mod!(a::PoissonExpt, b, c) = GeoPhyInv.Poisson.mod!(a, b, c)
+mod!(a::PoissonExpt, b) = GeoPhyInv.Poisson.mod!(a, b)
+mod!(a::PoissonExpt) = GeoPhyInv.Poisson.mod!(a)
+operator_Born(a::PoissonExpt, b) = GeoPhyInv.Poisson.operator_Born(a, b)
 
 
 end # module

@@ -10,10 +10,15 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
         # velocity-free boundary conditions    
         fname = Symbol("dirichlet", string(dim), "!")
 
-        is1, is2, is3 = [replace(is, i => ii) for ii in [:1, :2, :3]]
+        fdh=div(FD_ORDER,2)
+        # mirror ghost cells 
+        ighost=vcat(
+            [[replace(is, i => :($ifd)), replace(is, i => :($(FD_ORDER+1-ifd)))] for ifd = 1:fdh],
+            [[replace(is, i => :(n + $(FD_ORDER - ifd))), replace(is, i => :(n + $(ifd-1)))] for ifd = 1:fdh]
+        )
+
         isn = replace(is, i => :n)
-        isnm1 = replace(is, i => :(n - 1))
-        isnp1 = replace(is, i => :(n + 1))
+        is1 = replace(is, i => :1)
 
         irest = Meta.parse(
             string("(", [string(s, ",") for s in filter(x -> x != i, is)]..., ")"),
@@ -21,18 +26,12 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
         v = Symbol("v", string(dim))
         vs = broadcast(x -> Symbol(string("v", x)), getindex.(collect(dimnames), 2))
         vrest = filter(x -> x != v, vs)
-        vrestt = Meta.parse(string("(", [string(s, ",") for s in vrest]..., ")"))
 
         @eval @parallel_indices($irest, function $fname($v::Data.Array{$N}, $(vrest...), n)
             # along other dimensions velocity grid matches tauii grid
-            for vv in $vrestt
-                vv[$(is1...)] = 0
-                vv[$(isn...)] = 0
-            end
-
+            $((quote $vv[$(is1...)] = 0; $vv[$(isn...)] = 0 end for vv in vrest)...)
             # relative to the tauii grid, velocity at i=2 should be zero, so making use of ghost cells 
-            $v[$(is1...)] = -$v[$(is2...)]
-            $v[$(isnp1...)] = -$v[$(isn...)]
+            $((quote $v[$(ig[1]...)] = -$v[$(ig[2]...)] end for ig in ighost)...)
             return
         end)
     end

@@ -17,7 +17,15 @@ struct Receiver_B1 end
         rindices = pap[ipw].ss[issp].rindices
         for rfield in pac.rfields
             recs = pap[ipw].ss[issp].records[rfield]
-            pw = pap[ipw].w1[:t][rfield]
+
+            # copyto! before scalar indexing if GPU
+            if(USE_GPU)
+                pw = pap[ipw].w1[:t][rfield]
+                # pw = pap[ipw].wr[rfield]
+                # copyto!(pw,pw1)
+            else
+                pw = pap[ipw].w1[:t][rfield]
+            end
 
             @simd for ir = 1:pac.ageom[ipw][iss].nr
                 recs[it, ir] = 0.0

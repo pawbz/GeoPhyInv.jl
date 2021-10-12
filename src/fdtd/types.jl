@@ -15,8 +15,8 @@ mutable struct P_x_worker_x_pw_x_ss{N}
     rindices::Vector{<:CartesianIndices{N}} # contains indices for each receiver
     boundary::Vector{Array{Float64,3}}
     snaps::NamedVector{
-        Array{Float64,N},
-        Vector{Array{Float64,N}},
+        Array{Data.Number,N},
+        Vector{Array{Data.Number,N}},
         Tuple{OrderedDict{String,Int64}},
     }
     illum::Matrix{Float64}
@@ -81,7 +81,8 @@ mutable struct P_x_worker_x_pw{N,B}
     # 2D arrays of p, vx, vz, their previous snapshots, and 
     # x derivatives of p, vx, vz
     # z derivatives of p, vx, vz
-    w1::NamedStack{NamedStack{Data.Array{N,B}}} # p, vx, vz
+    w1::NamedStack{NamedStack{Data.Array{N,B}}} # p, vx, vz on GPU or CPU
+    wr::NamedStack{Array{Data.Number,N}} # same as above but only for receiver fields when GPU to facilitate faster scalar indexing!?
     w2::NamedStack{NamedStack{Data.Array{N,B}}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
     memory_pml::NamedStack{Data.Array{N,B}} # memory variables for CPML 
     born_svalue_stack::Array{Float64,N} # used for born modeling # only used for 2-D simulation

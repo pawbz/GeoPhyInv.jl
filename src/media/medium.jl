@@ -1,5 +1,3 @@
-#module Media
-
 """
 Mutable type for storing medium parameters.
 ```julia
@@ -64,13 +62,13 @@ end
 # default construction without fcs and ics, and m3
 function Medium(mgrid, m::NamedStack{Array{Float64,N}}, bounds, ref) where {N}
     return Medium(
-        mgrid,
-        m,
-        bounds,
-        ref,
-        NamedArray([0.0], ([:o],)),
+        StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}.(mgrid),
+        Array{Float64}.(m),
+        Array{Float64}.(bounds),
+        Float64.(ref),
+        NamedArray(Float64.([0.0]), ([:o],)),
         NamedArray([0], ([:o],)),
-        NamedArray([zeros(1, 1, 1)], ([:o],)),
+        NamedArray([zeros(Float64,1, 1, 1)], ([:o],)),
     )
 end
 
@@ -87,12 +85,6 @@ include("gallery.jl")
 
 #=
 
-
-"""
-Records type to represent a seismic model.
-A contrast function for a model m is given by ``χ(m) = \frac{m}{m0}-1``.
-
-# Fields
 
 * `vp0::Vector{Float64}` : [vpmin, vpmax]
 * `vs0::Vector{Float64}` : [vsmin, vsmax]
@@ -178,7 +170,7 @@ function update!(mod::Medium)
     for s in newnames
         # println(typeof(mod.bounds), '\'NamedArray([[0.0,0.0]],[[s],]))
         (s ∉ names(mod.bounds)[1]) &&
-            (mod.bounds = vcat(mod.bounds, NamedArray([[0.0, 0.0]], [s])))
+            (mod.bounds = Array{Float64}.(vcat(mod.bounds, NamedArray([[0.0, 0.0]], [s]))))
     end
 
     for s in newnames

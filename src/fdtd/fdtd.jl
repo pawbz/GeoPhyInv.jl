@@ -308,7 +308,7 @@ function PFdtd(
     # update pml coefficient, now that freqpeak is scanned from the source wavelets
     update_pml!(pa.c)
 
-    check_stability(pa, verbose, H = 10)
+    check_stability(pa, verbose, H = div(20, FD_ORDER))
 
 
     # update viscoelastic/ viscoacoustic parameters here
@@ -341,19 +341,14 @@ The idea is to use them later inside the loops for faster modelling.
 function get_fc(medium, tgrid)
     N = ndims(medium)
     ds = step.(medium.mgrid)
-    ds24I = inv.(ds .* 24.0)
-    dsI = inv.(ds)
+    # denominator depending on FD_ORDER
+    dsI = (FD_ORDER == 2) ? inv.(ds) : inv.(ds .* 24.0)
     dt = step(tgrid)
     dtI = inv(dt)
 
     return NamedArray(
-        vcat([dt, dtI], ds, dsI, ds24I),
-        vcat(
-            [:dt, :dtI],
-            dim_names(N, "d"),
-            dim_names(N, "d", "I"),
-            dim_names(N, "d", "24I"),
-        ),
+        vcat([dt, dtI], ds, dsI),
+        vcat([:dt, :dtI], dim_names(N, "d"), dim_names(N, "d", "I")),
     )
 end
 
@@ -420,6 +415,11 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
         [:t],
     )
 
+    wr = NamedArray(
+        [USE_GPU ? Array(zeros(eval(f)(), T(), n...)) : zeros(1,1,1) for f in pac.rfields],
+        Symbol.(pac.rfields),
+    )
+
     # dummy (use for viscoelastic modeling later)
     w2 = NamedArray(
         [NamedArray([@zeros(fill(1, N)...) for i in [:r]], ([:r],)) for i = 1:2],
@@ -435,7 +435,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
 
     ss = [P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp, iss) in enumerate(sschunks)]
 
-    return P_x_worker_x_pw(ss, w1, w2, memory_pml, born_svalue_stack)
+    return P_x_worker_x_pw(ss, w1, wr, w2, memory_pml, born_svalue_stack)
 end
 
 
@@ -656,12 +656,7 @@ end
 """
 Save snapshots for ipw=1
 """
-function snaps_save!(
-    itsnap,
-    issp::Int64,
-    pac::P_common,
-    pap
-) 
+function snaps_save!(itsnap, issp::Int64, pac::P_common, pap)
     p = pap[1].w1[:t][pac.snaps_field]
     snaps = pap[1].ss[issp].snaps[itsnap]
     copyto!(snaps, p)
