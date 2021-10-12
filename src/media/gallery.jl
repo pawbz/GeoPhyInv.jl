@@ -1,5 +1,6 @@
 
 global const marmousi_folder=joinpath(@__DIR__, "marmousi2")
+global const overthrust_folder=joinpath(@__DIR__, "overthrust")
 
 """
 ```julia
@@ -89,6 +90,35 @@ function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)
 		mgrid=[range(500,stop=3500, step=step(fmgrid[1])), range(4000,step=step(fmgrid[2]),stop=13000)]
 		model=update(fmodel,mgrid)
 
+    elseif (attrib == :overthrust)
+        vp= [];
+        for i in range(1,8, step= 1)
+            file_= h5open(joinpath(overthrust_folder, "overthrust_"*string(i)*".h5"), "r");
+            vp_sect= read(file_, "vp");
+            if i==1
+                vp= deepcopy(vp_sect)
+            else
+                vp= cat(vp, vp_sect, dims= 3);
+            end
+            close(file_)
+        end
+        file_= h5open(joinpath(overthrust_folder, "overthrust_mgrid.h5"), "r");
+        xgrid = read(file_, "xgrid")
+        ygrid = read(file_, "ygrid")
+        zgrid = read(file_, "zgrid")
+        close(file_)
+        mgrid = [
+            range(zgrid[1], stop = zgrid[end], length = size(vp, 1)),
+            range(xgrid[1], stop = xgrid[end], length = size(vp, 2)),
+            range(xgrid[1], stop = xgrid[end], length = size(vp, 3)),
+        ]
+        model = Medium(mgrid, [:vp, :rho])
+        rho0= [1500., 2500.0];
+        update!(model, [:rho], [rho0])
+        fill!(model)
+        copyto!(model[:vp], vp)
+        update!(model, bfrac)
+            
         #
         #		vs0=Models.bounds(vs,bfrac); 
         #		rho0=Models.bounds(rho, bfrac);
