@@ -42,6 +42,42 @@ for (i, x) in enumerate(dim_names(3))
 end
 
 #-------------------------------------------------------
+# grid indices and linear-interpolation weights
+#-------------------------------------------------------
+"""
+Output CartesianIndices and corresponding linear interpolation weights for point P in mgrid
+For example, when 2D,
+mgrid=[range(1.3, stop=10.6,step=0.003), range(1.2,stop=15.3,step=0.004)]
+P=[5,5]
+"""
+function get_indices_weights(mgrid, P)
+    @assert length(mgrid) == length(P)
+    N = length(mgrid)
+    idx = [Interpolation.indminn(mgrid[i], P[i], 2) for i = 1:N]
+    denomI = inv(prod([diff(mgrid[i][idx[i]])[1] for i = 1:N]))
+    c = CartesianIndices(Tuple(broadcast(x -> x[1]:x[2], idx)))
+    weights = zeros(length(c))
+    for (i, cc) in enumerate(c)
+        weights[i] = prod([abs(mgrid[i][cc[i]] - P[i]) for i = 1:N]) * denomI
+    end
+    return c, weights
+end
+
+for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
+    grids = broadcast(x -> Symbol(string("m", x)), getindex.(collect(dimnames), 2))
+    for (idim, dim) in dimnames
+        v = Symbol("v", string(dim))
+        g = Symbol("m", string(dim))
+        @eval function get_indices_weights(::$v, $(grids...), P) 
+            # velocity grids are stagerred in respective dimensions, so generate half grids in respective dimensions 
+            $g=range($g[1] - step($g) * (FD_ORDER - 1) * 0.5, step = step($g), length = length($g) + FD_ORDER - 1,)
+            return get_indices_weights([$(grids...)], P)
+        end
+    end
+end
+
+
+#-------------------------------------------------------
 # Acoustic
 #-------------------------------------------------------
 Base.zeros(::p, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx))
@@ -71,10 +107,10 @@ Base.zeros(::dpdy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(
         nx - 2(FD_ORDER - 1),
     ),
 )
-Base.zeros(::vx, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx + 1))
-Base.zeros(::vz, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz + 1, nx))
-Base.zeros(::vx, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + 1))
-Base.zeros(::vz, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz + 1, ny, nx))
+Base.zeros(::vx, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx + FD_ORDER - 1))
+Base.zeros(::vz, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz + FD_ORDER - 1, nx))
+Base.zeros(::vx, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + FD_ORDER - 1))
+Base.zeros(::vz, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz + FD_ORDER - 1, ny, nx))
 Base.zeros(::vy, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny + 1, nx))
 Base.zeros(::dvxdx, ::FdtdAcou, nz, nx; pml::Bool = false) =
     Data.Array(zeros(nz, pml ? 2 * npml : nx))
@@ -118,8 +154,8 @@ Base.zeros(::vx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + FD_O
 Base.zeros(::vy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny + FD_ORDER - 1, nx))
 Base.zeros(::vz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz + FD_ORDER - 1, ny, nx))
 
-Base.zeros(::vx, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx + 1))
-Base.zeros(::vz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz + 1, nx))
+Base.zeros(::vx, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx + FD_ORDER - 1))
+Base.zeros(::vz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz + FD_ORDER - 1, nx))
 
 Base.zeros(::dvxdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
     Data.Array(zeros(nz, ny, pml ? 2 * npml : nx))

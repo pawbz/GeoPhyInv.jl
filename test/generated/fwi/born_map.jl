@@ -24,7 +24,7 @@ for scenario in [:downhole, :pizza]
 
 		d12new=d1.+d2
 
-		f=Misfits.error_squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)
+		f=squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)
 
 		@test f<1e-25
 

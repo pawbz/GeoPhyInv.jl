@@ -8,11 +8,11 @@ Each worker needs a vector of this struct, as it models multiple superspources.
 mutable struct P_x_worker_x_pw_x_ss{N}
     iss::Int64
     wavelets::Vector{NamedStack{Vector{Float64}}} # [ .. for it in 1:nt]
-    ssprayw::Vector{Vector{Float64}}
+    ssprayw::NamedStack{Vector{Vector{Float64}}}
     records::NamedStack{Matrix{Float64}}
-    rinterpolatew::Vector{Vector{Float64}}
-    sindices::Vector{<:CartesianIndices{N}} # contains indices for each source 	
-    rindices::Vector{<:CartesianIndices{N}} # contains indices for each receiver
+    rinterpolatew::NamedStack{Vector{Vector{Float64}}}
+    sindices::NamedStack{Vector{T1}} where T1<:CartesianIndices{N} # contains indices for each source, each named field
+    rindices::NamedStack{Vector{T2}} where T2<:CartesianIndices{N}# contains indices for each receiver, each named field
     boundary::Vector{Array{Float64,3}}
     snaps::NamedVector{
         Array{Data.Number,N},

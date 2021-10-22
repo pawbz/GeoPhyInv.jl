@@ -1,7 +1,7 @@
 using Test
 using GeoPhyInv
 using LinearMaps
-using Misfits
+using Distances
 using LinearAlgebra
 
 pa=SeisInvExpt(FdtdAcouBorn(), LS(), :pizza, rfields=[:P, :vz]); # use linearized modeling attribute
@@ -16,7 +16,7 @@ d1=F*x1; #
 d2=F*x2;
 d12new=d1.+d2;
 
-@test Misfits.error_squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)<1e-25
+@test squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)<1e-25
 
 x=randn(size(F,2)); # random x
 y=randn(size(F,1)); # random y

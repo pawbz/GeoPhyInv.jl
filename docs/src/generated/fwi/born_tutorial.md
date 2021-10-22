@@ -6,7 +6,6 @@ EditURL = "<unknown>/fwi/born_tutorial.jl"
 using Test
 using GeoPhyInv
 using LinearMaps
-using Misfits
 using LinearAlgebra
 ```
 
@@ -36,7 +35,6 @@ nothing #hide
 ```
 
 ```@example born_tutorial
-@test Misfits.error_squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)<1e-25
 ```
 
 ### Adjoint test

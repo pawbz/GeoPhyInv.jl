@@ -1,7 +1,6 @@
 using Test
 using GeoPhyInv
 using LinearMaps
-using Misfits
 using LinearAlgebra
 
 
@@ -24,7 +23,7 @@ d12new=d1.+d2;
 
 #-
 
-@test Misfits.error_squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)<1e-25
+@test squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)<1e-25
 
 
 

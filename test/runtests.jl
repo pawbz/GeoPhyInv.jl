@@ -4,7 +4,7 @@ using Distributed
 using LinearAlgebra
 using GeoPhyInv
 using Test
-using Misfits
+using Distances
 using BenchmarkTools
 using Profile
 using LinearMaps

@@ -22,9 +22,9 @@ struct LS_prior # cls inversion including prior
 	# add data inverse covariance matrix here later, instead of just Float64
 	pdgls::Float64
 	# pdgls
-	pmgls::Misfits.P_gls{Float64}
+	# pmgls::P_gls{Float64}
 end
-LS_prior(α1::Float64, Q::LinearMap)=LS_prior(α1, Misfits.P_gls(Q))
+# LS_prior(α1::Float64, Q::LinearMap)=LS_prior(α1, P_gls(Q))
 struct Migr end
 struct Migr_FD end
 
@@ -128,7 +128,7 @@ function LS_prior(ninv::Int, α=[1.0, 0.5])
 	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
 	     (y,x)->LinearAlgebra.mul!(y,x,α[2]), 
 		      ninv, ninv, ismutating=true, issymmetric=true)
-	return LS_prior(α[1],Misfits.P_gls(Q))
+	return LS_prior(α[1],P_gls(Q))
 end
 
 

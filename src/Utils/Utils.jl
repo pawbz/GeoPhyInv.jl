@@ -2,7 +2,7 @@
 module Utils
 
 using DSP
-using Misfits
+using Distances
 using LinearAlgebra
 using Test
 using FFTW

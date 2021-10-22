@@ -415,8 +415,12 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
         [:t],
     )
 
+    # temp field arrays copied on the CPU before performing scalar operations
     wr = NamedArray(
-        [USE_GPU ? Array(zeros(eval(f)(), T(), n...)) : zeros(1,1,1) for f in pac.rfields],
+        [
+            USE_GPU ? Array(zeros(eval(f)(), T(), n...)) : zeros(1, 1, 1) for
+            f in pac.rfields
+        ],
         Symbol.(pac.rfields),
     )
 
@@ -570,10 +574,24 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     # end
 
     # initialize source_spray_weights per supersource and receiver interpolation weights per sequential source
-    ssprayw = [zeros(2^N) for i = 1:ageom[ipw][iss].ns]
-    sindices = [CartesianIndices(Tuple(fill(1:2, N))) for i = 1:ageom[ipw][iss].ns]
-    rinterpolatew = [zeros(2^N) for i = 1:ageom[ipw][iss].nr]
-    rindices = [CartesianIndices(Tuple(fill(1:2, N))) for i = 1:ageom[ipw][iss].nr]
+    ssprayw =
+        NamedArray([[zeros(2^N) for i = 1:ageom[ipw][iss].ns] for sf in sfields[ipw]], sfields[ipw])
+    sindices = NamedArray(
+        [
+            [CartesianIndices(Tuple(fill(1:2, N))) for i = 1:ageom[ipw][iss].ns] for
+            sf in sfields[ipw]
+        ],
+        sfields[ipw],
+    )
+    rinterpolatew =
+        NamedArray([[zeros(2^N) for i = 1:ageom[ipw][iss].nr] for rf in rfields], rfields)
+    rindices = NamedArray(
+        [
+            [CartesianIndices(Tuple(fill(1:2, N))) for i = 1:ageom[ipw][iss].nr] for
+            rf in rfields
+        ],
+        rfields,
+    )
 
     pass = P_x_worker_x_pw_x_ss(
         iss,

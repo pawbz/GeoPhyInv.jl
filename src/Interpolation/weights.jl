@@ -1,22 +1,3 @@
-"""
-Output CartesianIndices and corresponding linear interpolation weights for point P in mgrid
-    For example, 
-mgrid=[range(1.3, stop=10.6,step=0.003), range(1.2,stop=15.3,step=0.004)]
-P=[5,5]
-"""
-function get_interpolate_weights(mgrid, P)
-    @assert length(mgrid) == length(P)
-    N = length(mgrid)
-    idx = [indminn(mgrid[i], P[i], 2) for i = 1:N]
-    denomI = inv(prod([diff(mgrid[i][idx[i]])[1] for i = 1:N]))
-    c = CartesianIndices(Tuple(broadcast(x -> x[1]:x[2], idx)))
-    weights = zeros(length(c))
-    for (i, cc) in enumerate(c)
-        weights[i] = prod([abs(mgrid[i][cc[i]] - P[i]) for i = 1:N]) * denomI
-    end
-    return c, weights
-end
-
 
 
 # """

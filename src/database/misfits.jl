@@ -40,11 +40,12 @@ function func_grad!(pa::VNamedD_misfit, grad=nothing)
 			yr=y[iss].d[ifield]
 			wr=pa.w[iss].d[ifield]
 
+			# using Distances eqeuclidean here
 			if(grad===nothing)
-				JJ=Misfits.error_squared_euclidean!(nothing,xr,yr,wr,norm_flag=false)
+				# JJ=squared_euclidean!(nothing,xr,yr,wr,norm_flag=false)
 			elseif(grad==:dJx)
 				dJxr=pa.dJx[iss].d[ifield]
-				JJ=Misfits.error_squared_euclidean!(dJxr,xr,yr,wr,norm_flag=false)
+				# JJ=squared_euclidean!(dJxr,xr,yr,wr,norm_flag=false)
 			else
 				error("invalid grad")
 			end
@@ -121,7 +122,7 @@ function VNamedD_misfit_ssf(x, y; w=nothing, coup=nothing, func_attrib=:cls)
 
 	if(func_attrib==:cls)
 		pacse=[FBD.VNamedD_misfit_xcorr(1, 1,y=zeros(1,1)) for i in 1:2, j=1:2] # dummy
-		func=[(dJx,x)->Misfits.error_squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.ageom.nss, ifield=1:length(y.fields)]
+		func=[(dJx,x)->squared_euclidean!(dJx,x,y.d[iss,ifield],w.d[iss,ifield]) for iss in 1:y.ageom.nss, ifield=1:length(y.fields)]
 	elseif(func_attrib==:xcorrcls)
 		pacse=[FBD.VNamedD_misfit_xcorr(length(y.tgrid), y.ageom.nr[iss],y=y.d[iss,ifield]) for iss in 1:y.ageom.nss, ifield=1:length(y.fields)]
 		func=[(dJx,x)->FBD.func_grad!(dJx,x,pacse[iss,ifield]) for iss in 1:y.ageom.nss, ifield=1:length(y.fields)]

@@ -1,10 +1,11 @@
 module GeoPhyInv
 const NDIMS=3
 const USE_GPU=true
+const FD_TYPE=Float32
 const FD_ORDER=4
 
 # load all necessary packages
-using Misfits
+using Distances
 using TimerOutputs
 using LinearMaps
 using Ipopt
@@ -19,7 +20,7 @@ using ParallelStencil
 # check whether 2D or 3D, and initialize ParallelStencils accordingly
 @static if (NDIMS == 2)
     # using FiniteDifferences2D
-    include("fdtd/diff3D.jl")
+    include("fdtd/diff2D.jl")
 else
     # using FiniteDifferences3D
     include("fdtd/diff3D.jl")
@@ -49,9 +50,9 @@ using HDF5
 
 # choose Float64 or Float32
 @static if USE_GPU
-    @init_parallel_stencil(CUDA, Float32, NDIMS)
+    @init_parallel_stencil(CUDA, FD_TYPE, NDIMS)
 else
-    @init_parallel_stencil(Threads, Float32, NDIMS)
+    @init_parallel_stencil(Threads, FD_TYPE, NDIMS)
 end
 
 # This is extensively used to group arrays with Symbol names

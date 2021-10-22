@@ -150,28 +150,29 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
 
     ssprayw = pass.ssprayw
     rinterpolatew = pass.rinterpolatew
-    fill!.(ssprayw, 0.0)
-    fill!.(rinterpolatew, 0.0)
-    sindices = pass.sindices
-    rindices = pass.rindices
-
+    
+    for sfield in names(pass.sindices)[1]
+        sindices=pass.sindices[sfield]
     for is = 1:ageomss.ns
-        w = ssprayw[is]
-        sindices[is], ww = Interpolation.get_interpolate_weights(
-            pac.exmedium.mgrid,
+        w = ssprayw[sfield][is]
+        sindices[is], ww = get_indices_weights(eval(sfield)(),
+            pac.exmedium.mgrid...,
             [s[is] for s in ageomss.s],
         )
         copyto!(w, ww)
-
     end
+end
+    for rfield in names(pass.rindices)[1]
+    rindices = pass.rindices[rfield]
     for ir = 1:ageomss.nr
-        w = rinterpolatew[ir]
-        rindices[ir], ww = Interpolation.get_interpolate_weights(
-            pac.exmedium.mgrid,
+        w = rinterpolatew[rfield][ir]
+        rindices[ir], ww = get_indices_weights(eval(rfield)(),
+            pac.exmedium.mgrid...,
             [r[ir] for r in ageomss.r],
         )
         copyto!(w, ww)
     end
+end
 
 end
 
@@ -209,70 +210,63 @@ In-place method to perform the experiment and update `pa` after wave propagation
 
     reset_timer!(to)
 
-    @timeit to "initialize!" begin
-        # zero out all the results stored in pa.c
-        initialize!(pa.c)
+    # zero out all the results stored in pa.c
+    initialize!(pa.c)
 
-        # zero out results stored per worker
-        @sync begin
-            for (ip, p) in enumerate(procs(pa.p))
-                @async remotecall_wait(p) do
-                    initialize!(localpart(pa.p))
-                end
+    # zero out results stored per worker
+    @sync begin
+        for (ip, p) in enumerate(procs(pa.p))
+            @async remotecall_wait(p) do
+                initialize!(localpart(pa.p))
             end
         end
     end
 
 
-    @timeit to "mod_x_proc!" begin
+    # @timeit to "mod_x_proc!" begin
         # all localparts of DArray are input to this method
         # parallelization over shots
-        @sync begin
-            for (ip, p) in enumerate(procs(pa.p))
-                @async remotecall_wait(p) do
-                    mod_x_proc!(pa.c, localpart(pa.p))
-                end
+    @sync begin
+        for (ip, p) in enumerate(procs(pa.p))
+            @async remotecall_wait(p) do
+                mod_x_proc!(pa.c, localpart(pa.p))
+            end
+        end
+    end
+    # end
+
+    # stack gradients and illum over sources
+    @sync begin
+        for (ip, p) in enumerate(procs(pa.p))
+            @sync remotecall_wait(p) do
+                (pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
+                (pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
             end
         end
     end
 
-    @timeit to "stack_grads!" begin
-        # stack gradients and illum over sources
-        @sync begin
-            for (ip, p) in enumerate(procs(pa.p))
-                @sync remotecall_wait(p) do
-                    (pa.c.gmodel_flag) && stack_grads!(pa.c, localpart(pa.p))
-                    (pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
-                end
-            end
-        end
-    end
-
-    @timeit to "update gradient" begin
-        # update gradient medium using grad_modKI_stack, grad_modrr_stack
-        (pa.c.gmodel_flag) && update_gradient!(pa.c)
-    end
+    # update gradient medium using grad_modKI_stack, grad_modrr_stack
+    (pa.c.gmodel_flag) && update_gradient!(pa.c)
 
 
-    @timeit to "record data" begin
-        for ipw in pa.c.activepw
-            if (pa.c.rflags[ipw] ≠ 0) # record only if rflags is non-zero
-                for rfield in pa.c.rfields
+    for ipw in pa.c.activepw
+        if (pa.c.rflags[ipw] ≠ 0) # record only if rflags is non-zero
+            for rfield in pa.c.rfields
 
-                    fill!(pa.c.datamat, 0.0)
-                    @sync begin
-                        for (ip, p) in enumerate(procs(pa.p))
-                            @sync remotecall_wait(p) do
-                                update_datamat!(rfield, ipw, pa.c, localpart(pa.p))
-                            end
+                fill!(pa.c.datamat, 0.0)
+                @sync begin
+                    for (ip, p) in enumerate(procs(pa.p))
+                        @sync remotecall_wait(p) do
+                            update_datamat!(rfield, ipw, pa.c, localpart(pa.p))
                         end
                     end
-                    update_data!(rfield, ipw, pa.c)
                 end
+                update_data!(rfield, ipw, pa.c)
             end
         end
     end
     if (pa.c.verbose)
+        println("timer output of methods inside time loop")
         show(to)
         println("  ")
     end
@@ -299,7 +293,7 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
             pac.ic[:nt],
             dt = 1,
             desc = "\tmodeling supershot $iss/$(length(pac.ageom[1])) ",
-            color = :white,
+            color = :blue,
         )
         # time_loop
         """
@@ -309,12 +303,16 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
 
             pac.verbose && next!(prog, :white)
 
-            advance!(pac, pap)
+            @timeit to "advance time step" begin
+                advance!(pac, pap)
+            end
 
             # force p[1] on boundaries, only for ipw=1
             (pac.backprop_flag == -1) && boundary_force!(it, issp, pac, pap)
 
-            add_source!(it, issp, iss, pac, pap)
+            @timeit to "add source" begin
+                add_source!(it, issp, iss, pac, pap)
+            end
 
             # no born flag for adjoint modelling
             if (!pac.gmodel_flag)
@@ -325,9 +323,15 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
             # record boundaries after time reversal already
             (pac.backprop_flag == 1) && boundary_save!(pac.ic[:nt] - it + 1, issp, pac, pap)
 
-            record!(it, issp, iss, pac, pap)
+            @timeit to "record at receivers" begin
+                record!(it, issp, iss, pac, pap)
+            end
 
-            (pac.gmodel_flag) && compute_gradient!(issp, pac, pap)
+            if(pac.gmodel_flag)
+                @timeit to "compute gradient" begin
+                    compute_gradient!(issp, pac, pap)
+                end
+            end
 
             (pac.illum_flag) && compute_illum!(issp, pap)
 

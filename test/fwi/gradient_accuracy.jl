@@ -75,7 +75,7 @@ end
 	pa_fd=expt(Migr_FD());
 	result_fd=update!(pa_fd)
 
-	f=Misfits.error_squared_euclidean!(nothing, result[2], result_fd[2], nothing, norm_flag=true)
+	f=squared_euclidean!(nothing, result[2], result_fd[2], nothing, norm_flag=true)
 
 	@test f<1e-15
 end
@@ -103,7 +103,7 @@ end
 
 
 
-	f=Misfits.error_squared_euclidean!(nothing, result[2], result_fd[2], nothing, norm_flag=true)
+	f=squared_euclidean!(nothing, result[2], result_fd[2], nothing, norm_flag=true)
 
 	@test f<1e-15
 end

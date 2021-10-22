@@ -11,7 +11,7 @@ function test_linearmap(F)
 		d1=FF*x1
 		d2=FF*x2
 		d12new=d1.+d2
-		@test Misfits.error_squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)<1e-25
+		@test squared_euclidean!(nothing, d12, d12new, nothing, norm_flag=true)<1e-25
 	end
 
 	adjtest(F)

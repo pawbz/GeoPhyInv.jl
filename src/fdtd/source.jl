@@ -84,9 +84,6 @@ function fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
     return freqmin, freqmax, Statistics.mean(freqpeaks)
 end
 
-struct Source_B1 end
-struct Source_B0 end
-
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
 @inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac, pap)
     # aliases
@@ -113,9 +110,9 @@ struct Source_B0 end
                         pac.fc[:dt] *
                         prod(inv.(step.(pac.medium.mgrid)))
 
-                    for (i, si) in enumerate(sindices[is])
+                    for (i, si) in enumerate(sindices[sfield][is])
                         p[sfield][si] +=
-                            source(source_term, ssprayw[is][i], pac, si, eval(sfield)())
+                            source(source_term, ssprayw[sfield][is][i], pac, si, eval(sfield)())
                     end
                 end
             end

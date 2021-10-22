@@ -13,7 +13,6 @@ It also provides methods that apply source and receiver filters onto
 seismic data.
 """
 
-using Misfits
 using LinearAlgebra
 using Statistics
 import GeoPhyInv.Interpolation

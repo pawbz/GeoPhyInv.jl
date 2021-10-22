@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"jupyter.jupyterCommandLineArguments": [],
+		"julia.executablePath": "/home/pawan/software/julia-1.6.0/bin/julia",
+		"cSpell.enabled": true
+	}
+}
