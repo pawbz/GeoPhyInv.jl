@@ -361,6 +361,12 @@ git-tree-sha1 = "fd83fa0bde42e01952757f01149dd968c06c4dba"
 uuid = "0234f1f7-429e-5d53-9886-15a909be8d59"
 version = "1.12.0+1"
 
+[[IOCapture]]
+deps = ["Logging", "Random"]
+git-tree-sha1 = "f7be53659ab06ddc986428d3a9dcc95f6fa6705a"
+uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
+version = "0.2.2"
+
 [[IfElse]]
 git-tree-sha1 = "28e837ff3e7a6c3cdb252ce49fb412c8eb3caeef"
 uuid = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
@@ -512,6 +518,12 @@ deps = ["LinearAlgebra", "SparseArrays"]
 git-tree-sha1 = "ce708e2b5bbab5c47ffc24200566cbdfa04ff1c1"
 uuid = "7a12625a-238d-50fd-b39a-03d52299707e"
 version = "3.5.0"
+
+[[Literate]]
+deps = ["Base64", "IOCapture", "JSON", "REPL"]
+git-tree-sha1 = "d3493acfb9e6aa0cff46b09773fc2342327b0feb"
+uuid = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
+version = "2.9.4"
 
 [[LogExpFunctions]]
 deps = ["ChainRulesCore", "DocStringExtensions", "InverseFunctions", "IrrationalConstants", "LinearAlgebra"]
