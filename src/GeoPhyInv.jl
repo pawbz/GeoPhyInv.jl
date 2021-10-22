@@ -14,7 +14,6 @@ using DistributedArrays
 using Calculus
 using ProgressMeter
 using Distributed
-using DistributedArrays
 using SharedArrays
 using ParallelStencil
 # check whether 2D or 3D, and initialize ParallelStencils accordingly
