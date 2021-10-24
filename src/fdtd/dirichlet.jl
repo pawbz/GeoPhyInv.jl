@@ -10,11 +10,11 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
         # velocity-free boundary conditions    
         fname = Symbol("dirichlet", string(dim), "!")
 
-        fdh=div(FD_ORDER,2)
+        fdh=div(_fd.order,2)
         # mirror ghost cells 
         ighost=vcat(
-            [[replace(is, i => :($ifd)), replace(is, i => :($(FD_ORDER+1-ifd)))] for ifd = 1:fdh],
-            [[replace(is, i => :(n + $(FD_ORDER - ifd))), replace(is, i => :(n + $(ifd-1)))] for ifd = 1:fdh]
+            [[replace(is, i => :($ifd)), replace(is, i => :($(_fd.order+1-ifd)))] for ifd = 1:fdh],
+            [[replace(is, i => :(n + $(_fd.order - ifd))), replace(is, i => :(n + $(ifd-1)))] for ifd = 1:fdh]
         )
 
         isn = replace(is, i => :n)

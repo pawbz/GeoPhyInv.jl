@@ -1,6 +1,6 @@
 
 """
-A mutable type that bundles multi-component records at multiple receivers.
+A mutable type that bundles multi-component records at receiver array.
 ```julia
 records=Records(tgrid, ageom, [:p, :vx])
 

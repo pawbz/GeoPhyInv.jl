@@ -308,7 +308,7 @@ function PFdtd(
     # update pml coefficient, now that freqpeak is scanned from the source wavelets
     update_pml!(pa.c)
 
-    check_stability(pa, verbose, H = div(20, FD_ORDER))
+    check_stability(pa, verbose, H = div(20, _fd.order))
 
 
     # update viscoelastic/ viscoacoustic parameters here
@@ -341,8 +341,8 @@ The idea is to use them later inside the loops for faster modelling.
 function get_fc(medium, tgrid)
     N = ndims(medium)
     ds = step.(medium.mgrid)
-    # denominator depending on FD_ORDER
-    dsI = (FD_ORDER == 2) ? inv.(ds) : inv.(ds .* 24.0)
+    # denominator depending on _fd.order
+    dsI = (_fd.order == 2) ? inv.(ds) : inv.(ds .* 24.0)
     dt = step(tgrid)
     dtI = inv(dt)
 
@@ -418,7 +418,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
     # temp field arrays copied on the CPU before performing scalar operations
     wr = NamedArray(
         [
-            USE_GPU ? Array(zeros(eval(f)(), T(), n...)) : zeros(1, 1, 1) for
+            _fd.use_gpu ? Array(zeros(eval(f)(), T(), n...)) : zeros(1, 1, 1) for
             f in pac.rfields
         ],
         Symbol.(pac.rfields),

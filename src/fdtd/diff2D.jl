@@ -2,13 +2,13 @@
 
 import ..ParallelStencil: INDICES, WITHIN_DOC
 iz, ix = INDICES[1], INDICES[2]
-@static if (FD_ORDER == 2)
+@static if (_fd.order == 2)
     izi, ixi = :($iz + 1), :($ix + 1)
-elseif (FD_ORDER == 4)
+elseif (_fd.order == 4)
     izi, ixi = :($iz + 3), :($ix + 3)
 end
 
-@static if (FD_ORDER == 2)
+@static if (_fd.order == 2)
 
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"
@@ -39,7 +39,7 @@ end
     macro d_xi(A::Symbol)
         esc(:($A[$izi, $ix+1] - $A[$izi, $ix]))
     end
-elseif (FD_ORDER == 4)
+elseif (_fd.order == 4)
 
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"

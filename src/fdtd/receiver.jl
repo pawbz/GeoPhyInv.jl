@@ -11,7 +11,7 @@
             recs = pap[ipw].ss[issp].records[rfield]
 
             # copyto! before scalar indexing if GPU
-            if (USE_GPU)
+            if (_fd.use_gpu)
                 pw1 = pap[ipw].w1[:t][rfield]
                 pw = pap[ipw].wr[rfield]
                 copyto!(pw, pw1)

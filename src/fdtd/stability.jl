@@ -5,7 +5,7 @@
 	* choose 5 for 4th order scheme
 * `epsilon` : Courant number
 """
-function check_stability(pa::PFdtd, verbose=true; H=div(20,FD_ORDER), epsilon=inv(sqrt(ndims(pa.c.medium))))
+function check_stability(pa::PFdtd, verbose=true; H=div(20,_fd.order), epsilon=inv(sqrt(ndims(pa.c.medium))))
 	mgrid=pa.c.medium.mgrid
 	freqmin=pa.c.fc[:freqmin]
 	freqmax=pa.c.fc[:freqmax]

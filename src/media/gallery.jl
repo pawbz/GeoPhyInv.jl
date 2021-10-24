@@ -1,6 +1,6 @@
 
-global const marmousi_folder=joinpath(@__DIR__, "marmousi2")
-global const overthrust_folder=joinpath(@__DIR__, "overthrust")
+global const marmousi_folder=joinpath(dirname(pathof(GeoPhyInv)), "media", "marmousi2")
+global const overthrust_folder=joinpath(dirname(pathof(GeoPhyInv)), "media", "overthrust")
 
 """
 ```julia

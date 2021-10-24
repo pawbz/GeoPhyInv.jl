@@ -1,21 +1,5 @@
 # Structs for stress and velocity fields (used for multiple dispatch)
 
-"""
-Return axis names of 1D, 2D or 3D fields
-"""
-function dim_names(N, prefix = "", suffix = ""; order = 1)
-    if (N == 3)
-        names = (order == 2) ? [:zz, :yy, :xx, :xz, :xy, :yz] : [:z, :y, :x]
-    elseif (N == 2)
-        names = (order == 2) ? [:zz, :xx, :xz] : [:z, :x]
-    elseif (N == 1)
-        names = [:z]
-    else
-        error("invalid dim num")
-    end
-    return [Symbol(prefix, string(m), suffix) for m in names]
-end
-
 abstract type Fields end
 
 """
@@ -70,7 +54,7 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
         g = Symbol("m", string(dim))
         @eval function get_indices_weights(::$v, $(grids...), P) 
             # velocity grids are stagerred in respective dimensions, so generate half grids in respective dimensions 
-            $g=range($g[1] - step($g) * (FD_ORDER - 1) * 0.5, step = step($g), length = length($g) + FD_ORDER - 1,)
+            $g=range($g[1] - step($g) * (_fd.order - 1) * 0.5, step = step($g), length = length($g) + _fd.order - 1,)
             return get_indices_weights([$(grids...)], P)
         end
     end
@@ -83,34 +67,34 @@ end
 Base.zeros(::p, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx))
 Base.zeros(::p, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
 Base.zeros(::dpdx, ::FdtdAcou, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz - 2(FD_ORDER - 1), pml ? 2 * npml : nx - 1(FD_ORDER - 1)))
+    Data.Array(zeros(nz - 2(_fd.order - 1), pml ? 2 * npml : nx - 1(_fd.order - 1)))
 Base.zeros(::dpdx, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 2(FD_ORDER - 1),
-        ny - 2(FD_ORDER - 1),
-        pml ? 2 * npml : nx - 1(FD_ORDER - 1),
+        nz - 2(_fd.order - 1),
+        ny - 2(_fd.order - 1),
+        pml ? 2 * npml : nx - 1(_fd.order - 1),
     ),
 )
 Base.zeros(::dpdz, ::FdtdAcou, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz - 1(FD_ORDER - 1), nx - 2(FD_ORDER - 1)))
+    Data.Array(zeros(pml ? 2 * npml : nz - 1(_fd.order - 1), nx - 2(_fd.order - 1)))
 Base.zeros(::dpdz, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        pml ? 2 * npml : nz - 1(FD_ORDER - 1),
-        ny - 2(FD_ORDER - 1),
-        nx - 2(FD_ORDER - 1),
+        pml ? 2 * npml : nz - 1(_fd.order - 1),
+        ny - 2(_fd.order - 1),
+        nx - 2(_fd.order - 1),
     ),
 )
 Base.zeros(::dpdy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 2(FD_ORDER - 1),
-        pml ? 2 * npml : ny - 1(FD_ORDER - 1),
-        nx - 2(FD_ORDER - 1),
+        nz - 2(_fd.order - 1),
+        pml ? 2 * npml : ny - 1(_fd.order - 1),
+        nx - 2(_fd.order - 1),
     ),
 )
-Base.zeros(::vx, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx + FD_ORDER - 1))
-Base.zeros(::vz, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz + FD_ORDER - 1, nx))
-Base.zeros(::vx, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + FD_ORDER - 1))
-Base.zeros(::vz, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz + FD_ORDER - 1, ny, nx))
+Base.zeros(::vx, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx + _fd.order - 1))
+Base.zeros(::vz, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz + _fd.order - 1, nx))
+Base.zeros(::vx, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + _fd.order - 1))
+Base.zeros(::vz, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz + _fd.order - 1, ny, nx))
 Base.zeros(::vy, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny + 1, nx))
 Base.zeros(::dvxdx, ::FdtdAcou, nz, nx; pml::Bool = false) =
     Data.Array(zeros(nz, pml ? 2 * npml : nx))
@@ -139,23 +123,23 @@ Base.zeros(::tauxx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
 Base.zeros(::tauyy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
 Base.zeros(::tauzz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
 Base.zeros(::tauxy, ::FdtdElastic, nz, ny, nx) =
-    Data.Array(zeros(nz - 2(FD_ORDER - 1), ny - 1(FD_ORDER - 1), nx - 1(FD_ORDER - 1)))
+    Data.Array(zeros(nz - 2(_fd.order - 1), ny - 1(_fd.order - 1), nx - 1(_fd.order - 1)))
 Base.zeros(::tauxz, ::FdtdElastic, nz, ny, nx) =
-    Data.Array(zeros(nz - 1(FD_ORDER - 1), ny - 2(FD_ORDER - 1), nx - 1(FD_ORDER - 1)))
+    Data.Array(zeros(nz - 1(_fd.order - 1), ny - 2(_fd.order - 1), nx - 1(_fd.order - 1)))
 Base.zeros(::tauyz, ::FdtdElastic, nz, ny, nx) =
-    Data.Array(zeros(nz - 1(FD_ORDER - 1), ny - 1(FD_ORDER - 1), nx - 2(FD_ORDER - 1)))
+    Data.Array(zeros(nz - 1(_fd.order - 1), ny - 1(_fd.order - 1), nx - 2(_fd.order - 1)))
 
 Base.zeros(::tauxx, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx))
 Base.zeros(::tauzz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx))
 Base.zeros(::tauxz, ::FdtdElastic, nz, nx) =
-    Data.Array(zeros(nz - 1(FD_ORDER - 1), nx - 1(FD_ORDER - 1)))
+    Data.Array(zeros(nz - 1(_fd.order - 1), nx - 1(_fd.order - 1)))
 
-Base.zeros(::vx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + FD_ORDER - 1))
-Base.zeros(::vy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny + FD_ORDER - 1, nx))
-Base.zeros(::vz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz + FD_ORDER - 1, ny, nx))
+Base.zeros(::vx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + _fd.order - 1))
+Base.zeros(::vy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny + _fd.order - 1, nx))
+Base.zeros(::vz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz + _fd.order - 1, ny, nx))
 
-Base.zeros(::vx, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx + FD_ORDER - 1))
-Base.zeros(::vz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz + FD_ORDER - 1, nx))
+Base.zeros(::vx, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx + _fd.order - 1))
+Base.zeros(::vz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz + _fd.order - 1, nx))
 
 Base.zeros(::dvxdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
     Data.Array(zeros(nz, ny, pml ? 2 * npml : nx))
@@ -165,44 +149,44 @@ Base.zeros(::dvzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
     Data.Array(zeros(pml ? 2 * npml : nz, ny, nx))
 Base.zeros(::dvxdy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 2(FD_ORDER - 1),
-        pml ? 2 * npml : ny - 1(FD_ORDER - 1),
-        nx - 1(FD_ORDER - 1),
+        nz - 2(_fd.order - 1),
+        pml ? 2 * npml : ny - 1(_fd.order - 1),
+        nx - 1(_fd.order - 1),
     ),
 )
 Base.zeros(::dvxdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        pml ? 2 * npml : nz - 1(FD_ORDER - 1),
-        ny - 2(FD_ORDER - 1),
-        nx - 1(FD_ORDER - 1),
+        pml ? 2 * npml : nz - 1(_fd.order - 1),
+        ny - 2(_fd.order - 1),
+        nx - 1(_fd.order - 1),
     ),
 )
 Base.zeros(::dvydx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 2(FD_ORDER - 1),
-        ny - 1(FD_ORDER - 1),
-        pml ? 2 * npml : nx - 1(FD_ORDER - 1),
+        nz - 2(_fd.order - 1),
+        ny - 1(_fd.order - 1),
+        pml ? 2 * npml : nx - 1(_fd.order - 1),
     ),
 )
 Base.zeros(::dvydz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        pml ? 2 * npml : nz - 1(FD_ORDER - 1),
-        ny - 1(FD_ORDER - 1),
-        nx - 2(FD_ORDER - 1),
+        pml ? 2 * npml : nz - 1(_fd.order - 1),
+        ny - 1(_fd.order - 1),
+        nx - 2(_fd.order - 1),
     ),
 )
 Base.zeros(::dvzdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 1(FD_ORDER - 1),
-        ny - 2(FD_ORDER - 1),
-        pml ? 2 * npml : nx - 1(FD_ORDER - 1),
+        nz - 1(_fd.order - 1),
+        ny - 2(_fd.order - 1),
+        pml ? 2 * npml : nx - 1(_fd.order - 1),
     ),
 )
 Base.zeros(::dvzdy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 1(FD_ORDER - 1),
-        pml ? 2 * npml : ny - 1(FD_ORDER - 1),
-        nx - 2(FD_ORDER - 1),
+        nz - 1(_fd.order - 1),
+        pml ? 2 * npml : ny - 1(_fd.order - 1),
+        nx - 2(_fd.order - 1),
     ),
 )
 
@@ -211,82 +195,82 @@ Base.zeros(::dvxdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
 Base.zeros(::dvzdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
     Data.Array(zeros(pml ? 2 * npml : nz, nx))
 Base.zeros(::dvxdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz - 1(FD_ORDER - 1), nx - 1(FD_ORDER - 1)))
+    Data.Array(zeros(pml ? 2 * npml : nz - 1(_fd.order - 1), nx - 1(_fd.order - 1)))
 Base.zeros(::dvzdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz - 1(FD_ORDER - 1), pml ? 2 * npml : nx - 1(FD_ORDER - 1)))
+    Data.Array(zeros(nz - 1(_fd.order - 1), pml ? 2 * npml : nx - 1(_fd.order - 1)))
 
 Base.zeros(::dtauxxdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 2(FD_ORDER - 1),
-        ny - 2(FD_ORDER - 1),
-        pml ? 2 * npml : nx - 1(FD_ORDER - 1),
+        nz - 2(_fd.order - 1),
+        ny - 2(_fd.order - 1),
+        pml ? 2 * npml : nx - 1(_fd.order - 1),
     ),
 )
 Base.zeros(::dtauyydy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 2(FD_ORDER - 1),
-        pml ? 2 * npml : ny - 1(FD_ORDER - 1),
-        nx - 2(FD_ORDER - 1),
+        nz - 2(_fd.order - 1),
+        pml ? 2 * npml : ny - 1(_fd.order - 1),
+        nx - 2(_fd.order - 1),
     ),
 )
 Base.zeros(::dtauzzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        pml ? 2 * npml : nz - 1(FD_ORDER - 1),
-        ny - 2(FD_ORDER - 1),
-        nx - 2(FD_ORDER - 1),
+        pml ? 2 * npml : nz - 1(_fd.order - 1),
+        ny - 2(_fd.order - 1),
+        nx - 2(_fd.order - 1),
     ),
 )
 Base.zeros(::dtauxydx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 2(FD_ORDER - 1),
-        ny - 1(FD_ORDER - 1),
-        pml ? 2 * npml : nx - 2(FD_ORDER - 1),
+        nz - 2(_fd.order - 1),
+        ny - 1(_fd.order - 1),
+        pml ? 2 * npml : nx - 2(_fd.order - 1),
     ),
 )
 Base.zeros(::dtauxydy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 2(FD_ORDER - 1),
-        pml ? 2 * npml : ny - 2(FD_ORDER - 1),
-        nx - 1(FD_ORDER - 1),
+        nz - 2(_fd.order - 1),
+        pml ? 2 * npml : ny - 2(_fd.order - 1),
+        nx - 1(_fd.order - 1),
     ),
 )
 Base.zeros(::dtauxzdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 1(FD_ORDER - 1),
-        ny - 2(FD_ORDER - 1),
-        pml ? 2 * npml : nx - 2(FD_ORDER - 1),
+        nz - 1(_fd.order - 1),
+        ny - 2(_fd.order - 1),
+        pml ? 2 * npml : nx - 2(_fd.order - 1),
     ),
 )
 Base.zeros(::dtauxzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        pml ? 2 * npml : nz - 2(FD_ORDER - 1),
-        ny - 2(FD_ORDER - 1),
-        nx - 1(FD_ORDER - 1),
+        pml ? 2 * npml : nz - 2(_fd.order - 1),
+        ny - 2(_fd.order - 1),
+        nx - 1(_fd.order - 1),
     ),
 )
 Base.zeros(::dtauyzdy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        nz - 1(FD_ORDER - 1),
-        pml ? 2 * npml : ny - 2(FD_ORDER - 1),
-        nx - 2(FD_ORDER - 1),
+        nz - 1(_fd.order - 1),
+        pml ? 2 * npml : ny - 2(_fd.order - 1),
+        nx - 2(_fd.order - 1),
     ),
 )
 Base.zeros(::dtauyzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
     zeros(
-        pml ? 2 * npml : nz - 2(FD_ORDER - 1),
-        ny - 1(FD_ORDER - 1),
-        nx - 2(FD_ORDER - 1),
+        pml ? 2 * npml : nz - 2(_fd.order - 1),
+        ny - 1(_fd.order - 1),
+        nx - 2(_fd.order - 1),
     ),
 )
 
 Base.zeros(::dtauxxdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz - 2(FD_ORDER - 1), pml ? 2 * npml : nx - 1(FD_ORDER - 1)))
+    Data.Array(zeros(nz - 2(_fd.order - 1), pml ? 2 * npml : nx - 1(_fd.order - 1)))
 Base.zeros(::dtauzzdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz - 1(FD_ORDER - 1), nx - 2(FD_ORDER - 1)))
+    Data.Array(zeros(pml ? 2 * npml : nz - 1(_fd.order - 1), nx - 2(_fd.order - 1)))
 Base.zeros(::dtauxzdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz - 1(FD_ORDER - 1), pml ? 2 * npml : nx - 2(FD_ORDER - 1)))
+    Data.Array(zeros(nz - 1(_fd.order - 1), pml ? 2 * npml : nx - 2(_fd.order - 1)))
 Base.zeros(::dtauxzdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz - 2(FD_ORDER - 1), nx - 1(FD_ORDER - 1)))
+    Data.Array(zeros(pml ? 2 * npml : nz - 2(_fd.order - 1), nx - 1(_fd.order - 1)))
 
 # Dont need pressure for FdtdElastic, so no initialization
 for f in Fields("p")

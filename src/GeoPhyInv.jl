@@ -1,10 +1,7 @@
 module GeoPhyInv
-const NDIMS=3
-const USE_GPU=true
-const FD_TYPE=Float32
-const FD_ORDER=4
 
-# load all necessary packages
+# required packages
+using ParallelStencil
 using Distances
 using TimerOutputs
 using LinearMaps
@@ -15,15 +12,6 @@ using Calculus
 using ProgressMeter
 using Distributed
 using SharedArrays
-using ParallelStencil
-# check whether 2D or 3D, and initialize ParallelStencils accordingly
-@static if (NDIMS == 2)
-    # using FiniteDifferences2D
-    include("fdtd/diff2D.jl")
-else
-    # using FiniteDifferences3D
-    include("fdtd/diff3D.jl")
-end
 using Printf
 using DataFrames
 using SparseArrays
@@ -43,122 +31,120 @@ using StatsBase
 using InteractiveUtils
 using RecipesBase
 using FFTW
-using CUDA
 using HDF5
 
 
-# choose Float64 or Float32
-@static if USE_GPU
-    @init_parallel_stencil(CUDA, FD_TYPE, NDIMS)
-else
-    @init_parallel_stencil(Threads, FD_TYPE, NDIMS)
-end
+include("params.jl")
 
-# This is extensively used to group arrays with Symbol names
-
+# This type is extensively used to create named arrays with Symbols
 NamedStack{T} =
     NamedArray{T,1,Array{T,1},Tuple{OrderedCollections.OrderedDict{Symbol,Int64}}}
 
-
-# create a timer object, used throughout this package, see TimerOutputs.jl
-global const to = TimerOutput();
-
-
-struct FdtdElastic end
-
-"""
-2-D acoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
-"""
-struct FdtdAcou end
-
-"""
-2-D ViscoAcoustic forward modeling using a finite-difference simulation of the acoustic wave-equation.
-"""
-struct FdtdAcouVisco end
-
-"""
-2-D Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
-"""
-struct FdtdAcouBorn end
-
-
-global const npml = 20
-
-# define structs for wavefields in 2D/3D
-include("fields.jl")
-
-# include modules (note: due to dependencies, order is important!)
-include("Interpolation/Interpolation.jl")
+# a module with some util methods
 include("Utils/Utils.jl")
-include("Operators.jl")
-include("Smooth.jl")
-include("IO.jl")
-include("media/medium.jl")
-include("srcwav/wavelets.jl")
+include("Interpolation/Interpolation.jl")
 
-# need to define supersource, source and receiver structs and export them (necessary for multiple dispatch)
-struct Srcs
-    n::Int
-end
-Srcs() = Srcs(0)
-struct SSrcs
-    n::Int
-end
-SSrcs() = SSrcs(0)
-struct Recs
-    n::Int
-end
-Recs() = Recs(0)
+# some structs used for multiple dispatch throughout this package
+include("types.jl")
+export Srcs, Recs, SSrcs
+export FdtdAcou, FdtdElastic, FdtdAcouBorn, FdtdAcouVisco
 
+# mutable data type for seismic medium + related methods
+include("media/core.jl")
+export Medium
 
+# source-receiver geometry
 include("ageom/core.jl")
+export AGeom, AGeomss
 
+# 
 include("database/core.jl")
 
-include("srcwav/core.jl")
-
-include("Coupling.jl")
+# store records
 include("records/core.jl")
-
-
-
-include("Born/Born.jl")
-include("fdtd/fdtd.jl")
-
-include("fwi/fwi.jl")
-
-include("Poisson/Poisson.jl")
-include("plots.jl")
-
-# export stuff from GeoPhyInv
 export Records
-export SrcWav
-export update!, Medium
-export ricker, ormsby
-export Srcs, Recs, SSrcs
-export AGeom, AGeomss
-export update,
-    update!,
-    padarray,
-    padarray!,
-    SeisForwExpt,
-    SeisInvExpt,
-    FdtdAcou,
-    FdtdElastic,
-    FdtdAcouBorn,
-    FdtdAcouVisco,
-    LS,
-    LS_prior,
-    Migr,
-    Migr_FD
 
-# export the Expt for Poisson
-const PoissonExpt=GeoPhyInv.Poisson.ParamExpt
-export PoissonExpt
-mod!(a::PoissonExpt, b, c) = GeoPhyInv.Poisson.mod!(a, b, c)
-mod!(a::PoissonExpt, b) = GeoPhyInv.Poisson.mod!(a, b)
-mod!(a::PoissonExpt) = GeoPhyInv.Poisson.mod!(a)
-operator_Born(a::PoissonExpt, b) = GeoPhyInv.Poisson.operator_Born(a, b)
+# mutable data type for storing time-domain source wavelets
+include("srcwav/wavelets.jl")
+export ricker, ormsby
+include("srcwav/core.jl")
+export SrcWav
+
+
+macro init_parallel_stencil(ndims::Int, use_gpu::Bool, datatype, order)
+    quote
+        # using ParallelStencil
+        # ParallelStencil.is_initialized() && ParallelStencil.@reset_parallel_stencil()
+        # ParallelStencil.@init_parallel_stencil(CUDA, $datatype, $ndims)
+        @eval GeoPhyInv begin
+            _fd.ndims = $ndims
+            @assert _fd.ndims ∈ [2, 3]
+            _fd.order = $order
+            @assert _fd.order ∈ [2, 4]
+            _fd.use_gpu = $use_gpu
+            _fd.datatype = $datatype
+            @assert _fd.datatype ∈ [Float32, Float64]
+
+            ParallelStencil.is_initialized() && ParallelStencil.@reset_parallel_stencil()
+            # check whether 2D or 3D, and initialize ParallelStencils accordingly
+            @static if $use_gpu
+                # using CUDA
+                ParallelStencil.@init_parallel_stencil(CUDA, $datatype, $ndims)
+            else
+                ParallelStencil.@init_parallel_stencil(Threads, $datatype, $ndims)
+            end
+            include(
+                joinpath(
+                    dirname(pathof(GeoPhyInv)),
+                    "fdtd",
+                    string("diff", $ndims, "D.jl"),
+                ),
+            )
+            # define structs for wavefields in 2D/3D
+            include(joinpath(dirname(pathof(GeoPhyInv)), "fields.jl"))
+            include(joinpath(dirname(pathof(GeoPhyInv)), "fdtd", "fdtd.jl"))
+        end
+    end
+end
+export @init_parallel_stencil
+export SeisForwExpt
+
+# export update from GeoPhyInv, as it is commonly used
+export update, update!
+
+# # include modules (note: due to dependencies, order is important!)
+# include("Operators.jl")
+# include("Smooth.jl")
+# include("IO.jl")
+
+# include("Coupling.jl")
+
+# include("Born/Born.jl")
+# include("fdtd/fdtd.jl")
+
+# include("fwi/fwi.jl")
+
+# include("Poisson/Poisson.jl")
+# include("plots.jl")
+
+
+
+
+#     padarray,
+#     padarray!,
+#     SeisInvExpt,
+#     LS,
+#     LS_prior,
+#     Migr,
+#     Migr_FD
+
+# # export the Expt for Poisson
+# const PoissonExpt=GeoPhyInv.Poisson.ParamExpt
+# export PoissonExpt
+# mod!(a::PoissonExpt, b, c) = GeoPhyInv.Poisson.mod!(a, b, c)
+# mod!(a::PoissonExpt, b) = GeoPhyInv.Poisson.mod!(a, b)
+# mod!(a::PoissonExpt) = GeoPhyInv.Poisson.mod!(a)
+# operator_Born(a::PoissonExpt, b) = GeoPhyInv.Poisson.operator_Born(a, b)
 
 
 end # module
