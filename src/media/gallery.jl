@@ -123,30 +123,7 @@ function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)
         copyto!(model[:vp], vp)
         update!(model, bfrac)
 
-        #
-        #		vs0=Models.bounds(vs,bfrac); 
-        #		rho0=Models.bounds(rho, bfrac);
-        #		update!(model,[:vp,:rho,:vs],[vp0,rho0,vs0])
         #=
-        	elseif(attrib == :seismic_marmousi2_high_res)
-        		vp, h= IO.readsu(joinpath(marmousi_folder,"vp_marmousi-ii.su"))
-        		vs, h= IO.readsu(joinpath(marmousi_folder,"vs_marmousi-ii.su"))
-        		rho,  h= IO.readsu(joinpath(marmousi_folder,"density_marmousi-ii.su"))
-        		vp .*= 1000.; vs .*= 1000.; #rho .*=1000
-        		vp0=Models.bounds(vp,bfrac); 
-        		vs0=Models.bounds(vs,bfrac); 
-        		rho0=Models.bounds(rho, bfrac);
-        		mgrid=[range(0.,stop=3500.,length=size(vp,1)),range(0., stop=17000., length=size(vp,2))]
-        		model=Medium(mgrid,[:vp,:rho,:vs])
-        		update!(model,[:vp,:rho,:vs],[vp0,rho0,vs0])
-        		copyto!(model[:vp],vp)
-        		copyto!(model[:rho],rho)
-        		copyto!(model[:vs],vs)
-
-        	elseif(attrib == :seismic_marmousi2_xwell)
-        		model=Medium_trun(Seismic(:seismic_marmousi2_high_res), 
-        				     zmin=1000., zmax=2000., xmin=8500., xmax=9500.,)
-        		update!(model, bfrac) # adjuts bounds just inside the bounds 
         	elseif(attrib == :seismic_marmousi2_surf)
         		model=Medium_trun(Seismic(:seismic_marmousi2_high_res), 
         				     xmin=6000., xmax=12000.,)

@@ -15,19 +15,19 @@ using Test
 # # Examples
 
 # Load a predefined model.
-mod=Medium(:marmousi2);
+medium=Medium(:elastic_homo1);
 
 # Get the medium parameters that are stored.
-names(mod)
+names(medium)
 
 # Look at the reference values.
-mod.ref
+medium.ref
 
 # Inspect the bounds.
-mod.bounds
+medium.bounds
 
 # Plotting is easy
-#md p1=heatmap(mod, :vp)
+#md p1=heatmap(medium, :vp)
 #md plot(p1,size=(800,400))
 
 
@@ -39,32 +39,32 @@ mgrid = [range(0.0, stop=10.,step=0.1), range(0.0, stop=30.,step=0.2)];
 mgrid = fill(range(-10, stop=10.,step=0.1), 3)
 
 # Allocate basic medium parameters on the grid.
-mod = Medium(mgrid, [:vp,:rho,:vs]);
+medium = Medium(mgrid, [:vp,:rho,:vs]);
 
 # Bounds for these parameters should be input for modeling or inversion. Use `update!`
 vpb=[2100.,2200.]; vsb=[1500, 1700]; rhob=[2100., 2300.];
-update!(mod, [:vp,:vs,:rho], [vpb, vsb, rhob]);
+update!(medium, [:vp,:vs,:rho], [vpb, vsb, rhob]);
 
-# Just fill `mod` with average (reference) values.
-fill!(mod);
+# Just fill `medium` with average (reference) values.
+fill!(medium);
 
 # Once the basic medium parameters are input, we can access some other derived parameters.
-mod[:Zp];
+medium[:Zp];
 
-# Otherwise, we can manually update parameters of `mod`.
-mod[:vp].=3000.;
-mod[:vs].=2000.;
+# Otherwise, we can manually update parameters of `medium`.
+medium[:vp].=3000.;
+medium[:vs].=2000.;
 
-println(mod)
+println(medium)
 
 # A model can be also be updated by adding random noise.
-update!(mod, [:vp,:rho], randn_perc=1.);
+update!(medium, [:vp,:rho], randn_perc=1.);
 
 # # Methods 
 #md # ```@docs
 #md md # Base.getindex(::Medium, ::Symbol)
 #md # GeoPhyInv.update!(::GeoPhyInv.Medium, ::Vector{Symbol},)
-#md # Base.copyto!(x::AbstractArray, mod::Medium, fields::Vector{Symbol})  
-#md # Base.vec(mod::Medium, ::Symbol)  
+#md # Base.copyto!(x::AbstractArray, medium::Medium, fields::Vector{Symbol})  
+#md # Base.vec(medium::Medium, ::Symbol)  
 #md # ```
 
