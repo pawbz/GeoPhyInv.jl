@@ -1,7 +1,6 @@
 
 using GeoPhyInv
-using LinearAlgebra
-using Random
+@init_parallel_stencil(3, false, Float32, 4)
 
 # # Intro
 

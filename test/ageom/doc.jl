@@ -1,7 +1,5 @@
 
 using GeoPhyInv
-using Test
-using SparseArrays
 
 
 # # Intro
