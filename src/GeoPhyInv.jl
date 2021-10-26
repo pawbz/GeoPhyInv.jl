@@ -71,6 +71,18 @@ include("srcwav/core.jl")
 export SrcWav
 
 
+
+"""
+@init_parallel_stencil(ndims, use_gpu, datatype, order)
+Initialize the package with ParallelStencil, giving access to its main functionality. 
+
+# Arguments
+
+* `ndims::Int`: the number of dimensions used for the stencil computations 2D or 3D 
+* `use_gpu::Bool` : use GPU for stencil computations or not
+* `datatype`: the type of numbers used by field arrays (e.g. Float32 or Float64)
+* `order::Int` : order of the finite-difference stencil 
+"""
 macro init_parallel_stencil(ndims::Int, use_gpu::Bool, datatype, order)
     quote
         # using ParallelStencil

@@ -59,7 +59,7 @@ end
 ageom=AGeom(mgrid, SSrcs(10), Srcs(10), Recs(20))
 ```
 Initialize an acquisition, with 10 supersources, by randomly placing a 
-sources and receivers in `mgrid`. All the supersources have same source and receiver positions.
+sources and receivers in `mgrid`. In this case, all the supersources have same source and receiver positions.
 """
 function Array{AGeomss,1}(
     mgrid::AbstractVector{T},
@@ -144,13 +144,12 @@ function Base.ndims(ageom::Array{AGeomss,1})
 end
 
 """
-Output `n` interpolated 2-D points between `p1` and `p2`. 
+Output `n` interpolated sources/ receivers between positions `p1` and `p2`. 
 """
 function spread(
     n,
     p1::Vector{T1},
     p2::Vector{T2},
-    rand_flag::Bool = false,
 ) where {T1<:Real,T2<:Real}
     @assert (length(p1) == length(p2)) # check if 2D or 3D
     nd = length(p1)
@@ -167,6 +166,22 @@ function spread(
         ]
         return Tuple([[it(i) for i = 1:n] for it in itp])
     end
+end
+
+"""
+Spread using difference sources/ receivers in each dimension given by `n_per_dim`.
+"""
+function spread(
+    n,
+    p1::Vector{T1},
+    p2::Vector{T2},
+    n_per_dim::Vector{T3}
+) where {T1<:Real,T2<:Real,T3<:Int}
+    @assert length(p1)==length(p2)==length(n_per_dim)
+    nd = length(p1)
+    @assert prod(n_per_dim) == n
+    I=collect(Iterators.product([spread(n_per_dim[i], [p1[i]], [p2[i]])[1] for i in 1:length(n_per_dim)]...))
+    return Tuple([[I[i][id] for i = 1:n] for id=1:nd])
 end
 
 """
@@ -209,7 +224,7 @@ update!(ageom[2], Srcs(10), p0, rad, angles)
 Update source geometry for the second supersource, with 10 sources placed equidistant from `p0=[z0,x0]` given radius `rad`
 and angles `angles=[0,2pi]`.
 """
-function update!(ageomss::AGeomss, ::Srcs, args...) where {T<:Real}
+function update!(ageomss::AGeomss, ::Srcs, args...)
     p = spread(ageomss.ns, args...)
     for id = 1:ndims(ageomss)
         copyto!(ageomss.s[id], p[id])
