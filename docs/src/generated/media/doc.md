@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "<unknown>/GeoPhyInv/test/media/doc.jl"
+EditURL = "<unknown>/test/media/doc.jl"
 ```
 
 ````@example doc
@@ -22,32 +22,32 @@ Medium(::Symbol, ::Real)
 Load a predefined model.
 
 ````@example doc
-mod=Medium(:marmousi2);
+medium=Medium(:elastic_homo1);
 nothing #hide
 ````
 
 Get the medium parameters that are stored.
 
 ````@example doc
-names(mod)
+names(medium)
 ````
 
 Look at the reference values.
 
 ````@example doc
-mod.ref
+medium.ref
 ````
 
 Inspect the bounds.
 
 ````@example doc
-mod.bounds
+medium.bounds
 ````
 
 Plotting is easy
 
 ````@example doc
-p1=heatmap(mod, :vp)
+p1=heatmap(medium, :vp)
 plot(p1,size=(800,400))
 ````
 
@@ -67,7 +67,7 @@ mgrid = fill(range(-10, stop=10.,step=0.1), 3)
 Allocate basic medium parameters on the grid.
 
 ````@example doc
-mod = Medium(mgrid, [:vp,:rho,:vs]);
+medium = Medium(mgrid, [:vp,:rho,:vs]);
 nothing #hide
 ````
 
@@ -75,37 +75,37 @@ Bounds for these parameters should be input for modeling or inversion. Use `upda
 
 ````@example doc
 vpb=[2100.,2200.]; vsb=[1500, 1700]; rhob=[2100., 2300.];
-update!(mod, [:vp,:vs,:rho], [vpb, vsb, rhob]);
+update!(medium, [:vp,:vs,:rho], [vpb, vsb, rhob]);
 nothing #hide
 ````
 
-Just fill `mod` with average (reference) values.
+Just fill `medium` with average (reference) values.
 
 ````@example doc
-fill!(mod);
+fill!(medium);
 nothing #hide
 ````
 
 Once the basic medium parameters are input, we can access some other derived parameters.
 
 ````@example doc
-mod[:Zp];
+medium[:Zp];
 nothing #hide
 ````
 
-Otherwise, we can manually update parameters of `mod`.
+Otherwise, we can manually update parameters of `medium`.
 
 ````@example doc
-mod[:vp].=3000.;
-mod[:vs].=2000.;
+medium[:vp].=3000.;
+medium[:vs].=2000.;
 
-println(mod)
+println(medium)
 ````
 
 A model can be also be updated by adding random noise.
 
 ````@example doc
-update!(mod, [:vp,:rho], randn_perc=1.);
+update!(medium, [:vp,:rho], randn_perc=1.);
 nothing #hide
 ````
 
@@ -117,7 +117,7 @@ md # Base.getindex(::Medium, ::Symbol)
 ````
 
 GeoPhyInv.update!(::GeoPhyInv.Medium, ::Vector{Symbol},)
-Base.copyto!(x::AbstractArray, mod::Medium, fields::Vector{Symbol})
-Base.vec(mod::Medium, ::Symbol)
+Base.copyto!(x::AbstractArray, medium::Medium, fields::Vector{Symbol})
+Base.vec(medium::Medium, ::Symbol)
 ```
 

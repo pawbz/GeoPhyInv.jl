@@ -295,7 +295,8 @@ function PFdtd(
 
     # a distributed array of P_x_worker --- note that the parameters for each super source are efficiently distributed here
     papa = ddata(
-        T = Vector{P_x_worker_x_pw{N,CUDA.Mem.DeviceBuffer}},
+        T = _fd.use_gpu ?
+            Vector{P_x_worker_x_pw{N,CUDA.CuArray{_fd.datatype,N,CUDA.Mem.DeviceBuffer}}} : Vector{P_x_worker_x_pw{N,Array{_fd.datatype,N}}},
         init = I -> Vector{P_x_worker_x_pw}(sschunks[I...][1], pac),
         pids = work,
     )
@@ -574,8 +575,10 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     # end
 
     # initialize source_spray_weights per supersource and receiver interpolation weights per sequential source
-    ssprayw =
-        NamedArray([[zeros(2^N) for i = 1:ageom[ipw][iss].ns] for sf in sfields[ipw]], sfields[ipw])
+    ssprayw = NamedArray(
+        [[zeros(2^N) for i = 1:ageom[ipw][iss].ns] for sf in sfields[ipw]],
+        sfields[ipw],
+    )
     sindices = NamedArray(
         [
             [CartesianIndices(Tuple(fill(1:2, N))) for i = 1:ageom[ipw][iss].ns] for

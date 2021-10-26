@@ -29,11 +29,11 @@ makedocs(
 		# 		  "Tutorial" => "generated/fwi/pizza.md",
 		# 		  "Adjoint Tests" => "generated/fwi/born_tutorial.md",
 		# 		 ],
-	    "PoissonExpt" => Any[
-				  "Description" => "generated/Poisson/doc.md",
-				 "Tutorial" => "generated/Poisson/forw.md",
-				 "Adjoint Tests" => "generated/Poisson/test_born.md",
-				 ],
+	    # "PoissonExpt" => Any[
+				#   "Description" => "generated/Poisson/doc.md",
+				#  "Tutorial" => "generated/Poisson/forw.md",
+				#  "Adjoint Tests" => "generated/Poisson/test_born.md",
+				#  ],
 	    ]
 #	    "Seismic Born Modeling" => "FWI/born_map.md",
 #	    "Seismic Full Waveform Inversion" => "FWI/gradient_accuracy.md",

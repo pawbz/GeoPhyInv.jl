@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "<unknown>/GeoPhyInv/test/srcwav/doc.jl"
+EditURL = "<unknown>/test/srcwav/doc.jl"
 ```
 
 ````@example doc

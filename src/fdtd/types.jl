@@ -76,15 +76,15 @@ This struct contains velocity and stress fields simulated by each worker.
 Again, note that a single worker can take care of multiple supersources.
 * T1==Matrix{Float64} for 2D simulation
 """
-mutable struct P_x_worker_x_pw{N,B}
+mutable struct P_x_worker_x_pw{N,Q<:Data.Array{N}}
     ss::Vector{P_x_worker_x_pw_x_ss{N}} # supersource specific arrays
     # 2D arrays of p, vx, vz, their previous snapshots, and 
     # x derivatives of p, vx, vz
     # z derivatives of p, vx, vz
-    w1::NamedStack{NamedStack{Data.Array{N,B}}} # p, vx, vz on GPU or CPU
+    w1::NamedStack{NamedStack{Q}} # p, vx, vz on GPU or CPU
     wr::NamedStack{Array{Data.Number,N}} # same as above but only for receiver fields when GPU to facilitate faster scalar indexing!?
-    w2::NamedStack{NamedStack{Data.Array{N,B}}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
-    memory_pml::NamedStack{Data.Array{N,B}} # memory variables for CPML 
+    w2::NamedStack{NamedStack{Q}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
+    memory_pml::NamedStack{Q} # memory variables for CPML 
     born_svalue_stack::Array{Float64,N} # used for born modeling # only used for 2-D simulation
 end
 
@@ -131,7 +131,7 @@ Modelling parameters common for all supersources
 * stored snaps shots at tsnaps as Array{Float64,4} 
 
 """
-mutable struct P_common{T,N,B}
+mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
     jobname::Symbol
     attrib_mod::T
     activepw::Vector{Int64}
@@ -146,8 +146,8 @@ mutable struct P_common{T,N,B}
     rflags::Vector{Int64}
     fc::NamedStack{Float64}
     ic::NamedStack{Int64}
-    pml::NamedStack{NamedStack{Data.Array{1,B}}} # e.g., pml[:x][:a], pml[:z][:b]
-    mod::NamedStack{Data.Array{N,B}} # e.g., mod[:KI], mod[:K]
+    pml::NamedStack{NamedStack{Q1}} # e.g., pml[:x][:a], pml[:z][:b]
+    mod::NamedStack{Q2} # e.g., mod[:KI], mod[:K]
     mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
     #=
     	modKI::Matrix{Float64}

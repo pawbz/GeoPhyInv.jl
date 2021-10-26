@@ -2,6 +2,7 @@
 using GeoPhyInv
 using Test
 using Random
+@init_parallel_stencil(3, false, Float32, 4)
 
 # # Intro
 
