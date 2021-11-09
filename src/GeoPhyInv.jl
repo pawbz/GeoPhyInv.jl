@@ -30,6 +30,7 @@ using Distributions
 using StatsBase
 using InteractiveUtils
 using RecipesBase
+using ColorSchemes
 using FFTW
 using HDF5
 

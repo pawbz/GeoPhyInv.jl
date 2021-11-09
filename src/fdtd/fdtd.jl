@@ -421,7 +421,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
     # temp field arrays copied on the CPU before performing scalar operations
     wr = NamedArray(
         [
-            _fd.use_gpu ? Array(zeros(Data.Number, eval(f)(), T(), n...)) :
+            _fd.use_gpu ? Array(zeros(eval(f)(), T(), n...)) :
             zeros(Data.Number, fill(1, N)...) for f in pac.rfields
         ],
         Symbol.(pac.rfields),

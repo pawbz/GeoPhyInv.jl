@@ -1,4 +1,4 @@
-using Revise
+# This page was generated on DATEOFTODAY
 using GeoPhyInv
 using Statistics
 #md using Plots; gr();
@@ -48,7 +48,7 @@ pa = SeisForwExpt(
 # ### Modeling #1
 @time update!(pa);
 d1 = copy(pa[:data][:vz])
-#md p1=heatmap(pa[:data], :vz, grid=true, legend=:none);
+#md p1=heatmap(pa[:data], :vz, grid=true, legend=:none, 99);
 
 # ### Change medium in `pa` without memory allocation
 update!(pa, medium_new)
@@ -56,10 +56,11 @@ update!(pa, medium_new)
 # ### Modeling #2
 @time update!(pa);
 d2 = copy(pa[:data][:vz])
-#md p2=heatmap(pa[:data], :vz, grid=true, legend=:none);
+#md p2=heatmap(pa[:data], :vz, grid=true, legend=:none, 99);
 
 # Test
 @test d1 ≠ d2
 
 # ### Plotting #2
-#md plot(p1,p2, size=(500, 300))
+#md 
+plot(p1,p2, size=(500, 300))

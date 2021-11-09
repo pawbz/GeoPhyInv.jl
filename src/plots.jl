@@ -32,23 +32,24 @@ end
 	rx, rz
 end
 
-@recipe function heatmap(dat::NamedD, field::Symbol=:p, wclip_perc=0.0, bclip_perc=0.0)
+@recipe function heatmap(dat::NamedD, field::Symbol=:p, wclip_perc=0.0, bclip_perc=wclip_perc)
 
-	#wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
-	#bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
+	# wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
+	# bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
 	   
 	dp=dat.d[field]
 	dz = dat.grid
 	dx = 1:size(dp,2)
 	dmin=minimum(dp)
 	dmax=maximum(dp)
-	dmin=dmin+bclip_perc*inv(100)*abs(dmin)
-	dmax=dmax-wclip_perc*inv(100)*abs(dmax)
+	dmin_clip=dmin+bclip_perc*inv(100)*abs(dmin)
+	dmax_clip=dmax-wclip_perc*inv(100)*abs(dmax)
+	println(dmin_clip,"\t", dmax_clip)
 	legend --> true
 	xguide --> "channel index"
 	yguide --> "time"
-	seriescolor --> :grays
-	clims --> (dmin, dmax)
+	seriescolor --> :seismic
+	clims --> (dmin_clip, dmax_clip)
 	yflip := true
 	dx, dz, dp
 end
