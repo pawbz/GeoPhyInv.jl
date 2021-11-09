@@ -2,10 +2,12 @@
 EditURL = "<unknown>/test/srcwav/doc.jl"
 ```
 
+This page was generated on 2021-11-09
+
 ````@example doc
 using GeoPhyInv
-using LinearAlgebra
 using Random
+using LinearAlgebra
 ````
 
 # Intro
@@ -40,7 +42,7 @@ nothing #hide
 Fill the `:P` field of 3rd supersource with random numbers.
 
 ````@example doc
-Random.randn!(srcwav[3][:p]);
+randn!(srcwav[3][:p]);
 nothing #hide
 ````
 

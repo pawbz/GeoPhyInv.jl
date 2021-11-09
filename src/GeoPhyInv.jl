@@ -73,8 +73,10 @@ export SrcWav
 
 
 """
-@init_parallel_stencil(ndims, use_gpu, datatype, order)
 Initialize the package with ParallelStencil, giving access to its main functionality. 
+```julia
+@init_parallel_stencil(ndims, use_gpu, datatype, order)
+```
 
 # Arguments
 
@@ -137,7 +139,7 @@ export update, update!
 # include("fwi/fwi.jl")
 
 # include("Poisson/Poisson.jl")
-# include("plots.jl")
+include("plots.jl")
 
 
 

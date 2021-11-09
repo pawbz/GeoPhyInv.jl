@@ -39,6 +39,7 @@ end
     macro d_xi(A::Symbol)
         esc(:($A[$izi, $ix+1] - $A[$izi, $ix]))
     end
+    # dummy y
 elseif (_fd.order == 4)
 
     macro within(macroname::String, A::Symbol)
@@ -115,3 +116,11 @@ end
 macro av_xi(A::Symbol)
     esc(:(($A[$izi, $ix] + $A[$izi, $ix+1]) * 0.5))
 end
+
+
+macro d_yi(args...) end
+macro av_yi(args...) end
+macro d_ya(args...) end
+macro av_xzi(args...) end
+macro av_yzi(args...) end
+macro av_xyi(args...) end

@@ -1,5 +1,5 @@
 
-medium=Medium(:acou_homo1,5)
+medium=Medium(:acou_homo2D,5)
 update!(medium, [:vp,:rho], randn_perc=0.1)
 ageom=AGeom(medium.mgrid, SSrcs(4), Srcs(1), Recs(100))
 update!(ageom, SSrcs(),[0,0],990.0,[0, 2π])

@@ -1,8 +1,9 @@
+# This page was generated on DATEOFTODAY
 
 using GeoPhyInv
 using Test
 using Random
-@init_parallel_stencil(3, false, Float32, 4)
+#jl @init_parallel_stencil(3, false, Float32, 4)
 
 # # Intro
 
@@ -29,4 +30,3 @@ Random.randn!(data[3][:p]);
 
 # # Methods 
 # Methods listed for `SrcWav` can used on instances of `Records` too.
-

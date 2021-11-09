@@ -1,8 +1,8 @@
 
 function SeisForwExpt(attrib::Symbol)
-	@assert attrib in [:acou_homo1]
+	@assert attrib in [:acou_homo2D]
 
-	model=Seismic(:acou_homo1);
+	model=Seismic(:acou_homo2D);
 	ageom=AGeom(model.mgrid,:xwell);
 	tgrid=range(0.0,stop=2.0,length=1000)
 

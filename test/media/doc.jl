@@ -15,7 +15,7 @@ using Test
 # # Examples
 
 # Load a predefined model.
-medium = Medium(:elastic_homo1);
+medium = Medium(:elastic_homo3D);
 
 # Get the medium parameters that are stored.
 names(medium)

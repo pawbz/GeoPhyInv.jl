@@ -116,7 +116,7 @@ function PFdtd(
     srcwav::Union{SrcWav,Vector{SrcWav}} = nothing,
     sflags::Union{Int,Vector{Int}} = fill(2, npw),
     rflags::Union{Int,Vector{Int}} = fill(1, npw),
-    rfields::Vector{Symbol} = [:p],
+    rfields::Vector{Symbol} = [:vz],
     zfree = nothing,
     backprop_flag::Int64 = 0,
     gmodel_flag::Bool = false,
@@ -128,6 +128,8 @@ function PFdtd(
 )
 
     N = ndims(medium)
+
+    @assert N == _fd.ndims "Cannot initiate SeisForwExpt due to ndims inconsistency with @init_parallel_stencil"
 
     # convert to vectors 
     if (typeof(ageom) == AGeom)
@@ -419,8 +421,8 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
     # temp field arrays copied on the CPU before performing scalar operations
     wr = NamedArray(
         [
-            _fd.use_gpu ? Array(zeros(eval(f)(), T(), n...)) : zeros(1, 1, 1) for
-            f in pac.rfields
+            _fd.use_gpu ? Array(zeros(Data.Number, eval(f)(), T(), n...)) :
+            zeros(Data.Number, fill(1, N)...) for f in pac.rfields
         ],
         Symbol.(pac.rfields),
     )
@@ -549,7 +551,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     snaps = NamedArray(
         [
             (eval(pac.snaps_field) <: Fields) ?
-            Array(zeros(eval(pac.snaps_field)(), T(), n...)) : zeros(fill(1, N)...) for
+            Array(zeros(eval(pac.snaps_field)(), T(), n...)) : zeros(Data.Number, fill(1, N)...) for
             i = 1:length(pac.itsnaps)
         ],
         names(pac.itsnaps)[1],

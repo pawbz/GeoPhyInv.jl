@@ -1,6 +1,8 @@
-
+# This page was generated on DATEOFTODAY
 using GeoPhyInv
-@init_parallel_stencil(3, false, Float32, 4)
+using Random
+using LinearAlgebra
+#jl @init_parallel_stencil(3, false, Float32, 4)
 
 # # Intro
 
@@ -22,7 +24,7 @@ tgrid=range(0, stop=1.0, step=0.1);
 srcwav=SrcWav(tgrid, ageom, [:p]);
 
 # Fill the `:P` field of 3rd supersource with random numbers.
-Random.randn!(srcwav[3][:p]);
+randn!(srcwav[3][:p]);
 
 # Often we want to populate the same source wavelet to all
 # the supersources and sources.

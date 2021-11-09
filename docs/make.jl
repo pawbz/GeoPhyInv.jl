@@ -1,7 +1,9 @@
-using Pkg; Pkg.add("Gadfly"); Pkg.add("Plots");
-
 using Documenter, GeoPhyInv, SparseArrays, LinearAlgebra, Random, LinearMaps
-using Gadfly, Plots
+using Gadfly, Plots, Test
+
+# standard setting for generating doc pages
+@init_parallel_stencil(2, false, Float32, 4)
+
 gr()
 theme(:juno)
 
@@ -21,12 +23,13 @@ makedocs(
 	    "Records" => "generated/data/doc.md",
 	    "SeisForwExpt" => Any[
 				  "Description" => "generated/fdtd/doc.md",
-				#   "Tutorial I" => "generated/fdtd/create_snaps.md",
-				#   "Tutorial II" => "generated/fdtd/reuse_expt.md",
+				  "Tutorial I" => "generated/fdtd/create_snaps.md",
+				  "Tutorial II" => "generated/fdtd/reuse_expt.md",
 				  ],
 	    # "SeisInvExpt" => Any[
 		# 		  "Description" => "generated/fwi/doc.md",
 		# 		  "Tutorial" => "generated/fwi/pizza.md",
+
 		# 		  "Adjoint Tests" => "generated/fwi/born_tutorial.md",
 		# 		 ],
 	    # "PoissonExpt" => Any[

@@ -2,6 +2,8 @@
 EditURL = "<unknown>/test/fdtd/doc.jl"
 ```
 
+This page was generated on 2021-11-09
+
 ````@example doc
 using BenchmarkTools
 using GeoPhyInv

@@ -223,7 +223,7 @@ Since the reference values are adjust the χ fields should also be changed
 function update!(mod::Medium, frac::Real)# 0.1
     for name in names(mod.m)[1]
         b = bounds(mod.m[name], frac)
-        copyto!(mod.bounds[name], Float64.(b))
+        (name ∈ names(mod.bounds)[1]) && copyto!(mod.bounds[name], Float64.(b))
     end
     update!(mod)
     return mod

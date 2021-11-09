@@ -47,7 +47,7 @@ end
 	legend --> true
 	xguide --> "channel index"
 	yguide --> "time"
-	color --> :grays
+	seriescolor --> :grays
 	clims --> (dmin, dmax)
 	yflip := true
 	dx, dz, dp

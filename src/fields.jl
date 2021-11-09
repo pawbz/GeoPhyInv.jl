@@ -52,9 +52,19 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
     for (idim, dim) in dimnames
         v = Symbol("v", string(dim))
         g = Symbol("m", string(dim))
-        @eval function get_indices_weights(::$v, $(grids...), P) 
+        @eval function get_indices_weights(::$v, $(grids...), P)
             # velocity grids are stagerred in respective dimensions, so generate half grids in respective dimensions 
-            $g=range($g[1] - step($g) * (_fd.order - 1) * 0.5, step = step($g), length = length($g) + _fd.order - 1,)
+            $g = range(
+                $g[1] - step($g) * (_fd.order - 1) * 0.5,
+                step = step($g),
+                length = length($g) + _fd.order - 1,
+            )
+            return get_indices_weights([$(grids...)], P)
+        end
+    end
+    for f in [:p, :tauxx, :tauyy, :tauzz]
+        @eval function get_indices_weights(::$f, $(grids...), P)
+            # pressure/ stress grids unchanged 
             return get_indices_weights([$(grids...)], P)
         end
     end

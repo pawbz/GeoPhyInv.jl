@@ -14,49 +14,33 @@ This tutorial demonstrates how an instance of `SeisForwExpt` can be used iterati
 to perform forward modeling using `update!` for
 various bundles of medium parameters.
 
-### Grid
-
-````@example reuse_expt
-zgrid=range(-1000.0,stop=1000.0,length=201)
-xgrid=range(-1000.0,stop=1000.0,length=201)
-mgrid = [zgrid, xgrid];
-nothing #hide
-````
-
 ### Medium #1
 
 ````@example reuse_expt
-vpb = [1500., 3500.] # bounds for vp
-rhob = [1500., 3500.] # density bounds
-medium=Medium(mgrid);
-update!(medium, [:vp,:rho], [vpb,rhob]);
-fill!(medium);
-update!(medium, [:vp,:rho], randn_perc=5); # add some random noise
-nothing #hide
+medium = Medium(:elastic_homo2D, 5)
 ````
 
 ### Medium #2
 
 ````@example reuse_expt
-medium_new=similar(medium)
-update!(medium_new, [:vp,:rho], randn_perc=5.) # add some noise
-update!(medium_new, [:vp], constant_pert=500.) # perturb velocity
+medium_new = similar(medium)
+update!(medium_new, [:vp, :rho, :vs], rectangle = [[-500, -500], [500, 500]], perc = 5.0) # perturb velocity
 ````
 
 ### AGeom
 
 ````@example reuse_expt
-ageom=AGeom(medium.mgrid,:surf, SSrcs(3), Recs(30)); # surface seismic
+ageom = AGeom(medium.mgrid, :surf, SSrcs(3), Recs(100)); # surface seismic
 nothing #hide
 ````
 
 ### Plotting #1
 
 ````@example reuse_expt
-p1=heatmap(medium, :vp)
+p1=heatmap(medium, :rho)
 scatter!(ageom, SSrcs())
 scatter!(ageom, Recs())
-p2=heatmap(medium_new, :vp)
+p2=heatmap(medium_new, :rho)
 scatter!(ageom, SSrcs())
 scatter!(ageom, Recs())
 plot(p1, p2, size=(800,300))
@@ -65,16 +49,24 @@ plot(p1, p2, size=(800,300))
 ### SrcWav
 
 ````@example reuse_expt
-tgrid = range(0.0,stop=1.0,length=1000) # generate a temporal grid
-wav = ricker(10.0, tgrid, tpeak=0.25,); # Choose a source wavelet
-srcwav = SrcWav(tgrid, ageom, [:p]) # initialize
-update!(srcwav, [:p], wav) # distribute to all supersources
+tgrid = range(0.0, stop = 2.0, length = 2500) # generate a temporal grid
+wav = ricker(15.0, tgrid, tpeak = 0.25); # Choose a source wavelet
+srcwav = SrcWav(tgrid, ageom, [:vz]) # initialize
+update!(srcwav, [:vz], wav) # distribute to all supersources
 ````
 
 ### SeisForwExpt
 
 ````@example reuse_expt
-pa=SeisForwExpt(FdtdAcou(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
+pa = SeisForwExpt(
+    FdtdElastic(),
+    medium = medium,
+    ageom = ageom,
+    srcwav = srcwav,
+    tgrid = tgrid,
+    rfields = [:vz],
+    verbose = true,
+);
 nothing #hide
 ````
 
@@ -82,8 +74,8 @@ nothing #hide
 
 ````@example reuse_expt
 @time update!(pa);
-d1=copy(pa[:data][:p])
-p1=heatmap(pa[:data], grid=true);
+d1 = copy(pa[:data][:vz])
+p1=heatmap(pa[:data], :vz, grid=true, legend=:none);
 nothing #hide
 ````
 
@@ -97,15 +89,15 @@ update!(pa, medium_new)
 
 ````@example reuse_expt
 @time update!(pa);
-d2=copy(pa[:data][:p])
-p2=heatmap(pa[:data], grid=true);
+d2 = copy(pa[:data][:vz])
+p2=heatmap(pa[:data], :vz, grid=true, legend=:none);
 nothing #hide
 ````
 
 Test
 
 ````@example reuse_expt
-@test d1≠d2
+@test d1 ≠ d2
 ````
 
 ### Plotting #2

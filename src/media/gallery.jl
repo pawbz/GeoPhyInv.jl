@@ -8,7 +8,7 @@ mod=Medium(attrib)
 ```
 As of now, only seismic models are predefined in this package. Choose `attrib::Symbol`
 
-* `=:acou_homo1` : a test homogeneous acoustic model
+* `=:acou_homo2D` : a test homogeneous acoustic model
 * `=:acou_homo2` : a test homogeneous acoustic model, but with coarser spatial sampling (faster testing)
 * `=:marmousi2` : marmousi2 model with lower resolution; useful for surface seismic experiments
 * `=:marmousi2_small` : a smaller section of marmousi2 
@@ -17,21 +17,22 @@ As of now, only seismic models are predefined in this package. Choose `attrib::S
 function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)
     bfrac = 0.1
     δ = Float64(δ)
-    if ((attrib == :acou_homo1))
-        vp0 = [1500.0, 3500.0] # bounds for vp
-        rho0 = [1500.0, 3500.0] # density bounds
+    vp0 = [1500.0, 3500.0] # some bounds for vp
+    rho0 = [1500.0, 3500.0] # some density bounds
+    vs0 = [1000, 2000] # bounds for vs
+    if ((attrib == :acou_homo2D))
         mgrid = repeat([range(-1000.0, stop = 1000.0, length = 201)], 2)
         nz, nx = length.(mgrid)
         model = Medium(mgrid, [:vp, :rho])
         update!(model, [:vp, :rho], [vp0, rho0])
         fill!(model)
-    elseif ((attrib == :elastic_homo1))
-        vp0 = [3000.0, 3500.0] # bounds for vp
-        vs0 = [1900, 2000] # bounds for vs
-        rho0 = [1000.0, 2000.0] # density bounds
-        mgrid = fill(range(-500, stop = 500, length = 255), 3)
-        vp0 = [1500.0, 3500.0] # bounds for vp
-        rho0 = [1500.0, 3500.0] # density bounds
+    elseif ((attrib == :elastic_homo2D))
+        mgrid = fill(range(-1000, stop = 1000, length = 255), 2)
+        model = Medium(mgrid, [:vp, :vs, :rho])
+        update!(model, [:vp, :vs, :rho], [vp0, vs0, rho0])
+        fill!(model)
+    elseif ((attrib == :elastic_homo3D))
+        mgrid = fill(range(-1000, stop = 1000, length = 255), 3)
         model = Medium(mgrid, [:vp, :vs, :rho])
         update!(model, [:vp, :vs, :rho], [vp0, vs0, rho0])
         fill!(model)

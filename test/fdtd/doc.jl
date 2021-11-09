@@ -1,3 +1,5 @@
+# This page was generated on DATEOFTODAY
+
 using BenchmarkTools
 using GeoPhyInv
 using Test

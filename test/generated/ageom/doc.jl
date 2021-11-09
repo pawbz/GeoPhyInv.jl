@@ -1,6 +1,5 @@
 using GeoPhyInv
 using Test
-using SparseArrays
 
 mgrid2 = [range(0.0, stop = 10.0, step = 0.1), range(0.0, stop = 30.0, step = 0.2)];
 

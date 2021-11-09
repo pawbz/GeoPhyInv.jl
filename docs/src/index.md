@@ -16,7 +16,7 @@ Then these variables are input to in-place functions
 For example, the
 current `Expt` types within the realm of this package include:
 
-* `SeisForwExpt` is the seismic (acoustic) forward modeling experiment;
+* `SeisForwExpt` is the seismic (both acoustic and elastic) forward modeling experiment;
 * `SeisInvExpt` is the type for seismic inversion experiment, including migration;
 * `PoissonExpt` is type for the solving the Poisson experiment.
 
@@ -27,9 +27,17 @@ Some of the commonly used (and exported) mutable types to create the `Expt` vari
 * `SrcWav` allocates source signals input to an experiment;
 * `Data` allocated the output records that are fitted during inversion.
 
-To get started, as an example, simply load a seismic inversion experiment already defined in our package gallery into REPL:
+### Loading the package
+It is important to configure GeoPhyInv with a macro `@init_parallel_stencil` before anything else.
+If you need to change this configuration, julia kernel must be restarted.
 ```julia
 using GeoPhyInv # load package (after installation)
+```
+```@docs
+GeoPhyInv.@init_parallel_stencil
+```
+After this, to get started with modelling or inversion, as an example, simply load a seismic inversion experiment already defined in our package gallery into REPL:
+```julia
 pa=SeisInvExpt(FdtdAcou(), LS(), :pizza); # "pizza" is the name of the experiment
 ```
 Then, simply use `update!` to perform least-squares inversion.
@@ -45,9 +53,16 @@ These grids can be simply created using `Base.range` in Julia, as shown below.
 
 ```julia
 zgrid=range(0,stop=1000.0,length=201) # create vertical grid from 0 to 1000 m
-xgrid=range(0,stop=1000.0,length=201) # create horizontal grid
-mgrid=[zgrid, xgrid] # spatial-grid bundle
-@info string("spatial sampling intervals (dz,dx)=", step.(mgrid))
+xgrid=range(0,stop=1000.0,length=201) # similarly, create horizontal grid
+```
+While constructing spatial-grid bundle, watch out for order.
+```julia
+mgrid=[zgrid, xgrid] # 2D
+mgrid=[zgrid, ygrid, xgrid] # 3D
+@info string("spatial sampling intervals (dz, dy, dx)=", step.(mgrid))
+```
+Similarly, a temporal grid.
+```julia
 tgrid=range(0,stop=1.0,step=0.001) # a temporal grid from 0 to 1.0 s
 ```
 
