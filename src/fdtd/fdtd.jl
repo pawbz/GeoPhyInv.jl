@@ -350,6 +350,8 @@ function get_fc(medium, tgrid)
         dsI= inv.(ds .* 24.0)
     elseif (_fd.order == 6)
         dsI = inv.(ds .* 1920.0)
+    elseif (_fd.order == 8)
+        dsI = inv.(ds .* 107520.0)
     end
     dt = step(tgrid)
     dtI = inv(dt)
