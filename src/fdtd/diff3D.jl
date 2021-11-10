@@ -74,7 +74,7 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$iz+2, $iy, $ix] * 27.0 - $A[$iz+1, $iy, $ix] * 27.0 +
-                $A[$iz+3, $iy, $ix] - $A[$iz, $iy, $ix]
+                $A[$iz, $iy, $ix] - $A[$iz+3, $iy, $ix]
             ),
         )
     end
@@ -82,7 +82,7 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$iz, $iy+2, $ix] * 27.0 - $A[$iz, $iy+1, $ix] * 27.0 +
-                $A[$iz, $iy+3, $ix] - $A[$iz, $iy, $ix]
+                $A[$iz, $iy, $ix] - $A[$iz, $iy+3, $ix]
             ),
         )
     end
@@ -90,7 +90,7 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$iz, $iy, $ix+2] * 27.0 - $A[$iz, $iy, $ix+1] * 27.0 +
-                $A[$iz, $iy, $ix+3] - $A[$iz, $iy, $ix]
+                $A[$iz, $iy, $ix] - $A[$iz, $iy, $ix+3]
             ),
         )
     end
@@ -98,7 +98,7 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$iz+2, $iyi, $ixi] * 27.0 - $A[$iz+1, $iyi, $ixi] * 27.0 +
-                $A[$iz+3, $iyi, $ixi] - $A[$iz, $iyi, $ixi]
+                $A[$iz, $iyi, $ixi] - $A[$iz+3, $iyi, $ixi]
             ),
         )
     end
@@ -106,7 +106,7 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$izi, $iy+2, $ixi] * 27.0 - $A[$izi, $iy+1, $ixi] * 27.0 +
-                $A[$izi, $iy+3, $ixi] - $A[$izi, $iy, $ixi]
+                $A[$izi, $iy, $ixi] - $A[$izi, $iy+3, $ixi]
             ),
         )
     end
@@ -114,7 +114,7 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$izi, $iyi, $ix+2] * 27.0 - $A[$izi, $iyi, $ix+1] * 27.0 +
-                $A[$izi, $iyi, $ix+3] - $A[$izi, $iyi, $ix]
+                $A[$izi, $iyi, $ix] - $A[$izi, $iyi, $ix+3]
             ),
         )
     end
