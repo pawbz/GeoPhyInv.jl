@@ -6,6 +6,8 @@ iz, iy, ix = INDICES[1], INDICES[2], INDICES[3]
     izi, iyi, ixi = :($iz + 1), :($iy + 1), :($ix + 1)
 elseif (_fd.order == 4)
     izi, iyi, ixi = :($iz + 3), :($iy + 3), :($ix + 3)
+elseif (_fd.order == 6)
+    izi, iyi, ixi = :($iz + 5), :($iy + 5), :($ix + 5)
 end
 
 @static if (_fd.order == 2)
