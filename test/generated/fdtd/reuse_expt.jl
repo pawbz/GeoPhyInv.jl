@@ -1,4 +1,3 @@
-using Revise
 using GeoPhyInv
 using Statistics
 using Test
@@ -34,4 +33,6 @@ update!(pa, medium_new)
 d2 = copy(pa[:data][:vz])
 
 @test d1 ≠ d2
+
+plot(p1,p2, size=(500, 300))
 

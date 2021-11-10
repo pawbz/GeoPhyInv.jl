@@ -2,8 +2,9 @@
 EditURL = "<unknown>/test/fdtd/reuse_expt.jl"
 ```
 
+This page was generated on 2021-11-09
+
 ````@example reuse_expt
-using Revise
 using GeoPhyInv
 using Statistics
 using Plots; gr();
@@ -75,7 +76,7 @@ nothing #hide
 ````@example reuse_expt
 @time update!(pa);
 d1 = copy(pa[:data][:vz])
-p1=heatmap(pa[:data], :vz, grid=true, legend=:none);
+p1=heatmap(pa[:data], :vz, grid=true, legend=:none, 99);
 nothing #hide
 ````
 
@@ -90,7 +91,7 @@ update!(pa, medium_new)
 ````@example reuse_expt
 @time update!(pa);
 d2 = copy(pa[:data][:vz])
-p2=heatmap(pa[:data], :vz, grid=true, legend=:none);
+p2=heatmap(pa[:data], :vz, grid=true, legend=:none, 99);
 nothing #hide
 ````
 
