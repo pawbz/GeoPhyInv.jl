@@ -95,7 +95,7 @@ macro init_parallel_stencil(ndims::Int, use_gpu::Bool, datatype, order)
             _fd.ndims = $ndims
             @assert _fd.ndims ∈ [2, 3]
             _fd.order = $order
-            @assert _fd.order ∈ [2, 4]
+            @assert _fd.order ∈ [2, 4, 6, 8]
             _fd.use_gpu = $use_gpu
             _fd.datatype = $datatype
             @assert _fd.datatype ∈ [Float32, Float64]

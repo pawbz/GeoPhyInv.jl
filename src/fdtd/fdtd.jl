@@ -345,7 +345,14 @@ function get_fc(medium, tgrid)
     N = ndims(medium)
     ds = step.(medium.mgrid)
     # denominator depending on _fd.order
-    dsI = (_fd.order == 2) ? inv.(ds) : inv.(ds .* 24.0)
+    dsI= inv.(ds)
+    if (_fd.order == 4)
+        dsI= inv.(ds .* 24.0)
+    elseif (_fd.order == 6)
+        dsI = inv.(ds .* 1920.0)
+    elseif (_fd.order == 8)
+        dsI = inv.(ds .* 107520.0)
+    end
     dt = step(tgrid)
     dtI = inv(dt)
 

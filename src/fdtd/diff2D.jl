@@ -6,6 +6,10 @@ iz, ix = INDICES[1], INDICES[2]
     izi, ixi = :($iz + 1), :($ix + 1)
 elseif (_fd.order == 4)
     izi, ixi = :($iz + 3), :($ix + 3)
+elseif (_fd.order == 6)
+    izi, ixi = :($iz + 5), :($ix + 5)
+elseif (_fd.order == 8)
+    izi, ixi = :($iz + 7), :($ix + 7)
 end
 
 @static if (_fd.order == 2)
@@ -63,7 +67,7 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$iz+2,  $ix] * 27.0 - $A[$iz+1,  $ix] * 27.0 +
-                $A[$iz+3,  $ix] - $A[$iz,  $ix]
+                $A[$iz,  $ix] - $A[$iz+3,  $ix]
             ),
         )
     end
@@ -71,7 +75,7 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$iz,  $ix+2] * 27.0 - $A[$iz,  $ix+1] * 27.0 +
-                $A[$iz,  $ix+3] - $A[$iz,  $ix]
+                $A[$iz,  $ix] - $A[$iz,  $ix+3]
             ),
         )
     end
@@ -79,7 +83,7 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$iz+2, $ixi] * 27.0 - $A[$iz+1, $ixi] * 27.0 +
-                $A[$iz+3, $ixi] - $A[$iz, $ixi]
+                $A[$iz, $ixi] - $A[$iz+3, $ixi]
             ),
         )
     end
@@ -87,11 +91,128 @@ elseif (_fd.order == 4)
         esc(
             :(
                 $A[$izi, $ix+2] * 27.0 - $A[$izi, $ix+1] * 27.0 +
-                $A[$izi, $ix+3] - $A[$izi, $ix]
+                $A[$izi, $ix] - $A[$izi, $ix+3]
             ),
         )
     end
+elseif (_fd.order == 6)
+    macro within(macroname::String, A::Symbol)
+        if macroname == "@all"
+            esc(:($iz <= size($A, 1) && $ix <= size($A, 2)))
+        elseif macroname == "@inn"
+            esc(
+                :(
+                    $iz <= size($A, 1) - 10 &&
+                    $ix <= size($A, 2) - 10
+                ),
+            )
+        else
+            error(
+                "unkown macroname: $macroname. If you want to add your own assignement macros, overwrite the macro 'within(macroname::String, A::Symbol)'; to still use the exising macro within as well call ParallelStencil.FiniteDifferences{1|2|3}D.@within(macroname, A) at the end.",
+            )
+        end
+    end
+
+    macro d_za(A::Symbol)
+        esc(
+            :(
+                $A[$iz+3,  $ix] * 2250.0 - $A[$iz+2,  $ix] * 2250.0 +
+                $A[$iz+1,  $ix] * 125.0 - $A[$iz+4,  $ix] * 125.0 +
+                $A[$iz+5,  $ix] * 9.0 - $A[$iz,  $ix] * 9.0
+            ),
+        )
+    end
+    macro d_xa(A::Symbol)
+        esc(
+            :(
+                $A[$iz,  $ix+3] * 2250.0 - $A[$iz,  $ix+2] * 2250.0 +
+                $A[$iz,  $ix+1] * 125.0 - $A[$iz,  $ix+4] * 125.0 +
+                $A[$iz,  $ix+5] * 9.0 - $A[$iz,  $ix] * 9.0
+            ),
+        )
+    end
+    macro d_zi(A::Symbol)
+        esc(
+            :(
+                $A[$iz+3,  $ixi] * 2250.0 - $A[$iz+2,  $ixi] * 2250.0 +
+                $A[$iz+1,  $ixi] * 125.0 - $A[$iz+4,  $ixi] * 125.0 +
+                $A[$iz+5,  $ixi] * 9.0 - $A[$iz,  $ixi] * 9.0
+            ),
+        )
+    end
+    macro d_xi(A::Symbol)
+        esc(
+            :(
+                $A[$izi,  $ix+3] * 2250.0 - $A[$izi,  $ix+2] * 2250.0 +
+                $A[$izi,  $ix+1] * 125.0 - $A[$izi,  $ix+4] * 125.0 +
+                $A[$izi,  $ix+5] * 9.0 - $A[$izi,  $ix] * 9.0
+            ),
+        )
+    end
+elseif (_fd.order == 8)
+    macro within(macroname::String, A::Symbol)
+        if macroname == "@all"
+            esc(:($iz <= size($A, 1) && $ix <= size($A, 2)))
+        elseif macroname == "@inn"
+            esc(
+                :(
+                    $iz <= size($A, 1) - 14 &&
+                    $ix <= size($A, 2) - 14
+                ),
+            )
+        else
+            error(
+                "unkown macroname: $macroname. If you want to add your own assignement macros, overwrite the macro 'within(macroname::String, A::Symbol)'; to still use the exising macro within as well call ParallelStencil.FiniteDifferences{1|2|3}D.@within(macroname, A) at the end.",
+            )
+        end
+    end
+
+    macro d_za(A::Symbol)
+        esc(
+            :(
+                $A[$iz+4,  $ix] * 128625.0 - $A[$iz+3,  $ix] * 128625.0 +
+                $A[$iz+2,  $ix] * 8575.0 - $A[$iz+5,  $ix] * 8575.0 +
+                $A[$iz+6,  $ix] * 1029.0 - $A[$iz+1,  $ix] * 1029.0 +
+                $A[$iz,  $ix] * 75.0 - $A[$iz+7,  $ix] * 75.0
+            ),
+        )
+    end
+    macro d_xa(A::Symbol)
+        esc(
+            :(
+                $A[$iz,  $ix+4] * 128625.0 - $A[$iz,  $ix+3] * 128625.0 +
+                $A[$iz,  $ix+2] * 8575.0 - $A[$iz,  $ix+5] * 8575.0 +
+                $A[$iz,  $ix+6] * 1029.0 - $A[$iz,  $ix+1] * 1029.0 +
+                $A[$iz,  $ix] * 75.0 - $A[$iz,  $ix+7] * 75.0
+            ),
+        )
+    end
+    macro d_zi(A::Symbol)
+        esc(
+            :(
+                $A[$iz+4,  $ixi] * 128625.0 - $A[$iz+3,  $ixi] * 128625.0 +
+                $A[$iz+2,  $ixi] * 8575.0 - $A[$iz+5,  $ixi] * 8575.0 +
+                $A[$iz+6,  $ixi] * 1029.0 - $A[$iz+1,  $ixi] * 1029.0 +
+                $A[$iz,  $ixi] * 75.0 - $A[$iz+7,  $ixi] * 75.0
+            ),
+        )
+    end
+    macro d_xi(A::Symbol)
+        esc(
+            :(
+                $A[$izi,  $ix+4] * 128625.0 - $A[$izi,  $ix+3] * 128625.0 +
+                $A[$izi,  $ix+2] * 8575.0 - $A[$izi,  $ix+5] * 8575.0 +
+                $A[$izi,  $ix+6] * 1029.0 - $A[$izi,  $ix+1] * 1029.0 +
+                $A[$izi,  $ix] * 75.0 - $A[$izi,  $ix+7] * 75.0
+            ),
+        )
+    end
+
+
+
+
 end
+
 macro all(A::Symbol)
     esc(:($A[$iz,  $ix]))
 end
