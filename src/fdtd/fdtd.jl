@@ -17,7 +17,7 @@
 # 
 
 # union of old stuff without using ParallelStencils (should eventually remove this)
-FdtdOld = Union{FdtdAcou,FdtdAcouVisco,FdtdAcouBorn}
+FdtdOld = Union{FdtdAcoustic,FdtdAcousticVisco,FdtdAcousticBorn}
 
 # global const nlayer_rand = 0
 
@@ -52,9 +52,9 @@ finite-difference modeling.
 
 # Arguments
 * `attrib_mod` : attribute to choose the type of modeling. Choose from 
-  * `=FdtdAcou()` for acoustic modeling  
+  * `=FdtdAcoustic()` for acoustic modeling  
   * `=FdtdElastic()` for solving the isotropic elastic wave equation 
-  * `=FdtdAcouBorn()` for Born modeling 
+  * `=FdtdAcousticBorn()` for Born modeling 
 
 # Keyword Arguments
 * `medium` : medium parameters 
@@ -84,14 +84,14 @@ finite-difference modeling.
 * `verbose::Bool=false` : verbose flag
 """
 SeisForwExpt(
-    attrib_mod::Union{FdtdAcou,FdtdElastic,FdtdAcouBorn,FdtdAcouVisco},
+    attrib_mod::Union{FdtdAcoustic,FdtdElastic,FdtdAcousticBorn,FdtdAcousticVisco},
     args1...;
     args2...,
 ) = PFdtd(attrib_mod, args1...; args2...)
 
 
 """
-Primary method to generate Expt variable when FdtdAcou() and FdtdAcouBorn() are used.
+Primary method to generate Expt variable when FdtdAcoustic() and FdtdAcousticBorn() are used.
 
 # Some internal arguments
 * `jobname::String` : name
@@ -126,10 +126,7 @@ function PFdtd(
     verbose::Bool = false,
     nworker = nothing,
 )
-
     N = ndims(medium)
-
-    @assert N == _fd.ndims "Cannot initiate SeisForwExpt due to ndims inconsistency with @init_parallel_stencil"
 
     # convert to vectors 
     if (typeof(ageom) == AGeom)
@@ -145,8 +142,17 @@ function PFdtd(
         rflags = [rflags]
     end
 
-    #println("********PML Removed*************")
-    #pml_edges=[:null]
+    # check if fields input are meaningful for given attrib_mod and ndims
+    @assert N == _fd.ndims "Cannot initiate SeisForwExpt due to ndims inconsistency with @init_parallel_stencil"
+    @assert snaps_field ∈ Fields(attrib_mod, ndims = N)
+    foreach(rf -> @assert(rf ∈ Fields(attrib_mod; ndims = N)), rfields)
+    foreach(
+        s -> foreach(
+            ss -> foreach(f -> @assert(f ∈ Fields(attrib_mod, ndims = N)), names(ss.d)[1]),
+            s,
+        ),
+        srcwav,
+    )
 
     # check sizes and errors based on input
     #(length(TDout) ≠ length(findn(rflags))) && error("TDout dimension")
@@ -177,8 +183,8 @@ function PFdtd(
     bindices = get_boundary_indices(medium.mgrid, attrib_mod)
 
     # extend mediums in the PML layers
-    exmedium = padarray(medium, npml, pml_edges)
-    if (typeof(attrib_mod) == FdtdAcouBorn)
+    exmedium = padarray(medium, _fd.npextend, pml_edges)
+    if (typeof(attrib_mod) == FdtdAcousticBorn)
         (npw ≠ 2) && error("born modeling needs npw=2")
     end
 
@@ -197,7 +203,7 @@ function PFdtd(
     δmodall = zeros(2 * prod(length.(medium.mgrid)))
 
     # PML
-    pml = get_pml(exmedium.mgrid)
+    pml = get_pml(attrib_mod, exmedium.mgrid)
 
     # initialize gradient arrays
     gradient = zeros(2 * prod(length.(medium.mgrid)))
@@ -315,7 +321,7 @@ function PFdtd(
 
 
     # update viscoelastic/ viscoacoustic parameters here
-    # if(typeof(attrib_mod)==FdtdAcouVisco)
+    # if(typeof(attrib_mod)==FdtdAcousticVisco)
     # 	nsls=Int32(3)
     # 	exmedium.ic=vcat(exmedium.ic,NamedArray([nsls], ([:nsls],)))
     # 	exmedium.fc=vcat(exmedium.fc,NamedArray(2*pi .* [pa.c.fc[:freqmin], pa.c.fc[:freqmax]], ([:freqmin,:freqmax],)))
@@ -338,16 +344,16 @@ function get_ic(medium, tgrid, nsls, npw)
 end
 
 """
-Get some floats constants to store then in pac, e.g, spatial sampling.
+Get some float constants, and store then in pac, e.g, spatial sampling.
 The idea is to use them later inside the loops for faster modelling.
 """
 function get_fc(medium, tgrid)
     N = ndims(medium)
     ds = step.(medium.mgrid)
     # denominator depending on _fd.order
-    dsI= inv.(ds)
+    dsI = inv.(ds)
     if (_fd.order == 4)
-        dsI= inv.(ds .* 24.0)
+        dsI = inv.(ds .* 24.0)
     elseif (_fd.order == 6)
         dsI = inv.(ds .* 1920.0)
     elseif (_fd.order == 8)
@@ -362,7 +368,7 @@ function get_fc(medium, tgrid)
     )
 end
 
-function get_medium_names(::FdtdAcou)
+function get_medium_names(::FdtdAcoustic)
     "bulk modulus, and inverse density values"
     return [:KI, :K, :rhoI]
 end
@@ -372,41 +378,8 @@ function get_medium_names(::FdtdElastic)
     return [:lambda, :M, :mu, :rho]
 end
 
-
-# function P_x_worker_x_pw(ipw,sschunks::UnitRange{Int64},pac::T) where T<:P_common{<:FdtdOld}
-# 	N=ndims(pac.medium)
-# 	n=length.(pac.exmedium.mgrid)
-# 	# npw=pac.ic[:npw]
-
-# 	born_svalue_stack = zeros(n...)
-
-# 	fields=Dict()
-# 	dnames=dim_names(N,"d") # derivatives
-# 	vnames=dim_names(N,"v") # velocity
-# 	fields[:t]=vcat([:p],vnames) # :p, :vx, :vy, :vz
-# 	fields[:tp]=vcat([:p],vnames) # all fields in previous time step
-# 	fields[:tpp]=[:p]
-# 	# derivatives for pressure and velocities
-# 	for (i,x) in enumerate(dim_names(N))
-# 		fields[dnames[i]]=vcat([:p],filter(y->contains(string(y),string(x)),vnames))
-# 	end
-
-# 	w1=NamedArray([NamedArray(fill(zeros(n...),length(fields[key])), (fields[key],)) for key in keys(fields)], Symbol.(collect(keys(fields))))
-
-# 	if((typeof(pac.attrib_mod)==FdtdAcouVisco) && N==2)
-# 		w2=NamedArray([NamedArray([zeros(pac.ic[:nsls],nz,nx) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
-# 	else
-# 		# dummy
-# 		w2=NamedArray([NamedArray([zeros(1,1,1) for i in [:r]], ([:r],)) for i in 1:2], ([:t, :tp],))
-# 	end
-
 # 	# memory fields for all derivatives
 # 	memory_pml=NamedArray([NamedArray(fill(zeros(n...), length(fields[d])), fields[d]) for d in dnames], dnames)
-
-# 	ss=[P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp,iss) in enumerate(sschunks)]
-
-# 	return P_x_worker_x_pw(ss,w1,w2,memory_pml,born_svalue_stack)
-# end
 
 
 """
@@ -419,7 +392,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
 
     born_svalue_stack = zeros(n...)
 
-    fields = Fields()
+    fields = Fields(pac.attrib_mod)
     w1 = NamedArray(
         [NamedArray([zeros(eval(f)(), T(), n...) for f in fields], Symbol.(fields))],
         [:t],
@@ -441,7 +414,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
     )
 
     # memory fields for all derivatives
-    dfields = Fields("d")
+    dfields = Fields(pac.attrib_mod, "d")
     memory_pml = NamedArray(
         [zeros(eval(f)(), T(), n..., pml = true) for f in dfields],
         Symbol.(dfields),
@@ -498,7 +471,7 @@ end
 # 		  zeros(nz1+6,3,nt),
 # 		  zeros(3,nx1+6,nt),
 # 		  zeros(nz1+6,3,nt),
-# 		  zeros(nz1+2*npml,nx1+2*npml,3)]
+# 		  zeros(nz1+2*_fd.npml,nx1+2*_fd.npml,3)]
 # 	else
 # 		boundary=[zeros(1,1,1) for ii in 1:5]
 # 	end
@@ -558,8 +531,8 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     snaps = NamedArray(
         [
             (eval(pac.snaps_field) <: Fields) ?
-            Array(zeros(eval(pac.snaps_field)(), T(), n...)) : zeros(Data.Number, fill(1, N)...) for
-            i = 1:length(pac.itsnaps)
+            Array(zeros(eval(pac.snaps_field)(), T(), n...)) :
+            zeros(Data.Number, fill(1, N)...) for i = 1:length(pac.itsnaps)
         ],
         names(pac.itsnaps)[1],
     )
@@ -578,7 +551,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     # 	  zeros(nz1+6,3,nt),
     # 	  zeros(3,nx1+6,nt),
     # 	  zeros(nz1+6,3,nt),
-    # 	  zeros(nz1+2*npml,nx1+2*npml,3)]
+    # 	  zeros(nz1+2*_fd.npml,nx1+2*_fd.npml,3)]
     # else
     boundary = [zeros(1, 1, 1) for ii = 1:5]
     # end
@@ -625,8 +598,6 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
 end
 
 
-
-
 include("source.jl")
 include("receiver.jl")
 include("dirichlet.jl")
@@ -661,7 +632,7 @@ function stack_illums!(pac::P_common, pap::Vector{P_x_worker_x_pw{N}}) where {N}
     pass = pap[1].ss
     for issp = 1:length(pass)
         gs = pass[issp].illum
-        gss = view(gs, npml+1:nz-npml, npml+1:nx-npml)
+        gss = view(gs, _fd.npml+1:nz-_fd.npml, _fd.npml+1:nx-_fd.npml)
         @. illums += gss
     end
 end

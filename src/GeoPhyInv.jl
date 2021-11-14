@@ -48,7 +48,7 @@ include("Interpolation/Interpolation.jl")
 # some structs used for multiple dispatch throughout this package
 include("types.jl")
 export Srcs, Recs, SSrcs
-export FdtdAcou, FdtdElastic, FdtdAcouBorn, FdtdAcouVisco
+export FdtdAcoustic, FdtdElastic, FdtdAcousticBorn, FdtdAcousticVisco
 
 # mutable data type for seismic medium + related methods
 include("media/core.jl")
@@ -84,7 +84,7 @@ Initialize the package with ParallelStencil, giving access to its main functiona
 * `ndims::Int`: the number of dimensions used for the stencil computations 2D or 3D 
 * `use_gpu::Bool` : use GPU for stencil computations or not
 * `datatype`: the type of numbers used by field arrays (e.g. Float32 or Float64)
-* `order::Int` : order of the finite-difference stencil 
+* `order::Int ∈ [2,4,6,8]` : order of the finite-difference stencil 
 """
 macro init_parallel_stencil(ndims::Int, use_gpu::Bool, datatype, order)
     quote
@@ -99,6 +99,9 @@ macro init_parallel_stencil(ndims::Int, use_gpu::Bool, datatype, order)
             _fd.use_gpu = $use_gpu
             _fd.datatype = $datatype
             @assert _fd.datatype ∈ [Float32, Float64]
+            # extend by more points as we increase order, not sure if that is necessary!!!
+            _fd.npml = 20 + ($order - 1)
+            _fd.npextend = 20 + ($order - 1) # determines exmedium
 
             ParallelStencil.is_initialized() && ParallelStencil.@reset_parallel_stencil()
             # check whether 2D or 3D, and initialize ParallelStencils accordingly
@@ -117,6 +120,7 @@ macro init_parallel_stencil(ndims::Int, use_gpu::Bool, datatype, order)
             )
             # define structs for wavefields in 2D/3D
             include(joinpath(dirname(pathof(GeoPhyInv)), "fields.jl"))
+            export Fields
             include(joinpath(dirname(pathof(GeoPhyInv)), "fdtd", "fdtd.jl"))
         end
     end

@@ -56,7 +56,7 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Pkg
-            Pkg.add("Documenter"); Pkg.add("Gadfly"); Pkg.add("StatsBase"); Pkg.add("BenchmarkTools")
+            Pkg.add("Documenter"); Pkg.add("Gadfly"); Pkg.add("ColorSchemes"); Pkg.add("StatsBase"); Pkg.add("BenchmarkTools")
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
       - run: julia --project=docs docs/make.jl

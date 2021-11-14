@@ -14,13 +14,14 @@ wav = ricker(15.0, tgrid, tpeak = 0.25); # ricker wavelet
 srcwav = SrcWav(tgrid, ageom, [:p]);
 update!(srcwav, [:p], wav);
 
+tsnaps=tgrid[1:div(length(tgrid),20):end] # store 20 snapshots
 pa = SeisForwExpt(
-    FdtdAcou(),
+    FdtdAcoustic(),
     medium = medium,
     ageom = ageom,
     srcwav = srcwav,
     snaps_field = :p,
-    tsnaps = [0.4, 0.5, 0.8],
+    tsnaps = tsnaps,
     tgrid = tgrid,
     rfields = [:p],
     verbose = true,
@@ -46,7 +47,7 @@ pa = SeisForwExpt(
     ageom = ageom,
     srcwav = srcwav,
     snaps_field = :vz,
-    tsnaps = [0.4, 0.5, 0.8],
+    tsnaps = tsnaps,
     rfields = [:vz],
     tgrid = tgrid,
     verbose = true,

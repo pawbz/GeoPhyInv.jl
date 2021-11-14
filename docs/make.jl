@@ -1,5 +1,6 @@
 using Documenter, GeoPhyInv, SparseArrays, LinearAlgebra, Random, LinearMaps
 using Gadfly, Plots, Test
+using ColorSchemes
 
 # standard setting for generating doc pages
 @init_parallel_stencil(2, false, Float32, 4)

@@ -7,7 +7,7 @@ using LinearMaps
 for scenario in [:downhole, :pizza]
 	println("@@@@@@@@@@@@TESTING ", scenario)
 	for rfields in [[:p], [:vx], [:vz]]
-		pa=SeisInvExpt(FdtdAcouBorn(), LS(), scenario, rfields=rfields)
+		pa=SeisInvExpt(FdtdAcousticBorn(), LS(), scenario, rfields=rfields)
 
 
 		F=LinearMap(pa);

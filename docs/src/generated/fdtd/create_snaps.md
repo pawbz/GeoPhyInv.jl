@@ -52,13 +52,14 @@ Once the `Expt` object is created, do the modeling without *additional* any
 memory allocations using `update!`
 
 ````@example create_snaps
+tsnaps=tgrid[1:div(length(tgrid),20):end] # store 20 snapshots
 pa = SeisForwExpt(
-    FdtdAcou(),
+    FdtdAcoustic(),
     medium = medium,
     ageom = ageom,
     srcwav = srcwav,
     snaps_field = :p,
-    tsnaps = [0.4, 0.5, 0.8],
+    tsnaps = tsnaps,
     tgrid = tgrid,
     rfields = [:p],
     verbose = true,
@@ -84,14 +85,34 @@ nothing #hide
 ### Plotting pressure snapshots after acoustic simulation
 
 ````@example create_snaps
-function plot_snapshots()
-    p=[]
-    for j in 1:2, i in 1:3
-    	push!(p,heatmap(pa[:snaps, j][i], xlabel="x", ylabel="z", legend=:none))
+function plot_snapshots(name)
+    clip_perc = 90
+    pmax = maximum([maximum(pa[:snaps][it]) for it = 1:length(tsnaps)])
+    pmax -= pmax * 0.01 * clip_perc
+
+    anim = @animate for it = 1:length(tsnaps)
+        plot(
+            [
+                (
+                    f = pa[:snaps, is][it];
+                    heatmap(
+                        f,
+                        aspect_ratio = 1,
+                        xlims = (1, size(f, 2)),
+                        ylims = (1, size(f, 1)),
+                        yflip = true,
+                        c = :seismic,
+                        clims = (-pmax, pmax),
+                        legend = false,
+                    )
+                ) for is = 1:2
+            ]...,
+            title = string("snapshot at: ", round(tsnaps[it], digits = 5), " s"),
+        )
     end
-    Plots.plot(p..., layout=(2,3), size=(1200,600))
+    return gif(anim, string(name,".gif"), fps = 1)
 end
-plot_snapshots()
+plot_snapshots("acoustic_snaps")
 ````
 
 ## Elastic
@@ -113,7 +134,7 @@ update!(srcwav, [:vz], wav);
 nothing #hide
 ````
 
-Perform modelling and extract snaps
+Perform modelling
 
 ````@example create_snaps
 pa = SeisForwExpt(
@@ -122,7 +143,7 @@ pa = SeisForwExpt(
     ageom = ageom,
     srcwav = srcwav,
     snaps_field = :vz,
-    tsnaps = [0.4, 0.5, 0.8],
+    tsnaps = tsnaps,
     rfields = [:vz],
     tgrid = tgrid,
     verbose = true,
@@ -146,6 +167,6 @@ plot(p1)
 ### Plotting snapshots after elastic simulation
 
 ````@example create_snaps
-plot_snapshots() # P and S waves!
+plot_snapshots("elastic_snaps") # P and S waves!
 ````
 

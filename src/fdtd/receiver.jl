@@ -30,6 +30,6 @@ end
 
 
 
-# receiver(pw, weights, rindices[ir] spray, pac::P_common{FdtdAcou}, si, ::p) =
+# receiver(pw, weights, rindices[ir] spray, pac::P_common{FdtdAcoustic}, si, ::p) =
 # source_term * spray * pac.mod[:K][si]
 

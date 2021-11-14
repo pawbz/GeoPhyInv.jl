@@ -1,14 +1,14 @@
 
 function get_boundary_indices(mgrid,::FdtdOld)
 	# where to store the boundary values (careful, born scaterrers cannot be inside these!?)
-	ibx0=npml-2; ibx1=length(mgrid[2])+npml+3
-	ibz0=npml-2; ibz1=length(mgrid[1])+npml+3
-#	ibx0=npml+1; ibx1=length(mgrid[2])+npml
-#	ibz0=npml+1; ibz1=length(mgrid[1])+npml
+	ibx0=_fd.npml-2; ibx1=length(mgrid[2])+_fd.npml+3
+	ibz0=_fd.npml-2; ibz1=length(mgrid[1])+_fd.npml+3
+#	ibx0=_fd.npml+1; ibx1=length(mgrid[2])+_fd.npml
+#	ibz0=_fd.npml+1; ibz1=length(mgrid[1])+_fd.npml
 #	println("**** Boundary Storage Changed **** ")
 
 	# for snaps
-	isx0, isz0=npml, npml
+	isx0, isz0=_fd.npml, _fd.npml
 
 	return NamedArray([ibx0,ibx1,ibz0,ibz1,isx0,isz0],([:bx0,:bx1,:bz0,:bz1,:sx0,:sz0],))
 	

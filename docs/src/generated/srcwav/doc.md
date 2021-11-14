@@ -2,7 +2,7 @@
 EditURL = "<unknown>/test/srcwav/doc.jl"
 ```
 
-This page was generated on 2021-11-09
+This page was generated on 2021-11-14
 
 ````@example doc
 using GeoPhyInv

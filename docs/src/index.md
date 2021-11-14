@@ -38,7 +38,7 @@ GeoPhyInv.@init_parallel_stencil
 ```
 After this, to get started with modelling or inversion, as an example, simply load a seismic inversion experiment already defined in our package gallery into REPL:
 ```julia
-pa=SeisInvExpt(FdtdAcou(), LS(), :pizza); # "pizza" is the name of the experiment
+pa=SeisInvExpt(FdtdAcoustic(), LS(), :pizza); # "pizza" is the name of the experiment
 ```
 Then, simply use `update!` to perform least-squares inversion.
 ```julia

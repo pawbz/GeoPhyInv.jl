@@ -4,9 +4,25 @@ abstract type Fields end
 
 """
 Return a list of fields which contain `s`.
-Retruns all the fields defined here by default.
+Returns all the elastic fields defined here by default i.e., for `ndims=3`.
 """
-Fields(s = "") = filter(x -> contains(string(x), string(s)), nameof.(subtypes(Fields)))
+function Fields(s = ""; ndims = _fd.ndims)
+    @assert(ndims ∈ [2, 3])
+    f = filter(x -> contains(string(x), string(s)), nameof.(subtypes(Fields)))
+    if (ndims == 2)
+        f = filter(x -> !contains(string(x), "y"), f) # filter out y when 2D
+    end
+    return f
+end
+function Fields(::FdtdElastic, s = ""; ndims = _fd.ndims)
+    f = Fields(s, ndims = ndims) # get all
+    f = filter(x -> !contains(string(x), "p"), f) # filter out pressure
+end
+function Fields(::FdtdAcoustic, s = ""; ndims = _fd.ndims)
+    f = Fields(s, ndims = ndims) # get all
+    f = filter(x -> !contains(string(x), "tau"), f) # filter out tau
+    f = filter(x -> !in(x, [:dvxdy, :dvxdz, :dvydx, :dvydz, :dvzdx, :dvzdy]), f) # filter out dvxdy
+end
 
 # define pressure for acoustic 
 struct p <: Fields end
@@ -49,24 +65,45 @@ end
 
 for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
     grids = broadcast(x -> Symbol(string("m", x)), getindex.(collect(dimnames), 2))
-    for (idim, dim) in dimnames
-        v = Symbol("v", string(dim))
-        g = Symbol("m", string(dim))
-        @eval function get_indices_weights(::$v, $(grids...), P)
-            # velocity grids are stagerred in respective dimensions, so generate half grids in respective dimensions 
-            $g = range(
-                $g[1] - step($g) * (_fd.order - 1) * 0.5,
-                step = step($g),
-                length = length($g) + _fd.order - 1,
+    sizes1 = broadcast(x -> Symbol(string("n1", x)), getindex.(collect(dimnames), 2))
+    sizes = broadcast(x -> Symbol(string("n", x)), getindex.(collect(dimnames), 2))
+    # initialize fields by simply getting grids 
+    for f in Fields(ndims = length(collect(dimnames)))
+        n1pml = Symbol("n1", string(last(string(f))))
+        @eval function Base.zeros(
+            ::$f,
+            attrib_mod,
+            $(sizes...);
+            pml::Bool = false,
+        ) where {T<:Fields}
+            # get new sizes
+            $(
+                (
+                    quote
+                        $n1 = length(
+                            get_mgrid(
+                                $f(),
+                                attrib_mod,
+                                $((
+                                        quote
+                                            range(0, length = $n, stop = 1)
+                                        end for n in sizes
+                                    )...),
+                            )[$i],
+                        )
+                    end for (i, n1) in enumerate(sizes1)
+                )...
             )
-            return get_indices_weights([$(grids...)], P)
+            # if pml flag size on corresponding dimension is just 2*npml
+            if (pml)
+                $n1pml = 2 * _fd.npml
+            end
+            return Data.Array(zeros($(sizes1...)))
         end
     end
-    for f in [:p, :tauxx, :tauyy, :tauzz]
-        @eval function get_indices_weights(::$f, $(grids...), P)
-            # pressure/ stress grids unchanged 
-            return get_indices_weights([$(grids...)], P)
-        end
+    # get indices for any fields, routed via mgrid adjustment
+    @eval function get_indices_weights(f::Any, attrib_mod, $(grids...), P)
+        return get_indices_weights(get_mgrid(f, attrib_mod, $(grids...)), P)
     end
 end
 
@@ -74,227 +111,586 @@ end
 #-------------------------------------------------------
 # Acoustic
 #-------------------------------------------------------
-Base.zeros(::p, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx))
-Base.zeros(::p, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
-Base.zeros(::dpdx, ::FdtdAcou, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz - 2(_fd.order - 1), pml ? 2 * npml : nx - 1(_fd.order - 1)))
-Base.zeros(::dpdx, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 2(_fd.order - 1),
-        ny - 2(_fd.order - 1),
-        pml ? 2 * npml : nx - 1(_fd.order - 1),
+get_mgrid(::p, ::FdtdAcoustic, mz, mx) = [mz, mx]
+get_mgrid(::p, ::FdtdAcoustic, mz, my, mx) = [mz, my, mx]
+get_mgrid(::dpdx, ::FdtdAcoustic, mz, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
     ),
-)
-Base.zeros(::dpdz, ::FdtdAcou, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz - 1(_fd.order - 1), nx - 2(_fd.order - 1)))
-Base.zeros(::dpdz, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        pml ? 2 * npml : nz - 1(_fd.order - 1),
-        ny - 2(_fd.order - 1),
-        nx - 2(_fd.order - 1),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
     ),
-)
-Base.zeros(::dpdy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 2(_fd.order - 1),
-        pml ? 2 * npml : ny - 1(_fd.order - 1),
-        nx - 2(_fd.order - 1),
+]
+get_mgrid(::dpdx, ::FdtdAcoustic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
     ),
-)
-Base.zeros(::vx, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz, nx + _fd.order - 1))
-Base.zeros(::vz, ::FdtdAcou, nz, nx) = Data.Array(zeros(nz + _fd.order - 1, nx))
-Base.zeros(::vx, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + _fd.order - 1))
-Base.zeros(::vz, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz + _fd.order - 1, ny, nx))
-Base.zeros(::vy, ::FdtdAcou, nz, ny, nx) = Data.Array(zeros(nz, ny + 1, nx))
-Base.zeros(::dvxdx, ::FdtdAcou, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz, pml ? 2 * npml : nx))
-Base.zeros(::dvzdz, ::FdtdAcou, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz, nx))
-Base.zeros(::dvxdx, ::FdtdAcou, nz, ny, nx; pml::Bool = false) =
-    Data.Array(zeros(nz, ny, pml ? 2 * npml : nx))
-Base.zeros(::dvzdz, ::FdtdAcou, nz, ny, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz, ny, nx))
-Base.zeros(::dvydy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) =
-    Data.Array(zeros(nz, pml ? 2 * npml : ny, nx))
-Base.zeros(::dvxdz, ::FdtdAcou, nz, nx; pml::Bool = false) = Data.Array(zeros(1, 1))
-Base.zeros(::dvzdx, ::FdtdAcou, nz, nx; pml::Bool = false) = Data.Array(zeros(1, 1))
-Base.zeros(::dvxdz, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
-Base.zeros(::dvydx, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
-Base.zeros(::dvzdx, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
-Base.zeros(::dvydz, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
-Base.zeros(::dvxdy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
-Base.zeros(::dvzdy, ::FdtdAcou, nz, ny, nx; pml::Bool = false) = Data.Array(zeros(1, 1, 1))
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
+get_mgrid(::dpdz, ::FdtdAcoustic, mz, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
+get_mgrid(::dpdz, ::FdtdAcoustic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
+get_mgrid(::dpdy, ::FdtdAcoustic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
+    ),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
+get_mgrid(::vx, ::FdtdAcoustic, mz, mx) = [
+    mz,
+    range(
+        mx[1] - 0.5 * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) + (_fd.order - 1),
+    ),
+]
+get_mgrid(::vz, ::FdtdAcoustic, mz, mx) = [
+    range(
+        mz[1] - 0.5 * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) + (_fd.order - 1),
+    ),
+    mx,
+]
+get_mgrid(::vx, ::FdtdAcoustic, mz, my, mx) = [
+    mz,
+    my,
+    range(
+        mx[1] - 0.5 * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) + (_fd.order - 1),
+    ),
+]
+get_mgrid(::vz, ::FdtdAcoustic, mz, my, mx) = [
+    range(
+        mz[1] - 0.5 * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) + (_fd.order - 1),
+    ),
+    my,
+    mx,
+]
+get_mgrid(::vy, ::FdtdAcoustic, mz, my, mx) = [
+    mz,
+    range(
+        my[1] - 0.5 * (_fd.order - 1),
+        step = step(my),
+        length = length(my) + (_fd.order - 1),
+    ),
+    mx,
+]
+get_mgrid(::dvxdx, ::FdtdAcoustic, mz, mx) = [mz, mx]
+get_mgrid(::dvzdz, ::FdtdAcoustic, mz, mx) = [mz, mx]
+get_mgrid(::dvxdx, ::FdtdAcoustic, mz, my, mx) = [mz, my, mx]
+get_mgrid(::dvzdz, ::FdtdAcoustic, mz, my, mx) = [mz, my, mx]
+get_mgrid(::dvydy, ::FdtdAcoustic, mz, my, mx) = [mz, my, mx]
 
 
 #-------------------------------------------------------
 # Elastic
 #-------------------------------------------------------
-Base.zeros(::tauxx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
-Base.zeros(::tauyy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
-Base.zeros(::tauzz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx))
-Base.zeros(::tauxy, ::FdtdElastic, nz, ny, nx) =
-    Data.Array(zeros(nz - 2(_fd.order - 1), ny - 1(_fd.order - 1), nx - 1(_fd.order - 1)))
-Base.zeros(::tauxz, ::FdtdElastic, nz, ny, nx) =
-    Data.Array(zeros(nz - 1(_fd.order - 1), ny - 2(_fd.order - 1), nx - 1(_fd.order - 1)))
-Base.zeros(::tauyz, ::FdtdElastic, nz, ny, nx) =
-    Data.Array(zeros(nz - 1(_fd.order - 1), ny - 1(_fd.order - 1), nx - 2(_fd.order - 1)))
+get_mgrid(::tauxx, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
+get_mgrid(::tauyy, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
+get_mgrid(::tauzz, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
+get_mgrid(::tauxy, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
+    ),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
+get_mgrid(::tauxz, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
+get_mgrid(::tauyz, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
 
-Base.zeros(::tauxx, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx))
-Base.zeros(::tauzz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx))
-Base.zeros(::tauxz, ::FdtdElastic, nz, nx) =
-    Data.Array(zeros(nz - 1(_fd.order - 1), nx - 1(_fd.order - 1)))
+get_mgrid(::tauxx, ::FdtdElastic, mz, mx) = [mz, mx]
+get_mgrid(::tauzz, ::FdtdElastic, mz, mx) = [mz, mx]
+get_mgrid(::tauxz, ::FdtdElastic, mz, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
 
-Base.zeros(::vx, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny, nx + _fd.order - 1))
-Base.zeros(::vy, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz, ny + _fd.order - 1, nx))
-Base.zeros(::vz, ::FdtdElastic, nz, ny, nx) = Data.Array(zeros(nz + _fd.order - 1, ny, nx))
+get_mgrid(::vx, ::FdtdElastic, mz, my, mx) = [
+    mz,
+    my,
+    range(
+        mx[1] - 0.5 * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) + (_fd.order - 1),
+    ),
+]
+get_mgrid(::vy, ::FdtdElastic, mz, my, mx) = [
+    mz,
+    range(
+        my[1] - 0.5 * (_fd.order - 1),
+        step = step(my),
+        length = length(my) + (_fd.order - 1),
+    ),
+    mx,
+]
+get_mgrid(::vz, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] - 0.5 * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) + (_fd.order - 1),
+    ),
+    my,
+    mx,
+]
 
-Base.zeros(::vx, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz, nx + _fd.order - 1))
-Base.zeros(::vz, ::FdtdElastic, nz, nx) = Data.Array(zeros(nz + _fd.order - 1, nx))
+get_mgrid(::vx, ::FdtdElastic, mz, mx) = [
+    mz,
+    range(
+        mx[1] - 0.5 * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) + (_fd.order - 1),
+    ),
+]
+get_mgrid(::vz, ::FdtdElastic, mz, mx) = [
+    range(
+        mz[1] - 0.5 * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) + (_fd.order - 1),
+    ),
+    mx,
+]
 
-Base.zeros(::dvxdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
-    Data.Array(zeros(nz, ny, pml ? 2 * npml : nx))
-Base.zeros(::dvydy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
-    Data.Array(zeros(nz, pml ? 2 * npml : ny, nx))
-Base.zeros(::dvzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz, ny, nx))
-Base.zeros(::dvxdy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 2(_fd.order - 1),
-        pml ? 2 * npml : ny - 1(_fd.order - 1),
-        nx - 1(_fd.order - 1),
+get_mgrid(::dvxdx, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
+get_mgrid(::dvydy, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
+get_mgrid(::dvzdz, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
+get_mgrid(::dvxdy, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
     ),
-)
-Base.zeros(::dvxdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        pml ? 2 * npml : nz - 1(_fd.order - 1),
-        ny - 2(_fd.order - 1),
-        nx - 1(_fd.order - 1),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
     ),
-)
-Base.zeros(::dvydx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 2(_fd.order - 1),
-        ny - 1(_fd.order - 1),
-        pml ? 2 * npml : nx - 1(_fd.order - 1),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
     ),
-)
-Base.zeros(::dvydz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        pml ? 2 * npml : nz - 1(_fd.order - 1),
-        ny - 1(_fd.order - 1),
-        nx - 2(_fd.order - 1),
+]
+get_mgrid(::dvxdz, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
     ),
-)
-Base.zeros(::dvzdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 1(_fd.order - 1),
-        ny - 2(_fd.order - 1),
-        pml ? 2 * npml : nx - 1(_fd.order - 1),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
     ),
-)
-Base.zeros(::dvzdy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 1(_fd.order - 1),
-        pml ? 2 * npml : ny - 1(_fd.order - 1),
-        nx - 2(_fd.order - 1),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
     ),
-)
+]
+get_mgrid(::dvydx, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
+    ),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
+get_mgrid(::dvydz, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
+get_mgrid(::dvzdx, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
+get_mgrid(::dvzdy, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
 
-Base.zeros(::dvxdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz, pml ? 2 * npml : nx))
-Base.zeros(::dvzdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz, nx))
-Base.zeros(::dvxdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz - 1(_fd.order - 1), nx - 1(_fd.order - 1)))
-Base.zeros(::dvzdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz - 1(_fd.order - 1), pml ? 2 * npml : nx - 1(_fd.order - 1)))
+get_mgrid(::dvxdx, ::FdtdElastic, mz, mx) = [mz, mx]
+get_mgrid(::dvzdz, ::FdtdElastic, mz, mx) = [mz, mx]
+get_mgrid(::dvxdz, ::FdtdElastic, mz, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
+get_mgrid(::dvzdx, ::FdtdElastic, mz, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
 
-Base.zeros(::dtauxxdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 2(_fd.order - 1),
-        ny - 2(_fd.order - 1),
-        pml ? 2 * npml : nx - 1(_fd.order - 1),
+get_mgrid(::dtauxxdx, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
     ),
-)
-Base.zeros(::dtauyydy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 2(_fd.order - 1),
-        pml ? 2 * npml : ny - 1(_fd.order - 1),
-        nx - 2(_fd.order - 1),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
     ),
-)
-Base.zeros(::dtauzzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        pml ? 2 * npml : nz - 1(_fd.order - 1),
-        ny - 2(_fd.order - 1),
-        nx - 2(_fd.order - 1),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
     ),
-)
-Base.zeros(::dtauxydx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 2(_fd.order - 1),
-        ny - 1(_fd.order - 1),
-        pml ? 2 * npml : nx - 2(_fd.order - 1),
+]
+get_mgrid(::dtauyydy, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
     ),
-)
-Base.zeros(::dtauxydy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 2(_fd.order - 1),
-        pml ? 2 * npml : ny - 2(_fd.order - 1),
-        nx - 1(_fd.order - 1),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
     ),
-)
-Base.zeros(::dtauxzdx, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 1(_fd.order - 1),
-        ny - 2(_fd.order - 1),
-        pml ? 2 * npml : nx - 2(_fd.order - 1),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
     ),
-)
-Base.zeros(::dtauxzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        pml ? 2 * npml : nz - 2(_fd.order - 1),
-        ny - 2(_fd.order - 1),
-        nx - 1(_fd.order - 1),
+]
+get_mgrid(::dtauzzdz, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
     ),
-)
-Base.zeros(::dtauyzdy, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        nz - 1(_fd.order - 1),
-        pml ? 2 * npml : ny - 2(_fd.order - 1),
-        nx - 2(_fd.order - 1),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
     ),
-)
-Base.zeros(::dtauyzdz, ::FdtdElastic, nz, ny, nx; pml::Bool = false) = Data.Array(
-    zeros(
-        pml ? 2 * npml : nz - 2(_fd.order - 1),
-        ny - 1(_fd.order - 1),
-        nx - 2(_fd.order - 1),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
     ),
-)
+]
+get_mgrid(::dtauxydx, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
+    ),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
+get_mgrid(::dtauxydy, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
+    ),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
+get_mgrid(::dtauxzdx, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
+get_mgrid(::dtauxzdz, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
+    ),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
+get_mgrid(::dtauyzdy, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        my[1] + step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
+get_mgrid(::dtauyzdz, ::FdtdElastic, mz, my, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
+    ),
+    range(
+        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        step = step(my),
+        length = length(my) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
 
-Base.zeros(::dtauxxdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz - 2(_fd.order - 1), pml ? 2 * npml : nx - 1(_fd.order - 1)))
-Base.zeros(::dtauzzdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz - 1(_fd.order - 1), nx - 2(_fd.order - 1)))
-Base.zeros(::dtauxzdx, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(nz - 1(_fd.order - 1), pml ? 2 * npml : nx - 2(_fd.order - 1)))
-Base.zeros(::dtauxzdz, ::FdtdElastic, nz, nx; pml::Bool = false) =
-    Data.Array(zeros(pml ? 2 * npml : nz - 2(_fd.order - 1), nx - 1(_fd.order - 1)))
+get_mgrid(::dtauxxdx, ::FdtdElastic, mz, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
+get_mgrid(::dtauzzdz, ::FdtdElastic, mz, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
+get_mgrid(::dtauxzdx, ::FdtdElastic, mz, mx) = [
+    range(
+        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - (_fd.order - 1),
+    ),
+    range(
+        mx[1] + step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - 2(_fd.order - 1),
+    ),
+]
+get_mgrid(::dtauxzdz, ::FdtdElastic, mz, mx) = [
+    range(
+        mz[1] + step(mz) * (_fd.order - 1),
+        step = step(mz),
+        length = length(mz) - 2(_fd.order - 1),
+    ),
+    range(
+        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        step = step(mx),
+        length = length(mx) - (_fd.order - 1),
+    ),
+]
 
-# Dont need pressure for FdtdElastic, so no initialization
-for f in Fields("p")
-    @eval Base.zeros(::$f, ::FdtdElastic, args1...; args2...) =
-        Data.Array(zeros(fill(1, length(args1))...))
-end
-# remove stress from acoustic simulations
-for f in Fields("tau")
-    @eval Base.zeros(::$f, ::FdtdAcou, args1...; args2...) =
-        Data.Array(zeros(fill(1, length(args1))...))
-end
-# no "y" for 2D simulations
-for f in Fields("y")
-    @eval Base.zeros(::$f, attrib_mod, nz, nx; args...) = Data.Array(zeros(fill(1, 2)...))
-end
 
 

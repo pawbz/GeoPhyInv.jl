@@ -47,7 +47,7 @@ srcwav = SrcWav(tgrid, ageom, [:p]) # initialize
 update!(srcwav, [:p], wav) # distribute to all supersources
 
 # ### SeisForwExpt
-pa=SeisForwExpt(FdtdAcou(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
+pa=SeisForwExpt(FdtdAcoustic(),medium=medium, ageom=ageom, srcwav=srcwav, tgrid=tgrid, verbose=true);
 
 # ### Modeling #1
 @time update!(pa);

@@ -13,7 +13,7 @@ for field in [:p, :vx,:vz]
 	update!(srcwav, [field], wav)
 
 	for sflags in [[1,-1],[2,-2]]
-		pa=SeisForwExpt(FdtdAcou(),npw=1, tgrid=tgrid,
+		pa=SeisForwExpt(FdtdAcoustic(),npw=1, tgrid=tgrid,
 		#	pml_edges=[:null],
 			gmodel_flag=false,
 			sflags=[sflags[1]],

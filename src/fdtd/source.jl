@@ -123,15 +123,15 @@ end
 
 # multiplication with modK
 # on pressure grid
-source(source_term, spray, pac::P_common{FdtdAcou}, si, ::p) =
+source(source_term, spray, pac::P_common{FdtdAcoustic}, si, ::p) =
     source_term * spray * pac.mod[:K][si]
 
 # on vx grid
-source(source_term, spray, pac::P_common{FdtdAcou}, si, ::vx) = source_term * spray #* pac.mod[:rhovxI][si]
+source(source_term, spray, pac::P_common{FdtdAcoustic}, si, ::vx) = source_term * spray #* pac.mod[:rhovxI][si]
 source(source_term, spray, pac::P_common{FdtdElastic}, si, ::vx) = source_term * spray #* pac.mod[:rhovxI][si]
 
 # on vz grid
-source(source_term, spray, pac::P_common{FdtdAcou}, si, ::vz) = source_term * spray #* pac.mod[:rhovzI][si]
+source(source_term, spray, pac::P_common{FdtdAcoustic}, si, ::vz) = source_term * spray #* pac.mod[:rhovzI][si]
 source(source_term, spray, pac::P_common{FdtdElastic}, si, ::vz) = source_term * spray #* pac.mod[:rhovzI][si]
 
 

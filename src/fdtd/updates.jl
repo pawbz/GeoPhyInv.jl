@@ -12,13 +12,14 @@ function update_δmods!(pac::P_common, δmod::Vector{Float64})
     nznxd = prod(length.(pac.medium.mgrid))
     copyto!(pac.δmodall, δmod)
     fill!(pac.δmod[:KI], 0.0)
-    δmodKI = view(pac.δmod[:KI], npml+1:nz-npml, npml+1:nx-npml)
+    δmodKI = view(pac.δmod[:KI], _fd.npextend+1:nz-_fd.npextend, _fd.npextend+1:nx-_fd.npextend)
     for i = 1:nznxd
         # put perturbation due to KI as it is
         δmodKI[i] = δmod[i]
     end
     fill!(pac.δmod[:rhoI], 0.0)
-    δmodrr = view(pac.δmod[:rhoI], npml+1:nz-npml, npml+1:nx-npml)
+    δmodrr =
+        view(pac.δmod[:rhoI], _fd.npextend+1:nz-_fd.npextend, _fd.npextend+1:nx-_fd.npextend)
     for i = 1:nznxd
         # put perturbation due to rhoI here
         δmodrr[i] = δmod[nznxd+i]
@@ -61,9 +62,9 @@ algorithms.
 function update!(pa::PFdtd, medium::Medium)
     return update!(pa.c, medium)
 end
-function update!(pac::T, medium::Medium) where {T<:P_common{FdtdAcou}}
+function update!(pac::T, medium::Medium) where {T<:P_common{FdtdAcoustic}}
     copyto!(pac.medium, medium)
-    padarray!(pac.exmedium, pac.medium, npml, pac.pml_edges)
+    padarray!(pac.exmedium, pac.medium, _fd.npextend, pac.pml_edges)
     copyto!(pac.mod[:K], pac.exmedium, [:K])
     copyto!(pac.mod[:KI], pac.exmedium, [:KI])
     copyto!(pac.mod[:rhoI], pac.exmedium, [:rhoI])
@@ -73,7 +74,7 @@ function update!(pac::T, medium::Medium) where {T<:P_common{FdtdAcou}}
 end
 function update!(pac::T, medium::Medium) where {T<:P_common{FdtdElastic}}
     copyto!(pac.medium, medium)
-    padarray!(pac.exmedium, pac.medium, npml, pac.pml_edges)
+    padarray!(pac.exmedium, pac.medium, _fd.npextend, pac.pml_edges)
     copyto!(pac.mod[:mu], pac.exmedium, [:mu])
     copyto!(pac.mod[:lambda], pac.exmedium, [:lambda])
     copyto!(pac.mod[:M], pac.exmedium, [:M])
@@ -150,29 +151,33 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
 
     ssprayw = pass.ssprayw
     rinterpolatew = pass.rinterpolatew
-    
+
     for sfield in names(pass.sindices)[1]
-        sindices=pass.sindices[sfield]
-    for is = 1:ageomss.ns
-        w = ssprayw[sfield][is]
-        sindices[is], ww = get_indices_weights(eval(sfield)(),
-            pac.exmedium.mgrid...,
-            [s[is] for s in ageomss.s],
-        )
-        copyto!(w, ww)
+        sindices = pass.sindices[sfield]
+        for is = 1:ageomss.ns
+            w = ssprayw[sfield][is]
+            sindices[is], ww = get_indices_weights(
+                eval(sfield)(),
+                pac.attrib_mod,
+                pac.exmedium.mgrid...,
+                [s[is] for s in ageomss.s],
+            )
+            copyto!(w, ww)
+        end
     end
-end
     for rfield in names(pass.rindices)[1]
-    rindices = pass.rindices[rfield]
-    for ir = 1:ageomss.nr
-        w = rinterpolatew[rfield][ir]
-        rindices[ir], ww = get_indices_weights(eval(rfield)(),
-            pac.exmedium.mgrid...,
-            [r[ir] for r in ageomss.r],
-        )
-        copyto!(w, ww)
+        rindices = pass.rindices[rfield]
+        for ir = 1:ageomss.nr
+            w = rinterpolatew[rfield][ir]
+            rindices[ir], ww = get_indices_weights(
+                eval(rfield)(),
+                pac.attrib_mod,
+                pac.exmedium.mgrid...,
+                [r[ir] for r in ageomss.r],
+            )
+            copyto!(w, ww)
+        end
     end
-end
 
 end
 
@@ -224,8 +229,8 @@ In-place method to perform the experiment and update `pa` after wave propagation
 
 
     # @timeit to "mod_x_proc!" begin
-        # all localparts of DArray are input to this method
-        # parallelization over shots
+    # all localparts of DArray are input to this method
+    # parallelization over shots
     @sync begin
         for (ip, p) in enumerate(procs(pa.p))
             @async remotecall_wait(p) do
@@ -316,7 +321,7 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
 
             # no born flag for adjoint modelling
             if (!pac.gmodel_flag)
-                (typeof(pac.attrib_mod) == FdtdAcouBorn) &&
+                (typeof(pac.attrib_mod) == FdtdAcousticBorn) &&
                     add_born_sources!(issp, pac, pap)
             end
 
@@ -327,7 +332,7 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
                 record!(it, issp, iss, pac, pap)
             end
 
-            if(pac.gmodel_flag)
+            if (pac.gmodel_flag)
                 @timeit to "compute gradient" begin
                     compute_gradient!(issp, pac, pap)
                 end

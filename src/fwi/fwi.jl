@@ -84,7 +84,7 @@ pa=SeisInvExpt(attrib_mod, attrib_inv; srcwav, ageom, tgrid, mediumm, mediumm_ob
 
 # Arguments
 
-* `attrib_mod::Union{FdtdAcou,FdtdAcouBorn}` : choose modeling attribute
+* `attrib_mod::Union{FdtdAcoustic,FdtdAcousticBorn}` : choose modeling attribute
 * `attrib_inv::Union{LS,LS_prior,Migr,Migr_FD}` : choose inversion attribute
 * `obj::Union{LS,LS_prior}` : which objective function?
   * `=LS()` : least-squares inversion 
@@ -116,7 +116,7 @@ pa=SeisInvExpt(attrib_mod, attrib_inv; srcwav, ageom, tgrid, mediumm, mediumm_ob
   * `=:synthetic` synthetic data inversion
   * `=:field` field data inversion
 """
-SeisInvExpt(m1::Union{FdtdAcou, FdtdAcouBorn},m2::Union{LS,LS_prior,Migr,Migr_FD};args1...)=PFWI(m1,m2;args1...) # change this when you have more inversion experiments 
+SeisInvExpt(m1::Union{FdtdAcoustic, FdtdAcousticBorn},m2::Union{LS,LS_prior,Migr,Migr_FD};args1...)=PFWI(m1,m2;args1...) # change this when you have more inversion experiments 
 
 """
 this method constructs prior term with Q=α*I
@@ -174,7 +174,7 @@ Constructor for `PFWI`
 
 # Arguments
 
-* `attrib_mod::Union{FdtdAcou, FdtdAcouBorn}` : modeling attribute
+* `attrib_mod::Union{FdtdAcoustic, FdtdAcousticBorn}` : modeling attribute
 * `attrib_inv::Union{LS,LS_prior,Migr,Migr_FD} : inversion attribute
 
 
@@ -208,7 +208,7 @@ Constructor for `PFWI`
 * nworker : number of workers (input nothing to use all available)
 """
 function PFWI(
-	      attrib_mod::Union{FdtdAcou, FdtdAcouBorn}, 
+	      attrib_mod::Union{FdtdAcoustic, FdtdAcousticBorn}, 
 	      attrib_inv::Union{LS,LS_prior,Migr,Migr_FD};
 	      srcwav::SrcWav=nothing,
 	      ageom::AGeom=nothing,
@@ -392,7 +392,7 @@ function update_observed_data!(pa::PFWI, mediumm_obs)
 	copyto!(pa.mediumm, mediumm_obs)
 
 	# update models in the forward engine and do modelling
-	# FdtdAcouBorn: mediumm0 will be used as a background model for Born modelling and mediumm will be perturbed model
+	# FdtdAcousticBorn: mediumm0 will be used as a background model for Born modelling and mediumm will be perturbed model
 	# Fdtd: mediumm will be *the* model
 	F!(pa, nothing)
 
@@ -482,7 +482,7 @@ end
 """
 convert the gradient output from Fdtd to gx
 """
-function spray_gradient!(gx,  pa::PFWI{FdtdAcou,T1,T2}) where {T1,T2}
+function spray_gradient!(gx,  pa::PFWI{FdtdAcoustic,T1,T2}) where {T1,T2}
 
 	# apply chain rule on gmediumm to get gradient w.r.t. dense x
 	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.mediumm, pa.parameterization)
@@ -493,7 +493,7 @@ function spray_gradient!(gx,  pa::PFWI{FdtdAcou,T1,T2}) where {T1,T2}
 	# visualize gmediumi here?
 	# visualize_gx!(pa.gmediumm, pa.mediumm, pa.gmediumi, pa.mediumi, gx, pa)
 end
-function spray_gradient!(gx, pa::PFWI{FdtdAcouBorn,T1,T2}) where {T1,T2}   
+function spray_gradient!(gx, pa::PFWI{FdtdAcousticBorn,T1,T2}) where {T1,T2}   
 
 	# apply chain rule on gmediumm to get gradient w.r.t. dense x (note that background model is used for Born modeling here)
 	chainrule!(pa.mxm.gx, pa.paf.c.gradient, pa.mediumm, pa.parameterization)

@@ -66,7 +66,7 @@ rec1 = GeoPhyInv.Born.mod(
 
 
 pa = SeisForwExpt(
-    FdtdAcou(),
+    FdtdAcoustic(),
     npw = 1,
     medium = medium,
     ageom = [ageom],
@@ -95,7 +95,7 @@ check()
 # update!(srcwav, [:p], wav)
 
 # pa = SeisForwExpt(
-#     FdtdAcouVisco(),
+#     FdtdAcousticVisco(),
 #     npw = 1,
 #     medium = medium,
 #     ageom = [ageom],

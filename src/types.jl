@@ -6,15 +6,15 @@ struct FdtdElastic end
 """
 2-D/ 3-D acoustic forward modeling using staggered-grid velocity-stress finite-difference formulation.
 """
-struct FdtdAcou end
+struct FdtdAcoustic end
 """
 2-D/ 3-D viscoacoustic forward modeling using staggered-grid velocity-stress finite-difference formulation.
 """
-struct FdtdAcouVisco end
+struct FdtdAcousticVisco end
 """
 2-D Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
 """
-struct FdtdAcouBorn end
+struct FdtdAcousticBorn end
 
 
 # define supersource, source and receiver structs

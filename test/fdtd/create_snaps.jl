@@ -33,13 +33,14 @@ update!(srcwav, [:p], wav);
 # Once the `Expt` object is created, do the modeling without *additional* any 
 # memory allocations using `update!`
 
+tsnaps=tgrid[1:div(length(tgrid),20):end] # store 20 snapshots
 pa = SeisForwExpt(
-    FdtdAcou(),
+    FdtdAcoustic(),
     medium = medium,
     ageom = ageom,
     srcwav = srcwav,
     snaps_field = :p,
-    tsnaps = [0.4, 0.5, 0.8],
+    tsnaps = tsnaps,
     tgrid = tgrid,
     rfields = [:p],
     verbose = true,
@@ -53,15 +54,34 @@ snaps1 = pa[:snaps, 1]; # extracting snaps of the first supersource
 snaps2 = pa[:snaps, 2]; # second supersource
 
 # ### Plotting pressure snapshots after acoustic simulation
-
-#md function plot_snapshots()
-#md     p=[]
-#md     for j in 1:2, i in 1:3
-#md     	push!(p,heatmap(pa[:snaps, j][i], xlabel="x", ylabel="z", legend=:none))
+#md function plot_snapshots(name)
+#md     clip_perc = 90
+#md     pmax = maximum([maximum(pa[:snaps][it]) for it = 1:length(tsnaps)])
+#md     pmax -= pmax * 0.01 * clip_perc
+#md 
+#md     anim = @animate for it = 1:length(tsnaps)
+#md         plot(
+#md             [
+#md                 (
+#md                     f = pa[:snaps, is][it];
+#md                     heatmap(
+#md                         f,
+#md                         aspect_ratio = 1,
+#md                         xlims = (1, size(f, 2)),
+#md                         ylims = (1, size(f, 1)),
+#md                         yflip = true,
+#md                         c = :seismic,
+#md                         clims = (-pmax, pmax),
+#md                         legend = false,
+#md                     )
+#md                 ) for is = 1:2
+#md             ]...,
+#md             title = string("snapshot at: ", round(tsnaps[it], digits = 5), " s"),
+#md         )
 #md     end
-#md     Plots.plot(p..., layout=(2,3), size=(1200,600))
+#md     return gif(anim, string(name,".gif"), fps = 1)
 #md end
-#md plot_snapshots()
+#md plot_snapshots("acoustic_snaps")
 
 
 # ## Elastic
@@ -74,14 +94,14 @@ println(ageom)
 # Add source term on `:vz` grid
 srcwav = SrcWav(tgrid, ageom, [:vz]);
 update!(srcwav, [:vz], wav);
-# Perform modelling and extract snaps
+# Perform modelling 
 pa = SeisForwExpt(
     FdtdElastic(),
     medium = medium,
     ageom = ageom,
     srcwav = srcwav,
     snaps_field = :vz,
-    tsnaps = [0.4, 0.5, 0.8],
+    tsnaps = tsnaps,
     rfields = [:vz],
     tgrid = tgrid,
     verbose = true,
@@ -98,4 +118,4 @@ snaps = pa[:snaps, 2];
 #md plot(p1)
 
 # ### Plotting snapshots after elastic simulation
-#md plot_snapshots() # P and S waves!
+#md plot_snapshots("elastic_snaps") # P and S waves!

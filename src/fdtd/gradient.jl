@@ -100,8 +100,8 @@ function update_gradient!(pac)
 
 	gradient=pac.gradient
 	# truncate
-	gmodKI=view(pac.grad_mod[:KI],npml+1:nz-npml,npml+1:nx-npml)
-	gmodrr=view(pac.grad_mod[:rhoI],npml+1:nz-npml,npml+1:nx-npml)
+	gmodKI=view(pac.grad_mod[:KI],_fd.npml+1:nz-_fd.npml,_fd.npml+1:nx-_fd.npml)
+	gmodrr=view(pac.grad_mod[:rhoI],_fd.npml+1:nz-_fd.npml,_fd.npml+1:nx-_fd.npml)
 	for i in 1:nznxd
 		# parameterization is  [:KI, :ρI, :null]
 		gradient[i]=gmodKI[i]  # update gmodKI

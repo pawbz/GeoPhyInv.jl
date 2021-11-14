@@ -1,6 +1,5 @@
 # create a timer object, used throughout this package, see TimerOutputs.jl
 global const to = TimerOutput();
-global const npml = 20
 
 # struct to store FD params that are used in @initialize
 mutable struct FD_params
@@ -8,9 +7,11 @@ mutable struct FD_params
     order::Int64 # stencil order
     use_gpu::Bool # 
     datatype::DataType
+    npml::Int64
+    npextend::Int64
 end
-# default finite-difference stencil order
-const _fd = FD_params(2, 2, false, Float32)
+# dummy finite-difference stencil order; we need to initialize anyway
+const _fd = FD_params(2, 2, false, Float32, 20, 20+2)
 
 """
 Return axis names of 1D, 2D or 3D fields

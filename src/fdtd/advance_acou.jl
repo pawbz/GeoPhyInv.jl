@@ -1,4 +1,4 @@
-function advance!(pac::T, pap) where {T<:P_common{FdtdAcou}}
+function advance!(pac::T, pap) where {T<:P_common{FdtdAcoustic}}
     for ipw in pac.activepw
         # store p for the last two steps
         # pppppp!(pap[ipw],pac.attrib_mod)
@@ -7,7 +7,7 @@ function advance!(pac::T, pap) where {T<:P_common{FdtdAcou}}
     return nothing
 end
 
-function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcou,2}}
+function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcoustic,2}}
 
     w1t = pap.w1[:t]
     mw = pap.memory_pml
@@ -15,8 +15,8 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcou,2}}
 
     #compute dpdx and dpdz at [it-1] for all propagating fields
     @parallel compute_dp!(w1t[:p], w1t[:dpdx], w1t[:dpdz], pac.fc[:dzI], pac.fc[:dxI])
-    memoryx!(mw[:dpdx], w1t[:dpdx], pml[:x][:a_half], pml[:x][:b_half], pml[:x][:k_halfI])
-    memoryz!(mw[:dpdz], w1t[:dpdz], pml[:z][:a_half], pml[:z][:b_half], pml[:z][:k_halfI])
+    memoryx!(mw[:dpdx], w1t[:dpdx], pml[:dpdx][:a], pml[:dpdx][:b], pml[:dpdx][:kI])
+    memoryz!(mw[:dpdz], w1t[:dpdz], pml[:dpdz][:a], pml[:dpdz][:b], pml[:dpdz][:kI])
 
     #update velocity at [it-1/2] using 
     #velocity at [it-3/2] and dpdx and dpdz at [it-1] 
@@ -41,8 +41,8 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcou,2}}
         pac.fc[:dxI],
         pac.fc[:dzI],
     )#
-    memoryx!(mw[:dvxdx], w1t[:dvxdx], pml[:x][:a], pml[:x][:b], pml[:x][:kI])
-    memoryz!(mw[:dvzdz], w1t[:dvzdz], pml[:z][:a], pml[:z][:b], pml[:z][:kI])
+    memoryx!(mw[:dvxdx], w1t[:dvxdx], pml[:dvxdx][:a], pml[:dvxdx][:b], pml[:dvxdx][:kI])
+    memoryz!(mw[:dvzdz], w1t[:dvzdz], pml[:dvzdz][:a], pml[:dvzdz][:b], pml[:dvzdz][:kI])
 
     #compute pressure at [it] using p at [it-1] and dvxdx
     #and dvzdz at [it-1/2]
@@ -50,7 +50,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcou,2}}
 
 end
 
-function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcou,3}}
+function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcoustic,3}}
 
     w1t = pap.w1[:t]
     mw = pap.memory_pml
@@ -66,9 +66,9 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcou,3}}
         pac.fc[:dyI],
         pac.fc[:dxI],
     )
-    memoryx!(mw[:dpdx], w1t[:dpdx], pml[:x][:a_half], pml[:x][:b_half], pml[:x][:k_halfI])
-    memoryy!(mw[:dpdy], w1t[:dpdy], pml[:y][:a_half], pml[:y][:b_half], pml[:y][:k_halfI])
-    memoryz!(mw[:dpdz], w1t[:dpdz], pml[:z][:a_half], pml[:z][:b_half], pml[:z][:k_halfI])
+    memoryx!(mw[:dpdx], w1t[:dpdx], pml[:dpdx][:a], pml[:dpdx][:b], pml[:dpdx][:kI])
+    memoryy!(mw[:dpdy], w1t[:dpdy], pml[:dpdy][:a], pml[:dpdy][:b], pml[:dpdy][:kI])
+    memoryz!(mw[:dpdz], w1t[:dpdz], pml[:dpdz][:a], pml[:dpdz][:b], pml[:dpdz][:kI])
 
     #update velocity at [it-1/2] using 
     #velocity at [it-3/2] and dpdx and dpdz at [it-1] 
@@ -114,9 +114,9 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcou,3}}
         pac.fc[:dyI],
         pac.fc[:dzI],
     )#
-    memoryx!(mw[:dvxdx], w1t[:dvxdx], pml[:x][:a], pml[:x][:b], pml[:x][:kI])
-    memoryy!(mw[:dvydy], w1t[:dvydy], pml[:y][:a], pml[:y][:b], pml[:y][:kI])
-    memoryz!(mw[:dvzdz], w1t[:dvzdz], pml[:z][:a], pml[:z][:b], pml[:z][:kI])
+    memoryx!(mw[:dvxdx], w1t[:dvxdx], pml[:dvxdx][:a], pml[:dvxdx][:b], pml[:dvxdx][:kI])
+    memoryy!(mw[:dvydy], w1t[:dvydy], pml[:dvydy][:a], pml[:dvydy][:b], pml[:dvydy][:kI])
+    memoryz!(mw[:dvzdz], w1t[:dvzdz], pml[:dvzdz][:a], pml[:dvzdz][:b], pml[:dvzdz][:kI])
 
     #compute pressure at [it] using p at [it-1] and dvxdx
     #and dvzdz at [it-1/2]
@@ -212,7 +212,7 @@ end
 
 
 # # 
-#  function compute_p!(pap,pac,::T) where {T<:Union{FdtdAcouVisco}}
+#  function compute_p!(pap,pac,::T) where {T<:Union{FdtdAcousticVisco}}
 # 	dvxdx=pap.w1[:dx][:vx]
 # 	dvzdz=pap.w1[:dz][:vz]
 # 	p=pap.w1[:t][:p]
@@ -222,7 +222,7 @@ end
 # 	prvzvx!(p,pp,r,rp,dvzdz,dvxdx,pac.mod[:K],pac.mod3[:memcoeff1],pac.mod3[:memcoeff2],pac.fc[:dt],pac.ic[:nz],pac.ic[:nx],pac.ic[:nsls])
 # end
 # # viscoacoustic modeling (memory in stress-strain relation)
-#  function prvzvx!(p,pp,r,rp,dvxdx,dvzdz,mod,mod31,mod32,fc1,nz,nx,nsls)#pw,dpdxw,dpdzw,modK,nz,nx,dt, ::FdtdAcouVisco)
+#  function prvzvx!(p,pp,r,rp,dvxdx,dvzdz,mod,mod31,mod32,fc1,nz,nx,nsls)#pw,dpdxw,dpdzw,modK,nz,nx,dt, ::FdtdAcousticVisco)
 # 	for ix=1:nx  # see limits above
 # 	@simd for iz=1:nz
 
