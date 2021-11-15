@@ -20,10 +20,10 @@ update!(medium_new, [:vp, :rho, :vs], rectangle = [[-500, -500], [500, 500]], pe
 ageom = AGeom(medium.mgrid, :surf, SSrcs(3), Recs(100)); # surface seismic
 
 # ### Plotting #1
-#md p1=heatmap(medium, :rho) 
+#md p1=heatmap(medium, :rho, seriescolor=cgrad(colorschemes[:roma])) 
 #md scatter!(ageom, SSrcs())
 #md scatter!(ageom, Recs())
-#md p2=heatmap(medium_new, :rho) 
+#md p2=heatmap(medium_new, :rho, seriescolor=cgrad(colorschemes[:roma])) 
 #md scatter!(ageom, SSrcs())
 #md scatter!(ageom, Recs())
 #md plot(p1, p2, size=(800,300))
@@ -48,7 +48,7 @@ pa = SeisForwExpt(
 # ### Modeling #1
 @time update!(pa);
 d1 = copy(pa[:data][:vz])
-#md p1=heatmap(pa[:data], :vz, grid=true, legend=:none, 99);
+#md p1=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(colorschemes[:seismic]));
 
 # ### Change medium in `pa` without memory allocation
 update!(pa, medium_new)
@@ -56,11 +56,10 @@ update!(pa, medium_new)
 # ### Modeling #2
 @time update!(pa);
 d2 = copy(pa[:data][:vz])
-#md p2=heatmap(pa[:data], :vz, grid=true, legend=:none, 99);
+#md p2=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(colorschemes[:seismic]));
 
 # Test
 @test d1 ≠ d2
 
 # ### Plotting #2
-#md 
-plot(p1,p2, size=(500, 300))
+#md plot(p1,p2, size=(500, 300))

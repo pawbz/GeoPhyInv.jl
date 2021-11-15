@@ -93,8 +93,8 @@ with respect to KI and rhoI.
 
 # Arguments
 
-* `gmod::Seismic` : gradient model
-* `mod::Seismic` : model required for chain rule
+* `gmod::Medium` : gradient model
+* `mod::Medium` : model required for chain rule
 * `g1` : gradient of an objective function with respect `attribs[1]`
 * `g2` : gradient of an objective function with respect `attribs[2]`
 * `attribs::Vector{Symbol}=[:χKI, :χrhoI]` :  

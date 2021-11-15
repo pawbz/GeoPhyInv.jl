@@ -3,7 +3,7 @@ using Gadfly, Plots, Test
 using ColorSchemes
 
 # standard setting for generating doc pages
-@init_parallel_stencil(2, false, Float32, 4)
+@init_parallel_stencil(2, false, Float32, 2)
 
 gr()
 theme(:juno)

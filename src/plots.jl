@@ -3,7 +3,7 @@
 	mz = mod.mgrid[1]
 	xguide --> "x"
 	yguide --> "z"
-	seriescolor --> :roma
+	# seriescolor --> colorschemes[:roma]
 	xlims --> (mx[1], mx[end])
 	zlims --> (mz[1], mz[end])
 	title --> string(field)
@@ -32,7 +32,7 @@ end
 	rx, rz
 end
 
-@recipe function heatmap(dat::NamedD, field::Symbol=:p, wclip_perc=0.0, bclip_perc=wclip_perc)
+@recipe function heatmap(dat::NamedD, field::Symbol=:p, wclip_perc=0.0, bclip_perc=wclip_prec)
 
 	# wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
 	# bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
@@ -44,11 +44,11 @@ end
 	dmax=maximum(dp)
 	dmin_clip=dmin+bclip_perc*inv(100)*abs(dmin)
 	dmax_clip=dmax-wclip_perc*inv(100)*abs(dmax)
-	println(dmin_clip,"\t", dmax_clip)
+	# println(dmin_clip,"\t", dmax_clip)
 	legend --> true
 	xguide --> "channel index"
 	yguide --> "time"
-	seriescolor --> :seismic
+	# seriescolor --> colorschemes[:roma]
 	clims --> (dmin_clip, dmax_clip)
 	yflip := true
 	dx, dz, dp

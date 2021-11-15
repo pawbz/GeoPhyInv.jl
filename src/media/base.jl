@@ -154,7 +154,7 @@ using two input vectors.
 
 # Arguments
 
-* `mod::Seismic` : to be updated
+* `mod::Medium` : to be updated
 * `x1::Array{Float64,2}` : contrast of inverse bulk modulus
 * `x2::Array{Float64,2}` : contrast of inverse density
 * `fields:::Vector{Symbol}` : [:χKI, :χrhoI]

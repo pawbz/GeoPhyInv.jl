@@ -26,11 +26,13 @@ pa = SeisForwExpt(
 
 @time update!(pa);
 d1 = copy(pa[:data][:vz])
+p1=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(colorschemes[:seismic]));
 
 update!(pa, medium_new)
 
 @time update!(pa);
 d2 = copy(pa[:data][:vz])
+p2=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(colorschemes[:seismic]));
 
 @test d1 ≠ d2
 

@@ -144,7 +144,7 @@ function PFdtd(
 
     # check if fields input are meaningful for given attrib_mod and ndims
     @assert N == _fd.ndims "Cannot initiate SeisForwExpt due to ndims inconsistency with @init_parallel_stencil"
-    @assert snaps_field ∈ Fields(attrib_mod, ndims = N)
+    !(snaps_field === nothing) && @assert snaps_field ∈ Fields(attrib_mod, ndims = N)
     foreach(rf -> @assert(rf ∈ Fields(attrib_mod; ndims = N)), rfields)
     foreach(
         s -> foreach(
