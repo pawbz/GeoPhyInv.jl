@@ -34,6 +34,7 @@ using FFTW
 using HDF5
 using SpecialFunctions
 using DSP
+using CUDA
 using CUDA.CUSPARSE
 CUDA.allowscalar(false)
 
