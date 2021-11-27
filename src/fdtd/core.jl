@@ -556,7 +556,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
         [
             sparse(
                 Data.Array(
-                    zeros(
+                    zeros(  
                         prod(length.(get_mgrid(eval(sf)(), T(), pac.exmedium.mgrid...))),
                         ageom[ipw][iss].ns,
                     ),

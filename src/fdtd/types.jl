@@ -8,9 +8,9 @@ Each worker needs a vector of this struct, as it models multiple superspources.
 mutable struct P_x_worker_x_pw_x_ss{N}
     iss::Int64
     wavelets::Vector{NamedStack{T6}} where {T6<:Data.Array{1}} # [ .. for it in 1:nt]
-    ssprayw::NamedStack{T3} where {T3<:AbstractSparseMatrix{Data.Number,Int32}}
+    ssprayw::NamedStack{T3} where {T3<:AbstractMatrix{Data.Number}}
     records::NamedStack{Vector{T5}} where {T5<:Data.Array{1}}
-    rinterpolatew::NamedStack{T4} where {T4<:AbstractSparseMatrix{Data.Number,Int32}}
+    rinterpolatew::NamedStack{T4} where {T4<:AbstractMatrix{Data.Number}}
     boundary::Vector{Array{Float64,3}}
     snaps::NamedVector{
         Array{Data.Number,N},
