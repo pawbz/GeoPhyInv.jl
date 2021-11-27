@@ -26,7 +26,7 @@ end
 
 
 function findfreq(
-		  x::Array{Float64, ND},
+		  x::AbstractArray{T, ND} where {T<:AbstractFloat},
 		  tgrid;
 		  attrib::Symbol=:peak,
 		  threshold::Float64=-50.
