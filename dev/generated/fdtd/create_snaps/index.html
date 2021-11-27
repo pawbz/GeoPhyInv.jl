@@ -7,8 +7,8 @@ update!(medium, [:vp, :rho], randn_perc = 5); # add some random noise to the med
 println(medium)</code></pre><pre><code class="language-none">&gt; 2-D Medium with [:z, :x] in [[-1000.0, 1000.0], [-1000.0, 1000.0]]
 &gt; number of samples:	[401, 401]
 &gt; sampling intervals:	[5.0, 5.0]
-&gt; vp:	min	1890.360087028709	max	3056.4086375275115
-&gt; rho:	min	1945.696105392223	max	3149.367812804584
+&gt; vp:	min	1929.1917775206887	max	3035.4719792319283
+&gt; rho:	min	1944.3675160425555	max	3039.982279085861
 &gt; Bounds:
 5-element Named Vector{Vector{Float64}}
 vcat  │
@@ -73,9 +73,9 @@ ageom = AGeom(medium.mgrid, :xwell, SSrcs(2)); # load a simple acquisition using
 println(ageom)</code></pre><pre><code class="language-none">&gt; 2-D Medium with [:z, :x] in [[-1000.0, 1000.0], [-1000.0, 1000.0]]
 &gt; number of samples:	[401, 401]
 &gt; sampling intervals:	[5.0, 5.0]
-&gt; vp:	min	1961.7106486668304	max	3042.308971346192
-&gt; vs:	min	1182.2421340072615	max	1817.5801694503034
-&gt; rho:	min	1891.9229020925718	max	3110.3903386641277
+&gt; vp:	min	1969.4617754128842	max	3038.7942953933507
+&gt; vs:	min	1159.3779672561132	max	1838.1535141804147
+&gt; rho:	min	1965.8311737153651	max	3116.537748044101
 &gt; Bounds:
 8-element Named Vector{Vector{Float64}}
 vcat  │
@@ -108,4 +108,4 @@ snaps = pa[:snaps, 2];
 nothing #hide</code></pre><h3 id="Plotting-is-vs-model-1"><a class="docs-heading-anchor" href="#Plotting-is-vs-model-1">Plotting is vs model</a><a class="docs-heading-anchor-permalink" href="#Plotting-is-vs-model-1" title="Permalink"></a></h3><pre><code class="language-">p1=heatmap(medium, :vs, seriescolor=cgrad(colorschemes[:roma]))
 scatter!(ageom, SSrcs())
 scatter!(ageom, Recs())
-plot(p1)</code></pre><h3 id="Plotting-snapshots-after-elastic-simulation-1"><a class="docs-heading-anchor" href="#Plotting-snapshots-after-elastic-simulation-1">Plotting snapshots after elastic simulation</a><a class="docs-heading-anchor-permalink" href="#Plotting-snapshots-after-elastic-simulation-1" title="Permalink"></a></h3><pre><code class="language-">plot_snapshots(&quot;elastic_snaps&quot;) # P and S waves!</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../doc/">« Description</a><a class="docs-footer-nextpage" href="../reuse_expt/">Tutorial II »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Saturday 27 November 2021 11:13">Saturday 27 November 2021</span>. Using Julia version 1.6.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+plot(p1)</code></pre><h3 id="Plotting-snapshots-after-elastic-simulation-1"><a class="docs-heading-anchor" href="#Plotting-snapshots-after-elastic-simulation-1">Plotting snapshots after elastic simulation</a><a class="docs-heading-anchor-permalink" href="#Plotting-snapshots-after-elastic-simulation-1" title="Permalink"></a></h3><pre><code class="language-">plot_snapshots(&quot;elastic_snaps&quot;) # P and S waves!</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../doc/">« Description</a><a class="docs-footer-nextpage" href="../reuse_expt/">Tutorial II »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Saturday 27 November 2021 15:40">Saturday 27 November 2021</span>. Using Julia version 1.6.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
