@@ -23,7 +23,6 @@ using LinearAlgebra
 using Random
 using ImageFiltering
 using NamedArrays
-using DSP
 using Test
 using AxisArrays
 using Distributions
@@ -33,6 +32,11 @@ using RecipesBase
 using ColorSchemes
 using FFTW
 using HDF5
+using SpecialFunctions
+using DSP
+using CUDA.CUSPARSE
+CUDA.allowscalar(false)
+
 
 
 include("params.jl")
@@ -48,7 +52,7 @@ include("Interpolation/Interpolation.jl")
 # some structs used for multiple dispatch throughout this package
 include("types.jl")
 export Srcs, Recs, SSrcs
-export FdtdAcoustic, FdtdElastic, FdtdAcousticBorn, FdtdAcousticVisco
+export FdtdAcoustic, FdtdElastic, FdtdAcousticBorn, AcousticBorn, ElasticBorn, FdtdAcousticVisco
 
 # mutable data type for seismic medium + related methods
 include("media/core.jl")
@@ -121,7 +125,9 @@ macro init_parallel_stencil(ndims::Int, use_gpu::Bool, datatype, order)
             # define structs for wavefields in 2D/3D
             include(joinpath(dirname(pathof(GeoPhyInv)), "fields.jl"))
             export Fields
-            include(joinpath(dirname(pathof(GeoPhyInv)), "fdtd", "fdtd.jl"))
+            include(joinpath(dirname(pathof(GeoPhyInv)), "fdtd", "core.jl"))
+            include(joinpath(dirname(pathof(GeoPhyInv)), "born", "core.jl"))
+            nothing
         end
     end
 end
@@ -137,9 +143,6 @@ export update, update!
 # include("IO.jl")
 
 # include("Coupling.jl")
-
-# include("Born/Born.jl")
-# include("fdtd/fdtd.jl")
 
 # include("fwi/fwi.jl")
 

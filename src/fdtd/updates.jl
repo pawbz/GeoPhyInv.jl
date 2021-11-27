@@ -12,14 +12,18 @@ function update_δmods!(pac::P_common, δmod::Vector{Float64})
     nznxd = prod(length.(pac.medium.mgrid))
     copyto!(pac.δmodall, δmod)
     fill!(pac.δmod[:KI], 0.0)
-    δmodKI = view(pac.δmod[:KI], _fd.npextend+1:nz-_fd.npextend, _fd.npextend+1:nx-_fd.npextend)
+    δmodKI =
+        view(pac.δmod[:KI], _fd.npextend+1:nz-_fd.npextend, _fd.npextend+1:nx-_fd.npextend)
     for i = 1:nznxd
         # put perturbation due to KI as it is
         δmodKI[i] = δmod[i]
     end
     fill!(pac.δmod[:rhoI], 0.0)
-    δmodrr =
-        view(pac.δmod[:rhoI], _fd.npextend+1:nz-_fd.npextend, _fd.npextend+1:nx-_fd.npextend)
+    δmodrr = view(
+        pac.δmod[:rhoI],
+        _fd.npextend+1:nz-_fd.npextend,
+        _fd.npextend+1:nx-_fd.npextend,
+    )
     for i = 1:nznxd
         # put perturbation due to rhoI here
         δmodrr[i] = δmod[nznxd+i]
@@ -152,31 +156,37 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
     ssprayw = pass.ssprayw
     rinterpolatew = pass.rinterpolatew
 
-    for sfield in names(pass.sindices)[1]
-        sindices = pass.sindices[sfield]
+    for sfield in pac.sfields[ipw]
+        w = Array(ssprayw[sfield])
         for is = 1:ageomss.ns
-            w = ssprayw[sfield][is]
-            sindices[is], ww = get_indices_weights(
+            ww = selectdim(w, 2, is)
+            update_proj_mat!(
+                ww,
+                pac,
+                Srcs(),
                 eval(sfield)(),
                 pac.attrib_mod,
                 pac.exmedium.mgrid...,
                 [s[is] for s in ageomss.s],
             )
-            copyto!(w, ww)
         end
+        ssprayw[sfield] = sparse(Data.Array(w))
     end
-    for rfield in names(pass.rindices)[1]
-        rindices = pass.rindices[rfield]
+    for rfield in pac.rfields 
+        w = Array(rinterpolatew[rfield])
         for ir = 1:ageomss.nr
-            w = rinterpolatew[rfield][ir]
-            rindices[ir], ww = get_indices_weights(
+            ww = selectdim(w, 1, ir)
+            update_proj_mat!(
+                ww,
+                pac,
+                Recs(),
                 eval(rfield)(),
                 pac.attrib_mod,
                 pac.exmedium.mgrid...,
                 [r[ir] for r in ageomss.r],
             )
-            copyto!(w, ww)
         end
+        rinterpolatew[rfield] = sparse(Data.Array(w))
     end
 
 end
@@ -387,10 +397,10 @@ function update_datamat!(
     for issp = 1:length(pass)
         iss = pass[issp].iss
         records = pass[issp].records
-        for ir = 1:pac.ageom[ipw][iss].nr
-            for it = 1:pac.ic[:nt]
-                datamat[it, ir, iss] = records[rfield][it, ir]
-            end
+        for it = 1:pac.ic[:nt]
+            r = Array(records[rfield][it])
+            d = view(datamat, it, :, iss)
+            copyto!(d, r)
         end
     end
 end

@@ -4,10 +4,6 @@ Acquisition geometry for each supersource.
 mutable struct AGeomss
     s::NamedStack{Vector{Float64}} # x, y, z coordinates
     r::NamedStack{Vector{Float64}} # x, y, z coordinates
-    # sx::Vector{Float64}
-    # sz::Vector{Float64}
-    # rx::Vector{Float64}
-    # rz::Vector{Float64}
     ns::Int64 # change to +ve only integer later
     nr::Int64 # change to +ve only integer later
     "adding conditions that are to be false while construction"
@@ -340,6 +336,11 @@ function SparseArrays.SparseMatrixCSC(
     return ACQ
 end
 
+
+"""
+Return `[sz-rz, sy-ry, sx-rx]`
+"""
+offset(ageomss::AGeomss, is, ir)=[ageomss.s[d][is]-ageomss.r[d][ir] for d in dim_names(ndims(ageomss))] 
 
 #=
 

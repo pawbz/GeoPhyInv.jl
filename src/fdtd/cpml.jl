@@ -15,7 +15,6 @@ function update_pml!(
     freqpeak::Float64, # dominant frequency in Hz
 ) where {T<:Data.Array}
 
-    δx = step(exmgrid)
     nx = length(exmgrid)
 
     # origin, where the PMLs start (offset b/w the domain of interest and PML region depends on order
@@ -49,8 +48,6 @@ function update_pml!(
     "origin of the PML layer (position of right edge minus thickness, in meters)"
 
     for ix = 1:nx
-        # abscissa of current grid point along the damping profile
-        xval = exmgrid[ix]
         #---------- left edge
         if (flags[1])
             # define damping profile at the grid points
@@ -88,16 +85,21 @@ function update_pml!(
         (abs(d[ix]) > 1.e-6) ?
         a[ix] = d[ix] * (b[ix] - 1.e0) / (k[ix] * (d[ix] + k[ix] * alpha[ix])) : nothing
     end
+    pkI = zeros(2 * _fd.npml)
+    pa = zeros(2 * _fd.npml)
+    pb = zeros(2 * _fd.npml)
     for i = 1:_fd.npml
         j = i + _fd.npml
-        pml[:kI][i] = inv(k[i])
-        pml[:kI][j] = inv(k[end-_fd.npml+i])
-        pml[:a][i] = a[i]
-        pml[:a][j] = a[end-_fd.npml+i]
-        pml[:b][i] = b[i]
-        pml[:b][j] = b[end-_fd.npml+i]
+        pkI[i] = inv(k[i])
+        pkI[j] = inv(k[end-_fd.npml+i])
+        pa[i] = a[i]
+        pa[j] = a[end-_fd.npml+i]
+        pb[i] = b[i]
+        pb[j] = b[end-_fd.npml+i]
     end
-
+    copyto!(pml[:kI], pkI)
+    copyto!(pml[:a], pa)
+    copyto!(pml[:b], pb)
 end
 
 
@@ -110,14 +112,8 @@ function get_pml(attrib_mod, mgrid)
     np = 2 * _fd.npml
     return NamedArray(
         [
-            NamedArray(
-                Data.Array.([
-                    zeros(np),
-                    zeros(np),
-                    ones(np),
-                ]),
-                pnames,
-            ) for df in dfields
+            NamedArray(Data.Array.([zeros(np), zeros(np), ones(np)]), pnames) for
+            df in dfields
         ],
         dfields,
     )

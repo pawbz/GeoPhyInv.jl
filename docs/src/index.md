@@ -25,7 +25,7 @@ Some of the commonly used (and exported) mutable types to create the `Expt` vari
 * `Medium` for bundling medium parameters together;
 * `AGeom` stores acquisition geometry related parameters;
 * `SrcWav` allocates source signals input to an experiment;
-* `Data` allocated the output records that are fitted during inversion.
+* `Records` allocated the output records that are fitted during inversion.
 
 ### Loading the package
 It is important to configure GeoPhyInv with a macro `@init_parallel_stencil` before anything else.
@@ -45,6 +45,25 @@ Then, simply use `update!` to perform least-squares inversion.
 update!(pa, solver=:ipopt)
 ```
 
+### Fields
+
+For a given `attrib_mod` and `ndims`, you can always print a list of scalar fields that are active. 
+The idea is that these symbols will be used 
+* to generate mutable types like `SrcWav` or `Records`;
+* as input to keywords like `rfields` or `snaps_field`.
+First, lets look at the list of all the scalar fields defined in this package.
+````@example
+Fields()
+````
+We can always filter this list depending on the type of the `SeisForwExpt` i.e., `attrib_mod` and the number of dimensions.
+For example, lets check out the fields for 3-D acoustic simulation.
+````@example
+Fields(FdtdAcoustic(), ndims=3)
+````
+Similarly, for 2-D elastic simulation.
+````@example
+Fields(FdtdElastic(), ndims=2)
+````
 
 ### Grids
 
@@ -65,4 +84,3 @@ Similarly, a temporal grid.
 ```julia
 tgrid=range(0,stop=1.0,step=0.001) # a temporal grid from 0 to 1.0 s
 ```
-

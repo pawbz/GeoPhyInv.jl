@@ -14,11 +14,11 @@ function Fields(s = ""; ndims = _fd.ndims)
     end
     return f
 end
-function Fields(::FdtdElastic, s = ""; ndims = _fd.ndims)
+function Fields(::T, s = ""; ndims = _fd.ndims) where {T<:Elastic}
     f = Fields(s, ndims = ndims) # get all
     f = filter(x -> !contains(string(x), "p"), f) # filter out pressure
 end
-function Fields(::FdtdAcoustic, s = ""; ndims = _fd.ndims)
+function Fields(::T, s = ""; ndims = _fd.ndims) where {T<:Acoustic}
     f = Fields(s, ndims = ndims) # get all
     f = filter(x -> !contains(string(x), "tau"), f) # filter out tau
     f = filter(x -> !in(x, [:dvxdy, :dvxdz, :dvydx, :dvydz, :dvzdx, :dvzdy]), f) # filter out dvxdy
@@ -44,24 +44,6 @@ end
 #-------------------------------------------------------
 # grid indices and linear-interpolation weights
 #-------------------------------------------------------
-"""
-Output CartesianIndices and corresponding linear interpolation weights for point P in mgrid
-For example, when 2D,
-mgrid=[range(1.3, stop=10.6,step=0.003), range(1.2,stop=15.3,step=0.004)]
-P=[5,5]
-"""
-function get_indices_weights(mgrid, P)
-    @assert length(mgrid) == length(P)
-    N = length(mgrid)
-    idx = [Interpolation.indminn(mgrid[i], P[i], 2) for i = 1:N]
-    denomI = inv(prod([diff(mgrid[i][idx[i]])[1] for i = 1:N]))
-    c = CartesianIndices(Tuple(broadcast(x -> x[1]:x[2], idx)))
-    weights = zeros(length(c))
-    for (i, cc) in enumerate(c)
-        weights[i] = prod([abs(mgrid[i][cc[i]] - P[i]) for i = 1:N]) * denomI
-    end
-    return c, weights
-end
 
 for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
     grids = broadcast(x -> Symbol(string("m", x)), getindex.(collect(dimnames), 2))
@@ -100,10 +82,6 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
             end
             return Data.Array(zeros($(sizes1...)))
         end
-    end
-    # get indices for any fields, routed via mgrid adjustment
-    @eval function get_indices_weights(f::Any, attrib_mod, $(grids...), P)
-        return get_indices_weights(get_mgrid(f, attrib_mod, $(grids...)), P)
     end
 end
 

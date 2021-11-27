@@ -213,8 +213,8 @@ end
     mu,
 )
     @all(tauxz) = @all(tauxz) - dt * (@av_xzi(mu) * (@all(dvxdz) + @all(dvzdx)))
-    @all(tauxy) = @all(tauxy) - dt * (@av_yzi(mu) * (@all(dvxdy) + @all(dvydx)))
-    @all(tauyz) = @all(tauyz) - dt * (@av_xyi(mu) * (@all(dvydz) + @all(dvzdy)))
+    @all(tauxy) = @all(tauxy) - dt * (@av_xyi(mu) * (@all(dvxdy) + @all(dvydx)))
+    @all(tauyz) = @all(tauyz) - dt * (@av_yzi(mu) * (@all(dvydz) + @all(dvzdy)))
 
     return
 end

@@ -483,17 +483,12 @@ end
 # 	ssprayw = zeros(4,ageom[ipw][iss].ns)
 # 	# denomsI = zeros(ageom[ipw][iss].ns)
 
-# 	sindices=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
-
-
-
 # 	# receiver interpolation weights per sequential source
 # 	rinterpolatew = zeros(4,ageom[ipw][iss].nr)
 # 	# denomrI = zeros(ageom[ipw][iss].nr)
-# 	rindices=NamedArray([zeros(Int64,ageom[ipw][iss].nr) for i in coords], (coords,))
 
 # 	pass=P_x_worker_x_pw_x_ss(iss,wavelets,ssprayw,records,rinterpolatew,
-# 			   sindices,rindices, boundary,snaps,illum,# grad_modKI,grad_modrhovxI,grad_modrhovzI)
+# 			  boundary,snaps,illum,# grad_modKI,grad_modrhovxI,grad_modrhovzI)
 # 			   NamedArray([grad_modKI,grad_modrhovxI,grad_modrhovzI],([:KI,:rhovxI,:rhovzI],)))
 
 # 	# update acquisition
@@ -516,7 +511,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
 
     # records_output, distributed array among different procs
     records = NamedArray(
-        [zeros(nt, pac.ageom[ipw][iss].nr) for i = 1:length(rfields)],
+        [[Data.Array(zeros(ageom[ipw][iss].nr)) for it = 1:nt] for i = 1:length(rfields)],
         (rfields,),
     )
 
@@ -539,7 +534,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     # source wavelets
     wavelets = [
         NamedArray(
-            [zeros(pac.ageom[ipw][iss].ns) for i = 1:length(sfields[ipw])],
+            [Data.Array(zeros(ageom[ipw][iss].ns)) for i = 1:length(sfields[ipw])],
             (sfields[ipw],),
         ) for it = 1:nt
     ]
@@ -558,22 +553,28 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
 
     # initialize source_spray_weights per supersource and receiver interpolation weights per sequential source
     ssprayw = NamedArray(
-        [[zeros(2^N) for i = 1:ageom[ipw][iss].ns] for sf in sfields[ipw]],
-        sfields[ipw],
-    )
-    sindices = NamedArray(
         [
-            [CartesianIndices(Tuple(fill(1:2, N))) for i = 1:ageom[ipw][iss].ns] for
-            sf in sfields[ipw]
+            sparse(
+                Data.Array(
+                    zeros(
+                        prod(length.(get_mgrid(eval(sf)(), T(), pac.exmedium.mgrid...))),
+                        ageom[ipw][iss].ns,
+                    ),
+                ),
+            ) for sf in sfields[ipw]
         ],
         sfields[ipw],
     )
-    rinterpolatew =
-        NamedArray([[zeros(2^N) for i = 1:ageom[ipw][iss].nr] for rf in rfields], rfields)
-    rindices = NamedArray(
+    rinterpolatew = NamedArray(
         [
-            [CartesianIndices(Tuple(fill(1:2, N))) for i = 1:ageom[ipw][iss].nr] for
-            rf in rfields
+            sparse(
+                Data.Array(
+                    zeros(
+                        ageom[ipw][iss].nr,
+                        prod(length.(get_mgrid(eval(rf)(), T(), pac.exmedium.mgrid...))),
+                    ),
+                ),
+            ) for rf in rfields
         ],
         rfields,
     )
@@ -584,8 +585,6 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
         ssprayw,
         records,
         rinterpolatew,
-        sindices,
-        rindices,
         boundary,
         snaps,
         illum,# grad_modKI,grad_modrhovxI,grad_modrhovzI)
@@ -597,7 +596,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     return pass
 end
 
-
+include("proj_mat.jl")
 include("source.jl")
 include("receiver.jl")
 include("dirichlet.jl")
