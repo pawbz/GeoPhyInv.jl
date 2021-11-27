@@ -307,7 +307,7 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
         prog = Progress(
             pac.ic[:nt],
             dt = 1,
-            desc = "\tmodeling supershot $iss/$(length(pac.ageom[1])) ",
+            desc = "modeling $(pac.attrib_mod) supershot $iss/$(length(pac.ageom[1])) ",
             color = :blue,
         )
         # time_loop

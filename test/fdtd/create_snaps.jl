@@ -2,6 +2,7 @@ using GeoPhyInv
 using Statistics
 #jl @init_parallel_stencil(2, false, Float32, 4)
 #md using Plots; gr();
+#md using ColorSchemes
 
 # ### Medium
 medium = Medium(:acou_homo2D, 5); # load a simple homogeneous acoustic medium from the gallery

@@ -2,12 +2,13 @@
 EditURL = "<unknown>/test/fdtd/reuse_expt.jl"
 ```
 
-This page was generated on 2021-11-15
+This page was generated on 2021-11-27
 
 ````@example reuse_expt
 using GeoPhyInv
 using Statistics
 using Plots; gr();
+using ColorSchemes
 using Test
 ````
 
@@ -76,7 +77,6 @@ nothing #hide
 ````@example reuse_expt
 @time update!(pa);
 d1 = copy(pa[:data][:vz])
-
 p1=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(colorschemes[:seismic]));
 nothing #hide
 ````
@@ -92,7 +92,6 @@ update!(pa, medium_new)
 ````@example reuse_expt
 @time update!(pa);
 d2 = copy(pa[:data][:vz])
-
 p2=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(colorschemes[:seismic]));
 nothing #hide
 ````

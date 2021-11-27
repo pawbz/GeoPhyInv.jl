@@ -6,7 +6,7 @@ EditURL = "<unknown>/test/fdtd/create_snaps.jl"
 using GeoPhyInv
 using Statistics
 using Plots; gr();
-nothing #hide
+using ColorSchemes
 ````
 
 ### Medium

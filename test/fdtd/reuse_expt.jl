@@ -2,6 +2,7 @@
 using GeoPhyInv
 using Statistics
 #md using Plots; gr();
+#md using ColorSchemes
 using Test
 
 # This tutorial demonstrates how an instance of `SeisForwExpt` can be used iteratively 
