@@ -20,7 +20,7 @@ srcwav = SrcWav(tgrid, ageom, [:p]);
 update!(srcwav, [:p], wav);
 
 # ### Plotting the `vp` model
-#md p1=heatmap(medium, :vp, seriescolor=cgrad(colorschemes[:roma]))
+#md p1=heatmap(medium, :vp, seriescolor=cgrad(:roma))
 #md scatter!(ageom, SSrcs())
 #md scatter!(ageom, Recs())
 #md plot(p1)
@@ -71,7 +71,7 @@ snaps2 = pa[:snaps, 2]; # second supersource
 #md                         xlims = (1, size(f, 2)),
 #md                         ylims = (1, size(f, 1)),
 #md                         yflip = true,
-#md                         seriescolor = cgrad(colorschemes[:seismic]),
+#md                         seriescolor = cgrad(:seismic),
 #md                         clims = (-pmax, pmax),
 #md                         legend = false,
 #md                     )
@@ -113,7 +113,7 @@ snaps = pa[:snaps, 1];
 snaps = pa[:snaps, 2];
 
 # ### Plotting is vs model
-#md p1=heatmap(medium, :vs, seriescolor=cgrad(colorschemes[:roma]))
+#md p1=heatmap(medium, :vs, seriescolor=cgrad(:roma))
 #md scatter!(ageom, SSrcs())
 #md scatter!(ageom, Recs())
 #md plot(p1)
