@@ -37,7 +37,7 @@ nothing #hide
 ### Plotting the `vp` model
 
 ````@example create_snaps
-p1=heatmap(medium, :vp, seriescolor=cgrad(colorschemes[:roma]))
+p1=heatmap(medium, :vp, seriescolor=cgrad(:roma))
 scatter!(ageom, SSrcs())
 scatter!(ageom, Recs())
 plot(p1)
@@ -101,7 +101,7 @@ function plot_snapshots(name)
                         xlims = (1, size(f, 2)),
                         ylims = (1, size(f, 1)),
                         yflip = true,
-                        seriescolor = cgrad(colorschemes[:seismic]),
+                        seriescolor = cgrad(:seismic),
                         clims = (-pmax, pmax),
                         legend = false,
                     )
@@ -158,7 +158,7 @@ nothing #hide
 ### Plotting is vs model
 
 ````@example create_snaps
-p1=heatmap(medium, :vs, seriescolor=cgrad(colorschemes[:roma]))
+p1=heatmap(medium, :vs, seriescolor=cgrad(:roma))
 scatter!(ageom, SSrcs())
 scatter!(ageom, Recs())
 plot(p1)

@@ -2,7 +2,7 @@
 EditURL = "<unknown>/test/fdtd/reuse_expt.jl"
 ```
 
-This page was generated on 2021-11-27
+This page was generated on 2021-11-29
 
 ````@example reuse_expt
 using GeoPhyInv
@@ -39,10 +39,10 @@ nothing #hide
 ### Plotting #1
 
 ````@example reuse_expt
-p1=heatmap(medium, :rho, seriescolor=cgrad(colorschemes[:roma]))
+p1=heatmap(medium, :rho, seriescolor=cgrad(:roma))
 scatter!(ageom, SSrcs())
 scatter!(ageom, Recs())
-p2=heatmap(medium_new, :rho, seriescolor=cgrad(colorschemes[:roma]))
+p2=heatmap(medium_new, :rho, seriescolor=cgrad(:roma))
 scatter!(ageom, SSrcs())
 scatter!(ageom, Recs())
 plot(p1, p2, size=(800,300))
@@ -77,7 +77,7 @@ nothing #hide
 ````@example reuse_expt
 @time update!(pa);
 d1 = copy(pa[:data][:vz])
-p1=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(colorschemes[:seismic]));
+p1=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(:seismic));
 nothing #hide
 ````
 
@@ -92,7 +92,7 @@ update!(pa, medium_new)
 ````@example reuse_expt
 @time update!(pa);
 d2 = copy(pa[:data][:vz])
-p2=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(colorschemes[:seismic]));
+p2=heatmap(pa[:data], :vz, 99, 99, grid=true, legend=:none, seriescolor=cgrad(:seismic));
 nothing #hide
 ````
 

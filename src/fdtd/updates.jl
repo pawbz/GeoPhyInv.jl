@@ -157,11 +157,11 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
     rinterpolatew = pass.rinterpolatew
 
     for sfield in pac.sfields[ipw]
-        w = Array(ssprayw[sfield])
+        I = Vector{Int64}()
+        J = Vector{Int64}()
+        V = Vector{Data.Number}()
         for is = 1:ageomss.ns
-            ww = selectdim(w, 2, is)
-            update_proj_mat!(
-                ww,
+            In, Jn, Ln, Vn = findnz(
                 pac,
                 Srcs(),
                 eval(sfield)(),
@@ -169,15 +169,23 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
                 pac.exmedium.mgrid...,
                 [s[is] for s in ageomss.s],
             )
+            I = vcat(I, Ln)
+            J = vcat(J, fill(is, length(Ln)))
+            V = vcat(V, Data.Number.(Vn))
         end
-        ssprayw[sfield] = sparse(Data.Array(w))
+        M = prod(length.(get_mgrid(eval(sfield)(), pac.attrib_mod, pac.exmedium.mgrid...)))
+        if (_fd.use_gpu)
+            ssprayw[sfield] = CuSparseMatrixCSC(sparse(I, J, V, M, ageomss.ns))
+        else
+            ssprayw[sfield] = sparse(I, J, V, M, ageomss.ns)
+        end
     end
-    for rfield in pac.rfields 
-        w = Array(rinterpolatew[rfield])
+    for rfield in pac.rfields
+        I = Vector{Int64}()
+        J = Vector{Int64}()
+        V = Vector{Data.Number}()
         for ir = 1:ageomss.nr
-            ww = selectdim(w, 1, ir)
-            update_proj_mat!(
-                ww,
+            In, Jn, Ln, Vn = findnz(
                 pac,
                 Recs(),
                 eval(rfield)(),
@@ -185,8 +193,16 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
                 pac.exmedium.mgrid...,
                 [r[ir] for r in ageomss.r],
             )
+            J = vcat(J, Ln)
+            I = vcat(I, fill(ir, length(Ln)))
+            V = vcat(V, Data.Number.(Vn))
         end
-        rinterpolatew[rfield] = sparse(Data.Array(w))
+        M = prod(length.(get_mgrid(eval(rfield)(), pac.attrib_mod, pac.exmedium.mgrid...)))
+        if (_fd.use_gpu)
+            rinterpolatew[rfield] = CuSparseMatrixCSC(sparse(I, J, V, ageomss.nr, M))
+        else
+            rinterpolatew[rfield] = sparse(I, J, V, ageomss.nr, M)
+        end
     end
 
 end

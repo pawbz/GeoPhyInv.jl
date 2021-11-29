@@ -554,30 +554,31 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     # initialize source_spray_weights per supersource and receiver interpolation weights per sequential source
     ssprayw = NamedArray(
         [
-            sparse(
-                Data.Array(
-                    zeros(  
-                        prod(length.(get_mgrid(eval(sf)(), T(), pac.exmedium.mgrid...))),
-                        ageom[ipw][iss].ns,
-                    ),
-                ),
+            spzeros(
+                Data.Number,
+                prod(length.(get_mgrid(eval(sf)(), T(), pac.exmedium.mgrid...))),
+                ageom[ipw][iss].ns,
             ) for sf in sfields[ipw]
         ],
         sfields[ipw],
     )
     rinterpolatew = NamedArray(
         [
-            sparse(
-                Data.Array(
-                    zeros(
-                        ageom[ipw][iss].nr,
-                        prod(length.(get_mgrid(eval(rf)(), T(), pac.exmedium.mgrid...))),
-                    ),
-                ),
+            spzeros(
+                Data.Number,
+                ageom[ipw][iss].nr,
+                prod(length.(get_mgrid(eval(rf)(), T(), pac.exmedium.mgrid...))),
             ) for rf in rfields
         ],
         rfields,
     )
+
+    # transfer to GPUs if 
+    if (_fd.use_gpu)
+        ssprayw=map(x -> CuSparseMatrixCSC(x), ssprayw)
+        rinterpolatew=map(x -> CuSparseMatrixCSC(x), rinterpolatew)
+    end
+
 
     pass = P_x_worker_x_pw_x_ss(
         iss,
