@@ -44,7 +44,7 @@ makedocs(
     #    modules = []
 )
 
-deploydocs(repo = "github.com/pawbz/GeoPhyInv.jl.git", versions = nothing)
+deploydocs(repo = "github.com/pawbz/GeoPhyInv.jl.git")
 #=
 deploydocs(
     deps   = Deps.pip("mkdocs", "python-markdown-math"),
