@@ -6,7 +6,7 @@
 	],
 	"settings": {
 		"jupyter.jupyterCommandLineArguments": [],
-		"julia.executablePath": "/home/pawan/software/julia-1.6.0/bin/julia",
+		"julia.executablePath": "/home/pawan/software/julia-1.6.4/bin/julia",
 		"cSpell.enabled": true
 	}
 }

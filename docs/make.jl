@@ -1,3 +1,6 @@
+ENV["PLOTS_TEST"] = "true"
+ENV["GKSwstype"] = "100"
+
 using Documenter, GeoPhyInv, SparseArrays, LinearAlgebra, Random, LinearMaps
 using Gadfly, Plots, Test
 using ColorSchemes
