@@ -25,9 +25,7 @@ names(mod)
 
 """
 mutable struct Medium{N} # N is 2 for 2D, and 3 for 3D
-    mgrid::Vector{
-        StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}},
-    }
+    mgrid::Vector{T} where {T<:StepRangeLen{Float64}}
     m::NamedStack{Array{Float64,N}}
     bounds::NamedArrays.NamedArray{
         Array{Float64,1},
@@ -62,7 +60,7 @@ end
 # default construction without fcs and ics, and m3
 function Medium(mgrid, m::NamedStack{Array{Float64,N}}, bounds, ref) where {N}
     return Medium(
-        StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}.(mgrid),
+        map(StepRangeLen{Float64},(mgrid)),
         Array{Float64}.(m),
         Array{Float64}.(bounds),
         Float64.(ref),
@@ -332,9 +330,7 @@ Similar to previous method, but with initialization.
 """
 function update(
     mod::Medium,
-    mgrid::Vector{
-        StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}},
-    },
+    mgrid::Vector{T} where {T<:StepRangeLen{Float64}}
 )
     modex = Medium(mgrid, names(mod)[1]) # initialize a new medium
     update!(modex, mod)

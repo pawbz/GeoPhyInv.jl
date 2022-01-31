@@ -13,23 +13,21 @@
 end
 
 @recipe function scatter(ageom::AGeom, ::SSrcs)
-	sx = vcat([ag.s[:x] for ag in ageom]...)
-	sz = vcat([ag.s[:z] for ag in ageom]...)
 	legend --> false
 	markersize --> 7
 	markercolor := :red
 	markershape := :xcross
-	sx, sz
+	dnames = (ndims(ageom)==3) ? [:x, :y, :z] : [:x, :z]
+	tuple([vcat([ag.s[d] for ag in ageom]...)  for d in dnames]...)
 end
 
 @recipe function scatter(ageom::AGeom, ::Recs)
-	rx = vcat([ag.r[:x] for ag in ageom]...)
-	rz = vcat([ag.r[:z] for ag in ageom]...)
 	markersize --> 7
 	legend --> false
 	markercolor := :blue
 	markershape := :utriangle
-	rx, rz
+	dnames = (ndims(ageom)==3) ? [:x, :y, :z] : [:x, :z]
+	tuple([vcat([ag.r[d] for ag in ageom]...)  for d in dnames]...)
 end
 
 @recipe function heatmap(dat::NamedD, field::Symbol=:p, wclip_perc=0.0, bclip_perc=wclip_prec)

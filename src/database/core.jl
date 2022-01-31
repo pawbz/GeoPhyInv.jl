@@ -5,7 +5,7 @@
 Type for storing NamedD 
 """
 mutable struct NamedD{T<:Union{Srcs,Recs}}
-    grid::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}
+    grid::StepRangeLen{Float64}
     d::NamedArrays.NamedArray{
         Array{Float64,2},
         1,

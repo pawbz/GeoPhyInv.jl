@@ -5,17 +5,14 @@ Initialize an model with zeros, given mgrid and names.
 function Base.zero(::Type{Medium}, mgrid, names = [:vp, :rho])
     nvec = length.(mgrid)
     return Medium(
-        broadcast(
-            x -> convert(
-                StepRangeLen{
-                    Float64,
-                    Base.TwicePrecision{Float64},
-                    Base.TwicePrecision{Float64},
-                },
-                x,
-            ),
-            (mgrid),
-        ),
+        map( StepRangeLen{Float64}, mgrid),
+        # broadcast(
+            # x -> convert(
+            #    ,
+                # x,
+            # ),
+            # (mgrid),
+        # ),
         NamedArray([zeros(Float64, nvec...) for i in names], (names,)),
         NamedArray([fill(0.0, 2) for i in names], (names,)),
         NamedArray([0.0 for i in names], (names,)),

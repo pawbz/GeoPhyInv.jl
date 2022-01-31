@@ -1,6 +1,7 @@
 
 include("types.jl")
 include("homo.jl")
+include("getprop.jl")
 
 
 SeisForwExpt(attrib_mod::Union{AcousticBorn,ElasticBorn}, args1...; args2...) =

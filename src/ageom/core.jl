@@ -189,10 +189,9 @@ function spread(
     rad::T2,
     phi::Vector{T4},
     theta::Vector{T3} = [0, 0],
-    rand_flag::Bool = false,
 ) where {T1<:Real,T2<:Real,T3<:Real,T4<:Real}
-    phi = spread(n, [phi[1]], [phi[2]], rand_flag)[1]
-    theta = spread(n, [theta[1]], [theta[2]], rand_flag)[1]
+    phi = rand(Uniform(phi[1], phi[2]), n)
+    theta = rand(Uniform(theta[1], theta[2]), n)
     nd = length(p0)
     p = [zeros(n) for i = 1:nd]
 
