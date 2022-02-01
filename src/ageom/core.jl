@@ -21,7 +21,7 @@ include("gallery.jl")
 """
 Randomly place a given number of source and receivers in a `mgrid`.
 """
-function AGeomss(mgrid::AbstractArray{T}, s::Srcs, r::Recs) where {T<:StepRangeLen}
+function AGeomss(mgrid::Vector{T}, s::Srcs, r::Recs) where {T<:StepRangeLen}
     nd = length(mgrid)
     names = dim_names(nd)
     mins = [m[1] for m in mgrid]
@@ -41,8 +41,8 @@ ageom=AGeom(mgrid, SSrcs(2), [Srcs(3), Srcs(2)], [Recs(10), Recs(20)])
 Initialize an acquisition, with 2 supersources, by randomly placing a 
 sources and receivers in `mgrid`.
 """
-function Array{AGeomss,1}(
-    mgrid::AbstractVector{T},
+function Vector{AGeomss}(
+    mgrid::Vector{T},
     ss::SSrcs,
     s::Vector{Srcs},
     r::Vector{Recs},
@@ -57,8 +57,8 @@ ageom=AGeom(mgrid, SSrcs(10), Srcs(10), Recs(20))
 Initialize an acquisition, with 10 supersources, by randomly placing a 
 sources and receivers in `mgrid`. In this case, all the supersources have same source and receiver positions.
 """
-function Array{AGeomss,1}(
-    mgrid::AbstractVector{T},
+function Vector{AGeomss}(
+    mgrid::Vector{T},
     ss::SSrcs,
     s::Srcs,
     r::Recs,
@@ -97,12 +97,28 @@ function Base.isequal(ageom1::AGeom, ageom2::AGeom, attrib = :all)
            false
 end
 
+
+function dim_names(ageomss::AGeomss)
+    dN=dim_names(length(ageomss.s))
+    @assert all(map(in(dN),names(ageomss.s)[1]))
+    @assert all(map(in(dN),names(ageomss.r)[1]))
+    return dN
+end
+
+function dim_names(ageom::Vector{AGeomss})
+    dN=dim_names.(ageom)
+    @assert all(y -> y == dN[1], dN)
+    return dN[1]
+end
+
+
+
 function Base.show(io::Base.IO, ageomss::AGeomss)
     println(
         io,
         string(
             "> ",
-            ndims(ageomss),
+            length(dim_names(ageomss)),
             "-D acquisition with ",
             ageomss.ns,
             " source(s) and ",
@@ -112,12 +128,13 @@ function Base.show(io::Base.IO, ageomss::AGeomss)
     )
 end
 
+
 function Base.show(io::Base.IO, ageom::AGeom)
     println(
         io,
         string(
             "> ",
-            ndims(ageom),
+            length(dim_names(ageom)),
             "-D acquisition with ",
             length(ageom),
             " supersource(s), ",
@@ -129,15 +146,6 @@ function Base.show(io::Base.IO, ageom::AGeom)
     )
 end
 
-function Base.ndims(ageomss::AGeomss)
-    return length(ageomss.s)
-end
-
-function Base.ndims(ageom::Array{AGeomss,1})
-    nd = ndims.(ageom)
-    @assert all(y -> y == nd[1], nd)
-    return nd[1]
-end
 
 """
 Output `n` interpolated sources/ receivers between positions `p1` and `p2`. 
@@ -221,7 +229,7 @@ and angles `angles=[0,2pi]`.
 """
 function update!(ageomss::AGeomss, ::Srcs, args...)
     p = spread(ageomss.ns, args...)
-    for id = 1:ndims(ageomss)
+    for id = 1:length(dim_names(ageomss))
         copyto!(ageomss.s[id], p[id])
     end
     return ageomss
@@ -235,7 +243,7 @@ Similar to updating source positions, but for receivers.
 """
 function update!(ageomss::AGeomss, ::Recs, args...)
     p = spread(ageomss.nr, args...)
-    for id = 1:ndims(ageomss)
+    for id = 1:length(dim_names(ageomss))
         copyto!(ageomss.r[id], p[id])
     end
     return ageomss
@@ -283,7 +291,7 @@ function Base.in(ageom::AGeom, mgrid::AbstractVector{T}) where {T<:StepRangeLen}
     # xmin, zmin, xmax, zmax = mgrid[2][1], mgrid[1][1], mgrid[2][end], mgrid[1][end]
     checkvec = fill(false, length(ageom))
     for iss = 1:length(ageom)
-        nd = ndims(ageom[iss])
+        nd = length(dim_names(ageom[iss]))
         @assert nd == length(mgrid)
         names = dim_names(nd)
         checkvec[iss] = any(
@@ -339,7 +347,7 @@ end
 """
 Return `[sz-rz, sy-ry, sx-rx]`
 """
-offset(ageomss::AGeomss, is, ir)=[ageomss.s[d][is]-ageomss.r[d][ir] for d in dim_names(ndims(ageomss))] 
+offset(ageomss::AGeomss, is, ir)=[ageomss.s[d][is]-ageomss.r[d][ir] for d in dim_names(ageomss)] 
 
 #=
 

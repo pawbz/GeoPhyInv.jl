@@ -20,8 +20,8 @@ ageom2 = AGeom(mgrid2, SSrcs(10), Srcs(10), Recs(10));
 mgrid3 = fill(range(-10, stop=10, step=0.01),3);
 ageom3 = AGeom(mgrid3, SSrcs(10), Srcs(10), Recs(10));
 
-# You can check the number of dimensions.
-ndims(ageom2), ndims(ageom3) == 2, 3
+# You can check the dimensions.
+GeoPhyInv.dim_names(ageom2), GeoPhyInv.dim_names(ageom3)
 
 
 # For 2D, we can also initialize with one of the predefined acquisitions.

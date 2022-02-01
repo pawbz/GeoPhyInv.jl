@@ -17,7 +17,7 @@ end
 	markersize --> 7
 	markercolor := :red
 	markershape := :xcross
-	dnames = (ndims(ageom)==3) ? [:x, :y, :z] : [:x, :z]
+	dnames = (length(dim_names(ageom))==3) ? [:x, :y, :z] : [:x, :z]
 	tuple([vcat([ag.s[d] for ag in ageom]...)  for d in dnames]...)
 end
 
@@ -26,7 +26,7 @@ end
 	legend --> false
 	markercolor := :blue
 	markershape := :utriangle
-	dnames = (ndims(ageom)==3) ? [:x, :y, :z] : [:x, :z]
+	dnames = (length(dim_names(ageom))==3) ? [:x, :y, :z] : [:x, :z]
 	tuple([vcat([ag.r[d] for ag in ageom]...)  for d in dnames]...)
 end
 
