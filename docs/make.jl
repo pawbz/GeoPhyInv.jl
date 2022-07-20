@@ -2,7 +2,7 @@ ENV["PLOTS_TEST"] = "true"
 ENV["GKSwstype"] = "100"
 
 using Documenter, GeoPhyInv, SparseArrays, LinearAlgebra, Random, LinearMaps
-using Gadfly, Plots, Test
+using Gadfly, Plots, Test, Luxor
 using ColorSchemes
 
 # standard setting for generating doc pages

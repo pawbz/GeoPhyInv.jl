@@ -5,6 +5,7 @@ using ParallelStencil
 using Distances
 using TimerOutputs
 using LinearMaps
+using Luxor
 using Ipopt
 using Optim, LineSearches
 using DistributedArrays

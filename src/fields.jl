@@ -672,3 +672,48 @@ get_mgrid(::dtauxzdz, ::FdtdElastic, mz, mx) = [
 
 
 
+
+
+#-------------------------------------------------------
+# Visualization of grid using vector graphics
+#-------------------------------------------------------
+"""
+```julia
+@draw luxor_mgrid(FdtdAcoustic)
+@draw luxor_mgrid(FdtdAcoustic, [:p, :vx, :vz])
+```
+"""
+function luxor_mgrid(attrib_mod, fnames=Fields(attrib_mod))
+    # need a sample grid
+    xlim=[-500,500]
+    zlim=[-500,500]
+    mgrid0=[range(xlim[1], stop=xlim[2], length=5), range(zlim[1], stop=zlim[2], length=5)]
+    # decrease radius while overlaying
+    radii=range(30, stop=10, length=length(fnames))
+    # print title
+    name=string("mgrid for ", attrib_mod)
+    
+    Drawing(2000,2000)
+    background("black") # hide
+    origin() 
+    @layer begin string(name)
+        fontsize(40)
+        fontface("monospaced")
+        setcolor("white")
+        setmode("overlap")
+        Luxor.text(name, Point(0,-800), valign=:center, halign = :center)
+        
+        for (i,f) in enumerate(fnames)
+            mgrid=GeoPhyInv.get_mgrid(eval(:(GeoPhyInv.$f())),attrib_mod, mgrid0...)
+            randomhue()
+            for z in mgrid[2], x in mgrid[1]
+                star(Point(x,z), radii[i], i+1, 0.5, 0.0, :fill)
+            end
+            star(Point(800,-800+i*0.5*step(mgrid0[1])), radii[i], i+1, 0.5, 0.0, :fill)
+            Luxor.text(string(f),Point(900,-800+i*0.5*step(mgrid0[1])),halign=:center,valign=:center)
+        end 
+    end 
+    do_action(:clip)
+    
+    return nothing
+end 

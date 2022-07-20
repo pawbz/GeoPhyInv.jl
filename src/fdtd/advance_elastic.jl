@@ -225,21 +225,21 @@ end
 
 
 
-
-@parallel_indices (iy, ix) function free_surface!(tau::Data.Array{3}, izfree)
-    tau[izfree, iy, ix] = 0.0
+# stress-free boundary conditions (only implemented for zmin now)
+@parallel_indices (iy, ix) function free_surface!(tau::Data.Array{3})
+    tau[1, iy, ix] = 0.0
     return
 end
-@parallel_indices (iy, ix) function free_surface_mirror!(tau::Data.Array{3}, izfree)
-    tau[izfree-1, iy, ix] = -1 * tau[izfree, iy, ix]
+@parallel_indices (iy, ix) function free_surface_mirror!(tau::Data.Array{3})
+    tau[1, iy, ix] = -tau[2, iy, ix]
     return
 end
-@parallel_indices (ix) function free_surface!(tau::Data.Array{2}, izfree)
-    tau[izfree, ix] = 0.0
+@parallel_indices (ix) function free_surface!(tau::Data.Array{2})
+    tau[1, ix] = 0.0
     return
 end
-@parallel_indices (ix) function free_surface_mirror!(tau::Data.Array{2}, izfree)
-    tau[izfree-1, ix] = -1 * tau[izfree, ix]
+@parallel_indices (ix) function free_surface_mirror!(tau::Data.Array{2})
+    tau[1, ix] = -tau[2, ix]
     return
 end
 
@@ -250,6 +250,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
     w1t = pap.w1[:t]
     mw = pap.memory_pml
     pml = pac.pml
+    pml_faces = pac.pml_faces
 
     @parallel compute_dtau!(
         w1t[:tauxx],
@@ -278,6 +279,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauxxdx][:a],
         pml[:dtauxxdx][:b],
         pml[:dtauxxdx][:kI],
+        pml_faces,
     )
     memoryx!(
         mw[:dtauxydx],
@@ -285,6 +287,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauxydx][:a],
         pml[:dtauxydx][:b],
         pml[:dtauxydx][:kI],
+        pml_faces,
     )
     memoryx!(
         mw[:dtauxzdx],
@@ -292,6 +295,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauxzdx][:a],
         pml[:dtauxzdx][:b],
         pml[:dtauxzdx][:kI],
+        pml_faces,
     )
 
     memoryy!(
@@ -300,6 +304,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauyydy][:a],
         pml[:dtauyydy][:b],
         pml[:dtauyydy][:kI],
+        pml_faces,
     )
     memoryy!(
         mw[:dtauxydy],
@@ -307,6 +312,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauxydy][:a],
         pml[:dtauxydy][:b],
         pml[:dtauxydy][:kI],
+        pml_faces,
     )
     memoryy!(
         mw[:dtauyzdy],
@@ -314,6 +320,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauyzdy][:a],
         pml[:dtauyzdy][:b],
         pml[:dtauyzdy][:kI],
+        pml_faces,
     )
 
     memoryz!(
@@ -322,6 +329,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauzzdz][:a],
         pml[:dtauzzdz][:b],
         pml[:dtauzzdz][:kI],
+        pml_faces,
     )
     memoryz!(
         mw[:dtauyzdz],
@@ -329,6 +337,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauyzdz][:a],
         pml[:dtauyzdz][:b],
         pml[:dtauyzdz][:kI],
+        pml_faces,
     )
     memoryz!(
         mw[:dtauxzdz],
@@ -336,6 +345,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauxzdz][:a],
         pml[:dtauxzdz][:b],
         pml[:dtauxzdz][:kI],
+        pml_faces,
     )
 
     @parallel compute_v!(
@@ -355,24 +365,45 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pac.mod[:rho],
     )
 
-    @parallel (1:pac.ic[:nz], 1:pac.ic[:ny]) dirichletx!(
+    (:xmin ∈ pac.rigid_faces) && @parallel (1:pac.ic[:nz], 1:pac.ic[:ny]) dirichletxmin!(
         w1t[:vx],
         w1t[:vz],
         w1t[:vy],
         pac.ic[:nx],
     )
-    @parallel (1:pac.ic[:nz], 1:pac.ic[:nx]) dirichlety!(
+    (:xmax ∈ pac.rigid_faces) && @parallel (1:pac.ic[:nz], 1:pac.ic[:ny]) dirichletxmax!(
+        w1t[:vx],
+        w1t[:vz],
+        w1t[:vy],
+        pac.ic[:nx],
+    )
+    (:ymin ∈ pac.rigid_faces) && @parallel (1:pac.ic[:nz], 1:pac.ic[:nx]) dirichletymin!(
         w1t[:vy],
         w1t[:vz],
         w1t[:vx],
         pac.ic[:ny],
     )
-    @parallel (1:pac.ic[:ny], 1:pac.ic[:nx]) dirichletz!(
+    (:ymax ∈ pac.rigid_faces) && @parallel (1:pac.ic[:nz], 1:pac.ic[:nx]) dirichletymax!(
+        w1t[:vy],
+        w1t[:vz],
+        w1t[:vx],
+        pac.ic[:ny],
+    )
+
+    (:zmin ∈ pac.rigid_faces) && @parallel (1:pac.ic[:ny], 1:pac.ic[:nx]) dirichletzmin!(
         w1t[:vz],
         w1t[:vy],
         w1t[:vx],
         pac.ic[:nz],
     )
+
+    (:zmax ∈ pac.rigid_faces) && @parallel (1:pac.ic[:ny], 1:pac.ic[:nx]) dirichletzmax!(
+        w1t[:vz],
+        w1t[:vy],
+        w1t[:vx],
+        pac.ic[:nz],
+    )
+
     @parallel compute_dv!(
         w1t[:vx],
         w1t[:vy],
@@ -390,17 +421,80 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pac.fc[:dyI],
         pac.fc[:dzI],
     )
-    memoryx!(mw[:dvxdx], w1t[:dvxdx], pml[:dvxdx][:a], pml[:dvxdx][:b], pml[:dvxdx][:kI])
-    memoryy!(mw[:dvydy], w1t[:dvydy], pml[:dvydy][:a], pml[:dvydy][:b], pml[:dvydy][:kI])
-    memoryz!(mw[:dvzdz], w1t[:dvzdz], pml[:dvzdz][:a], pml[:dvzdz][:b], pml[:dvzdz][:kI])
+    memoryx!(
+        mw[:dvxdx],
+        w1t[:dvxdx],
+        pml[:dvxdx][:a],
+        pml[:dvxdx][:b],
+        pml[:dvxdx][:kI],
+        pml_faces,
+    )
+    memoryy!(
+        mw[:dvydy],
+        w1t[:dvydy],
+        pml[:dvydy][:a],
+        pml[:dvydy][:b],
+        pml[:dvydy][:kI],
+        pml_faces,
+    )
+    memoryz!(
+        mw[:dvzdz],
+        w1t[:dvzdz],
+        pml[:dvzdz][:a],
+        pml[:dvzdz][:b],
+        pml[:dvzdz][:kI],
+        pml_faces,
+    )
 
-    memoryy!(mw[:dvxdy], w1t[:dvxdy], pml[:dvxdy][:a], pml[:dvxdy][:b], pml[:dvxdy][:kI])
-    memoryz!(mw[:dvxdz], w1t[:dvxdz], pml[:dvxdz][:a], pml[:dvxdz][:b], pml[:dvxdz][:kI])
-    memoryx!(mw[:dvydx], w1t[:dvydx], pml[:dvydx][:a], pml[:dvydx][:b], pml[:dvydx][:kI])
+    memoryy!(
+        mw[:dvxdy],
+        w1t[:dvxdy],
+        pml[:dvxdy][:a],
+        pml[:dvxdy][:b],
+        pml[:dvxdy][:kI],
+        pml_faces,
+    )
+    memoryz!(
+        mw[:dvxdz],
+        w1t[:dvxdz],
+        pml[:dvxdz][:a],
+        pml[:dvxdz][:b],
+        pml[:dvxdz][:kI],
+        pml_faces,
+    )
+    memoryx!(
+        mw[:dvydx],
+        w1t[:dvydx],
+        pml[:dvydx][:a],
+        pml[:dvydx][:b],
+        pml[:dvydx][:kI],
+        pml_faces,
+    )
 
-    memoryz!(mw[:dvydz], w1t[:dvydz], pml[:dvydz][:a], pml[:dvydz][:b], pml[:dvydz][:kI])
-    memoryx!(mw[:dvzdx], w1t[:dvzdx], pml[:dvzdx][:a], pml[:dvzdx][:b], pml[:dvzdx][:kI])
-    memoryy!(mw[:dvzdy], w1t[:dvzdy], pml[:dvzdy][:a], pml[:dvzdy][:b], pml[:dvzdy][:kI])
+    memoryz!(
+        mw[:dvydz],
+        w1t[:dvydz],
+        pml[:dvydz][:a],
+        pml[:dvydz][:b],
+        pml[:dvydz][:kI],
+        pml_faces,
+    )
+    memoryx!(
+        mw[:dvzdx],
+        w1t[:dvzdx],
+        pml[:dvzdx][:a],
+        pml[:dvzdx][:b],
+        pml[:dvzdx][:kI],
+        pml_faces,
+    )
+    memoryy!(
+        mw[:dvzdy],
+        w1t[:dvzdy],
+        pml[:dvzdy][:a],
+        pml[:dvzdy][:b],
+        pml[:dvzdy][:kI],
+        pml_faces,
+    )
 
     @parallel compute_tauii!(
         w1t[:tauxx],
@@ -427,18 +521,15 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pac.mod[:mu],
     )
 
-    if (pac.ic[:izfree] ≠ 0)
+    if (:zmin ∈ pac.stressfree_faces)
         @parallel (1:size(w1t[:tauzz], 2), 1:size(w1t[:tauzz], 3)) free_surface_mirror!(
             w1t[:tauzz],
-            pac.ic[:izfree] + 1,
         )
         @parallel (1:size(w1t[:tauxz], 2), 1:size(w1t[:tauxz], 3)) free_surface!(
             w1t[:tauxz],
-            pac.ic[:izfree],
         )
         @parallel (1:size(w1t[:tauyz], 2), 1:size(w1t[:tauyz], 3)) free_surface!(
             w1t[:tauyz],
-            pac.ic[:izfree],
         )
     end
 
@@ -449,6 +540,8 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
     w1t = pap.w1[:t]
     mw = pap.memory_pml
     pml = pac.pml
+    pml_faces = pac.pml_faces
+
 
     @parallel compute_dtau!(
         w1t[:tauxx],
@@ -468,6 +561,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pml[:dtauxxdx][:a],
         pml[:dtauxxdx][:b],
         pml[:dtauxxdx][:kI],
+        pml_faces,
     )
     memoryx!(
         mw[:dtauxzdx],
@@ -475,6 +569,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pml[:dtauxzdx][:a],
         pml[:dtauxzdx][:b],
         pml[:dtauxzdx][:kI],
+        pml_faces,
     )
     memoryz!(
         mw[:dtauzzdz],
@@ -482,6 +577,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pml[:dtauzzdz][:a],
         pml[:dtauzzdz][:b],
         pml[:dtauzzdz][:kI],
+        pml_faces,
     )
     memoryz!(
         mw[:dtauxzdz],
@@ -489,6 +585,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pml[:dtauxzdz][:a],
         pml[:dtauxzdz][:b],
         pml[:dtauxzdz][:kI],
+        pml_faces,
     )
 
     @parallel compute_v!(
@@ -502,8 +599,15 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pac.mod[:rho],
     )
 
-    @parallel (1:pac.ic[:nz]) dirichletx!(w1t[:vx], w1t[:vz], pac.ic[:nx])
-    @parallel (1:pac.ic[:nx]) dirichletz!(w1t[:vz], w1t[:vx], pac.ic[:nz])
+    (:xmin ∈ pac.rigid_faces) &&
+        @parallel (1:pac.ic[:nz]) dirichletxmin!(w1t[:vx], w1t[:vz], pac.ic[:nx])
+    (:xmax ∈ pac.rigid_faces) &&
+        @parallel (1:pac.ic[:nz]) dirichletxmax!(w1t[:vx], w1t[:vz], pac.ic[:nx])
+    (:zmin ∈ pac.rigid_faces) &&
+        @parallel (1:pac.ic[:nx]) dirichletzmin!(w1t[:vz], w1t[:vx], pac.ic[:nz])
+    (:zmax ∈ pac.rigid_faces) &&
+        @parallel (1:pac.ic[:nx]) dirichletzmax!(w1t[:vz], w1t[:vx], pac.ic[:nz])
+
     @parallel compute_dv!(
         w1t[:vx],
         w1t[:vz],
@@ -514,10 +618,38 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pac.fc[:dxI],
         pac.fc[:dzI],
     )
-    memoryx!(mw[:dvxdx], w1t[:dvxdx], pml[:dvxdx][:a], pml[:dvxdx][:b], pml[:dvxdx][:kI])
-    memoryz!(mw[:dvzdz], w1t[:dvzdz], pml[:dvzdz][:a], pml[:dvzdz][:b], pml[:dvzdz][:kI])
-    memoryz!(mw[:dvxdz], w1t[:dvxdz], pml[:dvxdz][:a], pml[:dvxdz][:b], pml[:dvxdz][:kI])
-    memoryx!(mw[:dvzdx], w1t[:dvzdx], pml[:dvzdx][:a], pml[:dvzdx][:b], pml[:dvzdx][:kI])
+    memoryx!(
+        mw[:dvxdx],
+        w1t[:dvxdx],
+        pml[:dvxdx][:a],
+        pml[:dvxdx][:b],
+        pml[:dvxdx][:kI],
+        pml_faces,
+    )
+    memoryz!(
+        mw[:dvzdz],
+        w1t[:dvzdz],
+        pml[:dvzdz][:a],
+        pml[:dvzdz][:b],
+        pml[:dvzdz][:kI],
+        pml_faces,
+    )
+    memoryz!(
+        mw[:dvxdz],
+        w1t[:dvxdz],
+        pml[:dvxdz][:a],
+        pml[:dvxdz][:b],
+        pml[:dvxdz][:kI],
+        pml_faces,
+    )
+    memoryx!(
+        mw[:dvzdx],
+        w1t[:dvzdx],
+        pml[:dvzdx][:a],
+        pml[:dvzdx][:b],
+        pml[:dvzdx][:kI],
+        pml_faces,
+    )
 
     @parallel compute_tauii!(
         w1t[:tauxx],
@@ -537,12 +669,9 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
     )
 
 
-    if (pac.ic[:izfree] ≠ 0)
-        @parallel (1:size(w1t[:tauzz], 2)) free_surface_mirror!(
-            w1t[:tauzz],
-            pac.ic[:izfree] + 1,
-        )
-        @parallel (1:size(w1t[:tauxz], 2)) free_surface!(w1t[:tauxz], pac.ic[:izfree])
+    if (:zmin ∈ pac.stressfree_faces)
+        @parallel (1:size(w1t[:tauzz], 2)) free_surface_mirror!(w1t[:tauzz])
+        @parallel (1:size(w1t[:tauxz], 2)) free_surface!(w1t[:tauxz])
     end
 
 end

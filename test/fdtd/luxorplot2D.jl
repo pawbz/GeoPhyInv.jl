@@ -1,3 +1,10 @@
+# This page was generated on DATEOFTODAY
+using GeoPhyInv
+using Statistics
+#md using Luxor
+using Test
+
+
 function mlaxor(attrib_mod)
     b=GeoPhyInv.Fields(attrib_mod)
     cols = ["red","blue","black","green","blue2","orange","brown","tan1","blue4","grey","green4","purple4","orange4","brown4"]

@@ -80,7 +80,11 @@ finite-difference modeling.
 * `tsnaps` : store snapshots at these modeling times (defaults to half time)
   * `=[0.1,0.2,0.3]` record at these instances of tgrid
 * `snaps_field::Symbol=:tauxx` : which field to record? 
-* `zfree` : z-coordinate of a stress-free horizontal layer
+* `pml_faces::Vector{Symbol}=[:zmin, :zmax, :ymax, :ymin, :xmax, :xmin]` : control absorbing PML boundary conditions, e.g., in 2D 
+  * `=[:zmin, :zmax]` apply PML conditions only at the top and bottom of the medium 
+  * `=[:zmax, :xmax, :xmin]` top surface `zmin` is stress free and reflecting
+* `rigid_faces::Vector{Symbol}` : rigid faces 
+* `stressfree_faces::Vector{Symbol}` : stress-free faces
 * `verbose::Bool=false` : verbose flag
 """
 SeisForwExpt(
@@ -99,25 +103,23 @@ Primary method to generate Expt variable when FdtdAcoustic() and FdtdAcousticBor
 * `backprop_flag::Bool=Int64` : save final state variables and the boundary conditions for later use
   * `=1` save boundary and final values in `boundary` 
   * `=-1` use stored values in `boundary` for back propagation
-* `gmodel_flag=false` : flag that is used to output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
+* `gmodel_flag=false` : flag that is used to  output gradient; there should be atleast two propagating wavefields in order to do so: 1) forward wavefield and 2) adjoint wavefield
 * `illum_flag::Bool=false` : flag to output wavefield energy or source illumination; it can be used as preconditioner during inversion
-* `pml_edges::Vector{Symbol}=[:zmin, :zmax, :xmax, :xmin]` : use absorbing PML boundary conditions or not
-  * `=[:zmin, :zmax]` apply PML conditions only at the top and bottom of the medium 
-  * `=[:zmax, :xmax, :xmin]` top is reflecting
 """
 function PFdtd(
     attrib_mod;
     jobname::Symbol = :forward_propagation,
     npw::Int64 = 1,
     medium::Medium = nothing,
-    pml_edges::Vector{Symbol} = [:zmin, :zmax, :ymin, :ymax, :xmax, :xmin],
+    pml_faces::Vector{Symbol} = [:zmin, :zmax, :ymin, :ymax, :xmax, :xmin],
+    rigid_faces=pml_faces,
     tgrid::StepRangeLen = nothing,
     ageom::Union{AGeom,Vector{AGeom}} = nothing,
     srcwav::Union{SrcWav,Vector{SrcWav}} = nothing,
     sflags::Union{Int,Vector{Int}} = fill(2, npw),
     rflags::Union{Int,Vector{Int}} = fill(1, npw),
     rfields::Vector{Symbol} = [:vz],
-    zfree = nothing,
+    stressfree_faces = [:dummy],
     backprop_flag::Int64 = 0,
     gmodel_flag::Bool = false,
     illum_flag::Bool = false,
@@ -183,7 +185,7 @@ function PFdtd(
     bindices = get_boundary_indices(medium.mgrid, attrib_mod)
 
     # extend mediums in the PML layers
-    exmedium = padarray(medium, _fd.npextend, pml_edges)
+    exmedium = padarray(medium, _fd.npextend, pml_faces)
     if (typeof(attrib_mod) == FdtdAcousticBorn)
         (npw ≠ 2) && error("born modeling needs npw=2")
     end
@@ -245,12 +247,6 @@ function PFdtd(
     fc = get_fc(exmedium, tgrid)
     ic = get_ic(exmedium, tgrid, nsls, npw)
 
-    # check stress-free surface condition
-    # index of the free surface on the exmedium
-    izfree = (zfree === nothing) ? 0 : argmin(abs.(exmedium.mgrid[1] .- zfree))
-    ic = vcat(ic, NamedArray([izfree], ([:izfree],)))
-
-
     pac = P_common(
         jobname,
         attrib_mod,
@@ -259,7 +255,10 @@ function PFdtd(
         medium,
         ageom,
         srcwav,
-        pml_edges,
+        pml_faces,
+        # pml_faces also need rigid_boundary conditions
+        unique(vcat(rigid_faces, pml_faces)),
+        stressfree_faces,
         sfields,
         sflags,
         rfields,

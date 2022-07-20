@@ -137,7 +137,9 @@ mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
     medium::Medium
     ageom::Vector{AGeom}
     srcwav::Vector{SrcWav}
-    pml_edges::Vector{Symbol}
+    pml_faces::Vector{Symbol}
+    rigid_faces::Vector{Symbol}
+    stressfree_faces::Vector{Symbol}
     sfields::Vector{Vector{Symbol}}
     sflags::Vector{Int64}
     rfields::Vector{Symbol}

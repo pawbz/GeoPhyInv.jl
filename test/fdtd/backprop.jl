@@ -14,7 +14,7 @@ for field in [:p, :vx,:vz]
 
 	for sflags in [[1,-1],[2,-2]]
 		pa=SeisForwExpt(FdtdAcoustic(),npw=1, tgrid=tgrid,
-		#	pml_edges=[:null],
+		#	pml_faces=[:null],
 			gmodel_flag=false,
 			sflags=[sflags[1]],
 			# snaps_field=true,

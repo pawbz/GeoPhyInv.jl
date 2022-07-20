@@ -8,7 +8,7 @@ ageom2 = AGeom(mgrid2, SSrcs(10), Srcs(10), Recs(10));
 mgrid3 = fill(range(-10, stop=10, step=0.01),3);
 ageom3 = AGeom(mgrid3, SSrcs(10), Srcs(10), Recs(10));
 
-ndims(ageom2), ndims(ageom3) == 2, 3
+GeoPhyInv.dim_names(ageom2), GeoPhyInv.dim_names(ageom3)
 
 ageom2 = AGeom(mgrid2, :xwell, SSrcs(10), Recs(10));
 

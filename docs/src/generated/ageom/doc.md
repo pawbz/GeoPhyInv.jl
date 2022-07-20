@@ -2,7 +2,7 @@
 EditURL = "<unknown>/test/ageom/doc.jl"
 ```
 
-This page was generated on 2021-11-29
+This page was generated on 2022-03-18
 
 ````@example doc
 using GeoPhyInv
@@ -38,10 +38,10 @@ ageom3 = AGeom(mgrid3, SSrcs(10), Srcs(10), Recs(10));
 nothing #hide
 ````
 
-You can check the number of dimensions.
+You can check the dimensions.
 
 ````@example doc
-ndims(ageom2), ndims(ageom3) == 2, 3
+GeoPhyInv.dim_names(ageom2), GeoPhyInv.dim_names(ageom3)
 ````
 
 For 2D, we can also initialize with one of the predefined acquisitions.

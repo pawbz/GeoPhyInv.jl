@@ -1,55 +1,70 @@
-@recipe function heatmap(mod::Medium, field=:vp)
-	mx = mod.mgrid[2]
-	mz = mod.mgrid[1]
-	xguide --> "x"
-	yguide --> "z"
-	# seriescolor --> colorschemes[:roma]
-	xlims --> (mx[1], mx[end])
-	zlims --> (mz[1], mz[end])
-	title --> string(field)
-	clims --> (mod.bounds[field][1], mod.bounds[field][2])
-	yflip := true
-	mx, mz, mod[field]
+@recipe function heatmap(mod::Medium, field = :vp)
+    mx = mod.mgrid[2]
+    mz = mod.mgrid[1]
+    xguide --> "x"
+    yguide --> "z"
+    # seriescolor --> colorschemes[:roma]
+    xlims --> (mx[1], mx[end])
+    zlims --> (mz[1], mz[end])
+    title --> string(field)
+    clims --> (mod.bounds[field][1], mod.bounds[field][2])
+    yflip := true
+    mx, mz, mod[field]
 end
 
-@recipe function scatter(ageom::AGeom, ::SSrcs)
-	legend --> false
-	markersize --> 7
-	markercolor := :red
-	markershape := :xcross
-	dnames = (length(dim_names(ageom))==3) ? [:x, :y, :z] : [:x, :z]
-	tuple([vcat([ag.s[d] for ag in ageom]...)  for d in dnames]...)
+@recipe function scatter(ageom::Union{AGeom,AGeomss}, ::SSrcs)
+    legend --> false
+    markersize --> 7
+    markercolor := :red
+    markershape := :xcross
+    labels = (length(dim_names(ageom)) == 3) ? [:x, :y, :z] : [:x, :z, nothing]
+    xlabel --> labels[1]
+    ylabel --> labels[2]
+    zlabel --> labels[3]
+    dnames = (length(dim_names(ageom)) == 3) ? [:x, :y, :z] : [:x, :z]
+    isa(ageom, AGeom) ? tuple([vcat([ag.s[d] for ag in ageom]...) for d in dnames]...) :
+    tuple([ageom.s[d] for d in dnames]...)
 end
 
-@recipe function scatter(ageom::AGeom, ::Recs)
-	markersize --> 7
-	legend --> false
-	markercolor := :blue
-	markershape := :utriangle
-	dnames = (length(dim_names(ageom))==3) ? [:x, :y, :z] : [:x, :z]
-	tuple([vcat([ag.r[d] for ag in ageom]...)  for d in dnames]...)
+@recipe function scatter(ageom::Union{AGeom,AGeomss}, ::Recs)
+    markersize --> 7
+    legend --> false
+    markercolor := :blue
+    markershape := :utriangle
+    labels = (length(dim_names(ageom)) == 3) ? [:x, :y, :z] : [:x, :z, nothing]
+    xlabel --> labels[1]
+    ylabel --> labels[2]
+    zlabel --> labels[3]
+    dnames = (length(dim_names(ageom)) == 3) ? [:x, :y, :z] : [:x, :z]
+    isa(ageom, AGeom) ? tuple([vcat([ag.r[d] for ag in ageom]...) for d in dnames]...) :
+    tuple([ageom.r[d] for d in dnames]...)
 end
 
-@recipe function heatmap(dat::NamedD, field::Symbol=:p, wclip_perc=0.0, bclip_perc=wclip_prec)
+@recipe function heatmap(
+    dat::NamedD,
+    field::Symbol = :p,
+    wclip_perc = 0.0,
+    bclip_perc = wclip_prec,
+)
 
-	# wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
-	# bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
-	   
-	dp=dat.d[field]
-	dz = dat.grid
-	dx = 1:size(dp,2)
-	dmin=minimum(dp)
-	dmax=maximum(dp)
-	dmin_clip=dmin+bclip_perc*inv(100)*abs(dmin)
-	dmax_clip=dmax-wclip_perc*inv(100)*abs(dmax)
-	# println(dmin_clip,"\t", dmax_clip)
-	legend --> true
-	xguide --> "channel index"
-	yguide --> "time"
-	# seriescolor --> colorschemes[:roma]
-	clims --> (dmin_clip, dmax_clip)
-	yflip := true
-	dx, dz, dp
+    # wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
+    # bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
+
+    dp = dat.d[field]
+    dz = dat.grid
+    dx = 1:size(dp, 2)
+    dmin = minimum(dp)
+    dmax = maximum(dp)
+    dmin_clip = dmin + bclip_perc * inv(100) * abs(dmin)
+    dmax_clip = dmax - wclip_perc * inv(100) * abs(dmax)
+    # println(dmin_clip,"\t", dmax_clip)
+    legend --> true
+    xguide --> "channel index"
+    yguide --> "time"
+    # seriescolor --> colorschemes[:roma]
+    clims --> (dmin_clip, dmax_clip)
+    yflip := true
+    dx, dz, dp
 end
 
 
@@ -57,24 +72,24 @@ end
 @userplot Spectrum
 
 
-@recipe function pspectrum(p::Spectrum; tgrid=nothing)
-	wav=p.args[1]
-	if(tgrid===nothing)
-		x=0:length(wav)
-		tgrid=range(0.0, stop=Float64(length(wav)-1), step=1.0)
-	end
+@recipe function pspectrum(p::Spectrum; tgrid = nothing)
+    wav = p.args[1]
+    if (tgrid === nothing)
+        x = 0:length(wav)
+        tgrid = range(0.0, stop = Float64(length(wav) - 1), step = 1.0)
+    end
 
-	fgrid= FFTW.rfftfreq(length(tgrid), inv(step(tgrid)))
-	powwav = (abs.(FFTW.rfft(wav, [1])).^2)
-	powwavdb = 10. * log10.(powwav./maximum(powwav)) # power in decibel after normalizing
+    fgrid = FFTW.rfftfreq(length(tgrid), inv(step(tgrid)))
+    powwav = (abs2.(FFTW.rfft(wav, [1])))
+    powwavdb = 10.0 * log10.(powwav ./ maximum(powwav)) # power in decibel after normalizing
 
-	@series begin        
-		subplot := 1
-		legend := false
-		yguide := "power (dB)"
-		xguide := "frequency (Hz)"
-		fgrid, powwavdb
-	end
+    @series begin
+        subplot := 1
+        legend := false
+        yguide := "power (dB)"
+        xguide := "frequency (Hz)"
+        fgrid, powwavdb
+    end
 end
 
 
@@ -243,7 +258,7 @@ end
 #	write(fout,lines)
 #	close(fout)
 #end
-	
+
 
 @userplot Src
 

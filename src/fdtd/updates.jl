@@ -68,7 +68,7 @@ function update!(pa::PFdtd, medium::Medium)
 end
 function update!(pac::T, medium::Medium) where {T<:P_common{FdtdAcoustic}}
     copyto!(pac.medium, medium)
-    padarray!(pac.exmedium, pac.medium, _fd.npextend, pac.pml_edges)
+    padarray!(pac.exmedium, pac.medium, _fd.npextend, pac.pml_faces)
     copyto!(pac.mod[:K], pac.exmedium, [:K])
     copyto!(pac.mod[:KI], pac.exmedium, [:KI])
     copyto!(pac.mod[:rhoI], pac.exmedium, [:rhoI])
@@ -78,7 +78,7 @@ function update!(pac::T, medium::Medium) where {T<:P_common{FdtdAcoustic}}
 end
 function update!(pac::T, medium::Medium) where {T<:P_common{FdtdElastic}}
     copyto!(pac.medium, medium)
-    padarray!(pac.exmedium, pac.medium, _fd.npextend, pac.pml_edges)
+    padarray!(pac.exmedium, pac.medium, _fd.npextend, pac.pml_faces)
     copyto!(pac.mod[:mu], pac.exmedium, [:mu])
     copyto!(pac.mod[:lambda], pac.exmedium, [:lambda])
     copyto!(pac.mod[:M], pac.exmedium, [:M])
