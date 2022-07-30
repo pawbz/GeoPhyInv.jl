@@ -1,18 +1,54 @@
-@recipe function heatmap(mod::Medium, field = :vp)
-    mx = mod.mgrid[2]
-    mz = mod.mgrid[1]
+@recipe function plot(medium::Medium{2}, ageom = nothing)
+    fields = names(medium)[1]
+    layout := (1, length(fields))
+    margin --> 5Measures.mm
+    mx = medium.mgrid[2]
+    mz = medium.mgrid[1]
+    framestyle := [:grid :grid :grid]
+    size --> (length(fields) == 3 ? 1200 : 800, 500)
+    aspect_ratio --> length(mz) / length(mx)
+    yflip := true
+    legend --> true
     xguide --> "x"
     yguide --> "z"
-    # seriescolor --> colorschemes[:roma]
     xlims --> (mx[1], mx[end])
     zlims --> (mz[1], mz[end])
-    title --> string(field)
-    clims --> (mod.bounds[field][1], mod.bounds[field][2])
-    yflip := true
-    mx, mz, mod[field]
+    for (j, field) in enumerate(fields)
+        units = field in [:vp, :vs] ? " [m/s]" : " [kg/m3]"
+        title1 = string(field, units) # add using here later
+        @series begin
+            seriestype := :heatmap
+            subplot := j
+            # seriescolor --> colorschemes[:roma]
+            title --> title1
+            clims --> (medium.bounds[field][1], medium.bounds[field][2])
+            seriescolor --> :grays
+            mx, mz, medium[field]
+        end
+        if (!(ageom === nothing))
+            @assert ndims(medium) == length(dim_names(ageom))
+            @series begin
+                subplot := j
+                title --> title1
+                label --> "R"
+                seriestype := :scatter
+                clims --> (medium.bounds[field][1], medium.bounds[field][2])
+                ageom, Recs()
+            end
+            @series begin
+                subplot := j
+                title --> title1
+                label --> "S"
+                seriestype := :scatter
+                clims --> (medium.bounds[field][1], medium.bounds[field][2])
+                ageom, SSrcs()
+            end
+        end
+    end
 end
 
-@recipe function scatter(ageom::Union{AGeom,AGeomss}, ::SSrcs)
+@recipe function plot(ageom::Union{AGeom,AGeomss}, ::SSrcs)
+    seriestype := :scatter
     legend --> false
     markersize --> 7
     markercolor := :red
@@ -26,10 +62,11 @@ end
     tuple([ageom.s[d] for d in dnames]...)
 end
 
-@recipe function scatter(ageom::Union{AGeom,AGeomss}, ::Recs)
+@recipe function plot(ageom::Union{AGeom,AGeomss}, ::Recs)
+    seriestype := :scatter
     markersize --> 7
     legend --> false
-    markercolor := :blue
+    markercolor := :yellow
     markershape := :utriangle
     labels = (length(dim_names(ageom)) == 3) ? [:x, :y, :z] : [:x, :z, nothing]
     xlabel --> labels[1]
@@ -40,58 +77,78 @@ end
     tuple([ageom.r[d] for d in dnames]...)
 end
 
-@recipe function heatmap(
-    dat::NamedD,
-    field::Symbol = :p,
-    wclip_perc = 0.0,
-    bclip_perc = wclip_prec,
-)
-
-    # wclip::Vector{Float64}=[maximum(broadcast(maximum, td[id].d)) for id in 1:length(td)],
-    # bclip::Vector{Float64}=[minimum(broadcast(minimum, td[id].d)) for id in 1:length(td)],
-
-    dp = dat.d[field]
-    dz = dat.grid
-    dx = 1:size(dp, 2)
-    dmin = minimum(dp)
-    dmax = maximum(dp)
-    dmin_clip = dmin + bclip_perc * inv(100) * abs(dmin)
-    dmax_clip = dmax - wclip_perc * inv(100) * abs(dmax)
-    # println(dmin_clip,"\t", dmax_clip)
-    legend --> true
-    xguide --> "channel index"
-    yguide --> "time"
-    # seriescolor --> colorschemes[:roma]
-    clims --> (dmin_clip, dmax_clip)
-    yflip := true
-    dx, dz, dp
-end
-
-
-
-@userplot Spectrum
-
-
-@recipe function pspectrum(p::Spectrum; tgrid = nothing)
-    wav = p.args[1]
-    if (tgrid === nothing)
-        x = 0:length(wav)
-        tgrid = range(0.0, stop = Float64(length(wav) - 1), step = 1.0)
-    end
-
-    fgrid = FFTW.rfftfreq(length(tgrid), inv(step(tgrid)))
-    powwav = (abs2.(FFTW.rfft(wav, [1])))
-    powwavdb = 10.0 * log10.(powwav ./ maximum(powwav)) # power in decibel after normalizing
-
-    @series begin
-        subplot := 1
-        legend := false
-        yguide := "power (dB)"
-        xguide := "frequency (Hz)"
-        fgrid, powwavdb
+@recipe function plot(dat::NamedD{Recs}, clip_perc = 0.0)
+    layout := (1, length(dat.d))
+    size --> (length(dat.d) * 300, 300)
+    margin --> 5Measures.mm
+    for (j, field) in enumerate(names(dat.d)[1])
+        dp = dat[field]
+        dmax = maximum(abs.(dp))
+        if (!iszero(dmax))
+            @series begin
+                dz = dat.grid
+                dx = 1:size(dp, 2)
+                dmax_clip = dmax - clip_perc * inv(100) * abs(dmax)
+                seriestype := :heatmap
+                framestyle := :grid
+                title --> field
+                legend --> true
+                xguide --> "receiver channel"
+                yguide --> "time"
+                colorbar --> false
+                aspect_ratio --> 50
+                seriescolor --> :seismic
+                clims --> (-dmax_clip, dmax_clip)
+                yflip := true
+                dx, dz, dp
+            end
+        else
+            @info "iszero(data)==true; cannot plot"
+        end
     end
 end
 
+
+@recipe function plot(dat::NamedD{Srcs})
+    fgrid = FFTW.rfftfreq(length(dat.grid), inv(step(dat.grid)))
+    layout := (1,2)
+    size --> (800, length(dat.d) * 200)
+    margin --> 5Measures.mm
+    framestyle := :grid
+    for (j, field) in enumerate(names(dat.d)[1])
+        dp = dat[field]
+        dmax = maximum(abs.(dp))
+        if (!iszero(dmax))
+            D = (abs.(FFTW.rfft(dp, [1])))
+            D ./= maximum(D) # normalize spectrum
+            freqmax=maximum(findall(x->x>1e-6, D))[1]
+            @series begin
+                subplot := 1
+                seriestype := :line
+                w --> 2
+                legend --> true
+                label --> string(field)
+                xguide --> "time"
+                yguide --> "amplitude"
+                dat.grid, dp
+            end
+            @series begin
+                subplot := 2
+                w --> 2
+                legend --> true
+                label --> string(field)
+                seriestype := :line
+                xguide --> "frequency (Hz)"
+                yaxis := :log
+                ylims --> (1e-6, 1)
+                xlims --> (0, freqmax)
+                fgrid, D
+            end
+        else
+            @info "iszero(data)==true; cannot plot"
+        end
+    end
+end
 
 
 #=

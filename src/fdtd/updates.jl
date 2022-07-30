@@ -296,12 +296,7 @@ In-place method to perform the experiment and update `pa` after wave propagation
             end
         end
     end
-    if (pa.c.verbose)
-        println("timer output of methods inside fdtd time loop")
-        show(to)
-        println("  ")
-    end
-    return nothing
+    return to
 end
 
 # modelling for each worker

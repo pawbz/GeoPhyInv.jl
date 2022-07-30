@@ -2,11 +2,11 @@ ENV["PLOTS_TEST"] = "true"
 ENV["GKSwstype"] = "100"
 
 using Documenter, GeoPhyInv, SparseArrays, LinearAlgebra, Random, LinearMaps
-using Gadfly, Plots, Test, Luxor
+using Plots, Test, Luxor
 using ColorSchemes
 
 # standard setting for generating doc pages
-@init_parallel_stencil(2, false, Float32, 2)
+# @init_parallel_stencil(2, false, Float32, 2)
 
 gr()
 theme(:juno)
@@ -27,7 +27,8 @@ makedocs(
         "Records" => "generated/data/doc.md",
         "SeisForwExpt" => Any[
             "Description"=>"generated/fdtd/doc.md",
-            "Tutorial I"=>"generated/fdtd/create_snaps.md",
+            "Staggered Grids"=>"generated/fdtd/grid_visualize.md",
+            # "Tutorial I"=>"generated/fdtd/create_snaps.html",
             "Tutorial II"=>"generated/fdtd/reuse_expt.md",
         ],
         # "SeisInvExpt" => Any[

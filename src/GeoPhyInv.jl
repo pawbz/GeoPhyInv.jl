@@ -15,6 +15,7 @@ using Distributed
 using SharedArrays
 using Printf
 using DataFrames
+using Measures
 using SparseArrays
 using Interpolations
 using OrderedCollections
@@ -29,6 +30,7 @@ using AxisArrays
 using Distributions
 using StatsBase
 using InteractiveUtils
+using LaTeXStrings
 using RecipesBase
 using ColorSchemes
 using FFTW

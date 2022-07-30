@@ -1,1 +1,2 @@
-(cd build; python3 -m http.server --bind localhost)
+cd build
+python3 -m http.server --bind localhost
