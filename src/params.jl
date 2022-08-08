@@ -9,9 +9,10 @@ mutable struct FD_params
     datatype::DataType
     npml::Int64
     npextend::Int64
+    nbound::Int64
 end
 # dummy finite-difference stencil order; we need to initialize anyway
-const _fd = FD_params(2, 2, false, Float32, 20, 20+2)
+const _fd = FD_params(2, 2, false, Float32, 20, 20+2, 5)
 
 """
 Return axis names of 1D, 2D or 3D fields

@@ -85,4 +85,4 @@ run_literate(["doc"], "data")
 #run_literate(["gradient_accuracy","born_map"], "fwi")
 
 # run_literate(["doc", "pizza", "born_tutorial"], "fwi")
-run_literate(["doc", "create_snaps",], "fdtd", ["reuse_expt", "grid_visualize"])
+run_literate(["doc", "create_snaps",], "fdtd", ["reuse_expt", "marmousi_acoustic", "grid_visualize"])

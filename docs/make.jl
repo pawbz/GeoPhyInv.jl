@@ -27,9 +27,11 @@ makedocs(
         "Records" => "generated/data/doc.md",
         "SeisForwExpt" => Any[
             "Description"=>"generated/fdtd/doc.md",
-            "Staggered Grids"=>"generated/fdtd/grid_visualize.md",
+            "Staggered Fields"=>"generated/fdtd/grid_visualize.md",
+            "Acoustic"=>"generated/fdtd/marmousi_acoustic.md",
             # "Tutorial I"=>"generated/fdtd/create_snaps.html",
-            "Tutorial II"=>"generated/fdtd/reuse_expt.md",
+            # "Reuse Expt"=>"generated/fdtd/reuse_expt.md",
+            "Reuse Expt"=>"generated/fdtd/reuse_expt.md",
         ],
         # "SeisInvExpt" => Any[
         # 		  "Description" => "generated/fwi/doc.md",

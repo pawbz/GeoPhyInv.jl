@@ -1,3 +1,43 @@
+
+# nothing # just put zeros, no sources added, when flag is put to zero
+# -ve values correspond to source sink, used while time reversal
+# here, size of w is (nt, ns)
+get_source(w, ::Any, ::Val{0}) = zero(w)
+
+
+get_source(w, ::p, ::Val{1}) = w
+get_source(w, ::p, ::Val{-1}) = reverse!(w, dims = 1)
+get_source(w, ::p, ::Val{-1}) = reverse!(w, dims = 1)
+function get_source(w, ::Union{vz,vx,vy}, ::Val{1})
+    ww = zero(w)
+    for is = 1:size(ww, 2)
+        for it = 2:size(ww, 1)
+            ww[it, is] = (w[it-1, is] + w[it, is]) * 0.5
+        end
+    end
+    return ww
+end
+function get_source(w, ::Union{vz,vx,vy}, ::Val{-1})
+    ww = zero(w)
+    for is = 1:size(ww, 2)
+        for it = 2:size(ww, 1)
+            # as the source wavelet has to be subtracted before the propagation step, I shift here by one sample
+            ww[it, is] = (w[it-1, is] + w[it, is]) * 0.5
+        end
+    end
+    ww = circshift(ww, (1, 0))
+    ww[1, :] .= zero(Data.Number)
+    reverse!(ww, dims = 1)
+    # multiplication with -1 for subtraction #time reversal
+    rmul!(ww, -one(Data.Number))
+    return ww
+end
+
+get_source(w, f::Any, ::Val{2}) = get_source(cumsum(w, dims = 1), f, Val{1}())
+get_source(w, f::Any, ::Val{-2}) = get_source(cumsum(w, dims = 1), f, Val{-1}())
+
+
+
 """
 Use input srcwav to fill wavelets and returns frequency bounds.
 """
@@ -12,70 +52,13 @@ function fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
     freqpeaks = []
     freqmax = Inf
     for sfield in sfields
+        w = [srcwav[ipw][iss].d[sfield][it, is] for it = 1:nt, is = 1:ns]
+        w = get_source(w, eval(sfield)(), Val{sflags[ipw]}())
         snt = length(srcwav[ipw][1].grid)
-        if (sflags[ipw] == 0)
-            # nothing # just put zeros, no sources added
-            for it = 1:nt
-                w = zeros(ns)
-                wavelets[it][sfield] = Data.Array(w)
-            end
-        elseif (sflags[ipw] == 1)
-            "ϕ[t] = s[t]"
-            for it = 1:snt
-                w = [srcwav[ipw][iss].d[sfield][it, is] for is = 1:ns]
-                wavelets[it][sfield] = Data.Array(w)
-            end
-        elseif (sflags[ipw] == -1)
-            "source sink for 1"
-            "ϕ[t] = -s[t]"
-            for it = 2:snt
-                w = [-1.0 * srcwav[ipw][iss].d[sfield][it, is] for is = 1:ns]
-                wavelets[nt-it+2][sfield] = Data.Array(w)
-            end
-        elseif (sflags[ipw] == 2)
-            "ϕ[t] = ∑₁ᵗ⁻¹ s[t]"
-            w = zeros(ns)
-            if (sfield == :p)
-                for it = 1:snt-1
-                    for is = 1:ns
-                        w[is] += (srcwav[ipw][iss].d[sfield][it, is] .* δt)
-                    end
-                    wavelets[it+1][sfield] = Data.Array(w)
-                end
-            else
-                for it = 2:snt-1
-                    for is = 1:ns
-                        w[is] += (
-                            (
-                                (srcwav[ipw][iss].d[sfield][it, is] .* δt) +
-                                (srcwav[ipw][iss].d[sfield][it-1, is] .* δt)
-                            ) * 0.5
-                        )
-                    end
-                    wavelets[it+1][sfield] = Data.Array(w)
-                end
-
-            end
-            if (nt > snt)
-                copyto!(wavelets[snt+1:end][sfield], wavelets[snt][sfield])
-            end
-        elseif (sflags[ipw] == -2)
-            "source sink for 2"
-            # multiplication with -1 for subtraction #time reversal
-            # as the source wavelet has to be subtracted before the propagation step, I shift here by one sample"
-            w = zeros(ns)
-            for it = 1:snt-1
-                for is = 1:ns
-                    w[is] += (srcwav[ipw][iss].d[sfield][it, is] .* δt)
-                end
-                wavelets[nt-it+1][sfield][is] = Data.Array(-1.0 .* w)
-            end
-            if (nt > snt)
-                nt_diff = nt - snt
-                copyto!(wavelets[1:nt_diff+1][sfield], wavelets[nt_diff+2][sfield])
-            end
+        for it = 1:snt
+            ww = view(w, it, :) # view for all sources
+            copyto!(wavelets[it][sfield], Data.Array(ww))
         end
-        w = vcat([Array(wavelets[it][sfield]) for it = 1:nt]...)
         freqmax =
             min(GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib = :max), freqmax)
         freqmin =

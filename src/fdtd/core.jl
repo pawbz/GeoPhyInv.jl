@@ -181,8 +181,6 @@ function PFdtd(
 
     #(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
-    # indices where the fields are stored for backpropagation (used for RTM and FWI)
-    bindices = get_boundary_indices(medium.mgrid, attrib_mod)
 
     # extend mediums in the PML layers
     exmedium = padarray(medium, _fd.npextend, pml_faces)
@@ -278,7 +276,6 @@ function PFdtd(
         snaps_field,
         itsnaps,
         gmodel_flag,
-        bindices,
         datamat,
         data,
         verbose,
@@ -537,18 +534,15 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
             (sfields[ipw],),
         ) for it = 1:nt
     ]
-    # fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
-    # storing boundary values for back propagation
-    # nz1, nx1=length.(pac.medium.mgrid)
-    # if(pac.backprop_flag ≠ 0)
-    # 	boundary=[zeros(3,nx1+6,nt),
-    # 	  zeros(nz1+6,3,nt),
-    # 	  zeros(3,nx1+6,nt),
-    # 	  zeros(nz1+6,3,nt),
-    # 	  zeros(nz1+2*_fd.npml,nx1+2*_fd.npml,3)]
-    # else
-    boundary = [zeros(1, 1, 1) for ii = 1:5]
-    # end
+
+    # boundary fields stored (remove derivatives)
+    # fields are stored for backpropagation (used for RTM and FWI)
+    bfields = filter(x->x ∉ Fields(pac.attrib_mod, "d"), Fields(pac.attrib_mod))
+    boundary = NamedArray(
+        [get_boundary_store(eval(f)(), T(), n..., nt) for f in bfields],
+        Symbol.(bfields),
+    )
+
 
     # initialize source_spray_weights per supersource and receiver interpolation weights per sequential source
     ssprayw = NamedArray(

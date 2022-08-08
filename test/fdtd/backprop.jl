@@ -1,3 +1,13 @@
+	using Revise
+	using GeoPhyInv
+	using Statistics
+	using Test
+	using PlutoUI
+	using Plots; gr()
+	using LossFunctions
+
+	@init_parallel_stencil(2, true, Float32, 2)
+
 
 medium=Medium(:acou_homo2D,5)
 update!(medium, [:vp,:rho], randn_perc=0.1)
@@ -20,11 +30,13 @@ for field in [:p, :vx,:vz]
 			# snaps_field=true,
 			verbose=true,
 			backprop_flag=1,
-			illum_flag=true,ageom=[ageom], srcwav=[srcwav],
+			illum_flag=false,ageom=[ageom], srcwav=[srcwav],
 			medium=medium);
 
 		update!(pa);
 		rec1=deepcopy(pa.c.data[1])
+		rec1=rec1[1].d[1]
+		rec1./=std(rec1)
 
 		# change source flag and update wavelets in pa
 		pa.c.sflags=[sflags[2]];
@@ -36,14 +48,15 @@ for field in [:p, :vx,:vz]
 
 		# time reverse
 		reverse!(rec2);
+		rec2=rec2[1].d[1]
+		rec2./=std(rec2)
 
 		# compare results
-		# least-squares misfit
-		paerr=GeoPhyInv.VNamedD_misfit(rec1, rec2)
-		err = GeoPhyInv.func_grad!(paerr)
+		# compute L2dist
+		err = value(L2DistLoss(), rec1, rec2, AggMode.Mean())
 
 		# normalized error
-		error = err[1]./paerr.ynorm
+		@show error = err
 
 		# desired accuracy?
 		@test error<1e-20

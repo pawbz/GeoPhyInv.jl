@@ -7,6 +7,15 @@ function advance!(pac::T, pap) where {T<:P_common{FdtdAcoustic}}
     return nothing
 end
 
+"""
+Before calling this function 
+    p and its derivatives are at [it-1]
+    velocities are at [it-3/2]
+
+After calling
+    velocities and its derivatives with jump to [it-1/2]
+    Only p will jump to [it]
+"""
 function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdAcoustic,2}}
 
     w1t = pap.w1[:t]

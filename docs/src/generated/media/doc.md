@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "<unknown>/test/media/doc.jl"
+EditURL = "<unknown>/../media/doc.jl"
 ```
 
 ````@example doc

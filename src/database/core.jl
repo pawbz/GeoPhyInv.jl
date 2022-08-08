@@ -91,8 +91,8 @@ end
 Print information about `NamedD`.
 """
 function Base.show(io::Base.IO, src::NamedD)
-    s = isa(src.sr, Srcs) ? "source" : "receiver"
-    println(io, "> data with fields ", names(src.d)[1], " at ", src[:n], " ", s)
+    s = isa(src.sr, Srcs) ? "source(s)" : "receiver(s)"
+    println(io, "> data with ", names(src.d)[1], " field(s), ", src[:n], " ", s, ", ", length(src.grid), " time samples)")
 end
 
 

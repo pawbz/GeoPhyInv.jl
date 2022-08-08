@@ -311,14 +311,15 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
         # only for first propagating wavefield, i.e., pap[1]
         if (pac.backprop_flag == -1)
             "initial conditions from boundary for first propagating field only"
-            boundary_force_snap_p!(issp, pac, pap)
-            boundary_force_snap_vxvz!(issp, pac, pap)
+            boundary_force_snap_tau!(issp, pac, pap[1])
+            boundary_force_snap_v!(issp, pac, pap[1])
         end
 
         prog = Progress(
             pac.ic[:nt],
             dt = 1,
             desc = "$(pac.attrib_mod) supershot $iss/$(length(pac.ageom[1])) ",
+            showspeed = true,
             color = :blue,
         )
         # time_loop
@@ -329,16 +330,21 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
 
             pac.verbose && next!(prog, :blue)
 
+            # force p[1] on faces, only for ipw=1, after time reversal 
+            (pac.backprop_flag == -1) &&
+                boundary_force!(pac.ic[:nt] - it + 1, issp, pac, pap[1])
+
             @timeit to "advance time step" begin
                 advance!(pac, pap)
             end
 
-            # force p[1] on boundaries, only for ipw=1
-            (pac.backprop_flag == -1) && boundary_force!(it, issp, pac, pap)
-
             @timeit to "add source" begin
                 add_source!(it, issp, iss, pac, pap)
             end
+
+            # record wavefield on all the faces for ipw=1
+            (pac.backprop_flag == 1) && boundary_save!(it, issp, pac, pap[1])
+
 
             # no born flag for adjoint modelling
             if (!pac.gmodel_flag)
@@ -346,8 +352,6 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
                     add_born_sources!(issp, pac, pap)
             end
 
-            # record boundaries after time reversal already
-            (pac.backprop_flag == 1) && boundary_save!(pac.ic[:nt] - it + 1, issp, pac, pap)
 
             @timeit to "record at receivers" begin
                 record!(it, issp, iss, pac, pap)
@@ -369,27 +373,24 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
             end
 
         end # time_loop
-        "now pressure is at [nt], velocities are at [nt-1/2]"
+        # now pressure is at [nt], velocities are at [nt-1/2]
 
-        "one more propagating step to save pressure at [nt+1] -- for time revarsal"
+        # save last snap of pressure field for solving initial-value problem later
+        (pac.backprop_flag == 1) && boundary_save_snap_tau!(issp, pac, pap[1])
+
+        # one more advance step to move pressure to [nt+1] and 
+        # velocities to [nt+3/2] for solving initial-value problem
         advance!(pac, pap)
 
-        "save last snap of pressure field"
-        (pac.backprop_flag == 1) && boundary_save_snap_p!(issp, pac, pap)
+        # save last snap of velocity fields
+        (pac.backprop_flag == 1) && boundary_save_snap_v!(issp, pac, pap[1])
 
-        "one more propagating step to save velocities at [nt+3/2] -- for time reversal"
-        advance!(pac, pap)
-
-        "save last snap of velocity fields with opposite sign for adjoint propagation"
-        (pac.backprop_flag == 1) && boundary_save_snap_vxvz!(issp, pac, pap)
-
-        "scale gradients for each issp"
+        # scale gradients for each issp
         (pac.gmodel_flag) && scale_gradient!(
             issp,
             pap,
             step(pac.medium.mgrid[2]) * step(pac.medium.mgrid[1]),
         )
-
 
     end # source_loop
 end # mod_x_shot

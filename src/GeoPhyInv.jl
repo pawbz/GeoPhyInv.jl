@@ -111,6 +111,9 @@ macro init_parallel_stencil(ndims::Int, use_gpu::Bool, datatype, order)
             _fd.npml = 20 + ($order - 1)
             _fd.npextend = 20 + ($order - 1) # determines exmedium
 
+            # _fd.nbound = $order # number of points to store the boundary values
+            _fd.nbound = 3 # number of points to store the boundary values
+
             ParallelStencil.is_initialized() && ParallelStencil.@reset_parallel_stencil()
             # check whether 2D or 3D, and initialize ParallelStencils accordingly
             @static if $use_gpu

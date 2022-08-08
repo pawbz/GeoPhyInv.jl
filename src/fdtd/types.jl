@@ -11,7 +11,7 @@ mutable struct P_x_worker_x_pw_x_ss{N}
     ssprayw::NamedStack{T3} where {T3<:AbstractMatrix{Data.Number}}
     records::NamedStack{Vector{T5}} where {T5<:Data.Array{1}}
     rinterpolatew::NamedStack{T4} where {T4<:AbstractMatrix{Data.Number}}
-    boundary::Vector{Array{Float64,3}}
+    boundary::NamedStack{NamedStack{Vector{Data.Array{N}}}} # [[[ .. for it in 1:nt] for dim, snap] for field]
     snaps::NamedVector{
         Array{Data.Number,N},
         Vector{Array{Data.Number,N}},
@@ -183,15 +183,6 @@ mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
         Tuple{OrderedCollections.OrderedDict{String,Int64}},
     }
     gmodel_flag::Bool
-    bindices::NamedStack{Int64}
-    #=
-    	ibx0::Int64
-    	ibz0::Int64
-    	ibx1::Int64
-    	ibz1::Int64
-    	isx0::Int64
-    	isz0::Int64
-    	=#
     datamat::SharedArrays.SharedArray{Float64,3}
     data::Vector{Records}
     # attenuation related parameters

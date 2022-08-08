@@ -85,7 +85,7 @@ function Medium(attrib::Symbol, δ::Real = 0.0; verbose = false)
             ]
             model = Medium(mgrid, [:vp, :rho, :vs])
             copyto!(model[:vp], vp)
-            copyto!(model[:rho], rho)
+            copyto!(model[:rho], rho .* 1000) # convert density to kg/m3
             copyto!(model[:vs], vs)
             update!(model, bfrac)
         end

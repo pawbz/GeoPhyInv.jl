@@ -1,14 +1,24 @@
-@recipe function plot(medium::Medium{2}, ageom = nothing)
-    fields = names(medium)[1]
-    layout := (1, length(fields))
-    margin --> 5Measures.mm
+@recipe function plot(medium::Medium{2}, ageom = nothing; fields=names(medium)[1])
     mx = medium.mgrid[2]
     mz = medium.mgrid[1]
+    as=length(mz) / length(mx)
+    layout := ((as < 1) ? (length(fields),  1) : (1, length(fields)))
+    margin --> 5Measures.mm
     framestyle := [:grid :grid :grid]
-    size --> (length(fields) == 3 ? 1200 : 800, 500)
-    aspect_ratio --> length(mz) / length(mx)
+    if(as < 0.5)
+        as1 = 0.5
+        lp = :outertopleft
+    elseif(as > 2)
+        as1 = 2
+        lp = :outertop
+    else
+        as1 = 1
+        lp = :outertopleft
+    end 
+    aspect_ratio --> (inv(as) * as1)
+    size --> ((as < 1) ? (800, length(fields)*300) : (400*length(fields), 400))
     yflip := true
-    legend --> true
+    legend --> lp
     xguide --> "x"
     yguide --> "z"
     xlims --> (mx[1], mx[end])
@@ -96,7 +106,6 @@ end
                 xguide --> "receiver channel"
                 yguide --> "time"
                 colorbar --> false
-                aspect_ratio --> 50
                 seriescolor --> :seismic
                 clims --> (-dmax_clip, dmax_clip)
                 yflip := true

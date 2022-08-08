@@ -198,8 +198,8 @@ function spread(
     phi::Vector{T4},
     theta::Vector{T3} = [0, 0],
 ) where {T1<:Real,T2<:Real,T3<:Real,T4<:Real}
-    phi = rand(Uniform(phi[1], phi[2]), n)
-    theta = rand(Uniform(theta[1], theta[2]), n)
+    phi = (phi[1] ≈ phi[2]) ? fill(phi[1], n) : rand(Uniform(phi[1], phi[2]), n)
+    theta = (theta[1] ≈ theta[2]) ? fill(theta[1], n) : rand(Uniform(theta[1], theta[2]), n)
     nd = length(p0)
     p = [zeros(n) for i = 1:nd]
 

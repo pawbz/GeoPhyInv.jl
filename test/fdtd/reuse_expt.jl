@@ -16,6 +16,7 @@ begin
 	using CUDA
 	using PlutoUI
 	CUDA.device!(1)
+	@init_parallel_stencil(2, true, Float32, 2)
 end
 
 # ╔═╡ 869c583c-c24f-4451-a3c4-056963e88445
@@ -131,7 +132,7 @@ Notebook configuration.
 """
 
 # ╔═╡ 634c9676-53e9-4fa0-bfa6-2f5250b5964f
-@init_parallel_stencil(2, true, Float32, 2)
+
 
 # ╔═╡ Cell order:
 # ╠═50494fe6-6bdf-4db1-8e61-6c9b39627b1f
