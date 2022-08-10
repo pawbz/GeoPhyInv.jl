@@ -95,7 +95,7 @@ Update `pa` with a new bundle of source wavelets `srcwav_new`, without additiona
 Optionally, `sflags` can be changed. 
 """
 function update!(pa::PFdtd, srcwav::SrcWav, sflags::Any = nothing; verbose = false)
-    update!(pa, [srcwav], sflags)
+    update!(pa, [srcwav], sflags; verbose=verbose)
 end
 function update!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing; verbose = false)
     # update srcwav in pa.c
@@ -128,6 +128,10 @@ function update!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing; verbose = 
                 end
             end
         end
+
+        # after source is updated, need to update sfields as well
+        update!(pa, pa.c.ageom, Srcs())
+
         freqpeak = Statistics.mean(freqpeaks)
         # store frequency (in Hz) bounds for first propagating wavefield
         if (ipw == 1)
@@ -149,14 +153,23 @@ function update!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing; verbose = 
     end
 end
 
+"""
+This function updates spray and interpolation matrices. Call it whenever there is a change in the source positions or 
+their fields.
+"""
 function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
+    update!(pass, ipw, iss, ageomss, pac, Srcs())
+    update!(pass, ipw, iss, ageomss, pac, Recs())
+end
+function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::Srcs)
     @assert ageomss.ns == pac.ageom[ipw][iss].ns
-    @assert ageomss.nr == pac.ageom[ipw][iss].nr
 
     ssprayw = pass.ssprayw
-    rinterpolatew = pass.rinterpolatew
 
-    for sfield in pac.sfields[ipw]
+    sfields = names(pac.srcwav[ipw][iss].d)[1]
+    setnames!(ssprayw, sfields, 1)
+    
+    for sfield in sfields
         I = Vector{Int64}()
         J = Vector{Int64}()
         V = Vector{Data.Number}()
@@ -180,6 +193,13 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
             ssprayw[sfield] = sparse(I, J, V, M, ageomss.ns)
         end
     end
+
+end
+function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::Recs)
+    @assert ageomss.nr == pac.ageom[ipw][iss].nr
+
+    rinterpolatew = pass.rinterpolatew
+
     for rfield in pac.rfields
         I = Vector{Int64}()
         J = Vector{Int64}()
@@ -207,10 +227,17 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
 
 end
 
+
 # if just one propagating field
 update!(pa::PFdtd, ageom::AGeom) = update!(pa, [ageom])
+update!(pa::PFdtd, ageom::AGeom, ::Srcs) = update!(pa, [ageom], Srcs())
+update!(pa::PFdtd, ageom::AGeom, ::Recs) = update!(pa, [ageom], Recs())
 
 function update!(pa::PFdtd, ageom::Vector{AGeom})
+    update!(pa, ageom, Srcs())
+    update!(pa, ageom, Recs())
+end
+function update!(pa::PFdtd, ageom::Vector{AGeom}, ::Srcs)
     for ipw = 1:pa.c.ic[:npw]
         copyto!(pa.c.ageom[ipw], ageom[ipw])
         @sync begin
@@ -226,6 +253,24 @@ function update!(pa::PFdtd, ageom::Vector{AGeom})
         end
     end
 end
+
+function update!(pa::PFdtd, ageom::Vector{AGeom}, ::Recs)
+    for ipw = 1:pa.c.ic[:npw]
+        copyto!(pa.c.ageom[ipw], ageom[ipw])
+        @sync begin
+            for (ip, p) in enumerate(procs(pa.p))
+                @async remotecall_wait(p) do
+                    pap = localpart(pa.p)[ipw]
+                    for is = 1:length(pap.ss)
+                        iss = pap.ss[is].iss
+                        update!(localpart(pap).ss[is], ipw, iss, ageom[ipw][iss], pa.c)
+                    end
+                end
+            end
+        end
+    end
+end
+
 
 
 """

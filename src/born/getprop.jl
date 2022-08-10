@@ -18,9 +18,4 @@ function Base.getindex(pa::PBorn, s::Symbol, iss::Int = 1)
     end
 end
 
-function Base.show(io::Base.IO, pa::PFdtd)
-    println(typeof(pa), "")
-    println("pa[:data] : modeled data after running `update!`")
-    println("pa[:ageom]")
-    println("pa[:srcwav]")
-end
+Base.show(io::Base.IO, pa::PBorn) = @doc Base.getindex(::PBorn)

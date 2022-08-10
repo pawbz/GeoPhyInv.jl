@@ -39,6 +39,7 @@ using SpecialFunctions
 using DSP
 using CUDA
 using CUDA.CUSPARSE
+import Base.@doc
 CUDA.allowscalar(false)
 
 

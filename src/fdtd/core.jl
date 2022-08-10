@@ -112,7 +112,7 @@ function PFdtd(
     npw::Int64 = 1,
     medium::Medium = nothing,
     pml_faces::Vector{Symbol} = [:zmin, :zmax, :ymin, :ymax, :xmax, :xmin],
-    rigid_faces=pml_faces,
+    rigid_faces = pml_faces,
     tgrid::StepRangeLen = nothing,
     ageom::Union{AGeom,Vector{AGeom}} = nothing,
     srcwav::Union{SrcWav,Vector{SrcWav}} = nothing,
@@ -430,75 +430,13 @@ function Vector{P_x_worker_x_pw}(sschunks::UnitRange{Int64}, pac::P_common)
     return [P_x_worker_x_pw(ipw, sschunks, pac) for ipw = 1:pac.ic[:npw]]
 end
 
-# function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::T) where T<: P_common{<:FdtdOld}
-
-# 	rfields=pac.rfields
-# 	sfields=pac.sfields
-# 	nt=pac.ic[:nt]
-# 	nx=pac.ic[:nx]; nz=pac.ic[:nz]
-# 	nzd,nxd=length.(pac.medium.mgrid)
-# 	ageom=pac.ageom
-# 	srcwav=pac.srcwav
-# 	sflags=pac.sflags
-# 	mesh_x, mesh_z = pac.exmedium.mgrid[2], pac.exmedium.mgrid[1]
-
-# 	# records_output, distributed array among different procs
-# 	records = NamedArray([zeros(nt,pac.ageom[ipw][iss].nr) for i in 1:length(rfields)], (rfields,))
-
-# 	# gradient outputs
-# 	grad_modKI = zeros(nz, nx)
-# 	grad_modrhovxI = zeros(nz, nx)
-# 	grad_modrhovzI = zeros(nz, nx)
-
-
-# 	# saving illum
-# 	illum =  (pac.illum_flag) ? zeros(nz, nx) : zeros(1,1)
-
-# 	snaps = (pac.snaps_flag) ? zeros(nzd,nxd,length(pac.itsnaps)) : zeros(1,1,1)
-
-# 	# source wavelets
-# 	wavelets = [NamedArray([zeros(pac.ageom[ipw][iss].ns) for i in 1:length(sfields[ipw])],(sfields[ipw],)) for it in 1:nt]
-# 	fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
-
-# 	# storing boundary values for back propagation
-# 	nz1, nx1=length.(pac.medium.mgrid)
-# 	if(pac.backprop_flag ≠ 0)
-# 		boundary=[zeros(3,nx1+6,nt),
-# 		  zeros(nz1+6,3,nt),
-# 		  zeros(3,nx1+6,nt),
-# 		  zeros(nz1+6,3,nt),
-# 		  zeros(nz1+2*_fd.npml,nx1+2*_fd.npml,3)]
-# 	else
-# 		boundary=[zeros(1,1,1) for ii in 1:5]
-# 	end
-
-# 	coords=[:x1,:x2,:z1,:z2]
-
-# 	is=NamedArray([zeros(Int64,ageom[ipw][iss].ns) for i in coords], (coords,))
-# 	# source_spray_weights per supersource
-# 	ssprayw = zeros(4,ageom[ipw][iss].ns)
-# 	# denomsI = zeros(ageom[ipw][iss].ns)
-
-# 	# receiver interpolation weights per sequential source
-# 	rinterpolatew = zeros(4,ageom[ipw][iss].nr)
-# 	# denomrI = zeros(ageom[ipw][iss].nr)
-
-# 	pass=P_x_worker_x_pw_x_ss(iss,wavelets,ssprayw,records,rinterpolatew,
-# 			  boundary,snaps,illum,# grad_modKI,grad_modrhovxI,grad_modrhovzI)
-# 			   NamedArray([grad_modKI,grad_modrhovxI,grad_modrhovzI],([:KI,:rhovxI,:rhovzI],)))
-
-# 	# update acquisition
-# 	update!(pass,ipw,iss,ageom[ipw][iss],pac)
-# 	return pass
-# end
-
 """
 Create modeling parameters for each supersource. 
-Every worker mediums one or more supersources.
+Every worker models one or more supersources.
 """
 function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     rfields = pac.rfields
-    sfields = pac.sfields
+    sfields = names(pac.srcwav[ipw][iss].d)[1]
     nt = pac.ic[:nt]
     n = length.(pac.exmedium.mgrid)
     ageom = pac.ageom
@@ -530,19 +468,18 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     # source wavelets
     wavelets = [
         NamedArray(
-            [Data.Array(zeros(ageom[ipw][iss].ns)) for i = 1:length(sfields[ipw])],
-            (sfields[ipw],),
+            [Data.Array(zeros(ageom[ipw][iss].ns)) for i = 1:length(sfields)],
+            (sfields,),
         ) for it = 1:nt
     ]
 
     # boundary fields stored (remove derivatives)
     # fields are stored for backpropagation (used for RTM and FWI)
-    bfields = filter(x->x ∉ Fields(pac.attrib_mod, "d"), Fields(pac.attrib_mod))
+    bfields = filter(x -> x ∉ Fields(pac.attrib_mod, "d"), Fields(pac.attrib_mod))
     boundary = NamedArray(
         [get_boundary_store(eval(f)(), T(), n..., nt) for f in bfields],
         Symbol.(bfields),
     )
-
 
     # initialize source_spray_weights per supersource and receiver interpolation weights per sequential source
     ssprayw = NamedArray(
@@ -551,9 +488,9 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
                 Data.Number,
                 prod(length.(get_mgrid(eval(sf)(), T(), pac.exmedium.mgrid...))),
                 ageom[ipw][iss].ns,
-            ) for sf in sfields[ipw]
+            ) for sf in sfields
         ],
-        sfields[ipw],
+        (sfields,),
     )
     rinterpolatew = NamedArray(
         [
@@ -568,8 +505,8 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
 
     # transfer to GPUs if 
     if (_fd.use_gpu)
-        ssprayw=map(x -> CuSparseMatrixCSC(x), ssprayw)
-        rinterpolatew=map(x -> CuSparseMatrixCSC(x), rinterpolatew)
+        ssprayw = map(x -> CuSparseMatrixCSC(x), ssprayw)
+        rinterpolatew = map(x -> CuSparseMatrixCSC(x), rinterpolatew)
     end
 
 

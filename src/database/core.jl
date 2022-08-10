@@ -30,7 +30,7 @@ end
 
 
 """
-Initialize with zeros, given grid and names.
+Initialize with zeros, given grid and field names.
 """
 function Base.zero(
     ::Type{NamedD},
@@ -48,6 +48,14 @@ function Base.zero(
     )
 end
 NamedD(grid, s::Union{Srcs,Recs}, fields::Vector{Symbol}) = zero(NamedD, grid, s, fields)
+
+"""
+Updates the fields.
+"""
+function update!(dat::NamedD, fields::Vector{Symbol})
+    setnames!(dat.d, fields, 1)
+    return dat
+end
 
 VNamedD = Union{Array{NamedD{Recs},1},Array{NamedD{Srcs},1}}
 

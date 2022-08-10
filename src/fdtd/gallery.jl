@@ -1,23 +1,39 @@
 
 function SeisForwExpt(attrib::Symbol)
-	@assert attrib in [:acou_homo2D]
+    @assert attrib in [:acou_homo2D, :elastic_homo2D]
 
-	model=Seismic(:acou_homo2D);
-	ageom=AGeom(model.mgrid,:xwell);
-	tgrid=range(0.0,stop=2.0,length=1000)
+    medium = Medium(:elastic_homo2D, 5)
+    update!(medium, [:vp, :rho, :vs], randn_perc = 5)
+    ageom = AGeom(medium.mgrid, :xwell, SSrcs(2), Recs(100))
 
-	wav = ricker(10.0, tgrid, tpeak=0.25, );
-	srcwav = SrcWav(tgrid, SSrcs(length(ageom)), [Srcs(1)], [:P]);
-	update!(srcwav, [:P], wav)
+    wav, tgrid = ricker(medium, 10, 1.0)
+    srcwav = SrcWav(tgrid, ageom, [:vz])
+    update!(srcwav, [:vz], wav)
 
-	vp0=mean(GeoPhyInv.Models.χ(model.χvp,model.ref.vp,-1))
-	ρ0=mean(GeoPhyInv.Models.χ(model.χρ,model.ref.ρ,-1))
+    tsnaps = tgrid[1:div(length(tgrid), 20):end]
+    if (attrib == :acou_homo2D)
+        attrib_mod = FdtdAcoustic()
+    elseif (attrib == :elastic_homo2D)
+        attrib_mod = FdtdElastic()
+    end
 
-	pa=SeisForwExpt(npw=1,model=model,
-	    ageom=[ageom], srcwav=[srcwav],
-		sflags=[2], rflags=[1],
-		    tgridmod=tgrid, verbose=true);
-	return pa
+    return SeisForwExpt(
+        attrib_mod,
+        npw = 1,
+        tgrid = tgrid,
+        tsnaps = tsnaps,
+        snaps_field = :vz,
+        rfields = [:vx, :vz],
+        pml_faces = [:xmin, :xmax, :zmin, :zmax],
+        rigid_faces = [:xmin, :xmax, :zmin, :zmax],
+        sflags = 1,
+        verbose = true,
+        backprop_flag = 1,
+        illum_flag = false,
+        ageom = [ageom],
+        srcwav = [srcwav],
+        medium = medium,
+    )
 
 
 end

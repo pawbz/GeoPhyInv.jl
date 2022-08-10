@@ -51,6 +51,12 @@ function fill_wavelets!(ipw, iss, wavelets, srcwav, sflags)
     freqmin = 0.0
     freqpeaks = []
     freqmax = Inf
+
+    # change fieldnames that might be different
+    for w in wavelets # time slice
+        setnames!(w, sfields, 1)
+    end
+
     for sfield in sfields
         w = [srcwav[ipw][iss].d[sfield][it, is] for it = 1:nt, is = 1:ns]
         w = get_source(w, eval(sfield)(), Val{sflags[ipw]}())
@@ -72,8 +78,9 @@ end
 @inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac, pap)
     # adding source to respective sfield at [it] 
     for ipw in pac.activepw
+        sfields = names(pac.srcwav[ipw][iss].d)[1]
         if (pac.sflags[ipw] ≠ 0) # add only if sflags is non-zero
-            for sfield in pac.sfields[ipw]
+            for sfield in sfields
                 pw = view(pap[ipw].w1[:t][sfield], :)
                 w = pap[ipw].ss[issp].wavelets[it][sfield]
                 ssprayw = pap[ipw].ss[issp].ssprayw[sfield]
