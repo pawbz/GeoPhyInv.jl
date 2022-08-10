@@ -2,9 +2,6 @@ using Revise
 using GeoPhyInv
 using Statistics
 using Test
-using PlutoUI
-using Plots;
-gr();
 using LossFunctions
 
 @init_parallel_stencil(2, true, Float32, 2)
