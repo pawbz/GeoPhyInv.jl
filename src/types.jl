@@ -1,21 +1,30 @@
 abstract type Elastic end
 abstract type Acoustic end
+
+"""
+2-D/ 3-D Linearized forward modeling using a finite-difference simulation of the wave-equation.
+"""
+struct Born end
+
+"""
+Full wavefield modelling; chosen by default.
+"""
+struct FWmod end
+
 """
 2-D/ 3-D elastic forward modeling using staggered-grid velocity-stress finite-difference formulation.
 """
-struct FdtdElastic <: Elastic end
+struct FdtdElastic{T} <: Elastic end
+FdtdElastic()=FdtdElastic{FWmod}()
 """
 2-D/ 3-D acoustic forward modeling using staggered-grid velocity-stress finite-difference formulation.
 """
-struct FdtdAcoustic <: Acoustic end
+struct FdtdAcoustic{T} <: Acoustic end
+FdtdAcoustic()=FdtdAcoustic{FWmod}()
 """
 2-D/ 3-D viscoacoustic forward modeling using staggered-grid velocity-stress finite-difference formulation.
 """
 struct FdtdAcousticVisco end
-"""
-2-D Linearized forward modeling using a finite-difference simulation of the acoustic wave-equation.
-"""
-struct FdtdAcousticBorn <: Acoustic end
 """
 2-D/ 3-D Linearized forward modeling using a analytical solutions for homogeneous acoustic media.
 """

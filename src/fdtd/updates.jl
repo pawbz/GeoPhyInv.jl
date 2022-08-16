@@ -1,6 +1,6 @@
 # Methods to update FDTD structs in several ways
 
-
+#=
 """
 update the perturbation vector using the perturbed medium
 in this case, medium will be treated as the background medium 
@@ -33,6 +33,7 @@ function update_δmods!(pac::P_common, δmod::Vector{Float64})
     get_rhovzI!(pac.δmod[:rhovzI], pac.δmod[:rhoI])
     return nothing
 end
+=#
 
 """
 This method should be executed only after the updating the main medium.
@@ -40,17 +41,16 @@ Update the `δmods` when a perturbed `medium_pert` is input.
 The medium through which the waves are propagating 
 is assumed to be the background medium.
 """
-function update_δmods!(pac::P_common, medium_pert::Medium)
-    nznxd = prod(length.(pac.medium.mgrid))
-    fill!(pac.δmodall, 0.0)
-    copyto!(pac.δmodall, medium_pert, [:KI, :rhoI])
-
-    for i = 1:nznxd
-        pac.δmodall[i] -= pac.mod[:KI][i] # subtracting the background medium
-        pac.δmodall[nznxd+i] -= pac.mod[:rhoI][i] # subtracting the background medium
-    end
-    update_δmods!(pac, pac.δmodall)
-    return nothing
+function update!(pa::PFdtd, medium::Medium, medium_pert::Medium)
+    return update!(pa.c, medium, medium_pert)
+end
+function update!(pac::T, medium::Medium, medium_pert::Medium) where {T<:P_common{FdtdAcoustic{Born}}}
+    exmedium=padarray(medium, _fd.npextend, pac.pml_faces)
+    exmedium_pert=padarray(medium_pert, _fd.npextend, pac.pml_faces)
+    copyto!(pac.mod[:δK], exmedium_pert, [:K])
+    pac.mod[:δK] .-= exmedium[:K]
+    copyto!(pac.mod[:δrhoI], exmedium_pert, [:rhoI])
+    pac.mod[:δrhoI] .-= exmedium[:rhoI]
 end
 
 """
@@ -66,17 +66,15 @@ algorithms.
 function update!(pa::PFdtd, medium::Medium)
     return update!(pa.c, medium)
 end
-function update!(pac::T, medium::Medium) where {T<:P_common{FdtdAcoustic}}
+function update!(pac::T, medium::Medium) where {T<:P_common{<:FdtdAcoustic}}
     copyto!(pac.medium, medium)
     padarray!(pac.exmedium, pac.medium, _fd.npextend, pac.pml_faces)
     copyto!(pac.mod[:K], pac.exmedium, [:K])
-    copyto!(pac.mod[:KI], pac.exmedium, [:KI])
+    # copyto!(pac.mod[:KI], pac.exmedium, [:KI])
     copyto!(pac.mod[:rhoI], pac.exmedium, [:rhoI])
-    # get_rhovxI!(pac.mod[:rhovxI], pac.mod[:rhoI])
-    # get_rhovzI!(pac.mod[:rhovzI], pac.mod[:rhoI])
     return nothing
 end
-function update!(pac::T, medium::Medium) where {T<:P_common{FdtdElastic}}
+function update!(pac::T, medium::Medium) where {T<:P_common{<:FdtdElastic}}
     copyto!(pac.medium, medium)
     padarray!(pac.exmedium, pac.medium, _fd.npextend, pac.pml_faces)
     copyto!(pac.mod[:mu], pac.exmedium, [:mu])
@@ -95,7 +93,7 @@ Update `pa` with a new bundle of source wavelets `srcwav_new`, without additiona
 Optionally, `sflags` can be changed. 
 """
 function update!(pa::PFdtd, srcwav::SrcWav, sflags::Any = nothing; verbose = false)
-    update!(pa, [srcwav], sflags; verbose=verbose)
+    update!(pa, [srcwav], sflags; verbose = verbose)
 end
 function update!(pa::PFdtd, srcwav::Vector{SrcWav}, sflags = nothing; verbose = false)
     # update srcwav in pa.c
@@ -168,7 +166,7 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::
 
     sfields = names(pac.srcwav[ipw][iss].d)[1]
     setnames!(ssprayw, sfields, 1)
-    
+
     for sfield in sfields
         I = Vector{Int64}()
         J = Vector{Int64}()
@@ -324,9 +322,10 @@ In-place method to perform the experiment and update `pa` after wave propagation
     # update gradient medium using grad_modKI_stack, grad_modrr_stack
     (pa.c.gmodel_flag) && update_gradient!(pa.c)
 
-
+    ipww = 0
     for ipw in pa.c.activepw
         if (pa.c.rflags[ipw] ≠ 0) # record only if rflags is non-zero
+            ipww += 1
             for rfield in pa.c.rfields
 
                 fill!(pa.c.datamat, 0.0)
@@ -337,7 +336,7 @@ In-place method to perform the experiment and update `pa` after wave propagation
                         end
                     end
                 end
-                update_data!(rfield, ipw, pa.c)
+                update_data!(rfield, ipww, pa.c)
             end
         end
     end
@@ -368,9 +367,9 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
             color = :blue,
         )
         # time_loop
-        """
-        * don't use shared arrays inside this time loop, for speed when using multiple procs
-        """
+        #=
+        don't use shared arrays inside this time loop, for speed when using multiple procs
+        =#
         for it = 1:pac.ic[:nt]
 
             pac.verbose && next!(prog, :blue)
@@ -379,9 +378,29 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
             (pac.backprop_flag == -1) &&
                 boundary_force!(pac.ic[:nt] - it + 1, issp, pac, pap[1])
 
-            @timeit to "advance time step" begin
-                advance!(pac, pap)
+            @timeit to "compute stress derivatives" begin
+                for ipw in pac.activepw
+                    update_dstress!(pap[ipw], pac)
+                end
             end
+            @timeit to "compute particle velocities" begin
+                for ipw in pac.activepw
+                    update_v!(pap[ipw], pac)
+                end
+            end
+            add_born_sources_velocity!(pap, pac)
+
+            @timeit to "compute velocity derivatives" begin
+                for ipw in pac.activepw
+                    update_dv!(pap[ipw], pac)
+                end
+            end
+            @timeit to "compute stress" begin
+                for ipw in pac.activepw
+                    update_stress!(pap[ipw], pac)
+                end
+            end 
+            add_born_sources_stress!(pap, pac)
 
             @timeit to "add source" begin
                 add_source!(it, issp, iss, pac, pap)
@@ -389,13 +408,6 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
 
             # record wavefield on all the faces for ipw=1
             (pac.backprop_flag == 1) && boundary_save!(it, issp, pac, pap[1])
-
-
-            # no born flag for adjoint modelling
-            if (!pac.gmodel_flag)
-                (typeof(pac.attrib_mod) == FdtdAcousticBorn) &&
-                    add_born_sources!(issp, pac, pap)
-            end
 
 
             @timeit to "record at receivers" begin
@@ -412,9 +424,11 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
 
             if (eval(pac.snaps_field) <: Fields)
                 iitsnaps = findall(x -> ==(x, it), pac.itsnaps)
+                for ipw in pac.activepw
                 for itsnap in iitsnaps
-                    snaps_save!(itsnap, issp, pac, pap)
+                    snaps_save!(itsnap, issp, ipw, pac, pap)
                 end
+            end
             end
 
         end # time_loop
@@ -425,7 +439,8 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}) where {N,
 
         # one more advance step to move pressure to [nt+1] and 
         # velocities to [nt+3/2] for solving initial-value problem
-        advance!(pac, pap)
+        update_dstress!(pap[1], pac)
+        update_v!(pap[1], pac)
 
         # save last snap of velocity fields
         (pac.backprop_flag == 1) && boundary_save_snap_v!(issp, pac, pap[1])

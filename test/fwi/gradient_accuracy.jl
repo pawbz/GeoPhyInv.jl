@@ -26,7 +26,7 @@ parameterization=[:χvp, :χrho, :null]
 mgrid=medium.mgrid
 
 @testset "test parallel implementation during gradient" begin
-	for attrib_mod in [FdtdAcoustic(), FdtdAcousticBorn()]
+	for attrib_mod in [FdtdAcoustic(), FdtdAcoustic{Born}()]
 		global pa=SeisInvExpt(attrib_mod, Migr(), srcwav=srcwav, ageom=ageom, tgrid=tgrid, mediumm=medium0, 
 				     mediumm_obs=medium,  
 				     mediumm0=medium0,
@@ -55,7 +55,7 @@ end
 
 
 @testset "Testing Born Modeling and its gradient" begin
-	global expt=x->SeisInvExpt(FdtdAcousticBorn(), x, 
+	global expt=x->SeisInvExpt(FdtdAcoustic{Born}(), x, 
 			     srcwav=srcwav, ageom=ageom, tgrid=tgrid, mediumm=medium0, 
 	     		     mediumm0=medium0,
 			     mediumm_obs=medium,  

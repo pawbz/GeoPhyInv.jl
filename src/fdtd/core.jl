@@ -16,9 +16,6 @@
 
 # 
 
-# union of old stuff without using ParallelStencils (should eventually remove this)
-FdtdOld = Union{FdtdAcoustic,FdtdAcousticVisco,FdtdAcousticBorn}
-
 # global const nlayer_rand = 0
 
 include("types.jl")
@@ -54,7 +51,7 @@ finite-difference modeling.
 * `attrib_mod` : attribute to choose the type of modeling. Choose from 
   * `=FdtdAcoustic()` for acoustic modeling  
   * `=FdtdElastic()` for solving the isotropic elastic wave equation 
-  * `=FdtdAcousticBorn()` for Born modeling 
+  * `=FdtdAcoustic{Born}()` for Born modeling 
 
 # Keyword Arguments
 * `medium` : medium parameters 
@@ -88,14 +85,14 @@ finite-difference modeling.
 * `verbose::Bool=false` : verbose flag
 """
 SeisForwExpt(
-    attrib_mod::Union{FdtdAcoustic,FdtdElastic,FdtdAcousticBorn,FdtdAcousticVisco},
+    attrib_mod::Union{FdtdAcoustic,FdtdElastic,FdtdAcousticVisco},
     args1...;
     args2...,
 ) = PFdtd(attrib_mod, args1...; args2...)
 
 
 """
-Primary method to generate Expt variable when FdtdAcoustic() and FdtdAcousticBorn() are used.
+Primary method to generate Expt variable when FdtdAcoustic() and FdtdAcoustic{Born}() are used.
 
 # Some internal arguments
 * `jobname::String` : name
@@ -116,8 +113,8 @@ function PFdtd(
     tgrid::StepRangeLen = nothing,
     ageom::Union{AGeom,Vector{AGeom}} = nothing,
     srcwav::Union{SrcWav,Vector{SrcWav}} = nothing,
-    sflags::Union{Int,Vector{Int}} = fill(2, npw),
-    rflags::Union{Int,Vector{Int}} = fill(1, npw),
+    sflags::Int = 2,
+    rflags::Int = 1,
     rfields::Vector{Symbol} = [:vz],
     stressfree_faces = [:dummy],
     backprop_flag::Int64 = 0,
@@ -130,22 +127,26 @@ function PFdtd(
 )
     N = ndims(medium)
 
-    # convert to vectors 
-    if (typeof(ageom) == AGeom)
-        ageom = [ageom]
-    end
-    if (typeof(srcwav) == SrcWav)
-        srcwav = [srcwav]
-    end
-    if (typeof(sflags) == Int)
-        sflags = [sflags]
-    end
-    if (typeof(rflags) == Int)
-        rflags = [rflags]
+
+    if (first(typeof(attrib_mod).parameters) == Born)
+        # born modeling needs npw=2
+        npw = 2
+        sflags=[sflags, 0] # source is only active in the background medium 
+        rflags = [0, 1] # record scatterred data only 
+    else
+    (typeof(sflags) == Int) &&        (sflags = fill(sflags, npw))
+    (typeof(rflags) == Int) &&     (rflags = fill(rflags, npw))
+
     end
 
+    
+    # convert to vectors of length npw
+    (typeof(ageom) == AGeom) && (ageom = fill(ageom, npw))
+    (typeof(srcwav) == SrcWav) &&  (srcwav = fill(srcwav, npw))
+    
+
     # check if fields input are meaningful for given attrib_mod and ndims
-    @assert N == _fd.ndims "Cannot initiate SeisForwExpt due to ndims inconsistency with @init_parallel_stencil"
+    @assert (N == _fd.ndims) "Cannot initiate SeisForwExpt due to ndims inconsistency with @init_parallel_stencil"
     !(snaps_field === nothing) && @assert snaps_field ∈ Fields(attrib_mod, ndims = N)
     foreach(rf -> @assert(rf ∈ Fields(attrib_mod; ndims = N)), rfields)
     foreach(
@@ -158,20 +159,16 @@ function PFdtd(
 
     # check sizes and errors based on input
     #(length(TDout) ≠ length(findn(rflags))) && error("TDout dimension")
-    (length(ageom) ≠ npw) && error("ageom dimension")
-    (length(srcwav) ≠ npw) && error("srcwav dimension")
-    (length(sflags) ≠ npw) && error("sflags dimension")
-    (length(rflags) ≠ npw) && error("rflags dimension")
-    (maximum(tgrid) < maximum(srcwav[1][1].grid)) &&
-        error("modeling time is less than source time")
+    @assert (length(ageom) == npw) 
+    @assert (length(srcwav) == npw) 
+    @assert (length(sflags) == npw) 
+    @assert (length(rflags) == npw) 
+    @assert (maximum(tgrid) >= maximum(srcwav[1][1].grid)) "modeling time is less than source time"
     #(any([getfield(TDout[ip],:tgrid).δx < tgridmod.δx for ip=1:length(TDout)])) && error("output time grid sampling finer than modeling")
     #any([maximum(getfield(TDout[ip],:tgrid).x) > maximum(tgridmod) for ip=1:length(TDout)]) && error("output time > modeling time")
 
-    # necessary that nss and fields should be same for all nprop
+    # all the propagating wavefields should have same supersources, check that
     nss = length(ageom[1])
-    sfields = [names(srcwav[ipw][1].d)[1] for ipw = 1:npw]
-
-    # all the propagating wavefields should have same supersources? check that?
     (fill(nss, npw) != [length(ageom[ip]) for ip = 1:npw]) && error("different supersources")
 
     # check if all sources are receivers are inside medium
@@ -181,13 +178,8 @@ function PFdtd(
 
     #(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
-
     # extend mediums in the PML layers
     exmedium = padarray(medium, _fd.npextend, pml_faces)
-    if (typeof(attrib_mod) == FdtdAcousticBorn)
-        (npw ≠ 2) && error("born modeling needs npw=2")
-    end
-
     mod = NamedArray(
         [
             Data.Array(zeros(length.(exmedium.mgrid)...)) for
@@ -195,12 +187,6 @@ function PFdtd(
         ],
         get_medium_names(attrib_mod),
     )
-    δmod = NamedArray(
-        [zeros(length.(exmedium.mgrid)...) for name in get_medium_names(attrib_mod)],
-        get_medium_names(attrib_mod),
-    )
-
-    δmodall = zeros(2 * prod(length.(medium.mgrid)))
 
     # PML
     pml = get_pml(attrib_mod, exmedium.mgrid)
@@ -257,7 +243,6 @@ function PFdtd(
         # pml_faces also need rigid_boundary conditions
         unique(vcat(rigid_faces, pml_faces)),
         stressfree_faces,
-        sfields,
         sflags,
         rfields,
         rflags,
@@ -266,8 +251,6 @@ function PFdtd(
         pml,
         mod,
         NamedArray([memcoeff1, memcoeff2], ([:memcoeff1, :memcoeff2],)),
-        δmod,
-        δmodall,
         gradient,
         grad_mod,
         illum_flag,
@@ -285,6 +268,9 @@ function PFdtd(
     # update mod arrays in pac
     update!(pac, medium)
 
+    if (first(typeof(attrib_mod).parameters) == Born)
+        update!(pac, medium)
+    end
 
     # dividing the supersources to workers
     if (nworker === nothing)
@@ -364,18 +350,19 @@ function get_fc(medium, tgrid)
     )
 end
 
-function get_medium_names(::FdtdAcoustic)
-    "bulk modulus, and inverse density values"
-    return [:KI, :K, :rhoI]
+function get_medium_names(::FdtdAcoustic{FWmod})
+    # the following medium parameters are stored on XPU
+    return [:K, :rhoI]
+end
+function get_medium_names(::FdtdAcoustic{Born})
+    # the following medium parameters are stored on XPU
+    return [:K, :rhoI, :δK, :δrhoI]
 end
 
 function get_medium_names(::FdtdElastic)
-    "bulk modulus, and density values on vx and vz stagerred grids"
+    # the following medium parameters are stored on XPU
     return [:lambda, :M, :mu, :rho]
 end
-
-# 	# memory fields for all derivatives
-# 	memory_pml=NamedArray([NamedArray(fill(zeros(n...), length(fields[d])), fields[d]) for d in dnames], dnames)
 
 
 """
@@ -536,7 +523,7 @@ include("advance_acou.jl")
 include("advance_elastic.jl")
 include("rho_projection.jl")
 include("gradient.jl")
-include("born.jl")
+include("born_acoustic.jl")
 include("boundary.jl")
 include("gallery.jl")
 
@@ -587,9 +574,9 @@ end
 """
 Save snapshots for ipw=1
 """
-function snaps_save!(itsnap, issp::Int64, pac::P_common, pap)
-    p = pap[1].w1[:t][pac.snaps_field]
-    snaps = pap[1].ss[issp].snaps[itsnap]
+function snaps_save!(itsnap, issp::Int64, ipw::Int, pac::P_common, pap)
+    p = pap[ipw].w1[:t][pac.snaps_field]
+    snaps = pap[ipw].ss[issp].snaps[itsnap]
     copyto!(snaps, p)
 end
 

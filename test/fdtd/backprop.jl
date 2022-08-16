@@ -4,7 +4,7 @@ using Statistics
 using Test
 using LossFunctions
 
-@init_parallel_stencil(2, true, Float32, 2)
+@init_parallel_stencil(2, false, Float32, 2)
 
 
 pa = SeisForwExpt(:acou_homo2D)

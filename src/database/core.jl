@@ -98,10 +98,43 @@ end
 """
 Print information about `NamedD`.
 """
-function Base.show(io::Base.IO, src::NamedD)
-    s = isa(src.sr, Srcs) ? "source(s)" : "receiver(s)"
-    println(io, "> data with ", names(src.d)[1], " field(s), ", src[:n], " ", s, ", ", length(src.grid), " time samples)")
+function Base.show(io::Base.IO, ::MIME"text/plain", src::NamedD)
+    s = isa(src.sr, Srcs) ? "  ├─── # source(s): " : "  ├─ # receiver(s): "
+    print(
+        io,
+        "Data of a supersource\n",
+        "  ├───────  fields: ",
+        names(src.d)[1],
+        '\n',
+        s,
+        src[:n],
+        '\n',
+        "  ├── time samples: ",
+        length(src.grid),
+        '\n',
+    )
 end
+"""
+Print information about `Vector{NamedD}`.
+"""
+function Base.show(io::Base.IO, ::MIME"text/plain", src::Vector{NamedD{T}}) where {T}
+    s = (T == Srcs) ? "  ├─── # source(s): " : "  ├─ # receiver(s): "
+    print(
+        io,
+        "Data with $(length(src)) supersource(s)\n",
+        "  ├───────  fields: ",
+        getindex.(names.(getfield.(src, :d)), 1),
+        '\n',
+        s,
+        getindex.(src, :n),
+        '\n',
+        "  ├── time samples: ",
+        length.(getfield.(src, :grid)),
+        '\n',
+    )
+end
+
+
 
 
 

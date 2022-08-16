@@ -6,7 +6,7 @@ using LinearAlgebra
 
 
 # ### SeisInvExpt
-pa=SeisInvExpt(FdtdAcousticBorn(), LS(), :pizza, rfields=[:P, :vz]); # use linearized modeling attribute
+pa=SeisInvExpt(FdtdAcoustic{Born}(), LS(), :pizza, rfields=[:P, :vz]); # use linearized modeling attribute
 F=LinearMap(pa); # generate LinearMap 
 
 # ### Linearity test

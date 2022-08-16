@@ -99,50 +99,50 @@ end
 
 
 function dim_names(ageomss::AGeomss)
-    dN=dim_names(length(ageomss.s))
-    @assert all(map(in(dN),names(ageomss.s)[1]))
-    @assert all(map(in(dN),names(ageomss.r)[1]))
+    dN = dim_names(length(ageomss.s))
+    @assert all(map(in(dN), names(ageomss.s)[1]))
+    @assert all(map(in(dN), names(ageomss.r)[1]))
     return dN
 end
 
 function dim_names(ageom::Vector{AGeomss})
-    dN=dim_names.(ageom)
+    dN = dim_names.(ageom)
     @assert all(y -> y == dN[1], dN)
     return dN[1]
 end
 
 
 
-function Base.show(io::Base.IO, ageomss::AGeomss)
-    println(
+function Base.show(io::Base.IO, ::MIME"text/plain", ageomss::AGeomss)
+    print(
         io,
-        string(
-            "> ",
-            length(dim_names(ageomss)),
-            "-D acquisition with ",
-            ageomss.ns,
-            " source(s) and ",
-            ageomss.nr,
-            " receiver(s)",
-        ),
+        "Acquisition geometry of a supersource\n",
+        "  ├───────── ndims: ",
+        length(dim_names(ageomss)),
+        '\n',
+        "  ├─── # source(s): ",
+        ageomss.ns,
+        '\n',
+        "  ├─ # receiver(s): ",
+        ageomss.nr,
+        '\n',
     )
 end
 
 
-function Base.show(io::Base.IO, ageom::AGeom)
-    println(
+function Base.show(io::Base.IO, ::MIME"text/plain", ageom::AbstractVector{AGeomss})
+    print(
         io,
-        string(
-            "> ",
-            length(dim_names(ageom)),
-            "-D acquisition with ",
-            length(ageom),
-            " supersource(s), ",
-            getfield.(ageom, :ns),
-            " source(s) and ",
-            getfield.(ageom, :nr),
-            " receiver(s)",
-        ),
+        "Acquisition geometry with $(length(ageom)) supersource(s)\n",
+        "  ├───────── ndims: ",
+        length(dim_names(ageom)),
+        '\n',
+        "  ├─── # source(s): ",
+        getfield.(ageom, :ns),
+        '\n',
+        "  ├─ # receiver(s): ",
+        getfield.(ageom, :nr),
+        '\n',
     )
 end
 
@@ -150,11 +150,7 @@ end
 """
 Output `n` interpolated sources/ receivers between positions `p1` and `p2`. 
 """
-function spread(
-    n,
-    p1::Vector{T1},
-    p2::Vector{T2},
-) where {T1<:Real,T2<:Real}
+function spread(n, p1::Vector{T1}, p2::Vector{T2}) where {T1<:Real,T2<:Real}
     @assert (length(p1) == length(p2)) # check if 2D or 3D
     nd = length(p1)
     if (n == 1)
@@ -179,13 +175,17 @@ function spread(
     n,
     p1::Vector{T1},
     p2::Vector{T2},
-    n_per_dim::Vector{T3}
+    n_per_dim::Vector{T3},
 ) where {T1<:Real,T2<:Real,T3<:Int}
-    @assert length(p1)==length(p2)==length(n_per_dim)
+    @assert length(p1) == length(p2) == length(n_per_dim)
     nd = length(p1)
     @assert prod(n_per_dim) == n
-    I=collect(Iterators.product([spread(n_per_dim[i], [p1[i]], [p2[i]])[1] for i in 1:length(n_per_dim)]...))
-    return Tuple([[I[i][id] for i = 1:n] for id=1:nd])
+    I = collect(
+        Iterators.product(
+            [spread(n_per_dim[i], [p1[i]], [p2[i]])[1] for i = 1:length(n_per_dim)]...,
+        ),
+    )
+    return Tuple([[I[i][id] for i = 1:n] for id = 1:nd])
 end
 
 """
@@ -347,7 +347,8 @@ end
 """
 Return `[sz-rz, sy-ry, sx-rx]`
 """
-offset(ageomss::AGeomss, is, ir)=[ageomss.s[d][is]-ageomss.r[d][ir] for d in dim_names(ageomss)] 
+offset(ageomss::AGeomss, is, ir) =
+    [ageomss.s[d][is] - ageomss.r[d][ir] for d in dim_names(ageomss)]
 
 #=
 

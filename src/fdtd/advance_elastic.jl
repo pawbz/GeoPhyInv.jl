@@ -1,12 +1,3 @@
-function advance!(pac::T, pap) where {T<:P_common{<:FdtdElastic}}
-    for ipw in pac.activepw
-        # store p for the last two steps
-        # pppppp!(pap[ipw],pac.attrib_mod)
-        advance_kernel!(pap[ipw], pac)
-    end
-    return nothing
-end
-
 
 # these relative indices of the arrays point to same location
 # [ix,iy,iz]     --> tauxx, tauyy, and tauzz grid [1:nx,1:ny,1:nz]
@@ -16,7 +7,7 @@ end
 # [ix,iy-1/2,iz]       --> vy
 # [ix,iy,iz-1/2]       --> vz
 
-@parallel function compute_dtau!(
+@parallel function compute_dstress!(
     tauxx::Data.Array{3},
     tauyy,
     tauzz,
@@ -54,7 +45,7 @@ end
     return
 end
 
-@parallel function compute_dtau!(
+@parallel function compute_dstress!(
     tauxx::Data.Array{2},
     tauzz,
     tauxz,
@@ -100,6 +91,7 @@ end
 
     return
 end
+
 @parallel function compute_v!(
     vx::Data.Array{2},
     vz,
@@ -115,8 +107,6 @@ end
 
     return
 end
-
-
 
 @parallel function compute_dv!(
     vx::Data.Array{3},
@@ -151,7 +141,6 @@ end
     return
 end
 
-
 @parallel function compute_dv!(vx::Data.Array{2}, vz, dvxdx, dvzdz, dvxdz, dvzdx, dxI, dzI)
     @all(dvxdx) = @d_xa(vx) * dxI # at [ix,iz]
     @all(dvzdz) = @d_za(vz) * dzI # at      "
@@ -162,11 +151,7 @@ end
     return
 end
 
-
-
-
-
-@parallel function compute_tauii!(
+@parallel function compute_stressii!(
     tauxx::Data.Array{3},
     tauyy,
     tauzz,
@@ -191,7 +176,7 @@ end
     return
 end
 
-@parallel function compute_tauii!(tauxx::Data.Array{2}, tauzz, dvxdx, dvzdz, dt, M, lambda)
+@parallel function compute_stressii!(tauxx::Data.Array{2}, tauzz, dvxdx, dvzdz, dt, M, lambda)
     @all(tauxx) =
         @all(tauxx) - dt * ((@all(M) * @all(dvxdx)) + (@all(lambda) * (@all(dvzdz))))
     @all(tauzz) =
@@ -199,7 +184,7 @@ end
 
     return
 end
-@parallel function compute_tauij!(
+@parallel function compute_stressij!(
     tauxy::Data.Array{3},
     tauxz,
     tauyz,
@@ -218,7 +203,7 @@ end
 
     return
 end
-@parallel function compute_tauij!(tauxz::Data.Array{2}, dvxdz, dvzdx, dt, mu)
+@parallel function compute_stressij!(tauxz::Data.Array{2}, dvxdz, dvzdx, dt, mu)
     @all(tauxz) = @all(tauxz) - dt * (@av(mu) * (@all(dvxdz) + @all(dvzdx)))
     return
 end
@@ -244,15 +229,13 @@ end
 end
 
 
-
-
-function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
+function compute_dstress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
     w1t = pap.w1[:t]
     mw = pap.memory_pml
     pml = pac.pml
     pml_faces = pac.pml_faces
 
-    @parallel compute_dtau!(
+    @parallel compute_dstress!(
         w1t[:tauxx],
         w1t[:tauyy],
         w1t[:tauzz],
@@ -347,6 +330,9 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dtauxzdz][:kI],
         pml_faces,
     )
+end
+function compute_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
+    w1t = pap.w1[:t]
 
     @parallel compute_v!(
         w1t[:vx],
@@ -403,6 +389,12 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         w1t[:vx],
         pac.ic[:nz],
     )
+end
+function compute_dv!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
+    w1t = pap.w1[:t]
+    mw = pap.memory_pml
+    pml = pac.pml
+    pml_faces = pac.pml_faces
 
     @parallel compute_dv!(
         w1t[:vx],
@@ -495,8 +487,11 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pml[:dvzdy][:kI],
         pml_faces,
     )
+end
+function compute_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
+    w1t = pap.w1[:t]
 
-    @parallel compute_tauii!(
+    @parallel compute_stressii!(
         w1t[:tauxx],
         w1t[:tauyy],
         w1t[:tauzz],
@@ -507,7 +502,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
         pac.mod[:M],
         pac.mod[:lambda],
     )
-    @parallel compute_tauij!(
+    @parallel compute_stressij!(
         w1t[:tauxy],
         w1t[:tauxz],
         w1t[:tauyz],
@@ -536,14 +531,14 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,3}}
 end
 
 
-function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
+function compute_dstress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
     w1t = pap.w1[:t]
     mw = pap.memory_pml
     pml = pac.pml
     pml_faces = pac.pml_faces
 
 
-    @parallel compute_dtau!(
+    @parallel compute_dstress!(
         w1t[:tauxx],
         w1t[:tauzz],
         w1t[:tauxz],
@@ -587,6 +582,9 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pml[:dtauxzdz][:kI],
         pml_faces,
     )
+end
+function compute_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
+    w1t = pap.w1[:t]
 
     @parallel compute_v!(
         w1t[:vx],
@@ -607,6 +605,12 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         @parallel (1:pac.ic[:nx]) dirichletzmin!(w1t[:vz], w1t[:vx], pac.ic[:nz])
     (:zmax ∈ pac.rigid_faces) &&
         @parallel (1:pac.ic[:nx]) dirichletzmax!(w1t[:vz], w1t[:vx], pac.ic[:nz])
+end
+function compute_dv!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
+    w1t = pap.w1[:t]
+    mw = pap.memory_pml
+    pml = pac.pml
+    pml_faces = pac.pml_faces
 
     @parallel compute_dv!(
         w1t[:vx],
@@ -650,8 +654,11 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pml[:dvzdx][:kI],
         pml_faces,
     )
+end
+function compute_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
+    w1t = pap.w1[:t]
 
-    @parallel compute_tauii!(
+    @parallel compute_stressii!(
         w1t[:tauxx],
         w1t[:tauzz],
         w1t[:dvxdx],
@@ -660,7 +667,7 @@ function advance_kernel!(pap, pac::T) where {T<:P_common{FdtdElastic,2}}
         pac.mod[:M],
         pac.mod[:lambda],
     )
-    @parallel compute_tauij!(
+    @parallel compute_stressij!(
         w1t[:tauxz],
         w1t[:dvxdz],
         w1t[:dvzdx],

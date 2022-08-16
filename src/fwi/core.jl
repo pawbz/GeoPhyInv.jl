@@ -130,7 +130,7 @@ end
 """
 Born modeling with `mediumm` as the perturbed model and `mediumm0` as the background model.
 """
-function F!(pa::PFWI{FdtdAcousticBorn,T1,T2}, x) where {T1,T2}
+function F!(pa::PFWI{FdtdAcoustic{Born},T1,T2}, x) where {T1,T2}
 
 	# update background model in the forward engine 
 	update!(pa.paf.c, pa.mediumm0)
@@ -144,7 +144,7 @@ function F!(pa::PFWI{FdtdAcousticBorn,T1,T2}, x) where {T1,T2}
 	Fbornmod!(pa::PFWI)
 end
 
-function Fbornmod!(pa::PFWI{FdtdAcousticBorn,T1,T2}) where {T1,T2} 
+function Fbornmod!(pa::PFWI{FdtdAcoustic{Born},T1,T2}) where {T1,T2} 
 
 	# switch on born scattering
 	#pa.paf.c.born_flag=true
@@ -218,7 +218,7 @@ return the linearized forward modeling operator `F`, such that
 The imaging/migration operator is given by `transpose(F)`. 
 These operators are the building blocks of iterative optimization schemes.
 """
-function LinearMaps.LinearMap(pa::PFWI{FdtdAcousticBorn,T2,T3}) where {T2,T3}
+function LinearMaps.LinearMap(pa::PFWI{FdtdAcoustic{Born},T2,T3}) where {T2,T3}
 	fw=(y,x)->Fborn_map!(y, x, pa)
 	bk=(y,x)->Fadj_map!(y, x, pa)
 

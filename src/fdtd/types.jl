@@ -140,7 +140,6 @@ mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
     pml_faces::Vector{Symbol}
     rigid_faces::Vector{Symbol}
     stressfree_faces::Vector{Symbol}
-    sfields::Vector{Vector{Symbol}}
     sflags::Vector{Int64}
     rfields::Vector{Symbol}
     rflags::Vector{Int64}
@@ -155,15 +154,6 @@ mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
     	modrr::Matrix{Float64}
     	modrhovxI::Matrix{Float64}
     	modrhovzI::Matrix{Float64}
-    	=#
-    δmod::NamedStack{Array{Float64,N}}
-    δmodall::Vector{Float64}
-    #=
-    	δmodKI::Matrix{Float64}
-    	δmodrr::Matrix{Float64} 
-    	δmodrhovxI::Matrix{Float64}
-    	δmodrhovzI::Matrix{Float64}
-    	δmod::Vector{Float64} # perturbation vector (KI, rhoI)
     	=#
     gradient::Vector{Float64}  # output gradient vector w.r.t (KI, rhoI)
     grad_mod::NamedStack{SharedArrays.SharedArray{Float64,N}}
