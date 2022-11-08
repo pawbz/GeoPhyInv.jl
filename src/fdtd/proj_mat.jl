@@ -1,9 +1,12 @@
 
 """
-Output CartesianIndices and corresponding linear interpolation weights for point P in mgrid
+Output CartesianIndices, LinearIndices and corresponding weights for linear interpolation of point P on mgrid.
+mgrid is created depending on the input field.
 For example, when 2D,
 mgrid=[range(1.3, stop=10.6,step=0.003), range(1.2,stop=15.3,step=0.004)]
 P=[5,5]
+
+I, J, L, V are used to create sparse spray and interpolation matrices for sources and receivers.
 """
 function findnz(pac, sr, f, mgrid, P)
     @assert length(mgrid) == length(P)
