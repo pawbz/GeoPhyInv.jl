@@ -288,7 +288,7 @@ function PFdtd(
         T = _fd.use_gpu ?
             Vector{P_x_worker_x_pw{N,CUDA.CuArray{_fd.datatype,N,CUDA.Mem.DeviceBuffer}}} : Vector{P_x_worker_x_pw{N,Array{_fd.datatype,N}}},
         init = I -> Vector{P_x_worker_x_pw}(sschunks[I...][1], pac),
-        pids = work,
+        pids = work[1:1], # disable distributed in order for Pluto to work (waiting for Pluto bug to enable distributed)
     )
 
     pa = PFdtd(sschunks, papa, pac)

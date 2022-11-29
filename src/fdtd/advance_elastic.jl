@@ -229,7 +229,7 @@ end
 end
 
 
-function compute_dstress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
+function update_dstress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
     w1t = pap.w1[:t]
     mw = pap.memory_pml
     pml = pac.pml
@@ -331,7 +331,7 @@ function compute_dstress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
         pml_faces,
     )
 end
-function compute_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
+function update_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
     w1t = pap.w1[:t]
 
     @parallel compute_v!(
@@ -390,7 +390,7 @@ function compute_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
         pac.ic[:nz],
     )
 end
-function compute_dv!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
+function update_dv!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
     w1t = pap.w1[:t]
     mw = pap.memory_pml
     pml = pac.pml
@@ -488,7 +488,7 @@ function compute_dv!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
         pml_faces,
     )
 end
-function compute_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
+function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
     w1t = pap.w1[:t]
 
     @parallel compute_stressii!(
@@ -531,7 +531,7 @@ function compute_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
 end
 
 
-function compute_dstress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
+function update_dstress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
     w1t = pap.w1[:t]
     mw = pap.memory_pml
     pml = pac.pml
@@ -583,7 +583,7 @@ function compute_dstress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
         pml_faces,
     )
 end
-function compute_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
+function update_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
     w1t = pap.w1[:t]
 
     @parallel compute_v!(
@@ -606,7 +606,7 @@ function compute_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
     (:zmax ∈ pac.rigid_faces) &&
         @parallel (1:pac.ic[:nx]) dirichletzmax!(w1t[:vz], w1t[:vx], pac.ic[:nz])
 end
-function compute_dv!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
+function update_dv!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
     w1t = pap.w1[:t]
     mw = pap.memory_pml
     pml = pac.pml
@@ -655,7 +655,7 @@ function compute_dv!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
         pml_faces,
     )
 end
-function compute_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
+function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
     w1t = pap.w1[:t]
 
     @parallel compute_stressii!(

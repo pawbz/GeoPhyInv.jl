@@ -1,6 +1,7 @@
 module GeoPhyInv
 
 # required packages
+using Distributed
 using ParallelStencil
 using Distances
 using TimerOutputs
@@ -11,7 +12,6 @@ using Optim, LineSearches
 using DistributedArrays
 using Calculus
 using ProgressMeter
-using Distributed
 using SharedArrays
 using Printf
 using DataFrames
@@ -156,7 +156,6 @@ export update, update!
 
 # include("Poisson/Poisson.jl")
 include("plots.jl")
-
 
 
 

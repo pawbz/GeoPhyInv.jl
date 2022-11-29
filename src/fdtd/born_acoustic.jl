@@ -11,6 +11,14 @@ function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdAcoustic
         pac.fc[:dt],
     )#
 end
+# 
+
+function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdElastic{FWmod}}}
+end
+function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdElastic{FWmod}}}
+end
+
+
 function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdAcoustic{FWmod}}}
 end
 function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdAcoustic{FWmod}}}
