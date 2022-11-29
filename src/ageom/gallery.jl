@@ -16,7 +16,7 @@ record.
 This package provides tools to easily create commonly-used `AGeom` instances, 
 after deciding on a spatial grid `mgrid` for the experiment.
 
-## Indexing and Fields
+##### Indexing and Fields
 Let `ageom` be an instance of this type, then fields 
 can be accessed using:
 
@@ -26,7 +26,7 @@ can be accessed using:
 * `ageom[i].ns` : number of sources 
 * `ageom[i].nr` : number of receivers
 
-
+##### Gallery
 ```julia
 ageom=AGeom(mgrid, attrib, SSrcs(10), Recs(20))
 ```
@@ -43,7 +43,6 @@ Choose `attrib::Symbol`
 TODO: For 3D, just mean(ygrid) is used, need to work on more exotic gallery of 3D acquisitions.
 """
 AGeom = Array{AGeomss,1}
-
 
 
 function Array{AGeomss,1}(
