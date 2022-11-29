@@ -1,0 +1,10 @@
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+srcf90/*.mod
+srcf90/*.d
+srcf90/*.o
+lib/
+docs/build/
+docs/site/
+
