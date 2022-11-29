@@ -113,9 +113,12 @@ md"---"
 notebook_files = filter(Pluto.is_pluto_notebook, readdir(joinpath(@__DIR__,"notebooks"), join=true));
 
 # ╔═╡ 88917bd4-3d7b-49da-a12c-d8d16dac84e5
-html_files = broadcast(splitext.(notebook_files)) do f
+html_files = broadcast(splitext.(basename.(notebook_files))) do f
     "https://pawbz.github.io/GeoPhyInv.jl/" * first(f) * ".html"
 end;
+
+# ╔═╡ 93af118c-7def-463c-ad4a-b464d0b13e5d
+splitext.(basename.(notebook_files))
 
 # ╔═╡ 0ceb57ea-d2ee-4436-be98-bfb7a3c08ed5
 function links()
@@ -154,7 +157,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "45ccbad2614eb50532eb14d63c885298611767d5"
+project_hash = "65587a21c6c738d26799777693f784e97f4e3d64"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
@@ -568,6 +571,7 @@ version = "17.4.0+0"
 # ╟─8abc866c-7311-4e3c-804a-106b190e4cdc
 # ╠═460ad45c-23d8-4035-ac55-34691e135c0a
 # ╠═88917bd4-3d7b-49da-a12c-d8d16dac84e5
+# ╠═93af118c-7def-463c-ad4a-b464d0b13e5d
 # ╠═0ceb57ea-d2ee-4436-be98-bfb7a3c08ed5
 # ╠═09fe08a8-610b-11ed-1f9b-2526511c166a
 # ╠═f47cea55-2632-4cb7-9873-99e34c1cf3af

@@ -21,12 +21,13 @@ import Pkg
 Pkg.add("PlutoLinks")
 Pkg.add("PlutoUI")
 Pkg.add("PlutoTest")
+Pkg.add("Plots")
 using PlutoLinks: @revise
-using PlutoUI, PlutoTest
+using PlutoUI, PlutoTest, Plots
 end
 
 # ╔═╡ 981f55af-1557-49c5-921d-2e7e343a511b
-using Plots, Statistics
+using Statistics
 
 # ╔═╡ 86d3f068-a979-42f5-a9e7-138e94c16b38
 @bind reload_geophyinv Button("using GeoPhyInv")
