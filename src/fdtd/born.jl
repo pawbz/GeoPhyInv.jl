@@ -1,11 +1,11 @@
 function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdAcoustic{Born},2}}
-    @parallel compute_p!(pap[2].w1[:t][:p], pap[1].w1[:t][:dvxdx], pap[1].w1[:t][:dvzdz], pac.mod[:δK], pac.fc[:dt])
+    @parallel compute_p!(pap[2].w1[:t][:p], pap[1].w1[:t][:dvxdx], pap[1].w1[:t][:dvzdz], pac.δmod[:K], pac.fc[:dt])
 end
 function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdAcoustic{Born},2}}
     @parallel compute_v!(
         pap[2].w1[:t][:vx],
         pap[2].w1[:t][:vz],
-        pac.mod[:δrhoI],
+        pac.δmod[:rhoI],
         pap[1].w1[:t][:dpdx],
         pap[1].w1[:t][:dpdz],
         pac.fc[:dt],
@@ -13,16 +13,86 @@ function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdAcoustic
 end
 # 
 
-function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdElastic{FWmod}}}
+function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdElastic{FullWave}}}
 end
-function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdElastic{FWmod}}}
+function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdElastic{FullWave}}}
 end
 
 
-function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdAcoustic{FWmod}}}
+function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdAcoustic{FullWave}}}
 end
-function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdAcoustic{FWmod}}}
+function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdAcoustic{FullWave}}}
 end
+
+
+
+"""
+```
+F=LinearMap(pa)
+```
+If `pa` is an instance of `SeisInvExpt`, then 
+return the linearized forward modeling operator `F`, such that
+`F*x` can be computed without explicitly storing the operator matrix (see `LinearMaps.jl`).
+The imaging/migration operator is given by `transpose(F)`. 
+These operators are the building blocks of iterative optimization schemes.
+"""
+function LinearMaps.LinearMap(pa::T) where {T<:PFdtd{FdtdAcoustic{Born}}}
+    fw = (y, x) -> forward_map!(y, x, pa)
+    bk = (y, x) -> adjoint_map!(y, x, pa)
+
+    # data (output) length
+    nd = mapreduce(+, pa.c.data[1]) do d
+        return sum(length.(d.d))
+    end
+    # length of medium (input)
+    nm = sum(length.(pa.c.δmod))
+
+    return LinearMap(fw, bk,
+        nd, nm, 
+        ismutating=true)
+end
+
+function forward_map!(d, m, pa::PFdtd)
+    # copy input m to pac.δmod
+    broadcast(pa.c.δmod, Iterators.partition(m, length(first(pa.c.δmod)))) do m1, m2
+        copyto!(m1, m2)
+    end
+
+    update!(pa, pa.c.srcwav, [2, 2], verbose=false)
+    
+    mode_save = pa.c.attrib_mod.mode
+    pa.c.attrib_mod.mode = :forward
+    update!(pa)
+    # copy pac.data to d (only implemented for first supersource for now
+    copyto!(d, Iterators.flatten(pa.c.data[2][1].d))
+    pa.c.attrib_mod.mode = mode_save
+end
+
+function adjoint_map!(m, d, pa::PFdtd)
+
+    # copy input d to pac.srcwav (only implemented first source for now
+    broadcast(pa.c.srcwav[2][1].d, Iterators.partition(d, length(first(pa.c.srcwav[2][1].d)))) do d1, d2
+        copyto!(d1, d2)
+    end
+
+    # time reversal
+    foreach(pa.c.srcwav[2]) do S # each supersource
+        foreach(S.d) do s # each field
+            reverse!(s, dims=1)
+        end
+    end
+
+    update!(pa, pa.c.srcwav, [-2, 2], verbose=false)
+
+    mode_save = pa.c.attrib_mod.mode
+    pa.c.attrib_mod.mode = :adjoint
+    update!(pa)
+
+    # copy pac.gradients to m
+    copyto!(m, Iterators.flatten(pa.c.gradients))
+    pa.c.attrib_mod.mode = mode_save
+end
+
 
 
 # function add_born_sources!(issp::Int64, pac, pap)

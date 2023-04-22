@@ -18,7 +18,7 @@ mutable struct P_x_worker_x_pw_x_ss{N}
         Tuple{OrderedDict{String,Int64}},
     }
     illum::Matrix{Float64}
-    grad_mod::NamedStack{Matrix{Float64}} # w.r.t different coeffs
+    gradients::NamedStack{T7} where {T7<:Data.Array{N}}# gradients stored w.r.t. medium parameters
 end
 
 function iszero_boundary(pa)
@@ -64,7 +64,7 @@ function initialize!(pa::P_x_worker_x_pw_x_ss)
     map(x -> fill!.(x, 0.0), pa.records)
     fill!.(pa.snaps, 0.0)
     fill!(pa.illum, 0.0)
-    fill!.(pa.grad_mod, 0.0)
+    fill!.(pa.gradients, 0.0)
 end
 
 
@@ -76,13 +76,9 @@ Again, note that a single worker can take care of multiple supersources.
 """
 mutable struct P_x_worker_x_pw{N,Q<:Data.Array{N}}
     ss::Vector{P_x_worker_x_pw_x_ss{N}} # supersource specific arrays
-    # 2D arrays of p, vx, vz, their previous snapshots, and 
-    # x derivatives of p, vx, vz
-    # z derivatives of p, vx, vz
-    w1::NamedStack{NamedStack{Q}} # p, vx, vz on GPU or CPU
-    wr::NamedStack{Array{Data.Number,N}} # same as above but only for receiver fields when GPU to facilitate faster scalar indexing!?
+    w1::NamedStack{NamedStack{Q}} # fields stored on GPU or CPU, for both t (current) and tp (previous) time steps
     w2::NamedStack{NamedStack{Q}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
-    memory_pml::NamedStack{Q} # memory variables for CPML 
+    memory_pml::NamedStack{Q} # memory variables for CPML, only derivative fields stored 
     born_svalue_stack::Array{Float64,N} # used for born modeling # only used for 2-D simulation
 end
 
@@ -114,8 +110,7 @@ end
 Modelling parameters common for all supersources
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
-* `gradient::Vector{Float64}=Medium(medium.mgrid)` : gradient medium modified only if `gmodel_flag`
-* `TDout::Vector{Records.TD}=[Records.TD_zeros(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
+* `Records::Vector{Records.TD}=[Records(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
 * `illum::Array{Float64,2}=zeros(length(medium.mgrid[1]), length(medium.mgrid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
 * `snaps::NamedArray{Array{Float64}}` :snapshots saved at `tsnaps`
@@ -132,7 +127,6 @@ Modelling parameters common for all supersources
 mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
     jobname::Symbol
     attrib_mod::T
-    activepw::Vector{Int64}
     exmedium::Medium
     medium::Medium
     ageom::Vector{AGeom}
@@ -140,52 +134,32 @@ mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
     pml_faces::Vector{Symbol}
     rigid_faces::Vector{Symbol}
     stressfree_faces::Vector{Symbol}
-    sflags::Vector{Int64}
     rfields::Vector{Symbol}
-    rflags::Vector{Int64}
     fc::NamedStack{Float64}
     ic::NamedStack{Int64}
     pml::NamedStack{NamedStack{Q1}} # e.g., pml[:dvxdx][:x][:a], pml[:dtauxxdx][:z][:b]
     mod::NamedStack{Q2} # e.g., mod[:KI], mod[:K]
+    δmod::NamedStack{Q2} # e.g., mod[:KI], mod[:K]
+    # attenuation related parameters
     mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
-    #=
-    	modKI::Matrix{Float64}
-    	modK::Matrix{Float64} # just storing inv(modKI) for speed
-    	modrr::Matrix{Float64}
-    	modrhovxI::Matrix{Float64}
-    	modrhovzI::Matrix{Float64}
-    	=#
-    gradient::Vector{Float64}  # output gradient vector w.r.t (KI, rhoI)
-    grad_mod::NamedStack{SharedArrays.SharedArray{Float64,N}}
-    #=
-    	grad_modKI_stack::SharedArrays.SharedArray{Float64,2} # contains gmodKI
-    	grad_modrhovxI_stack::SharedArrays.SharedArray{Float64,2}
-    	grad_modrhovzI_stack::SharedArrays.SharedArray{Float64,2}
-    	grad_modrr_stack::Array{Float64,2}
-    	=#
+    gradients::NamedStack{SharedArrays.SharedArray{Data.Number,N}}
     illum_flag::Bool
     illum_stack::SharedArrays.SharedArray{Float64,N}
-    backprop_flag::Int64
+    backprop_flag::Symbol
     snaps_field::Symbol
     itsnaps::NamedVector{
         Int64,
         Vector{Int64},
         Tuple{OrderedCollections.OrderedDict{String,Int64}},
     }
-    gmodel_flag::Bool
-    datamat::SharedArrays.SharedArray{Float64,3}
+    datamat::SharedArrays.SharedArray{Data.Number,3}
     data::Vector{Records}
-    # attenuation related parameters
     verbose::Bool
 end
 
 
 function initialize!(pac::P_common)
-    fill!(pac.gradient, 0.0)
-    fill!.(pac.grad_mod, 0.0)
-    # fill!(pac.grad_mod[:rhovxI],0.0)
-    # fill!(pac.grad_mod[:rhovzI],0.0)
-    # fill!(pac.grad_mod[:rhoI],0.0)
+    fill!.(pac.gradients, 0.0)
     fill!(pac.illum_stack, 0.0)
     for dat in pac.data
         fill!(dat, 0.0)

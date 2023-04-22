@@ -74,7 +74,7 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
     push!(sizes1_nbound, sizes1) # for a single snapshot (no time dimension here)
     lsizes1_nbound = Meta.parse(string(length(sizes1_nbound)))
 
-    for f in Fields(ndims = length(collect(dimnames)))
+    for f in Fields(ndims=length(collect(dimnames)))
         @eval function get_boundary_store(::$f, attrib_mod, $(sizes...), nt)
             A = Array{Vector{Data.Array{_fd.ndims}}}(undef, $lsizes1_nbound)
             # get new sizes
@@ -86,10 +86,10 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
                                 $f(),
                                 attrib_mod,
                                 $((
-                                        quote
-                                            range(0, length = $n, stop = 1)
-                                        end for n in sizes
-                                    )...),
+                                    quote
+                                        range(0, length=$n, stop=1)
+                                    end for n in sizes
+                                )...),
                             )[$i],
                         )
                     end for (i, n1) in enumerate(sizes1)
@@ -109,45 +109,12 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
 end
 
 
-function boundary_force_snap_tau!(issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdElastic}}
-    w1t = pap.w1[:t]
-    boundary = pap.ss[issp].boundary
-    for f in [:tauxx, :tauxz, :tauzz]
-        copyto!(w1t[f], boundary[f][:snap][1])
-    end
-end
-function boundary_force_snap_tau!(
-    issp::Int64,
-    pac::T,
-    pap,
-) where {T<:P_common{<:FdtdAcoustic}}
-    w1t = pap.w1[:t]
-    boundary = pap.ss[issp].boundary
-    copyto!(w1t[:p], boundary[:p][:snap][1])
-end
-function boundary_force_snap_v!(
-    issp::Int64,
-    pac::T,
-    pap,
-) where {T<:Union{P_common{<:FdtdAcoustic,2},P_common{<:FdtdElastic,2}}}
-    w1t = pap.w1[:t]
-    boundary = pap.ss[issp].boundary
-    copyto!(w1t[:vx], boundary[:vx][:snap][1])
-    copyto!(w1t[:vz], boundary[:vz][:snap][1])
-end
-function boundary_force_snap_v!(
-    issp::Int64,
-    pac::T,
-    pap,
-) where {T<:Union{P_common{<:FdtdAcoustic,3},P_common{<:FdtdElastic,3}}}
-    w1t = pap.w1[:t]
-    boundary = pap.ss[issp].boundary
-    for f in [:vx, :vy, :vz]
-        copyto!(w1t[f], boundary[f][:snap][1])
-    end
-end
 
+# for options not specified below, don't do anything
+function boundary_force!(args...)
+end
 function boundary_force!(
+    ::Val{:adjoint},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -159,6 +126,7 @@ function boundary_force!(
     boundary_forcez!(w1t[:p], boundary[:p][:z][it], pac.pml_faces)
 end
 function boundary_force!(
+    ::Val{:adjoint},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -173,6 +141,7 @@ function boundary_force!(
 end
 
 function boundary_force!(
+    ::Val{:adjoint},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -185,6 +154,7 @@ function boundary_force!(
     boundary_forcez!(w1t[:p], boundary[:p][:z][it], pac.pml_faces)
 end
 function boundary_force!(
+    ::Val{:adjoint},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -200,32 +170,37 @@ function boundary_force!(
 end
 
 
-function boundary_save_snap_tau!(issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdAcoustic}}
-    w1t = pap.w1[:t]
-    boundary = pap.ss[issp].boundary
-    copyto!(boundary[:p][:snap][1], w1t[:p])
-    rmul!(boundary[:p][:snap][1], -one(Data.Number))
+function boundary_force_snap_tau!(args...)
 end
-function boundary_save_snap_tau!(issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdElastic}}
+function boundary_force_snap_v!(args...)
+end
+function boundary_force_snap_tau!(::Val{:adjoint}, issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdElastic}}
     w1t = pap.w1[:t]
     boundary = pap.ss[issp].boundary
     for f in [:tauxx, :tauxz, :tauzz]
-        copyto!(boundary[f][:snap][1], w1t[f])
-        rmul!(boundary[f][:snap][1], -one(Data.Number))
+        copyto!(w1t[f], boundary[f][:snap][1])
     end
 end
-function boundary_save_snap_v!(
+function boundary_force_snap_tau!(::Val{:adjoint},
+    issp::Int64,
+    pac::T,
+    pap,
+) where {T<:P_common{<:FdtdAcoustic}}
+    w1t = pap.w1[:t]
+    boundary = pap.ss[issp].boundary
+    copyto!(w1t[:p], boundary[:p][:snap][1])
+end
+function boundary_force_snap_v!(::Val{:adjoint},
     issp::Int64,
     pac::T,
     pap,
 ) where {T<:Union{P_common{<:FdtdAcoustic,2},P_common{<:FdtdElastic,2}}}
     w1t = pap.w1[:t]
     boundary = pap.ss[issp].boundary
-    for f in [:vx, :vz]
-        copyto!(boundary[f][:snap][1], w1t[f])
-    end
+    copyto!(w1t[:vx], boundary[:vx][:snap][1])
+    copyto!(w1t[:vz], boundary[:vz][:snap][1])
 end
-function boundary_save_snap_v!(
+function boundary_force_snap_v!(::Val{:adjoint},
     issp::Int64,
     pac::T,
     pap,
@@ -233,11 +208,15 @@ function boundary_save_snap_v!(
     w1t = pap.w1[:t]
     boundary = pap.ss[issp].boundary
     for f in [:vx, :vy, :vz]
-        copyto!(boundary[f][:snap][1], w1t[f])
+        copyto!(w1t[f], boundary[f][:snap][1])
     end
 end
 
+# for options not specified below, don't do anything
+function boundary_save!(args...)
+end
 function boundary_save!(
+    ::Val{:forward},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -252,6 +231,7 @@ function boundary_save!(
 end
 
 function boundary_save!(
+    ::Val{:forward},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -268,6 +248,7 @@ function boundary_save!(
 end
 
 function boundary_save!(
+    ::Val{:forward},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -281,5 +262,47 @@ function boundary_save!(
     rmul!(boundary[:p][:x][it], -one(Data.Number))
     rmul!(boundary[:p][:y][it], -one(Data.Number))
     rmul!(boundary[:p][:z][it], -one(Data.Number))
+end
+
+
+function boundary_save_snap_v!(args...)
+end
+function boundary_save_snap_tau!(args...)
+end
+function boundary_save_snap_tau!(::Val{:forward}, issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdAcoustic}}
+    w1t = pap.w1[:t]
+    boundary = pap.ss[issp].boundary
+    copyto!(boundary[:p][:snap][1], w1t[:p])
+    rmul!(boundary[:p][:snap][1], -one(Data.Number))
+end
+function boundary_save_snap_tau!(::Val{:forward}, issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdElastic}}
+    w1t = pap.w1[:t]
+    boundary = pap.ss[issp].boundary
+    for f in [:tauxx, :tauxz, :tauzz]
+        copyto!(boundary[f][:snap][1], w1t[f])
+        rmul!(boundary[f][:snap][1], -one(Data.Number))
+    end
+end
+function boundary_save_snap_v!(::Val{:forward},
+    issp::Int64,
+    pac::T,
+    pap,
+) where {T<:Union{P_common{<:FdtdAcoustic,2},P_common{<:FdtdElastic,2}}}
+    w1t = pap.w1[:t]
+    boundary = pap.ss[issp].boundary
+    for f in [:vx, :vz]
+        copyto!(boundary[f][:snap][1], w1t[f])
+    end
+end
+function boundary_save_snap_v!(::Val{:forward},
+    issp::Int64,
+    pac::T,
+    pap,
+) where {T<:Union{P_common{<:FdtdAcoustic,3},P_common{<:FdtdElastic,3}}}
+    w1t = pap.w1[:t]
+    boundary = pap.ss[issp].boundary
+    for f in [:vx, :vy, :vz]
+        copyto!(boundary[f][:snap][1], w1t[f])
+    end
 end
 

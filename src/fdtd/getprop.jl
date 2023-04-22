@@ -7,7 +7,7 @@ An instance of `SeisForwExpt`.
 * ├─── `pa[:medium]`: medium 
 * ├─ `pa[:exmedium]`: extended medium to PML regions
 """
-function Base.getindex(pa::PFdtd, s::Symbol, iss::Int = 1; ipw=1)
+function Base.getindex(pa::PFdtd, s::Symbol, iss::Int = 1; ipw = ((first(typeof(pa.c.attrib_mod).parameters) == Born) ? 2 : 1))
     @assert iss ≤ length(pa.c.ageom[1])
     @assert s in vcat([:snaps, :data], collect(fieldnames(P_common)))
     if (s == :snaps)

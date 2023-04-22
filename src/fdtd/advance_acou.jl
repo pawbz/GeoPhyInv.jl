@@ -252,20 +252,6 @@ function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdAcoustic,3}}
 
 end
 
-"""
-Exchange pointers (i.e., set names of NamedArray) instead of copying arrays around
-"""
-function pppppp!(pap, attrib_mod)
-    w2 = pap.w1
-    names_old = names(w2)[1]
-    names_new = vcat(circshift(names_old[1:3], -1), names_old[4:end])
-    setnames!(w2, names_new, 1)
-    # (old method), use for debugging
-    #copyto!.(w2[:tpp],w2[:tp])
-    #copyto!.(w2[:tp],w2[:t])
-end
-
-
 # these relative indices of the arrays point to same location
 # [ix,iy,iz]     --> pressure
 # [ix-1/2,iy,iz]       --> vx

@@ -116,7 +116,7 @@ function F!(pa::PFWI{FdtdAcoustic,T1,T2}, x) where {T1,T2}
 	pa.paf.c.sflags=[2, 0]
 	pa.paf.c.rflags=[1, 0] # record only after first scattering
 	update!(pa.paf,[pa.srcwav,pa.adjsrc])
-	pa.paf.c.backprop_flag=1
+	pa.paf.c.backprop_flag=:save
 	pa.paf.c.gmodel_flag=false
 
 	update!(pa.paf);
@@ -158,7 +158,7 @@ function Fbornmod!(pa::PFWI{FdtdAcoustic{Born},T1,T2}) where {T1,T2}
 	update!(pa.paf,[pa.srcwav,pa.adjsrc])
 
 	# actually, should record only when background field is changed
-	pa.paf.c.backprop_flag=1 # store boundary values for gradient later
+	pa.paf.c.backprop_flag=:save# store boundary values for gradient later
 
 	pa.paf.c.gmodel_flag=false # no gradient
 
@@ -190,7 +190,7 @@ function Fadj!(pa::PFWI)
 
 	# force boundaries in first pw and back propagation for second pw
 	pa.paf.c.sflags=[-2,2] 
-	pa.paf.c.backprop_flag=-1
+	pa.paf.c.backprop_flag=:force
 
 	# update source wavelets in paf using adjoint sources
 	update!(pa.paf,[pa.srcwav,pa.adjsrc])

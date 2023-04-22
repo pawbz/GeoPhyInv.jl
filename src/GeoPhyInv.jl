@@ -57,7 +57,7 @@ include("Interpolation/Interpolation.jl")
 # some structs used for multiple dispatch throughout this package
 include("types.jl")
 export Srcs, Recs, SSrcs
-export FdtdAcoustic, FdtdElastic, Born, FWmod, AcousticBorn, ElasticBorn, FdtdAcousticVisco
+export FdtdAcoustic, FdtdElastic, Born, FullWave, AcousticBorn, ElasticBorn, FdtdAcousticVisco
 
 # mutable data type for seismic medium + related methods
 include("media/core.jl")

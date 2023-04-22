@@ -296,7 +296,7 @@ function PFWI(
 		ageom=[ageom, adjageom], srcwav=[srcwav, adjsrc], 
 		rfields=rfields,
 		sflags=[3, 2], rflags=[1, 1],
-		backprop_flag=1, 
+		backprop_flag=:save, 
 		tgrid=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
 
 

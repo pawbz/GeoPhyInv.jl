@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.15
+# v0.19.21
 
 using Markdown
 using InteractiveUtils
@@ -26,8 +26,8 @@ using PlutoLinks: @revise
 using PlutoUI, PlutoTest, Plots
 end
 
-# ╔═╡ 981f55af-1557-49c5-921d-2e7e343a511b
-using Statistics
+# ╔═╡ a2dd216c-8ec1-47a5-a1de-b691e3c691d0
+TableOfContents()
 
 # ╔═╡ 86d3f068-a979-42f5-a9e7-138e94c16b38
 @bind reload_geophyinv Button("using GeoPhyInv")
@@ -41,6 +41,13 @@ begin
 	@revise using GeoPhyInv
 end
 
+# ╔═╡ 981f55af-1557-49c5-921d-2e7e343a511b
+begin
+	reload_geophyinv
+	GeoPhyInv.@init_parallel_stencil(2, false, Float32, 2)
+	using Statistics
+end
+
 # ╔═╡ de2f97fa-f64d-4754-bd34-e44dbf13c336
 md"""
 In order to install `GeoPhyInv` enter these package manager commands in the REPL.
@@ -48,18 +55,11 @@ In order to install `GeoPhyInv` enter these package manager commands in the REPL
 using Pkg
 Pkg.add(PackageSpec(name="GeoPhyInv",url="https://github.com/pawbz/GeoPhyInv.jl.git"))
 ```
-It is important to configure GeoPhyInv with a macro `@init_parallel_stencil` before anything else. If you need to change this configuration, the julia kernel must be restarted.
+It is necessary to configure GeoPhyInv with a macro `@init_parallel_stencil` before using it. If you need to change this configuration, the julia kernel must be restarted.
 ```julia
 using GeoPhyInv; @init_parallel_stencil(⋯)
 ```
 """
-
-# ╔═╡ d9b71485-8b64-4ad0-a242-dde6300af835
-# ╠═╡ show_logs = false
-begin
-	reload_geophyinv
-	@init_parallel_stencil(2, false, Float32, 2)
-end
 
 # ╔═╡ a6b59ba1-ea71-467f-bf26-49a634a1bbd9
 md"""
@@ -133,14 +133,14 @@ end
 update!(medium2D, [:vp, :rho], randn_perc = 10.0);
 
 # ╔═╡ bb287258-f383-4c04-aee2-c86b8a39a9bd
-plot(medium2D, fields=[:vp, :rho])
+plot(medium2D, fields=[:vp])
 
 # ╔═╡ Cell order:
+# ╠═a2dd216c-8ec1-47a5-a1de-b691e3c691d0
 # ╟─86d3f068-a979-42f5-a9e7-138e94c16b38
 # ╟─de2f97fa-f64d-4754-bd34-e44dbf13c336
 # ╟─0ffd8ee4-1735-4756-befb-c7c10d08eb34
 # ╟─7687d367-f9d5-4539-9156-e26d87379f87
-# ╟─d9b71485-8b64-4ad0-a242-dde6300af835
 # ╠═981f55af-1557-49c5-921d-2e7e343a511b
 # ╠═a6b59ba1-ea71-467f-bf26-49a634a1bbd9
 # ╠═3c549ecd-52dc-47d2-b846-620148089296

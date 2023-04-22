@@ -57,7 +57,7 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
             attrib_mod,
             $(sizes...);
             pml::Bool = false,
-        ) where {T<:Fields}
+        )
             # get new sizes
             $(
                 (

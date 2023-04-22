@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.15
+# v0.19.21
 
 using Markdown
 using InteractiveUtils
@@ -21,13 +21,13 @@ begin
     Pkg.add("PlutoLinks")
     Pkg.add("PlutoUI")
     Pkg.add("PlutoTest")
-Pkg.add("Plots")
+    Pkg.add("Plots")
     using PlutoLinks: @revise
     using PlutoUI, PlutoTest, Plots
 end
 
-# ╔═╡ 981f55af-1557-49c5-921d-2e7e343a511b
-using Plots, Statistics
+# ╔═╡ ed1cc48c-56c2-4a34-a210-fb2237472b9a
+TableOfContents()
 
 # ╔═╡ 86d3f068-a979-42f5-a9e7-138e94c16b38
 @bind reload_geophyinv Button("using GeoPhyInv")
@@ -41,6 +41,14 @@ begin
     @revise using GeoPhyInv
 end
 
+# ╔═╡ d9b71485-8b64-4ad0-a242-dde6300af835
+# ╠═╡ show_logs = false
+begin
+    reload_geophyinv
+    GeoPhyInv.@init_parallel_stencil(2, false, Float32, 2)
+	using Statistics
+end
+
 # ╔═╡ de2f97fa-f64d-4754-bd34-e44dbf13c336
 md"""
 In order to install `GeoPhyInv` enter these package manager commands in the REPL.
@@ -48,18 +56,11 @@ In order to install `GeoPhyInv` enter these package manager commands in the REPL
 using Pkg
 Pkg.add(PackageSpec(name="GeoPhyInv",url="https://github.com/pawbz/GeoPhyInv.jl.git"))
 ```
-It is important to configure GeoPhyInv with a macro `@init_parallel_stencil` before anything else. If you need to change this configuration, the julia kernel must be restarted.
+It is necessary to configure GeoPhyInv with a macro `@init_parallel_stencil` before using it. If you need to change this configuration, the julia kernel must be restarted.
 ```julia
 using GeoPhyInv; @init_parallel_stencil(⋯)
 ```
 """
-
-# ╔═╡ d9b71485-8b64-4ad0-a242-dde6300af835
-# ╠═╡ show_logs = false
-begin
-    reload_geophyinv
-    @init_parallel_stencil(2, false, Float32, 2)
-end
 
 # ╔═╡ a6b59ba1-ea71-467f-bf26-49a634a1bbd9
 md"""
@@ -171,12 +172,12 @@ plot(plot(data, 99.9), plot(data_box, 99.9), size=(800, 500))
 @test data ≠ data_box
 
 # ╔═╡ Cell order:
+# ╠═ed1cc48c-56c2-4a34-a210-fb2237472b9a
 # ╟─86d3f068-a979-42f5-a9e7-138e94c16b38
 # ╟─de2f97fa-f64d-4754-bd34-e44dbf13c336
 # ╟─0ffd8ee4-1735-4756-befb-c7c10d08eb34
 # ╟─7687d367-f9d5-4539-9156-e26d87379f87
-# ╟─d9b71485-8b64-4ad0-a242-dde6300af835
-# ╠═981f55af-1557-49c5-921d-2e7e343a511b
+# ╠═d9b71485-8b64-4ad0-a242-dde6300af835
 # ╟─a6b59ba1-ea71-467f-bf26-49a634a1bbd9
 # ╟─50494fe6-6bdf-4db1-8e61-6c9b39627b1f
 # ╠═ae4201a4-7bb1-456c-bdec-d55127324118

@@ -1,4 +1,46 @@
-# This routine ABSOLUTELY should not allocate any memory, called inside time loop.
+
+function sum_grads!(::Val{:adjoint}, pac, pap)
+    g1 = pac.gradients
+    for issp = 1:length(pap[1].ss)
+        g = pap[1].ss[issp].gradients
+        for name in names(g1)[1]
+            for i in eachindex(g1[name])
+                g1[name][i] = g1[name][i] + g[name][i]
+            end
+        end
+    end
+end
+function sum_grads!(::Val{:forward}, pac, pap)
+end
+
+
+function gradlame!(issp, pap, pac::T) where {T<:P_common{<:FdtdAcoustic}}
+    g = pap[1].ss[issp].gradients[:K]
+    pforward = pap[1].w1[:t][:p]
+    padjoint = pap[2].w1[:t][:p]
+    padjoint_previous = pap[2].w1[:tp][:p]
+	
+    @parallel compute_gmodKI!(g, pforward, padjoint, padjoint_previous)
+end
+
+
+@parallel function compute_gmodKI!(g, pforward, padjoint, padjoint_previous)
+    @all(g) = @all(g) + @all(pforward) * (@all(padjoint) - @all(padjoint_previous)) 
+    return
+end
+function gradrho!(issp, pap, pac::T) where {T<:P_common{<:FdtdAcoustic,2}}
+end
+
+
+
+function compute_gradient!(::Val{:adjoint}, issp::Int64, pac, pap)
+    gradlame!(issp, pap, pac)
+    gradrho!(issp, pap, pac)
+end
+
+function compute_gradient!(::Val{:forward}, issp::Int64, pac, pap)
+end
+#=
 @inbounds @fastmath function compute_gradient!(issp::Int64, pac, pap)
 	# aliases
 	p1=pap[1].w1[:t][:p]
@@ -12,7 +54,6 @@
 	dpdz1=pap[1].w1[:dz][:p]
 	dpdz2=pap[2].w1[:dz][:p]
 
-	gKI=pap[1].ss[issp].grad_mod[:KI]
 	grhovxI=pap[1].ss[issp].grad_mod[:rhovxI]
 	grhovzI=pap[1].ss[issp].grad_mod[:rhovzI]
 
@@ -70,42 +111,5 @@ function grad_modrr!(pac)
 	grad_modrr_sprayrhovzI!(pac.grad_mod[:rhoI],pac.grad_mod[:rhovzI])
 end
 
-function stack_grads!(pac, pap)
-	# theses are SharedArrays
-	gmodKI=pac.grad_mod[:KI]
-	gmodrhovxI=pac.grad_mod[:rhovxI]
-	gmodrhovzI=pac.grad_mod[:rhovzI]
-	for issp in 1:length(pap[1].ss)
-		gs=pap[1].ss[issp].grad_mod[:KI]
-		for i in eachindex(gmodKI)
-			gmodKI[i]+=gs[i]  # only update gmodKI
-		end
-		gs=pap[1].ss[issp].grad_mod[:rhovxI]
-		for i in eachindex(gmodrhovxI)
-			gmodrhovxI[i]+=gs[i]
-		end
-		gs=pap[1].ss[issp].grad_mod[:rhovzI]
-		for i in eachindex(gmodrhovzI)
-			gmodrhovzI[i]+=gs[i]
-		end
-	end
-end
 
-function update_gradient!(pac)
-	nx, nz=pac.ic[:nx], pac.ic[:nz]
-	nznxd = prod(length.(pac.model.mgrid))
-
-	# combine rhovxI and rhovzI
-	grad_modrr!(pac)
-
-	gradient=pac.gradient
-	# truncate
-	gmodKI=view(pac.grad_mod[:KI],_fd.npml+1:nz-_fd.npml,_fd.npml+1:nx-_fd.npml)
-	gmodrr=view(pac.grad_mod[:rhoI],_fd.npml+1:nz-_fd.npml,_fd.npml+1:nx-_fd.npml)
-	for i in 1:nznxd
-		# parameterization is  [:KI, :ρI, :null]
-		gradient[i]=gmodKI[i]  # update gmodKI
-		gradient[nznxd+i]=gmodrr[i]  # update gmodrr
-	end
-end
-
+=#

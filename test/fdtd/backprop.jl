@@ -15,10 +15,10 @@ for field in [:p, :vx, :vz]
     srcwav = pa[:srcwav][1]
     GeoPhyInv.update!(srcwav[1], [field])
 
-    for sflags in [[1, -1], [2, -2]]
-        pa.c.backprop_flag = 1 # do backpropagation
+    for src_types in [[1, -1], [2, -2]]
+        pa.c.backprop_flag = :save # do backpropagation
 
-        GeoPhyInv.update!(pa, [srcwav], [sflags[1]])
+        GeoPhyInv.update!(pa, [srcwav], [src_types[1]])
 
         update!(pa)
         rec1 = deepcopy(pa.c.data[1])
@@ -26,8 +26,8 @@ for field in [:p, :vx, :vz]
         rec1 ./= std(rec1)
 
         # change source flag and update wavelets in pa
-        GeoPhyInv.update!(pa, [srcwav], [sflags[2]])
-        pa.c.backprop_flag = -1 # do backpropagation
+        GeoPhyInv.update!(pa, [srcwav], [src_types[2]])
+        pa.c.backprop_flag = :force # do backpropagation
 
         update!(pa)
         rec2 = deepcopy(pa.c.data[1])

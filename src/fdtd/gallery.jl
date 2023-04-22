@@ -19,16 +19,14 @@ function SeisForwExpt(attrib::Symbol)
 
     return SeisForwExpt(
         attrib_mod,
-        npw = 1,
         tgrid = tgrid,
         tsnaps = tsnaps,
         snaps_field = :vz,
         rfields = [:vx, :vz],
         pml_faces = [:xmin, :xmax, :zmin, :zmax],
         rigid_faces = [:xmin, :xmax, :zmin, :zmax],
-        sflags = 1,
         verbose = true,
-        backprop_flag = 1,
+        backprop_flag = :save,
         illum_flag = false,
         ageom = [ageom],
         srcwav = [srcwav],
