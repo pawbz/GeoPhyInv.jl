@@ -158,14 +158,14 @@ Return a ricker wavelet for a given input `Medium`.
 
 # Arguments
 * `mod::Medium` : Medium
-* `nλ::Int64=10` : number of wavelengths (P-wave) in the medium
+* `nλ=10` : number of wavelengths (P-wave) in the medium along the body diagonal
 * `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the medium, 
 use this fraction to increase of reduce the maximum time
 
 # Keyword Arguments
 * all the keywords arguments of the `ricker` method can be used.
 """
-function ricker(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0, epsilon=inv(sqrt(ndims(mod))); args... )
+function ricker(mod::Medium, nλ=10, tmaxfrac::Real=1.0, epsilon=inv(sqrt(ndims(mod))); args... )
 	@assert(!iszero(mod))
 	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac, epsilon)
 	wav=ricker(fqdom, tgrid; args...)
@@ -175,7 +175,7 @@ end
 """
 Same as ricker, but return ormsby...
 """
-function ormsby(mod::Medium, nλ::Int=10, tmaxfrac::Real=1.0, epsilon=inv(sqrt(ndims(mod))); args... )
+function ormsby(mod::Medium, nλ=10, tmaxfrac::Real=1.0, epsilon=inv(sqrt(ndims(mod))); args... )
 	@assert(!iszero(mod))
 	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac, epsilon)
 	wav=ormsby(fqdom, tgrid; args...)
@@ -184,10 +184,10 @@ end
 
 """
 Return dominant source frequency, and its temporal grid for a finite-difference simulation, for given number of wavelengths `nλ` in the medium.
-The model has `nλ` wavelengths, and the maximum modeling time is determined by `tmaxfrac`.
+The model has `nλ` wavelengths along the (body) diagonal, and the maximum modeling time is determined by `tmaxfrac`.
 `epsilon` is Courant number.
 """
-function get_fqdom_tgrid( mod::Medium, nλ::Int, tmaxfrac::Real, epsilon)
+function get_fqdom_tgrid( mod::Medium, nλ, tmaxfrac::Real, epsilon)
 
 	# maximum distance (diagnol) the wave travels
 	d = sqrt(sum([(m[1]-m[end])^2 for m in mod.mgrid]))

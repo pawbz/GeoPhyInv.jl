@@ -13,7 +13,7 @@ function update_δmods!(pac::P_common, δmod::Vector{Float64})
     copyto!(pac.δmodall, δmod)
     fill!(pac.δmod[:KI], 0.0)
     δmodKI =
-        view(pac.δmod[:KI], _fd.npextend+1:nz-_fd.npextend, _fd.npextend+1:nx-_fd.npextend)
+        view(pac.δmod[:KI], _fd_npextend+1:nz-_fd_npextend, _fd_npextend+1:nx-_fd_npextend)
     for i = 1:nznxd
         # put perturbation due to KI as it is
         δmodKI[i] = δmod[i]
@@ -21,8 +21,8 @@ function update_δmods!(pac::P_common, δmod::Vector{Float64})
     fill!(pac.δmod[:rhoI], 0.0)
     δmodrr = view(
         pac.δmod[:rhoI],
-        _fd.npextend+1:nz-_fd.npextend,
-        _fd.npextend+1:nx-_fd.npextend,
+        _fd_npextend+1:nz-_fd_npextend,
+        _fd_npextend+1:nx-_fd_npextend,
     )
     for i = 1:nznxd
         # put perturbation due to rhoI here
@@ -81,6 +81,9 @@ Source added when src_flags is true, switch off the src_flag whenever necessary,
     # zero out all the results stored in pa.c
     initialize!(pa.c)
 
+    # don't erase boundary values for adjoint simulation
+    (pa.c.attrib_mod.mode == :forward) && initialize_boundary!(pa)
+
     # zero out results stored per worker
     @sync begin
         for (ip, p) in enumerate(procs(pa.p))
@@ -107,7 +110,7 @@ Source added when src_flags is true, switch off the src_flag whenever necessary,
     @sync begin
         for (ip, p) in enumerate(procs(pa.p))
             @sync remotecall_wait(p) do
-                sum_grads!(Val(pa.c.attrib_mod.mode), pa.c, localpart(pa.p))
+                sum_grads!(Val(pa.c.attrib_mod.mode), Val(pa.c.ic[:npw]), pa.c, localpart(pa.p))
                 # (pa.c.illum_flag) && stack_illums!(pa.c, localpart(pa.p))
             end
         end
@@ -135,13 +138,15 @@ end
 function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}, activepw, src_flags) where {N,B}
 
     # source_loop
-    for issp = 1:length(pap[1].ss) # note, all npw have same sources
+    for issp = 1:length(pap[1].ss) # note, all npw have same supersources
         reset_w2!(pap)
 
         iss = pap[1].ss[issp].iss # same note as above
 
-        # only for first propagating wavefield, i.e., pap[1]
-        "initial conditions from boundary for first propagating field only"
+        #=
+        initial conditions stored, used for solving boundary-valued time reversal 
+        for first propagating wavefield npw=1 only
+        =#
         boundary_force_snap_tau!(Val(pac.attrib_mod.mode), issp, pac, pap[1])
         boundary_force_snap_v!(Val(pac.attrib_mod.mode), issp, pac, pap[1])
 
@@ -152,13 +157,36 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}, activepw,
             showspeed=true,
             color=:blue,
         )
-        # time_loop
         #=
-        don't use shared arrays inside this time loop, for speed when using multiple procs
+        * time_loop
+        * the velocity field always lags behind by half time step
+        * don't use shared arrays inside this time loop, for speed when using multiple procs
+------------------------> time
+v  tau 
+o     o     o     o     o
+   x     x     x     x
+------------------------> time
         =#
         for it = 1:pac.ic[:nt]
 
-            pac.verbose && next!(prog, :blue)
+            verbose && next!(prog, :blue)
+
+            
+            # start recording stress
+            @timeit to "record stress" begin
+                record!(it, issp, iss, pac, pap, activepw, [:p])
+            end
+
+
+            @timeit to "compute gradient" begin
+                compute_gradient!(Val(pac.attrib_mod.mode), Val(pac.ic[:npw]), issp, pac, pap)
+            end
+
+            @timeit to "save tp" begin
+                for ipw in activepw
+                    save_tp!(Val(pac.attrib_mod.mode), pap[ipw])
+                end
+            end
 
             # force p[1] on faces, only for ipw=1, after time reversal 
             boundary_force!(Val(pac.attrib_mod.mode), pac.ic[:nt] - it + 1, issp, pac, pap[1])
@@ -173,7 +201,16 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}, activepw,
                     update_v!(pap[ipw], pac)
                 end
             end
-            add_born_sources_velocity!(pap, pac)
+
+            @timeit to "add body-force velocity sources" begin
+                add_source!(it, issp, iss, pac, pap, activepw, src_flags, [:vx, :vy, :vz])
+            end
+            
+            add_born_sources_velocity!(Val(pac.attrib_mod.mode), pap, pac)
+
+            @timeit to "record velocity" begin
+                record!(it, issp, iss, pac, pap, activepw, [:vx, :vy, :vz])
+            end
 
             @timeit to "compute velocity derivatives" begin
                 for ipw in activepw
@@ -185,23 +222,16 @@ function mod_x_proc!(pac::P_common, pap::Vector{P_x_worker_x_pw{N,B}}, activepw,
                     update_stress!(pap[ipw], pac)
                 end
             end
-            add_born_sources_stress!(pap, pac)
 
-            @timeit to "add source" begin
-                add_source!(it, issp, iss, pac, pap, activepw, src_flags)
+            @timeit to "add stress sources" begin # only pressure source, for now
+                add_source!(it, issp, iss, pac, pap, activepw, src_flags, [:p])
             end
+
+            add_born_sources_stress!(Val(pac.attrib_mod.mode), pap, pac)
 
             # record wavefield on all the faces for ipw=1
             boundary_save!(Val(pac.attrib_mod.mode), it, issp, pac, pap[1])
 
-
-            @timeit to "record at receivers" begin
-                record!(it, issp, iss, pac, pap, activepw)
-            end
-
-            @timeit to "compute gradient" begin
-                compute_gradient!(Val(pac.attrib_mod.mode), issp, pac, pap)
-            end
 
             # (pac.illum_flag) && compute_illum!(issp, pap)
 

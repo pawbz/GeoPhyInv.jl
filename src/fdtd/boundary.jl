@@ -21,34 +21,33 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
 
         fname = Symbol("boundary_force", string(dim), "!")
         @eval function $fname(d::Data.Array{$N}, b, pml_faces)
-            np = ($(Meta.quot(dimmin)) ∈ pml_faces) ? _fd.npml : 0
+            np = ($(Meta.quot(dimmin)) ∈ pml_faces) ? _fd_npml : 0
             sb = collect(size(b))
-            sb = collect(size(b))
-            setindex!(sb, _fd.nbound, $idim)
+            setindex!(sb, _fd_nbound, $idim)
             # first nbound points
             @parallel map(x -> (:)(1, x), Tuple(sb)) $fnamehalf(d, b, np, 0)
             # last nbound points independent of d
             @parallel map(x -> (:)(1, x), Tuple(sb)) $fnamehalf(
                 d,
                 b,
-                getindex(size(d), $idim) - np - _fd.nbound,
-                _fd.nbound,
+                getindex(size(d), $idim) - np - _fd_nbound,
+                _fd_nbound,
             )
         end
 
         fname = Symbol("boundary_save", string(dim), "!")
         @eval function $fname(b::Data.Array{$N}, d, pml_faces)
-            np = ($(Meta.quot(dimmin)) ∈ pml_faces) ? _fd.npml : 0
+            np = ($(Meta.quot(dimmin)) ∈ pml_faces) ? _fd_npml : 0
             sb = collect(size(b))
-            setindex!(sb, _fd.nbound, $idim)
-            # first _fd.np points
+            setindex!(sb, _fd_nbound, $idim)
+            # first _fd_np points
             @parallel map(x -> (:)(1, x), Tuple(sb)) $fnamehalf(b, d, 0, np)
-            # last _fd.np points independent of d
+            # last _fd_np points independent of d
             @parallel map(x -> (:)(1, x), Tuple(sb)) $fnamehalf(
                 b,
                 d,
-                _fd.nbound,
-                getindex(size(d), $idim) - np - _fd.nbound,
+                _fd_nbound,
+                getindex(size(d), $idim) - np - _fd_nbound,
             )
         end
 
@@ -66,7 +65,7 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
     ntvec = []
     for (idim, dim) in dimnames
         i = Symbol("n1", string(dim))
-        ss = replace(sizes1, i => :(2 * _fd.nbound))
+        ss = replace(sizes1, i => :(2 * _fd_nbound))
         push!(ntvec, [:nt]) # add time dimension
         push!(sizes1_nbound, ss)
     end
@@ -76,7 +75,7 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
 
     for f in Fields(ndims=length(collect(dimnames)))
         @eval function get_boundary_store(::$f, attrib_mod, $(sizes...), nt)
-            A = Array{Vector{Data.Array{_fd.ndims}}}(undef, $lsizes1_nbound)
+            A = Array{Vector{Data.Array{_fd_ndims}}}(undef, $lsizes1_nbound)
             # get new sizes
             $(
                 (

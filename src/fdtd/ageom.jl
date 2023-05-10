@@ -13,6 +13,50 @@ function get_adjoint_ageom(ageom::AGeom)
 end
 
 
+for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
+    grids = broadcast(x -> Symbol(string("m", x)), getindex.(collect(dimnames), 2))
+    # get indices for any fields, routed via mgrid adjustment
+    @eval function find_neighbour_weights(pac, sr, f::Any, attrib_mod, $(grids...), P)
+        return find_neighbour_weights(get_mgrid(f, attrib_mod, $(grids...)), P, (w, cc) -> weight(sr, f, cc, w, pac))
+    end
+end
+
+
+# multiplication with modK
+# division of source term with δx and δz (see Jan's fdelmodc manual)
+# on pressure grid
+# * pac.mod[:K][si] * pac.fc[:dt] * prod(inv.(step.(pac.medium.mgrid)))
+# cc is cartesian coordinate 
+
+# pressure source for acoustic source
+# cc is N-D cartesian coordinate corresponding to the field grid
+# is the medium e.g., K also on the field grid?
+function weight(::Srcs, f::p, cc, w, pac)
+    CUDA.allowscalar(true)
+    W = w * pac.fc[:dt] / pac.mod[:KI][cc]
+    CUDA.allowscalar(false)
+    return W
+end
+
+function weight(::Srcs, f::vz, cc, w, pac::T) where {T<:Union{P_common{<:FdtdAcoustic,3},P_common{<:FdtdElastic,3}}}
+    CUDA.allowscalar(true)
+    cc1 = CartesianIndex(cc[1] - (_fd_order - 1), cc[2], cc[3])
+    W = w * pac.fc[:dt] / (0.5 * (pac.mod[:rho][cc1] + pac.mod[:rho][cc]))
+    CUDA.allowscalar(false)
+    return W
+end
+
+function weight(::Srcs, f::vz, cc, w, pac::T) where {T<:Union{P_common{<:FdtdAcoustic,2},P_common{<:FdtdElastic,2}}}
+    CUDA.allowscalar(true)
+    cc1 = CartesianIndex(cc[1] - (_fd_order - 1), cc[2])
+    W = w * pac.fc[:dt] / (0.5 * (pac.mod[:rho][cc1] + pac.mod[:rho][cc]))
+    CUDA.allowscalar(false)
+    return W
+end
+
+weight(::Recs, ::Any, cc, w, pac) = w
+
+
 
 """
 This function updates spray and interpolation matrices. Call it whenever there is a change in the source positions or 
@@ -35,7 +79,7 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::
         J = Vector{Int64}()
         V = Vector{Data.Number}()
         for is = 1:ageomss.ns
-            In, Jn, Ln, Vn = findnz(
+            Ln, Vn = find_neighbour_weights(
                 pac,
                 Srcs(),
                 eval(sfield)(),
@@ -48,7 +92,7 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::
             V = vcat(V, Data.Number.(Vn))
         end
         M = prod(length.(get_mgrid(eval(sfield)(), pac.attrib_mod, pac.exmedium.mgrid...)))
-        if (_fd.use_gpu)
+        if (_fd_use_gpu)
             ssprayw[sfield] = CuSparseMatrixCSC(sparse(I, J, V, M, ageomss.ns))
         else
             ssprayw[sfield] = sparse(I, J, V, M, ageomss.ns)
@@ -66,7 +110,7 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::
         J = Vector{Int64}()
         V = Vector{Data.Number}()
         for ir = 1:ageomss.nr
-            In, Jn, Ln, Vn = findnz(
+            Ln, Vn = find_neighbour_weights(
                 pac,
                 Recs(),
                 eval(rfield)(),
@@ -79,7 +123,7 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::
             V = vcat(V, Data.Number.(Vn))
         end
         M = prod(length.(get_mgrid(eval(rfield)(), pac.attrib_mod, pac.exmedium.mgrid...)))
-        if (_fd.use_gpu)
+        if (_fd_use_gpu)
             rinterpolatew[rfield] = CuSparseMatrixCSC(sparse(I, J, V, ageomss.nr, M))
         else
             rinterpolatew[rfield] = sparse(I, J, V, ageomss.nr, M)

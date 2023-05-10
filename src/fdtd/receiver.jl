@@ -1,10 +1,10 @@
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac, pap, activepw)
-
+@inbounds @fastmath function record!(it::Int64, issp::Int64, iss::Int64, pac, pap, activepw, rfields=pac.rfields)
     for ipw in activepw
         rinterpolatew = pap[ipw].ss[issp].rinterpolatew
-        for rfield in pac.rfields
+        rfields1 = intersect(rfields, pac.rfields)
+        for rfield in rfields1
             pw = view(pap[ipw].w1[:t][rfield],:)
             recs = pap[ipw].ss[issp].records[rfield][it]
             w=rinterpolatew[rfield]
@@ -12,7 +12,6 @@
         end
     end
 end
-
 
 
 function update_datamat!(

@@ -1,7 +1,7 @@
-function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdAcoustic{Born},2}}
+function add_born_sources_stress!(::Val{:forward}, pap, pac::T) where {T<:P_common{FdtdAcoustic{Born},2}}
     @parallel compute_p!(pap[2].w1[:t][:p], pap[1].w1[:t][:dvxdx], pap[1].w1[:t][:dvzdz], pac.δmod[:K], pac.fc[:dt])
 end
-function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdAcoustic{Born},2}}
+function add_born_sources_velocity!(::Val{:forward}, pap, pac::T) where {T<:P_common{FdtdAcoustic{Born},2}}
     @parallel compute_v!(
         pap[2].w1[:t][:vx],
         pap[2].w1[:t][:vz],
@@ -13,15 +13,19 @@ function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdAcoustic
 end
 # 
 
-function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdElastic{FullWave}}}
+# function gradlame!(issp, pap, pac::T) where {T<:P_common{<:FdtdAcoustic}}
+function add_born_sources_stress!(::Val{:forward}, pap, pac::T) where {T<:P_common{FdtdElastic{FullWave}}}
 end
-function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdElastic{FullWave}}}
+function add_born_sources_velocity!(::Val{:forward}, pap, pac::T) where {T<:P_common{FdtdElastic{FullWave}}}
+end
+function add_born_sources_stress!(::Val{:forward}, pap, pac::T) where {T<:P_common{FdtdAcoustic{FullWave}}}
+end
+function add_born_sources_velocity!(::Val{:forward}, pap, pac::T) where {T<:P_common{FdtdAcoustic{FullWave}}}
 end
 
-
-function add_born_sources_stress!(pap, pac::T) where {T<:P_common{FdtdAcoustic{FullWave}}}
+function add_born_sources_stress!(::Val{:adjoint}, ::Any, ::Any) 
 end
-function add_born_sources_velocity!(pap, pac::T) where {T<:P_common{FdtdAcoustic{FullWave}}}
+function add_born_sources_velocity!(::Val{:adjoint}, ::Any, ::Any) 
 end
 
 
@@ -52,13 +56,14 @@ function LinearMaps.LinearMap(pa::T) where {T<:PFdtd{FdtdAcoustic{Born}}}
         ismutating=true)
 end
 
+# m is nondimensionalized model vector
 function forward_map!(d, m, pa::PFdtd)
     # copy input m to pac.δmod
-    broadcast(pa.c.δmod, Iterators.partition(m, length(first(pa.c.δmod)))) do m1, m2
-        copyto!(m1, m2)
+    broadcast(pa.c.δmod, chunk(m, size=length(first(pa.c.δmod)))) do m1, m2
+        CUDA.@allowscalar copyto!(m1, m2)
     end
 
-    update!(pa, pa.c.srcwav, [2, 2], verbose=false)
+    update!(pa, pa.c.srcwav, [1, 1], verbose=false)
     
     mode_save = pa.c.attrib_mod.mode
     pa.c.attrib_mod.mode = :forward
@@ -68,11 +73,11 @@ function forward_map!(d, m, pa::PFdtd)
     pa.c.attrib_mod.mode = mode_save
 end
 
-function adjoint_map!(m, d, pa::PFdtd)
+function adjoint_map!(gm, d, pa::PFdtd)
 
     # copy input d to pac.srcwav (only implemented first source for now
-    broadcast(pa.c.srcwav[2][1].d, Iterators.partition(d, length(first(pa.c.srcwav[2][1].d)))) do d1, d2
-        copyto!(d1, d2)
+    broadcast(pa.c.srcwav[2][1].d, chunk(d, size=length(first(pa.c.srcwav[2][1].d)))) do d1, d2
+        CUDA.@allowscalar copyto!(d1, d2)
     end
 
     # time reversal
@@ -82,14 +87,14 @@ function adjoint_map!(m, d, pa::PFdtd)
         end
     end
 
-    update!(pa, pa.c.srcwav, [-2, 2], verbose=false)
+    update!(pa, pa.c.srcwav, [-1, 1], verbose=false)
 
     mode_save = pa.c.attrib_mod.mode
     pa.c.attrib_mod.mode = :adjoint
     update!(pa)
 
     # copy pac.gradients to m
-    copyto!(m, Iterators.flatten(pa.c.gradients))
+    copyto!(gm, Iterators.flatten(pa.c.gradients))
     pa.c.attrib_mod.mode = mode_save
 end
 

@@ -1,6 +1,4 @@
 
-# global const nlayer_rand = 0
-
 include("types.jl")
 include("attenuation.jl")
 
@@ -100,7 +98,7 @@ function PFdtd(
 
 
     # check if fields input are meaningful for given attrib_mod and ndims
-    @assert (N == _fd.ndims) "Cannot initiate SeisForwExpt due to ndims inconsistency with @init_parallel_stencil"
+    @assert (N == _fd_ndims) "Cannot initiate SeisForwExpt due to ndims inconsistency with @init_parallel_stencil"
     !(snaps_field === nothing) && @assert snaps_field ∈ Fields(attrib_mod, ndims=N)
     foreach(rf -> @assert(rf ∈ Fields(attrib_mod; ndims=N)), rfields)
     foreach(
@@ -130,7 +128,7 @@ function PFdtd(
     #(verbose) &&	println(string("\t> number of super sources:\t",nss))	
 
     # extend mediums in the PML layers
-    exmedium = padarray(medium, _fd.npextend, pml_faces)
+    exmedium = padarray(medium, _fd_npextend, pml_faces)
     mod = NamedArray(
         [
             Data.Array(zeros(length.(exmedium.mgrid)...)) for
@@ -146,11 +144,14 @@ function PFdtd(
     # shared arrays required to reduce all the gradient from individual workers
     gradients = NamedArray(
         [
-            SharedArray{_fd.datatype}(zeros(length.(exmedium.mgrid)...)) for
+            SharedArray{_fd_datatype}(zeros(length.(exmedium.mgrid)...)) for
             name in Medium(attrib_mod)
         ],
         Medium(attrib_mod),
     )
+    # need reference values for nondimensionalize and dimensionalize
+    ref_mod = NamedArray([Data.Number(exmedium.ref[name]) for name in Medium(attrib_mod)], Medium(attrib_mod))
+    @info "Add Lambda HEre"
 
     illum_stack = SharedArray{Float64}(zeros(length.(medium.mgrid)...))
 
@@ -166,7 +167,7 @@ function PFdtd(
     end
 
     nrmat = [ageom[ipw][iss].nr for ipw = 1:npw, iss = 1:nss]
-    datamat = SharedArray{_fd.datatype}(length(tgrid), maximum(nrmat), nss)
+    datamat = SharedArray{_fd_datatype}(length(tgrid), maximum(nrmat), nss)
     data = [Records(tgrid, ageom[ip], rfields) for ip = 1:npw]
 
     # dont need visco parameters, initialize with proper sizes later
@@ -196,6 +197,7 @@ function PFdtd(
         δmod,
         NamedArray([memcoeff1, memcoeff2], ([:memcoeff1, :memcoeff2],)),
         gradients,
+        ref_mod,
         illum_flag,
         illum_stack,
         backprop_flag,
@@ -227,8 +229,8 @@ function PFdtd(
 
     # a distributed array of P_x_worker --- note that the parameters for each super source are efficiently distributed here
     papa = ddata(
-        T=_fd.use_gpu ?
-          Vector{P_x_worker_x_pw{N,CUDA.CuArray{_fd.datatype,N,CUDA.Mem.DeviceBuffer}}} : Vector{P_x_worker_x_pw{N,Array{_fd.datatype,N}}},
+        T=_fd_use_gpu ?
+          Vector{P_x_worker_x_pw{N,CUDA.CuArray{_fd_datatype,N,CUDA.Mem.DeviceBuffer}}} : Vector{P_x_worker_x_pw{N,Array{_fd_datatype,N}}},
         init=I -> Vector{P_x_worker_x_pw}(sschunks[I...][1], pac),
         pids=work[1:1], # disable distributed in order for Pluto to work (waiting for Pluto bug to enable distributed)
     )
@@ -236,12 +238,12 @@ function PFdtd(
     pa = PFdtd(sschunks, papa, pac)
 
     # update source wavelets with default source type
-    update!(pa, pa.c.srcwav, fill(2, length(pa.c.srcwav)), verbose=true)
+    update!(pa, pa.c.srcwav, fill(1, length(pa.c.srcwav)), verbose=true)
 
     # update pml coefficient, now that freqpeak is scanned from the source wavelets
     update_pml!(pa.c)
 
-    check_stability(pa, verbose, H=div(20, _fd.order))
+    check_stability(pa, verbose, H=div(20, _fd_order))
 
 
     # update viscoelastic/ viscoacoustic parameters here
@@ -274,22 +276,22 @@ The idea is to use them later inside the loops for faster modelling.
 function get_fc(medium, tgrid)
     N = ndims(medium)
     ds = step.(medium.mgrid)
-    # denominator depending on _fd.order
+    # denominator depending on _fd_order
     dsI = inv.(ds)
-    if (_fd.order == 4)
+    if (_fd_order == 4)
         dsI = inv.(ds .* 24.0)
-    elseif (_fd.order == 6)
+    elseif (_fd_order == 6)
         dsI = inv.(ds .* 1920.0)
-    elseif (_fd.order == 8)
+    elseif (_fd_order == 8)
         dsI = inv.(ds .* 107520.0)
     end
     dt = step(tgrid)
     dtI = inv(dt)
 
-    return NamedArray(
+    return map(Data.Number, NamedArray(
         vcat([dt, dtI], ds, dsI),
         vcat([:dt, :dtI], dim_names(N, "d"), dim_names(N, "d", "I")),
-    )
+    ))
 end
 
 
@@ -404,7 +406,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     )
 
     # transfer to GPUs if 
-    if (_fd.use_gpu)
+    if (_fd_use_gpu)
         ssprayw = map(x -> CuSparseMatrixCSC(x), ssprayw)
         rinterpolatew = map(x -> CuSparseMatrixCSC(x), rinterpolatew)
     end
@@ -436,7 +438,6 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     return pass
 end
 
-include("proj_mat.jl")
 include("source.jl")
 include("receiver.jl")
 include("dirichlet.jl")
@@ -471,7 +472,7 @@ function stack_illums!(pac::P_common, pap::Vector{P_x_worker_x_pw{N}}) where {N}
     pass = pap[1].ss
     for issp = 1:length(pass)
         gs = pass[issp].illum
-        gss = view(gs, _fd.npml+1:nz-_fd.npml, _fd.npml+1:nx-_fd.npml)
+        gss = view(gs, _fd_npml+1:nz-_fd_npml, _fd_npml+1:nx-_fd_npml)
         @. illums += gss
     end
 end

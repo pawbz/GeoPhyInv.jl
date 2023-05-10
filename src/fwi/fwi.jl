@@ -116,7 +116,15 @@ pa=SeisInvExpt(attrib_mod, attrib_inv; srcwav, ageom, tgrid, mediumm, mediumm_ob
   * `=:synthetic` synthetic data inversion
   * `=:field` field data inversion
 """
-SeisInvExpt(m1::Union{FdtdAcoustic, FdtdAcoustic{Born}},m2::Union{LS,LS_prior,Migr,Migr_FD};args1...)=PFWI(m1,m2;args1...) # change this when you have more inversion experiments 
+# function SeisInvExpt(
+#     attrib_mod::Union{FdtdAcoustic,FdtdElastic,FdtdAcousticVisco},
+#     args1...;
+#     args2...
+# )
+# attrib_mod.npw = 2 
+# return PFdtd(attrib_mod, args1...; args2...)
+# end
+# SeisInvExpt(m1::Union{FdtdAcoustic, FdtdAcoustic{Born}},m2::Union{LS,LS_prior,Migr,Migr_FD};args1...)=PFWI(m1,m2;args1...) # change this when you have more inversion experiments 
 
 """
 this method constructs prior term with Q=α*I

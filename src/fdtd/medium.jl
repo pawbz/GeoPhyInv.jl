@@ -1,13 +1,47 @@
+# returns non-dimensionalized model vector corresponding to pa.c.mod
+function get_modelvector(pa::PFdtd)
+    m = Data.Array(zeros(sum(length.(pa.c.mod))))
+    update!(m, pa)
+    return m
+end
 
+# updated pa.c.mod using a (non-dimensional) medium vector
+# this is make pa.c.exmedium inconsistent with pa.c.mod, which is used in propagate functions
+function update!(pa::PFdtd, m::AbstractVector)
+    CUDA.allowscalar(true)
+    mchunks = chunk(m, size=length(first(pa.c.mod)))
+    # dimensionalize
+    broadcast(pa.c.mod, mchunks) do mod, m
+        copyto!(mod, m)
+    end
+    broadcast!(pa.c.mod, pa.c.mod, pa.c.ref_mod) do mod, r
+        exp.(mod) .* r
+    end
+    CUDA.allowscalar(false)
+end
+
+# update m using pa.c.mod
+function update!(m::AbstractVector, pa::PFdtd)
+    CUDA.allowscalar(true)
+    map!(pa.c.mod, pa.c.mod, pa.c.ref_mod) do mod, r
+        log.(mod ./ r)
+    end
+    copyto!(m, Iterators.flatten(pa.c.mod))
+    map!(pa.c.mod, pa.c.mod, pa.c.ref_mod) do mod, r
+        exp.(mod) .* r
+    end
+    CUDA.allowscalar(false)
+end
 
 function Medium(::FdtdAcoustic)
     # the following medium parameters are stored on XPU
-    return [:K, :rhoI]
+    return [:KI, :rho]
 end
 function Medium(::FdtdElastic)
     # the following medium parameters are stored on XPU
     return [:lambda, :M, :mu, :rho]
 end
+
 
 # function get_medium_grad_names(::FdtdElastic)
 #     return [:KI, :rho]
@@ -24,7 +58,7 @@ function update!(pa::PFdtd, medium::Medium, medium_pert::Medium)
 end
 function update!(pac::T, medium::Medium, medium_pert::Medium) where {T<:P_common{FdtdAcoustic{Born}}}
     update!(pac, medium)
-    exmedium_pert=padarray(medium_pert, _fd.npextend, pac.pml_faces)
+    exmedium_pert = padarray(medium_pert, _fd_npextend, pac.pml_faces)
     broadcast(names(pac.δmod)[1]) do name
         copyto!(pac.δmod[name], exmedium_pert, [name])
     end
@@ -49,7 +83,7 @@ function update!(pa::PFdtd, medium::Medium)
 end
 function update!(pac::T, medium::Medium) where {T<:P_common}
     copyto!(pac.medium, medium)
-    padarray!(pac.exmedium, pac.medium, _fd.npextend, pac.pml_faces)
+    padarray!(pac.exmedium, pac.medium, _fd_npextend, pac.pml_faces)
     broadcast(names(pac.mod)[1]) do name
         copyto!(pac.mod[name], pac.exmedium, [name])
     end

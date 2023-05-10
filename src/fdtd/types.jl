@@ -47,8 +47,12 @@ function initialize_boundary!(pa)
                     pap = localpart(pa.p)[ipw]
                     for issp = 1:length(pap.ss)
                         pass = pap.ss[issp]
-                        for i = 1:length(pass.boundary)
-                            fill!(pass.boundary[i], 0.0)
+                        map(pass.boundary) do b1
+                            map(b1) do b2
+                                map(b2) do b3
+                                    fill!(b3, zero(Data.Number))
+                                end
+                            end
                         end
                     end
                 end
@@ -86,7 +90,7 @@ end
 
 function initialize!(pap::Vector{P_x_worker_x_pw{N,B}}) where {N,B}
     reset_w2!(pap)
-    for pap_x_pw in pap
+    map(pap) do pap_x_pw
         initialize!.(pap_x_pw.ss)
     end
 
@@ -96,10 +100,10 @@ end
 function reset_w2!(pap::Vector{P_x_worker_x_pw{N,B}}) where {N,B}
     for pap_x_pw in pap
         fill!(pap_x_pw.born_svalue_stack, 0.0)
-        for w in pap_x_pw.w1
+        map(pap_x_pw.w1) do w
             fill!.(w, 0.0)
         end
-        for w in pap_x_pw.w2
+        map(pap_x_pw.w2) do w
             fill!.(w, 0.0)
         end
         fill!.(pap_x_pw.memory_pml, 0.0)
@@ -135,7 +139,7 @@ mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
     rigid_faces::Vector{Symbol}
     stressfree_faces::Vector{Symbol}
     rfields::Vector{Symbol}
-    fc::NamedStack{Float64}
+    fc::NamedStack{Data.Number}
     ic::NamedStack{Int64}
     pml::NamedStack{NamedStack{Q1}} # e.g., pml[:dvxdx][:x][:a], pml[:dtauxxdx][:z][:b]
     mod::NamedStack{Q2} # e.g., mod[:KI], mod[:K]
@@ -143,6 +147,7 @@ mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
     # attenuation related parameters
     mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
     gradients::NamedStack{SharedArrays.SharedArray{Data.Number,N}}
+    ref_mod::NamedStack{Data.Number} # reference medium values
     illum_flag::Bool
     illum_stack::SharedArrays.SharedArray{Float64,N}
     backprop_flag::Symbol
@@ -161,7 +166,7 @@ end
 function initialize!(pac::P_common)
     fill!.(pac.gradients, 0.0)
     fill!(pac.illum_stack, 0.0)
-    for dat in pac.data
+    map(pac.data) do dat
         fill!(dat, 0.0)
     end
     fill!(pac.datamat, 0.0)

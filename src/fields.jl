@@ -6,7 +6,7 @@ abstract type Fields end
 Return a list of fields which contain `s`.
 Returns all the elastic fields defined here by default i.e., for `ndims=3`.
 """
-function Fields(s = ""; ndims = _fd.ndims)
+function Fields(s = ""; ndims = _fd_ndims)
     @assert(ndims ∈ [2, 3])
     f = filter(x -> contains(string(x), string(s)), nameof.(subtypes(Fields)))
     if (ndims == 2)
@@ -14,11 +14,11 @@ function Fields(s = ""; ndims = _fd.ndims)
     end
     return f
 end
-function Fields(::T, s = ""; ndims = _fd.ndims) where {T<:Elastic}
+function Fields(::T, s = ""; ndims = _fd_ndims) where {T<:Elastic}
     f = Fields(s, ndims = ndims) # get all
     f = filter(x -> !contains(string(x), "p"), f) # filter out pressure
 end
-function Fields(::T, s = ""; ndims = _fd.ndims) where {T<:Acoustic}
+function Fields(::T, s = ""; ndims = _fd_ndims) where {T<:Acoustic}
     f = Fields(s, ndims = ndims) # get all
     f = filter(x -> !contains(string(x), "tau"), f) # filter out tau
     f = filter(x -> !in(x, [:dvxdy, :dvxdz, :dvydx, :dvydz, :dvzdx, :dvzdy]), f) # filter out dvxdy
@@ -78,7 +78,7 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
             )
             # if pml flag size on corresponding dimension is just 2*npml
             if (pml)
-                $n1pml = 2 * _fd.npml
+                $n1pml = 2 * _fd_npml
             end
             return Data.Array(zeros($(sizes1...)))
         end
@@ -93,92 +93,92 @@ get_mgrid(::p, ::FdtdAcoustic, mz, mx) = [mz, mx]
 get_mgrid(::p, ::FdtdAcoustic, mz, my, mx) = [mz, my, mx]
 get_mgrid(::dpdx, ::FdtdAcoustic, mz, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dpdx, ::FdtdAcoustic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dpdz, ::FdtdAcoustic, mz, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dpdz, ::FdtdAcoustic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dpdy, ::FdtdAcoustic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::vx, ::FdtdAcoustic, mz, mx) = [
     mz,
     range(
-        mx[1] - 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] - 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) + (_fd.order - 1),
+        length = length(mx) + (_fd_order - 1),
     ),
 ]
 get_mgrid(::vz, ::FdtdAcoustic, mz, mx) = [
     range(
-        mz[1] - 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] - 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) + (_fd.order - 1),
+        length = length(mz) + (_fd_order - 1),
     ),
     mx,
 ]
@@ -186,16 +186,16 @@ get_mgrid(::vx, ::FdtdAcoustic, mz, my, mx) = [
     mz,
     my,
     range(
-        mx[1] - 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] - 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) + (_fd.order - 1),
+        length = length(mx) + (_fd_order - 1),
     ),
 ]
 get_mgrid(::vz, ::FdtdAcoustic, mz, my, mx) = [
     range(
-        mz[1] - 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] - 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) + (_fd.order - 1),
+        length = length(mz) + (_fd_order - 1),
     ),
     my,
     mx,
@@ -203,9 +203,9 @@ get_mgrid(::vz, ::FdtdAcoustic, mz, my, mx) = [
 get_mgrid(::vy, ::FdtdAcoustic, mz, my, mx) = [
     mz,
     range(
-        my[1] - 0.5 * step(my) * (_fd.order - 1),
+        my[1] - 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) + (_fd.order - 1),
+        length = length(my) + (_fd_order - 1),
     ),
     mx,
 ]
@@ -224,53 +224,53 @@ get_mgrid(::tauyy, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
 get_mgrid(::tauzz, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
 get_mgrid(::tauxy, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::tauxz, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::tauyz, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 
@@ -278,14 +278,14 @@ get_mgrid(::tauxx, ::FdtdElastic, mz, mx) = [mz, mx]
 get_mgrid(::tauzz, ::FdtdElastic, mz, mx) = [mz, mx]
 get_mgrid(::tauxz, ::FdtdElastic, mz, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 
@@ -293,25 +293,25 @@ get_mgrid(::vx, ::FdtdElastic, mz, my, mx) = [
     mz,
     my,
     range(
-        mx[1] - 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] - 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) + (_fd.order - 1),
+        length = length(mx) + (_fd_order - 1),
     ),
 ]
 get_mgrid(::vy, ::FdtdElastic, mz, my, mx) = [
     mz,
     range(
-        my[1] - 0.5 * step(my) * (_fd.order - 1),
+        my[1] - 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) + (_fd.order - 1),
+        length = length(my) + (_fd_order - 1),
     ),
     mx,
 ]
 get_mgrid(::vz, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] - 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] - 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) + (_fd.order - 1),
+        length = length(mz) + (_fd_order - 1),
     ),
     my,
     mx,
@@ -320,16 +320,16 @@ get_mgrid(::vz, ::FdtdElastic, mz, my, mx) = [
 get_mgrid(::vx, ::FdtdElastic, mz, mx) = [
     mz,
     range(
-        mx[1] - 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] - 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) + (_fd.order - 1),
+        length = length(mx) + (_fd_order - 1),
     ),
 ]
 get_mgrid(::vz, ::FdtdElastic, mz, mx) = [
     range(
-        mz[1] - 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] - 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) + (_fd.order - 1),
+        length = length(mz) + (_fd_order - 1),
     ),
     mx,
 ]
@@ -339,104 +339,104 @@ get_mgrid(::dvydy, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
 get_mgrid(::dvzdz, ::FdtdElastic, mz, my, mx) = [mz, my, mx]
 get_mgrid(::dvxdy, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dvxdz, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dvydx, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dvydz, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dvzdx, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dvzdy, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 
@@ -444,229 +444,229 @@ get_mgrid(::dvxdx, ::FdtdElastic, mz, mx) = [mz, mx]
 get_mgrid(::dvzdz, ::FdtdElastic, mz, mx) = [mz, mx]
 get_mgrid(::dvxdz, ::FdtdElastic, mz, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dvzdx, ::FdtdElastic, mz, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 
 get_mgrid(::dtauxxdx, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauyydy, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauzzdz, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauxydx, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauxydy, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauxzdx, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauxzdz, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauyzdy, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        my[1] + step(my) * (_fd.order - 1),
+        my[1] + step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - 2(_fd.order - 1),
+        length = length(my) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauyzdz, ::FdtdElastic, mz, my, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        my[1] + 0.5 * step(my) * (_fd.order - 1),
+        my[1] + 0.5 * step(my) * (_fd_order - 1),
         step = step(my),
-        length = length(my) - (_fd.order - 1),
+        length = length(my) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 
 get_mgrid(::dtauxxdx, ::FdtdElastic, mz, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauzzdz, ::FdtdElastic, mz, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauxzdx, ::FdtdElastic, mz, mx) = [
     range(
-        mz[1] + 0.5 * step(mz) * (_fd.order - 1),
+        mz[1] + 0.5 * step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - (_fd.order - 1),
+        length = length(mz) - (_fd_order - 1),
     ),
     range(
-        mx[1] + step(mx) * (_fd.order - 1),
+        mx[1] + step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - 2(_fd.order - 1),
+        length = length(mx) - 2(_fd_order - 1),
     ),
 ]
 get_mgrid(::dtauxzdz, ::FdtdElastic, mz, mx) = [
     range(
-        mz[1] + step(mz) * (_fd.order - 1),
+        mz[1] + step(mz) * (_fd_order - 1),
         step = step(mz),
-        length = length(mz) - 2(_fd.order - 1),
+        length = length(mz) - 2(_fd_order - 1),
     ),
     range(
-        mx[1] + 0.5 * step(mx) * (_fd.order - 1),
+        mx[1] + 0.5 * step(mx) * (_fd_order - 1),
         step = step(mx),
-        length = length(mx) - (_fd.order - 1),
+        length = length(mx) - (_fd_order - 1),
     ),
 ]
 

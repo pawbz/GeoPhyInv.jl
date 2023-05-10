@@ -1,6 +1,7 @@
 module GeoPhyInv
 
 # required packages
+using Preferences
 using Distributed
 using ParallelStencil
 using Distances
@@ -14,6 +15,7 @@ using Calculus
 using ProgressMeter
 using SharedArrays
 using Printf
+using Markdown
 using DataFrames
 using Measures
 using SparseArrays
@@ -21,6 +23,7 @@ using Interpolations
 using OrderedCollections
 using CSV
 using Statistics
+using LossFunctions
 using LinearAlgebra
 using Random
 using ImageFiltering
@@ -38,13 +41,77 @@ using HDF5
 using SpecialFunctions
 using DSP
 using CUDA
+using MLUtils
 using CUDA.CUSPARSE
 import Base.@doc
 CUDA.allowscalar(false)
 
 
+"""
+Setup ParallelStencil preferences.
+```julia
+setup_parallel_stencil(ndims, use_gpu, datatype, order)
+```
 
-include("params.jl")
+# Arguments
+
+* `ndims::Int`: the number of dimensions used for the stencil computations 2D or 3D 
+* `use_gpu::Bool` : use GPU for stencil computations or not
+* `datatype`: the type of numbers used by field arrays (e.g. Float32 or Float64)
+* `order::Int ∈ [2,4,6,8]` : order of the finite-difference stencil 
+"""
+function set_preferences(; ndims=2, use_gpu=false, datatype="Float32", order=2, verbose=false)
+    @assert ndims ∈ [2, 3]
+    @assert order ∈ [2, 4, 6, 8]
+    @assert isa(use_gpu, Bool)
+    @assert isa(verbose, Bool)
+    @assert datatype ∈ ["Float32", "Float64"]
+    # Set it in our runtime values, as well as saving it to disk
+    @set_preferences!("ndims" => ndims)
+    @set_preferences!("verbose" => verbose)
+    @set_preferences!("order" => order)
+    @set_preferences!("use_gpu" => use_gpu)
+    @set_preferences!("datatype" => datatype)
+
+    @info("GeoPhyInv: new parallel stencil preferences set; restart your Julia session for this change to take effect!")
+end
+export setup_parallel_stencil
+
+const verbose = @load_preference("verbose", false)
+const _fd_order = @load_preference("order", 2)
+const _fd_ndims = @load_preference("ndims", 2)
+const _fd_datatype = eval(Symbol(@load_preference("datatype", "Float32")))
+const _fd_use_gpu = @load_preference("use_gpu", false)
+const _fd_npml = 20 + (_fd_order - 1)
+const _fd_npextend = 20 + (_fd_order - 1) # determines exmedium
+const _fd_nbound = 3 # number of points to store the boundary values
+
+
+ParallelStencil.is_initialized() && ParallelStencil.@reset_parallel_stencil()
+@static if _fd_use_gpu
+    ParallelStencil.@init_parallel_stencil(CUDA, _fd_datatype, _fd_ndims)
+else
+    ParallelStencil.@init_parallel_stencil(Threads, _fd_datatype, _fd_ndims)
+end
+
+# create a timer object, used throughout this package, see TimerOutputs.jl
+global const to = TimerOutput();
+
+"""
+Return axis names of 1D, 2D or 3D fields
+"""
+function dim_names(N, prefix = "", suffix = ""; order = 1)
+    if (N == 3)
+        names = (order == 2) ? [:zz, :yy, :xx, :xz, :xy, :yz] : [:z, :y, :x]
+    elseif (N == 2)
+        names = (order == 2) ? [:zz, :xx, :xz] : [:z, :x]
+    elseif (N == 1)
+        names = [:z]
+    else
+        error("invalid dim num")
+    end
+    return [Symbol(prefix, string(m), suffix) for m in names]
+end
 
 # This type is extensively used to create named arrays with Symbols
 NamedStack{T} =
@@ -52,7 +119,7 @@ NamedStack{T} =
 
 # a module with some util methods
 include("Utils/Utils.jl")
-include("Interpolation/Interpolation.jl")
+include("proj_mat.jl")
 
 # some structs used for multiple dispatch throughout this package
 include("types.jl")
@@ -81,65 +148,19 @@ include("srcwav/core.jl")
 export SrcWav
 
 
-
-"""
-Initialize the package with ParallelStencil, giving access to its main functionality. 
-```julia
-@init_parallel_stencil(ndims, use_gpu, datatype, order)
-```
-
-# Arguments
-
-* `ndims::Int`: the number of dimensions used for the stencil computations 2D or 3D 
-* `use_gpu::Bool` : use GPU for stencil computations or not
-* `datatype`: the type of numbers used by field arrays (e.g. Float32 or Float64)
-* `order::Int ∈ [2,4,6,8]` : order of the finite-difference stencil 
-"""
-macro init_parallel_stencil(ndims::Int, use_gpu::Bool, datatype, order)
-    quote
-        # using ParallelStencil
-        # ParallelStencil.is_initialized() && ParallelStencil.@reset_parallel_stencil()
-        # ParallelStencil.@init_parallel_stencil(CUDA, $datatype, $ndims)
-        @eval GeoPhyInv begin
-            _fd.ndims = $ndims
-            @assert _fd.ndims ∈ [2, 3]
-            _fd.order = $order
-            @assert _fd.order ∈ [2, 4, 6, 8]
-            _fd.use_gpu = $use_gpu
-            _fd.datatype = $datatype
-            @assert _fd.datatype ∈ [Float32, Float64]
-            # extend by more points as we increase order, not sure if that is necessary!!!
-            _fd.npml = 20 + ($order - 1)
-            _fd.npextend = 20 + ($order - 1) # determines exmedium
-
-            # _fd.nbound = $order # number of points to store the boundary values
-            _fd.nbound = 3 # number of points to store the boundary values
-
-            ParallelStencil.is_initialized() && ParallelStencil.@reset_parallel_stencil()
-            # check whether 2D or 3D, and initialize ParallelStencils accordingly
-            @static if $use_gpu
-                # using CUDA
-                ParallelStencil.@init_parallel_stencil(CUDA, $datatype, $ndims)
-            else
-                ParallelStencil.@init_parallel_stencil(Threads, $datatype, $ndims)
-            end
-            include(
-                joinpath(
-                    dirname(pathof(GeoPhyInv)),
-                    "fdtd",
-                    string("diff", $ndims, "D.jl"),
-                ),
-            )
-            # define structs for wavefields in 2D/3D
-            include(joinpath(dirname(pathof(GeoPhyInv)), "fields.jl"))
-            export Fields
-            include(joinpath(dirname(pathof(GeoPhyInv)), "fdtd", "core.jl"))
-            include(joinpath(dirname(pathof(GeoPhyInv)), "born", "core.jl"))
-            nothing
-        end
-    end
+@static if _fd_ndims == 3
+    include("fdtd/diff3D.jl")
+else
+    include("fdtd/diff2D.jl")
 end
-export @init_parallel_stencil
+
+# define structs for wavefields in 2D/3D
+include("fields.jl")
+export Fields
+include("fdtd/core.jl")
+include("fdtd/func_grad.jl")
+include("born/core.jl")
+
 export SeisForwExpt
 
 # export update from GeoPhyInv, as it is commonly used
@@ -152,7 +173,9 @@ export update, update!
 
 # include("Coupling.jl")
 
-# include("fwi/fwi.jl")
+include("fwi/core.jl")
+include("fwi/func_grad.jl")
+export SeisInvExpt
 
 # include("Poisson/Poisson.jl")
 include("plots.jl")
@@ -175,5 +198,4 @@ include("plots.jl")
 # mod!(a::PoissonExpt) = GeoPhyInv.Poisson.mod!(a)
 # operator_Born(a::PoissonExpt, b) = GeoPhyInv.Poisson.operator_Born(a, b)
 
-
-end # module
+end # module GeoPhyInv

@@ -2,17 +2,17 @@
 
 import ..ParallelStencil: INDICES, WITHIN_DOC
 iz, iy, ix = INDICES[1], INDICES[2], INDICES[3]
-@static if (_fd.order == 2)
+@static if (_fd_order == 2)
     izi, iyi, ixi = :($iz + 1), :($iy + 1), :($ix + 1)
-elseif (_fd.order == 4)
+elseif (_fd_order == 4)
     izi, iyi, ixi = :($iz + 3), :($iy + 3), :($ix + 3)
-elseif (_fd.order == 6)
+elseif (_fd_order == 6)
     izi, iyi, ixi = :($iz + 5), :($iy + 5), :($ix + 5)
-elseif (_fd.order == 8)
+elseif (_fd_order == 8)
     izi, iyi, ixi = :($iz + 7), :($iy + 7), :($ix + 7)
 end
 
-@static if (_fd.order == 2)
+@static if (_fd_order == 2)
 
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"
@@ -50,7 +50,7 @@ end
     macro d_xi(A::Symbol)
         esc(:($A[$izi, $iyi, $ix+1] - $A[$izi, $iyi, $ix]))
     end
-elseif (_fd.order == 4)
+elseif (_fd_order == 4)
 
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"
@@ -118,7 +118,7 @@ elseif (_fd.order == 4)
             ),
         )
     end
-elseif (_fd.order == 6)
+elseif (_fd_order == 6)
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"
             esc(:($iz <= size($A, 1) && $ix <= size($A, 2)))
@@ -191,7 +191,7 @@ elseif (_fd.order == 6)
             ),
         )
     end
-elseif (_fd.order == 8)
+elseif (_fd_order == 8)
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"
             esc(:($iz <= size($A, 1) && $ix <= size($A, 2)))

@@ -10,9 +10,9 @@ function update_pml!(
     exmgrid, # 1D grid extended
     mgrid, # 1D grid without extension
     flags::Vector{Bool},
-    δt::Float64,
-    velavg::Float64,
-    freqpeak::Float64, # dominant frequency in Hz
+    δt,
+    velavg,
+    freqpeak, # dominant frequency in Hz
 ) where {T<:Data.Array}
 
     nx = length(exmgrid)
@@ -26,7 +26,7 @@ function update_pml!(
     ALPHA_MAX_PML = pi * freqpeak # from Festa and Vilotte
 
     # thickness of the PML layer in meters
-    thickness_PML = (_fd.npml - 1) * step(mgrid)
+    thickness_PML = (_fd_npml - 1) * step(mgrid)
 
     "reflection coefficient (INRIA report section 6.1) http://hal.inria.fr/docs/00/07/32/19/PDF/RR-3471.pdf"
     Rcoef = 0.001e0
@@ -85,17 +85,17 @@ function update_pml!(
         (abs(d[ix]) > 1.e-6) ?
         a[ix] = d[ix] * (b[ix] - 1.e0) / (k[ix] * (d[ix] + k[ix] * alpha[ix])) : nothing
     end
-    pkI = zeros(2 * _fd.npml)
-    pa = zeros(2 * _fd.npml)
-    pb = zeros(2 * _fd.npml)
-    for i = 1:_fd.npml
-        j = i + _fd.npml
+    pkI = zeros(2 * _fd_npml)
+    pa = zeros(2 * _fd_npml)
+    pb = zeros(2 * _fd_npml)
+    for i = 1:_fd_npml
+        j = i + _fd_npml
         pkI[i] = inv(k[i])
-        pkI[j] = inv(k[end-_fd.npml+i])
+        pkI[j] = inv(k[end-_fd_npml+i])
         pa[i] = a[i]
-        pa[j] = a[end-_fd.npml+i]
+        pa[j] = a[end-_fd_npml+i]
         pb[i] = b[i]
-        pb[j] = b[end-_fd.npml+i]
+        pb[j] = b[end-_fd_npml+i]
     end
     copyto!(pml[:kI], pkI)
     copyto!(pml[:a], pa)
@@ -109,7 +109,7 @@ Generate a NamedArray with PML coefficients for all the dimensions that are then
 function get_pml(attrib_mod, mgrid)
     dfields = Fields(attrib_mod, "d", ndims = length(mgrid)) # derivative fields that need PML memory
     pnames = [:a, :b, :kI]
-    np = 2 * _fd.npml
+    np = 2 * _fd_npml
     return NamedArray(
         [
             NamedArray(Data.Array.([zeros(np), zeros(np), ones(np)]), pnames) for
@@ -184,8 +184,8 @@ for dimnames in [zip([:1, :2, :3], dim_names(3)), zip([:1, :2], dim_names(2))]
             @eval function $fname(memory::Data.Array{$N}, d, a, b, kI, pml_faces)
 
                 sm = collect(size(memory))
-                setindex!(sm, _fd.npml, $idim)
-                # first _fd.npml points
+                setindex!(sm, _fd_npml, $idim)
+                # first _fd_npml points
                 if ($(Meta.quot(dimmin)) ∈ pml_faces)
                     @parallel map(x -> (:)(1, x), Tuple(sm)) $fnamenp(
                         memory,
@@ -197,7 +197,7 @@ for dimnames in [zip([:1, :2, :3], dim_names(3)), zip([:1, :2], dim_names(2))]
                         0,
                     )
                 end
-                # last _fd.npml points independent of d
+                # last _fd_npml points independent of d
                 if ($(Meta.quot(dimmax)) ∈ pml_faces)
                     @parallel map(x -> (:)(1, x), Tuple(sm)) $fnamenp(
                         memory,
@@ -205,8 +205,8 @@ for dimnames in [zip([:1, :2, :3], dim_names(3)), zip([:1, :2], dim_names(2))]
                         a,
                         b,
                         kI,
-                        _fd.npml,
-                        getindex(size(d), $idim) - _fd.npml,
+                        _fd_npml,
+                        getindex(size(d), $idim) - _fd_npml,
                     )
                 end
             end

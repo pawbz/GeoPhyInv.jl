@@ -7,12 +7,12 @@ get_source(w, ::Any, ::Val{0}) = zero(w)
 
 get_source(w, ::p, ::Val{1}) = w
 get_source(w, ::p, ::Val{-1}) = reverse!(w, dims = 1)
-get_source(w, ::p, ::Val{-1}) = reverse!(w, dims = 1)
 function get_source(w, ::Union{vz,vx,vy}, ::Val{1})
     ww = zero(w)
     for is = 1:size(ww, 2)
-        for it = 2:size(ww, 1)
-            ww[it, is] = (w[it-1, is] + w[it, is]) * 0.5
+        for it = 1:size(ww, 1)
+            # ww[it, is] = (w[it-1, is] + w[it, is]) * 0.5
+            ww[it, is] =  w[it, is]
         end
     end
     return ww
@@ -20,14 +20,15 @@ end
 function get_source(w, ::Union{vz,vx,vy}, ::Val{-1})
     ww = zero(w)
     for is = 1:size(ww, 2)
-        for it = 2:size(ww, 1)
-            # as the source wavelet has to be subtracted before the propagation step, I shift here by one sample
-            ww[it, is] = (w[it-1, is] + w[it, is]) * 0.5
+        for it = 1:size(ww, 1)
+            # ww[it, is] = (w[it-1, is] + w[it, is]) * 0.5
+            ww[it, is] = w[it, is]
         end
     end
-    ww = circshift(ww, (1, 0))
-    ww[1, :] .= zero(Data.Number)
+    # as the source wavelet has to be subtracted before the propagation step, I shift here by one sample
+    ww = circshift(ww, (-1, 0))
     reverse!(ww, dims = 1)
+    ww[1, :] .= zero(Data.Number)
     # multiplication with -1 for subtraction #time reversal
     rmul!(ww, -one(Data.Number))
     return ww
@@ -76,10 +77,10 @@ function fill_wavelets!(ipw, iss, wavelets, srcwav, src_types)
 end
 
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac, pap, activepw, src_flags)
+@inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac, pap, activepw, src_flags, sfields=Fields(pac.attrib_mod))
     # adding source to respective sfield at [it] 
     for ipw in activepw
-        sfields = names(pac.srcwav[ipw][iss].d)[1]
+        sfields = intersect(names(pac.srcwav[ipw][iss].d)[1], sfields)
         if (src_flags[ipw]) # add only if src_flags is non-zero
             for sfield in sfields
                 pw = view(pap[ipw].w1[:t][sfield], :)
@@ -109,7 +110,7 @@ Optionally, `src_types` can be changed.
 function update!(pa::PFdtd, srcwav::SrcWav, src_types = 2; verbose = false)
     update!(pa, [srcwav], src_types; verbose = verbose)
 end
-function update!(pa::PFdtd, srcwav::Vector{SrcWav}, src_types = fill(2, length(srcwav)); verbose = false)
+function update!(pa::PFdtd, srcwav::Vector{SrcWav}, src_types = fill(1, length(srcwav)); verbose = false)
     # make a copy of srcwav in pa.c
     @assert (length(srcwav) == length(pa.c.srcwav))
     for i = 1:length(srcwav)
@@ -147,9 +148,9 @@ function update!(pa::PFdtd, srcwav::Vector{SrcWav}, src_types = fill(2, length(s
             for (f, nf) in
                 zip([freqmin, freqmax, freqpeak], [:freqmin, :freqmax, :freqpeak])
                 if (nf ∈ names(pa.c.fc)[1])
-                    pa.c.fc[nf] = f
+                    pa.c.fc[nf] = Data.Number(f)
                 else
-                    pa.c.fc = vcat(pa.c.fc, NamedArray([f], [nf]))
+                    pa.c.fc = vcat(pa.c.fc, NamedArray([Data.Number(f)], [nf]))
                 end
             end
         end

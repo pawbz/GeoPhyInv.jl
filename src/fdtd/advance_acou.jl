@@ -41,7 +41,7 @@ function update_v!(pap, pac::T) where {T<:P_common{<:FdtdAcoustic,2}}
     @parallel compute_v!(
         w1t[:vx],
         w1t[:vz],
-        pac.mod[:rhoI],
+        pac.mod[:rho],
         w1t[:dpdx],
         w1t[:dpdz],
         pac.fc[:dt],
@@ -93,7 +93,7 @@ function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdAcoustic,2}}
 
     #compute pressure at [it] using p at [it-1] and dvxdx
     #and dvzdz at [it-1/2]
-    @parallel compute_p!(w1t[:p], w1t[:dvxdx], w1t[:dvzdz], pac.mod[:K], pac.fc[:dt])
+    @parallel compute_p!(w1t[:p], w1t[:dvxdx], w1t[:dvzdz], pac.mod[:KI], pac.fc[:dt])
 end
 
 function update_dstress!(pap, pac::T) where {T<:P_common{<:FdtdAcoustic,3}}
@@ -146,7 +146,7 @@ function update_v!(pap, pac::T) where {T<:P_common{<:FdtdAcoustic,3}}
         w1t[:vx],
         w1t[:vy],
         w1t[:vz],
-        pac.mod[:rhoI],
+        pac.mod[:rho],
         w1t[:dpdx],
         w1t[:dpdy],
         w1t[:dpdz],
@@ -246,7 +246,7 @@ function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdAcoustic,3}}
         w1t[:dvxdx],
         w1t[:dvydy],
         w1t[:dvzdz],
-        pac.mod[:K],
+        pac.mod[:KI],
         pac.fc[:dt],
     )
 
@@ -273,16 +273,16 @@ end
 end
 
 
-@parallel function compute_v!(vx, vz, rhoI, dpdx, dpdz, dt)#
-    @inn(vx) = @inn(vx) + dt * @av_xi(rhoI) * @all(dpdx)
-    @inn(vz) = @inn(vz) + dt * @av_zi(rhoI) * @all(dpdz)
+@parallel function compute_v!(vx, vz, rho, dpdx, dpdz, dt)#
+    @inn(vx) = @inn(vx) + dt / @av_xi(rho) * @all(dpdx)
+    @inn(vz) = @inn(vz) + dt / @av_zi(rho) * @all(dpdz)
     return
 end
 
-@parallel function compute_v!(vx, vy, vz, rhoI, dpdx, dpdy, dpdz, dt)#
-    @inn(vx) = @inn(vx) + dt * @av_xi(rhoI) * @all(dpdx)
-    @inn(vy) = @inn(vy) + dt * @av_yi(rhoI) * @all(dpdy)
-    @inn(vz) = @inn(vz) + dt * @av_zi(rhoI) * @all(dpdz)
+@parallel function compute_v!(vx, vy, vz, rho, dpdx, dpdy, dpdz, dt)#
+    @inn(vx) = @inn(vx) + dt / @av_xi(rho) * @all(dpdx)
+    @inn(vy) = @inn(vy) + dt / @av_yi(rho) * @all(dpdy)
+    @inn(vz) = @inn(vz) + dt / @av_zi(rho) * @all(dpdz)
     return
 end
 
@@ -303,15 +303,15 @@ end
 
 
 # no attenuation (no memory in stress-strain relation)
-@parallel function compute_p!(p, dvxdx, dvzdz, K, dt)
-    @all(p) = @all(p) + @all(K) * (@all(dvxdx) + @all(dvzdz)) * dt
+@parallel function compute_p!(p, dvxdx, dvzdz, KI, dt)
+    @all(p) = @all(p) + (@all(dvxdx) + @all(dvzdz)) * dt / @all(KI) 
     return
 end
 
 
 # no attenuation (no memory in stress-strain relation)
-@parallel function compute_p!(p, dvxdx, dvydy, dvzdz, K, dt)
-    @all(p) = @all(p) + @all(K) * (@all(dvxdx) + @all(dvzdz) + @all(dvydy)) * dt
+@parallel function compute_p!(p, dvxdx, dvydy, dvzdz, KI, dt)
+    @all(p) = @all(p) + (@all(dvxdx) + @all(dvzdz) + @all(dvydy)) * dt / @all(KI) 
     return
 end
 

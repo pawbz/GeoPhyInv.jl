@@ -1,31 +1,31 @@
 
-function sum_grads!(::Val{:adjoint}, pac, pap)
+function sum_grads!(::Val{:adjoint}, ::Val{2}, pac, pap)
     g1 = pac.gradients
     for issp = 1:length(pap[1].ss)
         g = pap[1].ss[issp].gradients
         for name in names(g1)[1]
             for i in eachindex(g1[name])
-                g1[name][i] = g1[name][i] + g[name][i]
+                CUDA.@allowscalar g1[name][i] = g1[name][i] + g[name][i]
             end
         end
     end
 end
-function sum_grads!(::Val{:forward}, pac, pap)
+function sum_grads!(::Any, ::Any, pac, pap)
 end
 
 
 function gradlame!(issp, pap, pac::T) where {T<:P_common{<:FdtdAcoustic}}
-    g = pap[1].ss[issp].gradients[:K]
+    g = pap[1].ss[issp].gradients[:KI]
+    pforward_previous = pap[1].w1[:tp][:p]
     pforward = pap[1].w1[:t][:p]
-    padjoint = pap[2].w1[:t][:p]
-    padjoint_previous = pap[2].w1[:tp][:p]
+    padjoint_previous = pap[2].w1[:t][:p]
 	
-    @parallel compute_gmodKI!(g, pforward, padjoint, padjoint_previous)
+    @parallel compute_gmodKI!(g, pforward, pforward_previous, padjoint_previous, pac.fc[:dt])
 end
 
 
-@parallel function compute_gmodKI!(g, pforward, padjoint, padjoint_previous)
-    @all(g) = @all(g) + @all(pforward) * (@all(padjoint) - @all(padjoint_previous)) 
+@parallel function compute_gmodKI!(g, pforward, pforward_previous, padjoint_previous, dt)
+    @all(g) = @all(g) + dt * @all(padjoint_previous) * (@all(pforward) - @all(pforward_previous))
     return
 end
 function gradrho!(issp, pap, pac::T) where {T<:P_common{<:FdtdAcoustic,2}}
@@ -33,12 +33,12 @@ end
 
 
 
-function compute_gradient!(::Val{:adjoint}, issp::Int64, pac, pap)
+function compute_gradient!(::Val{:adjoint}, ::Val{2}, issp::Int64, pac, pap)
     gradlame!(issp, pap, pac)
     gradrho!(issp, pap, pac)
 end
 
-function compute_gradient!(::Val{:forward}, issp::Int64, pac, pap)
+function compute_gradient!(::Any, ::Any, issp::Int64, pac, pap)
 end
 #=
 @inbounds @fastmath function compute_gradient!(issp::Int64, pac, pap)

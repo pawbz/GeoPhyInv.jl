@@ -299,7 +299,7 @@ function Base.vec(data::VNamedD)
     return v
 end
 
-function Base.copyto!(d::NamedD, v::AbstractVector{Float64}, i0 = 1)
+function Base.copyto!(d::NamedD, v::AbstractVector{Float64}, i0=1)
     #	@assert length(d)==length(v)
     for dd in d.d
         for i = 1:d[:n]
@@ -334,7 +334,7 @@ end
 
 
 
-function Base.copyto!(v::AbstractVector{Float64}, d::NamedD, i0 = 1)
+function Base.copyto!(v::AbstractVector{Float64}, d::NamedD, i0=1)
     for dd in d.d
         for i = 1:d[:n]
             for it = 1:length(d.grid)
@@ -463,11 +463,9 @@ function Base.fill!(data::VNamedD, k::Float64)
 end
 
 function Base.reverse!(data::NamedD)
-    for dd in data.d
-        for i = 1:data[:n]
-            dv = view(dd, :, i)
-            reverse!(dv)
-        end
+    # time reversal
+    foreach(data.d) do d # each field
+        reverse!(d, dims=1)
     end
 end
 
@@ -478,7 +476,8 @@ reverse!(srcwav)
 Perform in-place time-reversal operation for each wavelet in `srcwav`.
 """
 function Base.reverse!(data::VNamedD)
-    for d in data
+    # time reversal
+    foreach(data) do d # each supersource
         reverse!(d)
     end
 end
@@ -498,30 +497,30 @@ srcwav_new=interp(srcwav, grid_new)
 ```
 Interpolates `srcwav` onto a new grid.
 """
-function interp(data::VNamedD, grid::StepRangeLen, Battrib = :B1)
+function interp(data::VNamedD, grid::StepRangeLen, Battrib=:B1)
     nss = length(data)
     dataout = [NamedD(grid, data[iss].sr, names(data[iss].d, 1)) for iss = 1:nss]
     interp_spray!(data, dataout, :interp, Battrib)
     return dataout
 end
 
-function interp(data::NamedD, grid::StepRangeLen, Battrib = :B1)
+function interp(data::NamedD, grid::StepRangeLen, Battrib=:B1)
     dataout = NamedD(grid, data.sr, names(data.d, 1))
     interp_spray!(data, dataout, :interp, Battrib)
     return dataout
 end
 
 
-function taper!(data::VNamedD, perc = 0.0; bperc = perc, eperc = perc)
+function taper!(data::VNamedD, perc=0.0; bperc=perc, eperc=perc)
     for d in data
-        taper!(d, perc, bperc = bperc, eperc = eperc)
+        taper!(d, perc, bperc=bperc, eperc=eperc)
     end
     return data
 end
 
-function taper!(data::NamedD, perc = 0.0; bperc = perc, eperc = perc)
+function taper!(data::NamedD, perc=0.0; bperc=perc, eperc=perc)
     for dd in data
-        Utils.taper!(dd, bperc = bperc, eperc = eperc)
+        Utils.taper!(dd, bperc=bperc, eperc=eperc)
     end
     return data
 end
@@ -541,9 +540,9 @@ Can reduce allocations =========
 function interp_spray!(
     data::NamedD,
     dataout::NamedD,
-    attrib = :interp,
-    Battrib = :B1;
-    pa = nothing,
+    attrib=:interp,
+    Battrib=:B1;
+    pa=nothing
 )
     @assert length(data.d) == length(dataout.d)
     xin = data.grid
@@ -567,15 +566,15 @@ end
 function interp_spray!(
     data::VNamedD,
     dataout::VNamedD,
-    attrib = :interp,
-    Battrib = :B1;
-    pa = nothing,
+    attrib=:interp,
+    Battrib=:B1;
+    pa=nothing
 )
     @assert length(data) == length(dataout)
     for i = 1:length(data)
         d = data[i]
         dout = dataout[i]
-        interp_spray!(d, dout, attrib, Battrib, pa = pa)
+        interp_spray!(d, dout, attrib, Battrib, pa=pa)
     end
 end
 

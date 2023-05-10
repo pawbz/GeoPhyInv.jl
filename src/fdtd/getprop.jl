@@ -17,7 +17,10 @@ function Base.getindex(pa::PFdtd, s::Symbol, iss::Int = 1; ipw = ((first(typeof(
             p = procs(pa.p)[ip]
             @sync remotecall_wait(p) do
                 pap = localpart(pa.p)
-                return pap[ipw].ss[issp].snaps
+                # for i in eachindex(snaps_all)
+				# 	snaps_all[i]=pap[1].ss[issp].snaps[i] # only first wavefield
+				# end
+                return pap[ipw].ss[issp].snaps[1]
             end
         end
     elseif (s == :data)

@@ -2,17 +2,17 @@
 
 import ..ParallelStencil: INDICES, WITHIN_DOC
 iz, ix = INDICES[1], INDICES[2]
-@static if (_fd.order == 2)
+@static if (_fd_order == 2)
     izi, ixi = :($iz + 1), :($ix + 1)
-elseif (_fd.order == 4)
+elseif (_fd_order == 4)
     izi, ixi = :($iz + 3), :($ix + 3)
-elseif (_fd.order == 6)
+elseif (_fd_order == 6)
     izi, ixi = :($iz + 5), :($ix + 5)
-elseif (_fd.order == 8)
+elseif (_fd_order == 8)
     izi, ixi = :($iz + 7), :($ix + 7)
 end
 
-@static if (_fd.order == 2)
+@static if (_fd_order == 2)
 
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"
@@ -39,7 +39,7 @@ end
         esc(:($A[$izi, $ix+1] - $A[$izi, $ix]))
     end
     # dummy y
-elseif (_fd.order == 4)
+elseif (_fd_order == 4)
 
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"
@@ -85,7 +85,7 @@ elseif (_fd.order == 4)
             ),
         )
     end
-elseif (_fd.order == 6)
+elseif (_fd_order == 6)
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"
             esc(:($iz <= size($A, 1) && $ix <= size($A, 2)))
@@ -132,7 +132,7 @@ elseif (_fd.order == 6)
             ),
         )
     end
-elseif (_fd.order == 8)
+elseif (_fd_order == 8)
     macro within(macroname::String, A::Symbol)
         if macroname == "@all"
             esc(:($iz <= size($A, 1) && $ix <= size($A, 2)))
