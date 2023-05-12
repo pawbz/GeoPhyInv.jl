@@ -1,34 +1,45 @@
 # returns non-dimensionalized model vector corresponding to pa.c.mod
-function get_modelvector(pa::PFdtd)
-    m = Data.Array(zeros(sum(length.(pa.c.mod))))
-    update!(m, pa)
+function get_modelvector(pa::PFdtd, mparams)
+    m = Data.Array(zeros(length(first(pa.c.mod))*length(mparams)))
+    update!(m, pa, mparams)
     return m
 end
 
 # updated pa.c.mod using a (non-dimensional) medium vector
 # this is make pa.c.exmedium inconsistent with pa.c.mod, which is used in propagate functions
-function update!(pa::PFdtd, m::AbstractVector)
+function update!(pa::PFdtd, m::AbstractVector, mparams)
     CUDA.allowscalar(true)
-    mchunks = chunk(m, size=length(first(pa.c.mod)))
+    mchunks = chunk(m, length(mparams))
     # dimensionalize
-    broadcast(pa.c.mod, mchunks) do mod, m
-        copyto!(mod, m)
+    broadcast(enumerate(mparams)) do (i, mname)
+        mod = pa.c.mod[mname]
+        x = mchunks[i]
+        copyto!(mod, x)
     end
-    broadcast!(pa.c.mod, pa.c.mod, pa.c.ref_mod) do mod, r
-        exp.(mod) .* r
+    broadcast(mparams) do mname
+        mod = pa.c.mod[mname]
+        r = pa.c.ref_mod[mname]
+        @. mod = exp(mod) * r
+        # @. mod = mod * r + r
     end
     CUDA.allowscalar(false)
 end
 
 # update m using pa.c.mod
-function update!(m::AbstractVector, pa::PFdtd)
+function update!(m::AbstractVector, pa::PFdtd, mparams)
     CUDA.allowscalar(true)
-    map!(pa.c.mod, pa.c.mod, pa.c.ref_mod) do mod, r
-        log.(mod ./ r)
+    broadcast(mparams) do mname
+        mod = pa.c.mod[mname]
+        r = pa.c.ref_mod[mname]
+        @. mod = log(mod * inv(r))
+        # @. mod = (mod - r) * inv(r)
     end
-    copyto!(m, Iterators.flatten(pa.c.mod))
-    map!(pa.c.mod, pa.c.mod, pa.c.ref_mod) do mod, r
-        exp.(mod) .* r
+    copyto!(m, Iterators.flatten(pa.c.mod[mparams]))
+    broadcast(mparams) do mname
+        mod = pa.c.mod[mname]
+        r = pa.c.ref_mod[mname]
+        @. mod = exp(mod) * r
+        # @. mod = mod * r + r
     end
     CUDA.allowscalar(false)
 end

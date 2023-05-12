@@ -2,13 +2,10 @@
 function SeisForwExpt(attrib::Symbol; npw=1)
     @assert attrib in [:acou_homo2D, :elastic_homo2D]
 
-    medium = Medium(:elastic_homo2D, 5)
+    medium = Medium(:elastic_homo2D, 15)
     # update!(medium, [:vp, :rho, :vs], randn_perc = 5)
-    ageom = AGeom(medium.mgrid, :xwell, SSrcs(1), Recs(100))
-    ageom = AGeom(medium.mgrid, :microseismic, SSrcs(1), Recs(1))
-
-update!(ageom[1], Srcs(), [-200, 0], [-200, 0])
-update!(ageom[1], Recs(), [200, 0], [200, 0])
+    # ageom = AGeom(medium.mgrid, :xwell, SSrcs(1), Recs(100))
+    ageom = AGeom(medium.mgrid, :xwell, SSrcs(1), Recs(1))
 
     wav, tgrid = ricker(medium, 10, 1.0)
     rmul!(wav, 1e6)

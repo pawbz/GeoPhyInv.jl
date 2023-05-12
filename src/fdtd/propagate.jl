@@ -178,10 +178,6 @@ o     o     o     o     o
             end
 
 
-            @timeit to "compute gradient" begin
-                compute_gradient!(Val(pac.attrib_mod.mode), Val(pac.ic[:npw]), issp, pac, pap)
-            end
-
             @timeit to "save tp" begin
                 for ipw in activepw
                     save_tp!(Val(pac.attrib_mod.mode), pap[ipw])
@@ -232,6 +228,10 @@ o     o     o     o     o
             # record wavefield on all the faces for ipw=1
             boundary_save!(Val(pac.attrib_mod.mode), it, issp, pac, pap[1])
 
+
+            @timeit to "compute gradient" begin
+                compute_gradient!(Val(pac.attrib_mod.mode), Val(pac.ic[:npw]), issp, pac, pap)
+            end
 
             # (pac.illum_flag) && compute_illum!(issp, pap)
 

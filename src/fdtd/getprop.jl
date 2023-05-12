@@ -20,7 +20,7 @@ function Base.getindex(pa::PFdtd, s::Symbol, iss::Int = 1; ipw = ((first(typeof(
                 # for i in eachindex(snaps_all)
 				# 	snaps_all[i]=pap[1].ss[issp].snaps[i] # only first wavefield
 				# end
-                return pap[ipw].ss[issp].snaps[1]
+                return pap[ipw].ss[issp].snaps
             end
         end
     elseif (s == :data)

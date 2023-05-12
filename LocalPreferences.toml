@@ -1,0 +1,5 @@
+[GeoPhyInv]
+datatype = "Float32"
+ndims = 2
+order = 2
+use_gpu = true

@@ -1,5 +1,5 @@
-function lossvalue(m, loss, dobs::Records, pa::PFdtd)
-    update!(pa, m)
+function lossvalue(m, loss, dobs::Records, pa::PFdtd, mparams=Medium(pa.c.attrib_mod))
+    update!(pa, m, mparams)
     mode_save = pa.c.attrib_mod.mode
     pa.c.attrib_mod.mode = :forward
     update!(pa, pa.c.srcwav, [1, 0], verbose=false)
@@ -8,9 +8,10 @@ function lossvalue(m, loss, dobs::Records, pa::PFdtd)
     return lossvalue(loss, dobs, pa.c.data[1])
 end
 
-function gradient!(g, m, loss, dobs::Records, pa::PFdtd)
+function gradient!(g, m, loss, dobs::Records, pa::PFdtd, mparams=Medium(pa.c.attrib_mod))
+
     # put m into pac.mod
-    update!(pa, m)
+    update!(pa, m, mparams)
 
     mode_save = pa.c.attrib_mod.mode
 
@@ -26,17 +27,19 @@ function gradient!(g, m, loss, dobs::Records, pa::PFdtd)
     pa.c.attrib_mod.mode = :adjoint
     update!(pa)
 
-
     CUDA.allowscalar(true)
-    mchunks = chunk(m, size=length(first(pa.c.mod)))
-    foreach(pa.c.gradients, mchunks, pa.c.ref_mod) do gm, m, r
-        map!(gm, gm, m) do gm1, m1
-            # chainrule
-            gm1 * exp(m1) * r
+    mchunks = chunk(m, length(mparams))
+    broadcast(enumerate(mparams)) do (i, mname)
+        r = pa.c.ref_mod[mname]
+        gm = pa.c.gradients[mname]
+        x = mchunks[i]
+        # chainrule
+        map!(gm, gm, x) do gm1, x1
+            gm1 * exp(x1) * r
         end
     end
     # copy pac.gradients to g
-    copyto!(g, Iterators.flatten(pa.c.gradients))
+    copyto!(g, Iterators.flatten(pa.c.gradients[mparams]))
     CUDA.allowscalar(false)
     pa.c.attrib_mod.mode = mode_save
     return lossvalue(loss, dobs, pa.c.data[1])
