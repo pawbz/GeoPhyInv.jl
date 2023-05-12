@@ -18,7 +18,7 @@ function gradlame!(issp, pap, pac::T) where {T<:P_common{<:FdtdAcoustic}}
     g = pap[1].ss[issp].gradients[:KI]
     pforward_previous = pap[1].w1[:tp][:p]
     pforward = pap[1].w1[:t][:p]
-    padjoint_previous = pap[2].w1[:t][:p]
+    padjoint_previous = pap[2].w1[:tp][:p]
 	
     @parallel compute_gmodKI!(g, pforward, pforward_previous, padjoint_previous, pac.fc[:dt])
 end
@@ -29,6 +29,17 @@ end
     return
 end
 function gradrho!(issp, pap, pac::T) where {T<:P_common{<:FdtdAcoustic,2}}
+    # g = pap[1].ss[issp].gradients[:rho]
+    # vxforward_previous = pap[1].w1[:tp][:vx]
+    # vxforward = pap[1].w1[:t][:vx]
+    # vxadjoint_previous = pap[2].w1[:t][:p]
+
+    # @parallel compute_gmodrho!(g, pforward, pforward_previous, padjoint_previous, pac.fc[:dt])
+end
+
+@parallel function compute_gmodrho!(g, vxforward, vxforward_previous, vxadjoint_previous, dt)
+    @all(g) = @all(g) + dt * @all(padjoint_previous) * (@all(pforward) - @all(pforward_previous))
+    return
 end
 
 

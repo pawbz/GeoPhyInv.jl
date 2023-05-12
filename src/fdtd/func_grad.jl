@@ -36,6 +36,7 @@ function gradient!(g, m, loss, dobs::Records, pa::PFdtd, mparams=Medium(pa.c.att
         # chainrule
         map!(gm, gm, x) do gm1, x1
             gm1 * exp(x1) * r
+            # gm1 * r
         end
     end
     # copy pac.gradients to g

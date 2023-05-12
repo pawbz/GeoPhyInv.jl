@@ -6,13 +6,12 @@ get_source(w, ::Any, ::Val{0}) = zero(w)
 
 
 get_source(w, ::p, ::Val{1}) = w
-get_source(w, ::p, ::Val{-1}) = reverse!(w, dims = 1)
+get_source(w, ::p, ::Val{-1}) = reverse!(w, dims=1)
 function get_source(w, ::Union{vz,vx,vy}, ::Val{1})
     ww = zero(w)
     for is = 1:size(ww, 2)
         for it = 1:size(ww, 1)
-            # ww[it, is] = (w[it-1, is] + w[it, is]) * 0.5
-            ww[it, is] =  w[it, is]
+            ww[it, is] = w[it, is]
         end
     end
     return ww
@@ -21,22 +20,20 @@ function get_source(w, ::Union{vz,vx,vy}, ::Val{-1})
     ww = zero(w)
     for is = 1:size(ww, 2)
         for it = 1:size(ww, 1)
-            # ww[it, is] = (w[it-1, is] + w[it, is]) * 0.5
-            ww[it, is] = w[it, is]
+            # multiplication with -1 for subtraction #time reversal
+            ww[it, is] = -w[it, is]
         end
     end
     # as the source wavelet has to be subtracted before the propagation step, I shift here by one sample
     ww = circshift(ww, (-1, 0))
-    reverse!(ww, dims = 1)
+    reverse!(ww, dims=1)
     ww[1, :] .= zero(Data.Number)
-    # multiplication with -1 for subtraction #time reversal
-    rmul!(ww, -one(Data.Number))
     return ww
 end
 
 # cumsum is used for integration, but `dt` factor is ignored
-get_source(w, f::Any, ::Val{2}) = get_source(cumsum(w, dims = 1), f, Val{1}())
-get_source(w, f::Any, ::Val{-2}) = get_source(cumsum(w, dims = 1), f, Val{-1}())
+get_source(w, f::Any, ::Val{2}) = get_source(cumsum(w, dims=1), f, Val{1}())
+get_source(w, f::Any, ::Val{-2}) = get_source(cumsum(w, dims=1), f, Val{-1}())
 
 
 
@@ -67,11 +64,15 @@ function fill_wavelets!(ipw, iss, wavelets, srcwav, src_types)
             ww = view(w, it, :) # view for all sources
             copyto!(wavelets[it][sfield], Data.Array(ww))
         end
-        freqmax =
-            min(GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib = :max), freqmax)
-        freqmin =
-            max(GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib = :min), freqmin)
-        push!(freqpeaks, GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib = :peak))
+        if (all(isapprox.(w, 0.0)))
+            push!(freqpeaks, missing)
+        else
+            freqmax =
+                min(GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib=:max), freqmax)
+            freqmin =
+                max(GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib=:min), freqmin)
+            push!(freqpeaks, GeoPhyInv.Utils.findfreq(w, srcwav[ipw][iss].grid, attrib=:peak))
+        end
     end
     return freqmin, freqmax, Statistics.mean(freqpeaks)
 end
@@ -107,10 +108,10 @@ Optionally, `src_types` can be changed.
   * `=1` sources with injection rate
   * `=2` volume injection sources
 """
-function update!(pa::PFdtd, srcwav::SrcWav, src_types = 2; verbose = false)
-    update!(pa, [srcwav], src_types; verbose = verbose)
+function update!(pa::PFdtd, srcwav::SrcWav, src_types=2; verbose=false)
+    update!(pa, [srcwav], src_types; verbose=verbose)
 end
-function update!(pa::PFdtd, srcwav::Vector{SrcWav}, src_types = fill(1, length(srcwav)); verbose = false)
+function update!(pa::PFdtd, srcwav::Vector{SrcWav}, src_types=fill(1, length(srcwav)); verbose=false)
     # make a copy of srcwav in pa.c
     @assert (length(srcwav) == length(pa.c.srcwav))
     for i = 1:length(srcwav)
@@ -153,12 +154,12 @@ function update!(pa::PFdtd, srcwav::Vector{SrcWav}, src_types = fill(1, length(s
                     pa.c.fc = vcat(pa.c.fc, NamedArray([Data.Number(f)], [nf]))
                 end
             end
-        end
-        if (verbose)
-            freqmin = @sprintf("%0.2e", freqmin)
-            freqmax = @sprintf("%0.2e", freqmax)
-            freqpeak = @sprintf("%0.2e", freqpeak)
-            @info "frequency bounds for propagating wavefield $ipw are: [$freqmin, $freqmax], with peak at: $freqpeak"
+            if (verbose)
+                freqmin = @sprintf("%0.2e", freqmin)
+                freqmax = @sprintf("%0.2e", freqmax)
+                freqpeak = @sprintf("%0.2e", freqpeak)
+                @info "frequency bounds for propagating wavefield $ipw are: [$freqmin, $freqmax], with peak at: $freqpeak"
+            end
         end
     end
 end
