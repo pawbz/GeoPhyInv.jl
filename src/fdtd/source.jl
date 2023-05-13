@@ -5,8 +5,6 @@
 get_source(w, ::Any, ::Val{0}) = zero(w)
 
 
-get_source(w, ::p, ::Val{1}) = w
-get_source(w, ::p, ::Val{-1}) = reverse!(w, dims=1)
 function get_source(w, ::Union{vz,vx,vy}, ::Val{1})
     ww = zero(w)
     for is = 1:size(ww, 2)
@@ -31,9 +29,12 @@ function get_source(w, ::Union{vz,vx,vy}, ::Val{-1})
     return ww
 end
 
+
+# get_source(w, ::p, ::Val{1}) = w
+# get_source(w, ::p, ::Val{-1}) = reverse!(w, dims=1)
 # cumsum is used for integration, but `dt` factor is ignored
-get_source(w, f::Any, ::Val{2}) = get_source(cumsum(w, dims=1), f, Val{1}())
-get_source(w, f::Any, ::Val{-2}) = get_source(cumsum(w, dims=1), f, Val{-1}())
+# get_source(w, f::Any, ::Val{2}) = get_source(cumsum(w, dims=1), f, Val{1}())
+# get_source(w, f::Any, ::Val{-2}) = get_source(cumsum(w, dims=1), f, Val{-1}())
 
 
 
@@ -80,20 +81,52 @@ end
 # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
 @inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac, pap, activepw, src_flags, sfields=Fields(pac.attrib_mod))
     # adding source to respective sfield at [it] 
-    for ipw in activepw
+    if (1 ∈ activepw)
+        ipw = 1
         sfields = intersect(names(pac.srcwav[ipw][iss].d)[1], sfields)
-        if (src_flags[ipw]) # add only if src_flags is non-zero
-            for sfield in sfields
-                pw = view(pap[ipw].w1[:t][sfield], :)
+        for sfield in sfields
+            if (src_flags[ipw]) # add only if src_flags is non-zero
+                pw = pap[ipw].w1[:t][sfield]
+                pv = pap[ipw].velocity_buffer[sfield] # pick velocity buffer
+                pv_vec = view(pv, :) 
                 w = pap[ipw].ss[issp].wavelets[it][sfield]
                 ssprayw = pap[ipw].ss[issp].ssprayw[sfield]
-                mul!(pw, ssprayw, w, 1.0, 1.0)
+                mul!(pv_vec, ssprayw, w)
+                @parallel eval(Symbol("muladd_with_density_", sfield))(pw, pv, pac.mod[:rho], pac.fc[:dt])
+            end
+        end
+    end
+    # add adjoint sources at the receiver, using rinterpolatew' of the first pw
+    if (2 ∈ activepw)
+        ipw = 2
+        sfields = intersect(names(pac.srcwav[ipw][iss].d)[1], sfields)
+        for sfield in sfields
+            if (src_flags[ipw]) # add only if src_flags is non-zero
+                pw = pap[ipw].w1[:t][sfield]
+                pv = pap[ipw].velocity_buffer[sfield] # pick velocity buffer
+                pv_vec = view(pv, :) 
+                w = pap[ipw].ss[issp].wavelets[it][sfield]
+                adj_ssprayw = pap[1].ss[issp].rinterpolatew[sfield]
+                mul!(pv_vec, adj_ssprayw, w)
+                @parallel eval(Symbol("muladd_with_density_", sfield))(pw, pv, pac.mod[:rho], pac.fc[:dt])
             end
         end
     end
 end
 
-
+# pw = pw + pv * rho
+@parallel function muladd_with_density_vx(pw, pv, rho, dt)
+    @inn(pw) = @inn(pw) + (@inn(pv) / @av_xi(rho) * dt)
+    return
+end
+@parallel function muladd_with_density_vz(pw, pv, rho, dt)
+    @inn(pw) = @inn(pw) + (@inn(pv) / @av_zi(rho) * dt)
+    return
+end
+@parallel function muladd_with_density_vy(pw, pv, rho, dt)
+    @inn(pw) = @inn(pw) + (@inn(pv) / @av_yi(rho) * dt)
+    return
+end
 
 
 """

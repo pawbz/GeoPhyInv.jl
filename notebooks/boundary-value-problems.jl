@@ -51,14 +51,8 @@ pa_acoustic = SeisForwExpt(:acou_homo2D, snaps_field=:vz);
 # ╔═╡ 4d993c22-9e5e-44e5-994b-a41a3829d94a
 nt = length(pa_acoustic.c.srcwav[1][1].grid)
 
-# ╔═╡ a22a089a-7747-472f-a43e-b2566031642a
-normalize
-
 # ╔═╡ 85a08047-2d00-4c08-85c3-35de37e71e37
 @bind it Slider(1:nt)
-
-# ╔═╡ 051ff48e-40b8-4682-9a89-7074c05f144c
-it
 
 # ╔═╡ b236913b-5320-461a-8583-74eb4140ff27
 pa_elastic = SeisForwExpt(:elastic_homo2D);
@@ -110,9 +104,6 @@ snaps_forw, snaps_back = test_backprop(pa_acoustic, [:p, :vx, :vz])
 # ╔═╡ f2c45770-192a-475c-ab48-29b6f524946c
 A = snaps_back[nt-it+1][GeoPhyInv._fd_npextend + 2 : end - GeoPhyInv._fd_npextend - 1, GeoPhyInv._fd_npextend + 2 : end - GeoPhyInv._fd_npextend-1];
 
-
-
-
 # ╔═╡ 28533942-e735-4444-b897-f4a1bb82463f
 B = snaps_forw[it][GeoPhyInv._fd_npextend + 2 : end - GeoPhyInv._fd_npextend - 1, GeoPhyInv._fd_npextend + 2 : end - GeoPhyInv._fd_npextend - 1 ];
 
@@ -131,10 +122,8 @@ plot(heatmap(B), heatmap(A), heatmap(A - B))
 # ╠═2c5e29cf-67cd-4c74-b7e8-8f16b1828390
 # ╠═c4e9f408-8408-41b7-a788-20e50dace617
 # ╠═4d993c22-9e5e-44e5-994b-a41a3829d94a
-# ╠═051ff48e-40b8-4682-9a89-7074c05f144c
 # ╠═f2c45770-192a-475c-ab48-29b6f524946c
 # ╠═28533942-e735-4444-b897-f4a1bb82463f
-# ╠═a22a089a-7747-472f-a43e-b2566031642a
 # ╠═4bd8806f-5afe-48af-83cd-aa8f6220eb44
 # ╠═85a08047-2d00-4c08-85c3-35de37e71e37
 # ╠═29ad7daf-873f-4b59-b10b-780d6798426e

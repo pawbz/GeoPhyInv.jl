@@ -303,9 +303,9 @@ The parameters common to all workers are stored in `pac`.
 function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) where {T,N}
     n = length.(pac.exmedium.mgrid)
 
-    born_svalue_stack = zeros(n...) # not used anymore?
 
     fields = Fields(pac.attrib_mod) # for current time step
+    velocity_fields = filter(x -> x ∉ Fields(pac.attrib_mod, "d"), Fields(pac.attrib_mod, "v"))
     fields_wo_derivatives = filter(x -> x ∉ Fields(pac.attrib_mod, "d"), Fields(pac.attrib_mod)) # remove derivatives, for previous time step
     w1 = NamedArray(
         [NamedArray([zeros(eval(f)(), T(), n...) for f in fields], Symbol.(fields)), # for all fields attached with attrib_mod
@@ -313,6 +313,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
         ],
         [:t, :tp], # current and previous time step
     )
+    velocity_buffer = NamedArray([zeros(eval(f)(), T(), n...) for f in velocity_fields], Symbol.(velocity_fields))
 
     # dummy (use for viscoelastic modeling later)
     w2 = NamedArray(
@@ -329,7 +330,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
 
     ss = [P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp, iss) in enumerate(sschunks)]
 
-    return P_x_worker_x_pw(ss, w1, w2, memory_pml, born_svalue_stack)
+    return P_x_worker_x_pw(ss, w1, w2, memory_pml, velocity_buffer)
 end
 
 
@@ -398,8 +399,8 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
         [
             spzeros(
                 Data.Number,
-                ageom[ipw][iss].nr,
                 prod(length.(get_mgrid(eval(rf)(), T(), pac.exmedium.mgrid...))),
+                ageom[ipw][iss].nr,
             ) for rf in rfields
         ],
         rfields,

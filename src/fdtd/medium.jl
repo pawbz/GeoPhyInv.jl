@@ -53,11 +53,6 @@ function Medium(::FdtdElastic)
     return [:lambda, :M, :mu, :rho]
 end
 
-
-# function get_medium_grad_names(::FdtdElastic)
-#     return [:KI, :rho]
-# end
-
 """
 This method should be executed only after the updating the main medium.
 Update the `δmods` when a perturbed `medium_pert` is input.

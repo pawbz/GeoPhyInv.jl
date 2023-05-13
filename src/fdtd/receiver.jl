@@ -8,7 +8,7 @@
             pw = view(pap[ipw].w1[:t][rfield],:)
             recs = pap[ipw].ss[issp].records[rfield][it]
             w=rinterpolatew[rfield]
-            mul!(recs, w, pw)
+            mul!(recs, transpose(w), pw)
         end
     end
 end

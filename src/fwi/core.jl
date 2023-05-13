@@ -12,7 +12,7 @@ function SeisInvExpt(paf::PFdtd, dobs::Records, migrid=paf.c.medium.mgrid, mpara
     # modeling mesh
     mmgrid = reverse(paf.c.exmedium.mgrid) # to x, y, z
 
-    P = get_proj_matrix(migrid, mmgrid, use_gpu=_fd_use_gpu, weight_fn=(w, cc) -> Data.Number(w))
+    P = get_proj_matrix(migrid, mmgrid, use_gpu=_fd_use_gpu, number=Data.Number)
 
     # don't change the order of first two entries here
     # P will be repeated based on the number of medium parameters, e.g., KI and rho

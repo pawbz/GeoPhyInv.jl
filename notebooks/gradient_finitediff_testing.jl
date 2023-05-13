@@ -25,6 +25,9 @@ end
 # ╔═╡ f86410b5-87f7-4761-91a8-856406d00234
 @revise using GeoPhyInv
 
+# ╔═╡ 501a84e3-c4f8-4451-aba7-5df49d6eccf8
+using DistributedArrays
+
 # ╔═╡ bd68d9b1-633b-4c9b-b759-791581714306
 using Statistics, LossFunctions, LinearAlgebra, MLUtils, FiniteDifferences, SparseArrays
 
@@ -41,14 +44,23 @@ begin
 	# @test m1 ≈ m2
 end
 
+# ╔═╡ 89d3982a-b8d4-4f0d-8d30-db89b054aabe
+A=localpart(pa_mod.p)[2].ss[1].ssprayw
+
+# ╔═╡ ecbc28a1-4bbd-465e-a4ab-b43bcfdadb3f
+B=localpart(pa_mod.p)[1].ss[1].rinterpolatew
+
+# ╔═╡ a3e8da59-c844-4111-9f02-6eeecb7f6430
+Array(A[1]) ≈ Array(B[1])
+
+# ╔═╡ dec88b97-3316-4467-9c92-58f1f415bf3c
+Array(B[1]) |> heatmap
+
 # ╔═╡ 2a737f8b-92d0-4042-96eb-6b85ea4030c7
 # @time update!(m1, pa_mod, [:KI])
 
 # ╔═╡ 9d3aeb6f-936d-4173-b41c-2159a458b8ce
 m1= GeoPhyInv.get_modelvector(pa_mod, [:KI])
-
-# ╔═╡ 0ecf589f-a5e1-4139-8ec4-563f4a7c38f7
-
 
 # ╔═╡ f49439df-3db3-48ae-bf9d-1387e3c14c8f
 N=2
@@ -89,14 +101,18 @@ GeoPhyInv.get_modelvector(pa_inv)
 # ╔═╡ aa0f7f1b-65ff-4a0b-9fb0-e6660911fdc8
 heatmap(Array(deepcopy(pa_mod.c.gradients[:KI])));
 
+# ╔═╡ cb6ba7e9-0685-4e59-96ef-a8a7af640107
+mul!
+
 # ╔═╡ 839cf146-639c-4d13-9470-d25882837169
-1/prod(step.(pa_true.c.medium.mgrid)) * pa_true.c.srcwav[1][1].grid |> step
+# prod(step.(pa_true.c.medium.mgrid)) #
+pa_true.c.srcwav[1][1].grid |> step |> abs2
 
 # ╔═╡ d3b4cd08-eca1-4fac-915f-a64dc29b870f
-pa_true.c.srcwav[1][1].grid |> step
+GeoPhyInv.Fields(pa_mod.c.attrib_mod, "v")
 
-# ╔═╡ 911518e0-0fc1-43fe-8df9-b4e27382181f
-
+# ╔═╡ b14a5a36-94c4-4a6c-8b26-730919e3e5ae
+filter(x -> x ∉ Fields(pa_mod.c.attrib_mod, "d"), Fields(pa_mod.c.attrib_mod, "v"))
 
 # ╔═╡ 417388ad-8709-4d4a-9d81-d4bbb0351a92
 heatmap(Array(pa_mod.c.gradients[1]), clim=(-1e-11, 1e-11), c=:seismic)
@@ -168,11 +184,15 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═75ad24f7-8b57-401b-8170-d3e35f3c960f
 # ╠═893cd92d-3d0d-4fb2-b465-f61a237fc154
 # ╠═f86410b5-87f7-4761-91a8-856406d00234
+# ╠═501a84e3-c4f8-4451-aba7-5df49d6eccf8
+# ╠═89d3982a-b8d4-4f0d-8d30-db89b054aabe
+# ╠═ecbc28a1-4bbd-465e-a4ab-b43bcfdadb3f
+# ╠═a3e8da59-c844-4111-9f02-6eeecb7f6430
+# ╠═dec88b97-3316-4467-9c92-58f1f415bf3c
 # ╠═bd68d9b1-633b-4c9b-b759-791581714306
 # ╠═de9a4882-cba9-4707-a900-3d82b9a2faa1
 # ╠═2a737f8b-92d0-4042-96eb-6b85ea4030c7
 # ╠═9d3aeb6f-936d-4173-b41c-2159a458b8ce
-# ╠═0ecf589f-a5e1-4139-8ec4-563f4a7c38f7
 # ╠═f49439df-3db3-48ae-bf9d-1387e3c14c8f
 # ╠═43fb3211-9ffc-4ea5-a459-539cf55ba009
 # ╠═c6b19c3d-6ccb-436f-a191-d3cc1958a91a
@@ -192,11 +212,12 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═630faaff-f7f0-46d7-a36f-31a54e589c8e
 # ╠═8ec00fb7-fe18-4741-b987-813ec97d73fe
 # ╠═cd5bff59-6466-43d7-bd10-795d6f55d4ef
+# ╠═cb6ba7e9-0685-4e59-96ef-a8a7af640107
 # ╠═4bbcd3e5-62f5-408d-a4a4-eee04fb61b26
 # ╠═c6007b1a-3819-4543-bab4-f0dc0c12e075
 # ╠═839cf146-639c-4d13-9470-d25882837169
 # ╠═d3b4cd08-eca1-4fac-915f-a64dc29b870f
-# ╠═911518e0-0fc1-43fe-8df9-b4e27382181f
+# ╠═b14a5a36-94c4-4a6c-8b26-730919e3e5ae
 # ╠═60a9adc0-466d-4e54-9838-f01b0a2c50c5
 # ╠═417388ad-8709-4d4a-9d81-d4bbb0351a92
 # ╠═4b49262a-28a5-4182-bc46-43e567056bd6

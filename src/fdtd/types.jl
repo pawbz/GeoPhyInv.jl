@@ -83,7 +83,7 @@ mutable struct P_x_worker_x_pw{N,Q<:Data.Array{N}}
     w1::NamedStack{NamedStack{Q}} # fields stored on GPU or CPU, for both t (current) and tp (previous) time steps
     w2::NamedStack{NamedStack{Q}} # required for attenuation, where third dimension is nsls (only used for 2D simulation right now)
     memory_pml::NamedStack{Q} # memory variables for CPML, only derivative fields stored 
-    born_svalue_stack::Array{Float64,N} # used for born modeling # only used for 2-D simulation
+    velocity_buffer::NamedStack{Q} # used for born modeling # only used for 2-D simulation
 end
 
 # P_x_worker=Vector{P_x_worker_x_pw}
@@ -99,14 +99,14 @@ end
 # reset wavefields for every worker
 function reset_w2!(pap::Vector{P_x_worker_x_pw{N,B}}) where {N,B}
     for pap_x_pw in pap
-        fill!(pap_x_pw.born_svalue_stack, 0.0)
+        fill!.(pap_x_pw.velocity_buffer, zero(Data.Number))
         map(pap_x_pw.w1) do w
-            fill!.(w, 0.0)
+            fill!.(w, zero(Data.Number))
         end
         map(pap_x_pw.w2) do w
-            fill!.(w, 0.0)
+            fill!.(w, zero(Data.Number))
         end
-        fill!.(pap_x_pw.memory_pml, 0.0)
+        fill!.(pap_x_pw.memory_pml, zero(Data.Number))
     end
 end
 
