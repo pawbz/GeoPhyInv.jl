@@ -7,109 +7,139 @@ using InteractiveUtils
 # ╔═╡ e9e81c62-bef9-4736-9fce-bfe3b0cada7a
 using SparseArrays, Test
 
-# ╔═╡ c23c557c-a426-48d0-a1dd-7cf2f3a47fa5
-"""
-minimum index using imask
-"""
-function indminimum(x, val, imask=[])
-    min_i = 0
-    min_x = typemax(Float64)
-    for (i, xi) in enumerate(x)
-        dist = abs(xi - val)
-        if ((dist < min_x) && (i ∉ imask))
-            min_x = dist
-            min_i = i
-        end
-    end
-    return min_i
-end
-
-
-# ╔═╡ 8d41c81f-390d-417e-9231-7b42184dfb18
-"""
-Return n indices in order
-Cannot find a julia method which does, this.
-If a faster method is found, replace it later.
-"""
-function indminn!(ivec, x, val)
-    # using enumerate to avoid indexing
-    n = length(ivec)
-    if (length(x) < n)
-        # if the desired indices is greater than length of x, what to do..
-        fill!(ivec, one(eltype(ivec)))
+# ╔═╡ 78c2e09e-843c-4b32-a09a-df4027d10895
+function get_neighbour_indices(arr, val)
+    len = length(arr)
+    idx = searchsortedfirst(arr, val)
+    if idx == 1
+        return [1, 2]
+	elseif idx >= len
+        return [len-1, len]
     else
-        fill!(ivec, zero(eltype(ivec)))
-        for inn in 1:n
-            ivec[inn] = indminimum(x, val, ivec)
-        end
-        sort!(ivec)
+        return [idx-1, idx]
     end
-    return ivec
 end
 
-
-# ╔═╡ 6d953eda-506e-484c-b084-5c318c8f67d0
-function indminn(x, val, n)
-    ivec = fill(0, n)
-    indminn!(ivec, x, val)
-    return ivec
+# ╔═╡ 49d5dc87-0256-404c-9b59-f1db4450a3e3
+"""
+This function takes in three vectors x, y, z, and three values xi, yi, zi, corresponding to the interpolation point. It first checks if the interpolation point is inside the grid, then finds the indices of the 8 neighbouring grid points using the get_neighbour_indices function. It then computes the interpolation weights and stores them in a sparse vector with values of 1 and the specified weights at the corresponding indices. The resulting sparse vector has length n * m * p and a single column.
+"""
+function bilinear_interp(x, y, z, xi, yi, zi; number=Data.Number)
+    if (xi < minimum(x) || xi > maximum(x) || yi < minimum(y) || yi > maximum(y) || zi < minimum(z) || zi > maximum(z))
+        throw(ArgumentError("Interpolation point is outside the grid."))
+    end
+    n, m, p = length(x), length(y), length(z)
+    x_idx1, x_idx2 = get_neighbour_indices(x, xi)
+    y_idx1, y_idx2 = get_neighbour_indices(y, yi)
+    z_idx1, z_idx2 = get_neighbour_indices(z, zi)
+    l = LinearIndices((n, m, p))
+    i000 = l[x_idx1, y_idx1, z_idx1]
+    i001 = l[x_idx1, y_idx1, z_idx2]
+    i010 = l[x_idx1, y_idx2, z_idx1]
+    i011 = l[x_idx1, y_idx2, z_idx2]
+    i100 = l[x_idx2, y_idx1, z_idx1]
+    i101 = l[x_idx2, y_idx1, z_idx2]
+    i110 = l[x_idx2, y_idx2, z_idx1]
+    i111 = l[x_idx2, y_idx2, z_idx2]
+    dx = (xi - x[x_idx1]) / (x[x_idx2] - x[x_idx1])
+    dy = (yi - y[y_idx1]) / (y[y_idx2] - y[y_idx1])
+    dz = (zi - z[z_idx1]) / (z[z_idx2] - z[z_idx1])
+    w000 = (1 - dx) * (1 - dy) * (1 - dz)
+    w001 = (1 - dx) * (1 - dy) * dz
+    w010 = (1 - dx) * dy * (1 - dz)
+    w011 = (1 - dx) * dy * dz
+    w100 = dx * (1 - dy) * (1 - dz)
+    w101 = dx * (1 - dy) * dz
+    w110 = dx * dy * (1 - dz)
+    w111 = dx * dy * dz
+    weights = [w000, w001, w010, w011, w100, w101, w110, w111]
+    indices = [i000, i001, i010, i011, i100, i101, i110, i111]
+    return sparse(indices, fill(1, 8), number.(weights), n * m * p, 1)
 end
 
-# ╔═╡ 7dd272c1-f614-4410-9aba-192e2a33a85a
+# ╔═╡ f8a70920-ac87-4126-980f-c3cbd223269a
 """
-Output CartesianIndices, LinearIndices and corresponding weights for linear interpolation of point P on mgrid.
-mgrid is created depending on the input field.
-For example, when 2D,
-mgrid=[range(1.3, stop=10.6,step=0.003), range(1.2,stop=15.3,step=0.004)]
-P=[5,5]
+This function takes as input the x and y coordinates of the grid points, the corresponding function values z, and the x and y coordinates of the point to interpolate (xi, yi). It returns a sparse matrix with the weights for each of the four grid points used in the bilinear interpolation.
 
-I, J, L, V are used to create sparse spray and interpolation matrices for sources and receivers.
+Note that if the interpolation point is outside the grid, the function will throw an error.
 """
-function find_neighbour_weights(mgrid, P)
-    @assert length(mgrid) == length(P)
-    N = length(mgrid)
-    idx = [indminn(mgrid[i], P[i], 2) for i = 1:N]
-    denomI = inv(prod([diff(mgrid[i][idx[i]])[1] for i = 1:N]))
-    c = CartesianIndices(Tuple(broadcast(x -> x[1]:x[2], idx)))
-    l = LinearIndices(Tuple(length.(mgrid)))
-    # linear indices 
-    L = [l[cc] for cc in c]
-    # calculate distance to each neighbour
-    dist = [sum([abs2(mgrid[i][cc[i]] - P[i]) for i = 1:N]) * denomI for cc in c]
-    # the weight is inversely proportional to the distance
-    Idist = sortperm(vec(dist), rev=true)
-    # the weights are proportional to the area patches
-    V = [prod([abs(mgrid[i][cc[i]] - P[i]) for i = 1:N]) * denomI for cc in c]
-    return vec(L), vec(V)[Idist]
+function bilinear_interp(x, y, xi, yi; number=Data.Number)
+	if (xi < minimum(x) || xi > maximum(x) || yi < minimum(y) || yi > maximum(y))
+        throw(ArgumentError("Interpolation point is outside the grid."))
+    end
+    n, m = length(x), length(y)
+    x_idx1, x_idx2 = get_neighbour_indices(x, xi)
+	y_idx1, y_idx2 = get_neighbour_indices(y, yi)
+	
+    l = LinearIndices((n, m))
+	
+    i00 = l[x_idx1, y_idx1]
+    i01 = l[x_idx1, y_idx2]
+    i10 = l[x_idx2, y_idx1]
+    i11 = l[x_idx2, y_idx2]
+    
+    dx = (xi - x[x_idx1]) / (x[x_idx2] - x[x_idx1])
+    dy = (yi - y[y_idx1]) / (y[y_idx2] - y[y_idx1])
+    
+    w00 = (1-dx)*(1-dy)
+    w01 = (1-dx)*dy
+    w10 = dx*(1-dy)
+    w11 = dx*dy
+    
+    weights = [w00, w01, w10, w11]
+    indices = [i00, i01, i10, i11]
+    
+    return sparse(indices, fill(1, 4), number.(weights), n*m, 1)
+end
+
+# ╔═╡ 4fa99e86-d6fb-4da1-91d9-8065245c1191
+"""
+This function returns a sparse matrix with four nonzero elements, which are the weights for the four surrounding points used in bilinear interpolation. If the given xi value is outside the range of x, the function returns a sparse matrix with a single nonzero element, which is the index of the closest boundary point.
+"""
+function bilinear_interp(x, xi; number=Data.Number)
+	if (xi < minimum(x) || xi > maximum(x))
+        throw(ArgumentError("Interpolation point is outside the grid."))
+    end
+    n = length(x)
+    x_idx1, x_idx2 = get_neighbour_indices(x, xi)
+
+    l = LinearIndices((n,))
+	
+    i00 = l[x_idx1]
+    i01 = l[x_idx2]
+   
+    dx = (xi - x[x_idx1]) / (x[x_idx2] - x[x_idx1])
+    
+    w00 = 1 - dx
+    w01 = dx
+    
+    weights = [w00, w01]
+    indices = [i00, i01]
+    
+    return sparse(indices, fill(1, 2), number.(weights), n, 1)
 end
 
 # ╔═╡ 1c90e052-ed95-11ed-0cad-ff4e7234f520
 function get_proj_matrix(migrid::T, mmgrid::T; use_gpu=_fd_use_gpu, number=Data.Number) where {T}
-    ijv = mapreduce((x, y) -> (; I=vcat(x.I, y.I), J=vcat(x.J, y.J), V=vcat(x.V, y.V)), 1:prod(length.(migrid)), Iterators.product(migrid...)) do iP, P
-        Ln, Vn = find_neighbour_weights(mmgrid, P)
-        return (; I=Ln, J=fill(iP, length(Ln)), V=number.(Vn))
+    mat = mapreduce(sparse_hcat, Iterators.product(migrid...)) do P
+  		bilinear_interp(mmgrid..., P..., number=number)
     end
-    (; I, J, V) = ijv
-
     if (use_gpu)
-        ssprayw = CuSparseMatrixCSC(sparse(I, J, V, prod(length.(mmgrid)), prod(length.(migrid))))
+        return CuSparseMatrixCSC(mat)
     else
-        ssprayw = sparse(I, J, V, prod(length.(mmgrid)), prod(length.(migrid)))
+        return mat
     end
 end
 
 # ╔═╡ 137e4dfd-60f0-460b-8239-082680b09b77
 function get_proj_matrix(Ps, mmgrid; use_gpu=_fd_use_gpu, number=Data.Number)
-    ijv = mapreduce((x, y) -> (; I=vcat(x.I, y.I), J=vcat(x.J, y.J), V=vcat(x.V, y.V)), 1:length(Ps), Ps) do iP, P
-        Ln, Vn = find_neighbour_weights(mmgrid, P)
-        return (; I=Ln, J=fill(iP, length(Ln)), V=number.(Vn))
+    mat = mapreduce(sparse_hcat, Ps) do P
+		bilinear_interp(mmgrid..., P..., number=number)
     end
-    (; I, J, V) = ijv
-
     if (use_gpu)
-        ssprayw = CuSparseMatrixCSC(sparse(I, J, V, prod(length.(mmgrid)), length(Ps)))
+        return CuSparseMatrixCSC(mat)
     else
-        ssprayw = sparse(I, J, V, prod(length.(mmgrid)), length(Ps))
+        return mat
     end
 end
 
@@ -117,19 +147,22 @@ end
 get_proj_matrix( [[1.2], [1.5]],[1:10], use_gpu=false, number=Float32)
 
 # ╔═╡ d0de00fa-9fa7-4159-9756-97e4c4bc33e2
-@time get_proj_matrix([range(-0.75, 0.5, length=3)], [range(-1, 1, length=10)], use_gpu=false, number=Float32)'
-
-# ╔═╡ fdef69e3-41cf-4bf7-b50e-3ed097c58818
-get_proj_matrix([range(-1, 1, length=10)], [range(-0.75, 0.5, length=3)], use_gpu=false, number=Float32)
+@time get_proj_matrix([range(-0.75, 0.5, length=3)], [range(-1, 1, length=10)], use_gpu=false, number=Float32)
 
 # ╔═╡ eecdb64c-c123-4678-b449-66cdef070244
 get_proj_matrix([range(-0.75, 0.5, length=3), range(-0.75, 0.5, length=3)], [range(-1, 1, length=10), range(-1, 1, length=10)], use_gpu=false, number=Float32)'
 
-# ╔═╡ 0c7520d9-60a9-4925-8b58-354ea863ecca
-find_neighbour_weights([1:10], [1.2])
+# ╔═╡ e2416fd8-e0be-49db-a672-0d9fd9b09db4
+@time bilinear_interp(range(-1, 1, length=5), range(-1, 1, length=5), 0.5, 0.2)
+
+# ╔═╡ be183231-697e-408f-aa08-ad0d6db1f663
+@time bilinear_interp(1:10, 1.8, number=Float32)
 
 # ╔═╡ 95ff1284-db71-4927-b509-e4f76da8c892
-@test sum(find_neighbour_weights([1:10, 1:10], [2.2, 4.2])[2]) == 1
+@test sum(bilinear_interp(1:10, range(10, 20, length=7), 2.2, 14.4, number=Float64)) ≈ 1
+
+# ╔═╡ e1c0c307-2fb4-4fe8-a6d0-cb26624c9075
+@test sum(bilinear_interp(1:10, range(10, 20, length=7), range(30, 41, length=5), 5.2, 14.2, 35.0, number=Float64)) ≈ 1
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -310,15 +343,16 @@ version = "17.4.0+0"
 # ╠═e9e81c62-bef9-4736-9fce-bfe3b0cada7a
 # ╠═1c90e052-ed95-11ed-0cad-ff4e7234f520
 # ╠═137e4dfd-60f0-460b-8239-082680b09b77
-# ╠═7dd272c1-f614-4410-9aba-192e2a33a85a
-# ╠═0c7520d9-60a9-4925-8b58-354ea863ecca
+# ╠═49d5dc87-0256-404c-9b59-f1db4450a3e3
+# ╠═f8a70920-ac87-4126-980f-c3cbd223269a
+# ╠═e2416fd8-e0be-49db-a672-0d9fd9b09db4
+# ╠═4fa99e86-d6fb-4da1-91d9-8065245c1191
+# ╠═be183231-697e-408f-aa08-ad0d6db1f663
 # ╠═205e6872-a5fa-4b2d-9d1d-8f0c55793f30
 # ╠═95ff1284-db71-4927-b509-e4f76da8c892
+# ╠═e1c0c307-2fb4-4fe8-a6d0-cb26624c9075
 # ╠═d0de00fa-9fa7-4159-9756-97e4c4bc33e2
-# ╠═fdef69e3-41cf-4bf7-b50e-3ed097c58818
 # ╠═eecdb64c-c123-4678-b449-66cdef070244
-# ╠═c23c557c-a426-48d0-a1dd-7cf2f3a47fa5
-# ╠═6d953eda-506e-484c-b084-5c318c8f67d0
-# ╠═8d41c81f-390d-417e-9231-7b42184dfb18
+# ╠═78c2e09e-843c-4b32-a09a-df4027d10895
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
