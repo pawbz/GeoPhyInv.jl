@@ -10,18 +10,18 @@ function check_stability(pa::PFdtd, verbose=true; H=div(20,_fd_order), epsilon=i
 	freqmin=pa.c.fc[:freqmin]
 	freqmax=pa.c.fc[:freqmax]
 	attrib_mod=pa.c.attrib_mod
-	bounds=pa.c.medium.bounds
+	medium=pa.c.medium
 
 	δ=step.(mgrid)
 	δt=pa.c.fc[:dt]
 
 	if(isa(attrib_mod, FdtdElastic))
 		vmin=minimum(filter(x->x ≠ 0, pa.c.medium[:vs])) # vs condition overrides (other than zero?)
-		vmax=sqrt(bounds[:vp][2]^2 + bounds[:vs][2]^2) # see Virieux (1986)
+		vmax=sqrt(medium[:vp].bounds[2]^2 + medium[:vs].bounds[2]^2) # see Virieux (1986)
 
 	else
-		vmin=bounds[:vp][1]
-		vmax=bounds[:vp][2]
+		vmin=medium[:vp].bounds[1]
+		vmax=medium[:vp].bounds[2]
 	end
 
 	# check spatial sampling, i.e., number of grid points in minimum wavelength

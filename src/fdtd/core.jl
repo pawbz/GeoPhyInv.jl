@@ -103,7 +103,7 @@ function PFdtd(
     foreach(rf -> @assert(rf ∈ Fields(attrib_mod; ndims=N)), rfields)
     foreach(
         s -> foreach(
-            ss -> foreach(f -> @assert(f ∈ Fields(attrib_mod, ndims=N)), names(ss.d)[1]),
+            ss -> foreach(f -> @assert(f ∈ Fields(attrib_mod, ndims=N)), AxisArrays.names(ss.d)[1]),
             s,
         ),
         srcwav,
@@ -132,9 +132,9 @@ function PFdtd(
     mod = NamedArray(
         [
             Data.Array(zeros(length.(exmedium.mgrid)...)) for
-            name in Medium(attrib_mod)
+            name in MediumParameters(attrib_mod)
         ],
-        Medium(attrib_mod),
+        MediumParameters(attrib_mod),
     )
     δmod = deepcopy(mod) # for perturbations in medium parameters
 
@@ -145,12 +145,12 @@ function PFdtd(
     gradients = NamedArray(
         [
             SharedArray{_fd_datatype}(zeros(length.(exmedium.mgrid)...)) for
-            name in Medium(attrib_mod)
+            name in MediumParameters(attrib_mod)
         ],
-        Medium(attrib_mod),
+        MediumParameters(attrib_mod),
     )
     # need reference values for nondimensionalize and dimensionalize
-    ref_mod = NamedArray([Data.Number(exmedium.ref[name]) for name in Medium(attrib_mod)], Medium(attrib_mod))
+    ref_mod = NamedArray([Data.Number(exmedium[name].ref) for name in MediumParameters(attrib_mod)], MediumParameters(attrib_mod))
     @info "Add Lambda HEre"
 
     illum_stack = SharedArray{Float64}(zeros(length.(medium.mgrid)...))
@@ -348,7 +348,7 @@ Every worker models one or more supersources.
 """
 function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     rfields = pac.rfields
-    sfields = names(pac.srcwav[ipw][iss].d)[1]
+    sfields = AxisArrays.names(pac.srcwav[ipw][iss].d)[1]
     nt = pac.ic[:nt]
     n = length.(pac.exmedium.mgrid)
     ageom = pac.ageom
@@ -366,7 +366,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
             Array(zeros(eval(pac.snaps_field)(), T(), n...)) :
             zeros(Data.Number, fill(1, N)...) for i = 1:length(pac.itsnaps)
         ],
-        names(pac.itsnaps)[1],
+        AxisArrays.names(pac.itsnaps)[1],
     )
     # source wavelets
     wavelets = [
@@ -414,8 +414,8 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
 
     # named array to store gradients for each supersource
     gradients = NamedArray(
-        [Data.Array(zeros(length.(pac.exmedium.mgrid)...)) for name in Medium(pac.attrib_mod)],
-        Medium(pac.attrib_mod),
+        [Data.Array(zeros(length.(pac.exmedium.mgrid)...)) for name in MediumParameters(pac.attrib_mod)],
+        MediumParameters(pac.attrib_mod),
     )
 
     # saving illum (dummy)
@@ -450,7 +450,6 @@ include("rho_projection.jl")
 include("gradient.jl")
 include("born.jl")
 include("boundary.jl")
-include("gallery.jl")
 
 
 # update TDout after forming a vector and resampling

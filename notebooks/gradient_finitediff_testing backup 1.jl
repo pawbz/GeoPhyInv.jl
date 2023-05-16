@@ -95,7 +95,7 @@ end
 gKI = reshape(first(chunk(g, 2)), 5, 5)
 
 # ╔═╡ aa0f7f1b-65ff-4a0b-9fb0-e6660911fdc8
-heatmap(Array(deepcopy(pa_mod.c.gradients[:KI])));
+heatmap(Array(deepcopy(pa_mod.c.gradients[:invK])));
 
 # ╔═╡ 630faaff-f7f0-46d7-a36f-31a54e589c8e
 heatmap(Array(gKI), c=:seismic)

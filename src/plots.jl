@@ -1,4 +1,4 @@
-@recipe function plot(medium::Medium{2}, ageom = nothing; fields=names(medium)[1])
+@recipe function plot(medium::Medium, ageom = nothing; fields=MediumParameters(medium))
     mx = medium.mgrid[2]
     mz = medium.mgrid[1]
     as=length(mz) / length(mx)
@@ -31,9 +31,9 @@
             subplot := j
             # seriescolor --> colorschemes[:roma]
             title --> title1
-            clims --> (medium.bounds[field][1], medium.bounds[field][2])
+            clims --> Tuple(getfield(medium, field).bounds)
             seriescolor --> :grays
-            mx, mz, medium[field]
+            mx, mz, getfield(medium, field).m
         end
         if (!(ageom === nothing))
             @assert ndims(medium) == length(dim_names(ageom))

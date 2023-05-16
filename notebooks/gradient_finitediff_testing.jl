@@ -4,6 +4,16 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+end
+
 # ╔═╡ 75ad24f7-8b57-401b-8170-d3e35f3c960f
 begin
 import Pkg
@@ -37,10 +47,10 @@ TableOfContents()
 # ╔═╡ de9a4882-cba9-4707-a900-3d82b9a2faa1
 # testing parameterization
 begin
-	pa_mod = GeoPhyInv.SeisForwExpt(:acou_homo2D, npw=2);
-	# m1=GeoPhyInv.get_modelvector(pa_mod, [:KI]); 
-	# @time update!(pa_mod, m1, [:KI])
-	# m2=GeoPhyInv.get_modelvector(pa_mod, [:KI])
+	pa_mod = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 2), Homogeneous())
+	# m1=GeoPhyInv.get_modelvector(pa_mod, [:invK]); 
+	# @time update!(pa_mod, m1, [:invK])
+	# m2=GeoPhyInv.get_modelvector(pa_mod, [:invK])
 	# @test m1 ≈ m2
 end
 
@@ -53,26 +63,35 @@ B=localpart(pa_mod.p)[1].ss[1].rinterpolatew
 # ╔═╡ a3e8da59-c844-4111-9f02-6eeecb7f6430
 Array(A[1]) ≈ Array(B[1])
 
-# ╔═╡ dec88b97-3316-4467-9c92-58f1f415bf3c
-Array(B[1]) |> heatmap
-
 # ╔═╡ 2a737f8b-92d0-4042-96eb-6b85ea4030c7
-# @time update!(m1, pa_mod, [:KI])
-
-# ╔═╡ 9d3aeb6f-936d-4173-b41c-2159a458b8ce
-m1= GeoPhyInv.get_modelvector(pa_mod, [:KI])
+# @time update!(m1, pa_mod, [:invK])
 
 # ╔═╡ f49439df-3db3-48ae-bf9d-1387e3c14c8f
 N=2
 
+# ╔═╡ 6d47ae1d-2554-4d42-af6c-02ce952bf14e
+@bind mpara Select([:invK, :rho])
+
+# ╔═╡ 9d3aeb6f-936d-4173-b41c-2159a458b8ce
+m1= GeoPhyInv.get_modelvector(pa_mod, [mpara])
+
+# ╔═╡ 5582110f-327c-419a-8759-ca11844c0c96
+mpara
+
+# ╔═╡ 8e9a92dc-dc58-40d7-9a38-df08852a33a0
+typeof(pa_mod.c.medium.mgrid)
+
+# ╔═╡ 247896d7-6c39-4bf6-856b-7afc6f4d6655
+supertype(StepRangeLen)
+
 # ╔═╡ c6b19c3d-6ccb-436f-a191-d3cc1958a91a
 begin
-	pa_true = GeoPhyInv.SeisForwExpt(:acou_homo2D);
+	pa_true = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 1), Homogeneous())
 	update!(pa_true); dobs=deepcopy(pa_true.c.data[1]);
 end
 
 # ╔═╡ 43fb3211-9ffc-4ea5-a459-539cf55ba009
-pa_inv = SeisInvExpt(pa_mod, dobs, [range(-50, 50, length=N), range(-50, 50, length=N)], [:KI])
+pa_inv = SeisInvExpt(pa_mod, dobs, [N, N], [mpara])
 
 # ╔═╡ 4ce63c81-9367-4635-89af-27219f0fe478
 loss=L2DistLoss()
@@ -82,6 +101,12 @@ GeoPhyInv.lossvalue(loss, pa_true.c.data[1], pa_mod.c.data[1])
 
 # ╔═╡ fc739bbe-7cf6-4701-9462-7813768a924a
 plot(dobs[1])
+
+# ╔═╡ 8d16ea50-51d9-4d76-9552-ad1a20bfa67b
+heatmap(dobs[1][:vz] .- pa_mod.c.data[1][1][:vz])
+
+# ╔═╡ 9530c17a-f19a-4fb1-a045-033f70f54fa4
+heatmap(dobs[1][:vz])
 
 # ╔═╡ 74401c84-0f96-46ff-bbfd-7414440c907b
 extrema(dobs[1].d[1])
@@ -98,8 +123,11 @@ dobs[1].d[:vz] |> extrema
 # ╔═╡ 6e7d2876-4345-441d-9d29-e36fa02ca2eb
 GeoPhyInv.get_modelvector(pa_inv)
 
+# ╔═╡ f141913d-2e21-45e9-b153-78af2fdc6c2f
+searchsortedfirst
+
 # ╔═╡ aa0f7f1b-65ff-4a0b-9fb0-e6660911fdc8
-heatmap(Array(deepcopy(pa_mod.c.gradients[:KI])));
+heatmap(Array(deepcopy(pa_mod.c.gradients[:invK])));
 
 # ╔═╡ cb6ba7e9-0685-4e59-96ef-a8a7af640107
 mul!
@@ -124,7 +152,7 @@ xs=zeros(N*N)
 m=GeoPhyInv.Data.Array(xs)
 
 # ╔═╡ 6c037136-4822-438f-85ba-9d61c724f0d9
-GeoPhyInv.lossvalue(m, loss, dobs, pa_mod, [:KI])
+GeoPhyInv.lossvalue(m, loss, dobs, pa_mod, [mpara])
 
 # ╔═╡ b57d5882-660b-4b71-b31e-8d461d70d14f
 m
@@ -188,18 +216,23 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═89d3982a-b8d4-4f0d-8d30-db89b054aabe
 # ╠═ecbc28a1-4bbd-465e-a4ab-b43bcfdadb3f
 # ╠═a3e8da59-c844-4111-9f02-6eeecb7f6430
-# ╠═dec88b97-3316-4467-9c92-58f1f415bf3c
 # ╠═bd68d9b1-633b-4c9b-b759-791581714306
 # ╠═de9a4882-cba9-4707-a900-3d82b9a2faa1
 # ╠═2a737f8b-92d0-4042-96eb-6b85ea4030c7
 # ╠═9d3aeb6f-936d-4173-b41c-2159a458b8ce
 # ╠═f49439df-3db3-48ae-bf9d-1387e3c14c8f
+# ╠═6d47ae1d-2554-4d42-af6c-02ce952bf14e
+# ╠═5582110f-327c-419a-8759-ca11844c0c96
 # ╠═43fb3211-9ffc-4ea5-a459-539cf55ba009
+# ╠═8e9a92dc-dc58-40d7-9a38-df08852a33a0
+# ╠═247896d7-6c39-4bf6-856b-7afc6f4d6655
 # ╠═c6b19c3d-6ccb-436f-a191-d3cc1958a91a
 # ╠═4ce63c81-9367-4635-89af-27219f0fe478
 # ╠═57bc5dd6-a33e-4439-ad27-fdbb9b3b17e3
 # ╠═6c037136-4822-438f-85ba-9d61c724f0d9
 # ╠═fc739bbe-7cf6-4701-9462-7813768a924a
+# ╠═8d16ea50-51d9-4d76-9552-ad1a20bfa67b
+# ╠═9530c17a-f19a-4fb1-a045-033f70f54fa4
 # ╠═74401c84-0f96-46ff-bbfd-7414440c907b
 # ╠═1dcee841-0a03-422c-874e-ecba38ab4cab
 # ╠═c3cc4fd8-7477-47a8-b1ce-3735a1868666
@@ -207,6 +240,7 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═6e7d2876-4345-441d-9d29-e36fa02ca2eb
 # ╠═c895f6d7-2012-4929-85dd-f0fa1bb97866
 # ╠═b57d5882-660b-4b71-b31e-8d461d70d14f
+# ╠═f141913d-2e21-45e9-b153-78af2fdc6c2f
 # ╠═8a47e8ba-08df-40bc-ad77-539c8da17943
 # ╠═aa0f7f1b-65ff-4a0b-9fb0-e6660911fdc8
 # ╠═630faaff-f7f0-46d7-a36f-31a54e589c8e

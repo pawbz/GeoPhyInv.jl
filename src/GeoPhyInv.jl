@@ -19,8 +19,8 @@ using Markdown
 using DataFrames
 using Measures
 using SparseArrays
-using Interpolations
 using OrderedCollections
+using Interpolations: interpolate, extrapolate, Gridded, Linear, Flat
 using CSV
 using Statistics
 using LossFunctions
@@ -127,8 +127,11 @@ export Srcs, Recs, SSrcs
 export FdtdAcoustic, FdtdElastic, Born, FullWave, AcousticBorn, ElasticBorn, FdtdAcousticVisco
 
 # mutable data type for seismic medium + related methods
-include("media/core.jl")
-export Medium
+
+global const marmousi_folder=joinpath(dirname(pathof(GeoPhyInv)), "media", "marmousi2")
+global const overthrust_folder=joinpath(dirname(pathof(GeoPhyInv)), "media", "overthrust")
+include("media/media.jl")
+export Medium, AcousticMedium, ElasticMedium
 
 # source-receiver geometry
 include("ageom/core.jl")
@@ -176,6 +179,16 @@ export update, update!
 include("fwi/core.jl")
 include("fwi/func_grad.jl")
 export SeisInvExpt
+
+abstract type Gallery end
+struct Homogeneous <: Gallery end
+struct RandScatterer <: Gallery end
+struct Marmousi2 <: Gallery end
+struct Overthrust <: Gallery end
+export Homogeneous, RandScatterer, Marmousi2, Overthrust
+include("media/gallery.jl")
+include("fdtd/gallery.jl")
+
 
 # include("Poisson/Poisson.jl")
 include("plots.jl")

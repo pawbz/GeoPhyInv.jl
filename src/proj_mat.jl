@@ -13,10 +13,10 @@ function get_neighbour_indices(arr, val)
     idx = searchsortedfirst(arr, val)
     if idx == 1
         return [1, 2]
-	elseif idx >= len
-        return [len-1, len]
+    elseif idx >= len
+        return [len - 1, len]
     else
-        return [idx-1, idx]
+        return [idx - 1, idx]
     end
 end
 
@@ -64,32 +64,32 @@ This function takes as input the x and y coordinates of the grid points, the cor
 Note that if the interpolation point is outside the grid, the function will throw an error.
 """
 function bilinear_interp(x, y, xi, yi; number=Data.Number)
-	if (xi < minimum(x) || xi > maximum(x) || yi < minimum(y) || yi > maximum(y))
+    if (xi < minimum(x) || xi > maximum(x) || yi < minimum(y) || yi > maximum(y))
         throw(ArgumentError("Interpolation point is outside the grid."))
     end
     n, m = length(x), length(y)
     x_idx1, x_idx2 = get_neighbour_indices(x, xi)
-	y_idx1, y_idx2 = get_neighbour_indices(y, yi)
-	
+    y_idx1, y_idx2 = get_neighbour_indices(y, yi)
+
     l = LinearIndices((n, m))
-	
+
     i00 = l[x_idx1, y_idx1]
     i01 = l[x_idx1, y_idx2]
     i10 = l[x_idx2, y_idx1]
     i11 = l[x_idx2, y_idx2]
-    
+
     dx = (xi - x[x_idx1]) / (x[x_idx2] - x[x_idx1])
     dy = (yi - y[y_idx1]) / (y[y_idx2] - y[y_idx1])
-    
-    w00 = (1-dx)*(1-dy)
-    w01 = (1-dx)*dy
-    w10 = dx*(1-dy)
-    w11 = dx*dy
-    
+
+    w00 = (1 - dx) * (1 - dy)
+    w01 = (1 - dx) * dy
+    w10 = dx * (1 - dy)
+    w11 = dx * dy
+
     weights = [w00, w01, w10, w11]
     indices = [i00, i01, i10, i11]
-    
-    return sparse(indices, fill(1, 4), number.(weights), n*m, 1)
+
+    return sparse(indices, fill(1, 4), number.(weights), n * m, 1)
 end
 
 # ╔═╡ 4fa99e86-d6fb-4da1-91d9-8065245c1191
@@ -97,32 +97,32 @@ end
 This function returns a sparse matrix with four nonzero elements, which are the weights for the four surrounding points used in bilinear interpolation. If the given xi value is outside the range of x, the function returns a sparse matrix with a single nonzero element, which is the index of the closest boundary point.
 """
 function bilinear_interp(x, xi; number=Data.Number)
-	if (xi < minimum(x) || xi > maximum(x))
+    if (xi < minimum(x) || xi > maximum(x))
         throw(ArgumentError("Interpolation point is outside the grid."))
     end
     n = length(x)
     x_idx1, x_idx2 = get_neighbour_indices(x, xi)
 
     l = LinearIndices((n,))
-	
+
     i00 = l[x_idx1]
     i01 = l[x_idx2]
-   
+
     dx = (xi - x[x_idx1]) / (x[x_idx2] - x[x_idx1])
-    
+
     w00 = 1 - dx
     w01 = dx
-    
+
     weights = [w00, w01]
     indices = [i00, i01]
-    
+
     return sparse(indices, fill(1, 2), number.(weights), n, 1)
 end
 
 # ╔═╡ 1c90e052-ed95-11ed-0cad-ff4e7234f520
 function get_proj_matrix(migrid::T, mmgrid::T; use_gpu=_fd_use_gpu, number=Data.Number) where {T}
     mat = mapreduce(sparse_hcat, Iterators.product(migrid...)) do P
-  		bilinear_interp(mmgrid..., P..., number=number)
+        bilinear_interp(mmgrid..., P..., number=number)
     end
     if (use_gpu)
         return CuSparseMatrixCSC(mat)
@@ -134,7 +134,7 @@ end
 # ╔═╡ 137e4dfd-60f0-460b-8239-082680b09b77
 function get_proj_matrix(Ps, mmgrid; use_gpu=_fd_use_gpu, number=Data.Number)
     mat = mapreduce(sparse_hcat, Ps) do P
-		bilinear_interp(mmgrid..., P..., number=number)
+        bilinear_interp(mmgrid..., P..., number=number)
     end
     if (use_gpu)
         return CuSparseMatrixCSC(mat)
@@ -144,7 +144,7 @@ function get_proj_matrix(Ps, mmgrid; use_gpu=_fd_use_gpu, number=Data.Number)
 end
 
 # ╔═╡ 205e6872-a5fa-4b2d-9d1d-8f0c55793f30
-get_proj_matrix( [[1.2], [1.5]],[1:10], use_gpu=false, number=Float32)
+get_proj_matrix([[1.2], [1.5]], [1:10], use_gpu=false, number=Float32)
 
 # ╔═╡ d0de00fa-9fa7-4159-9756-97e4c4bc33e2
 @time get_proj_matrix([range(-0.75, 0.5, length=3)], [range(-1, 1, length=10)], use_gpu=false, number=Float32)

@@ -159,14 +159,14 @@ function Base.copyto!(
     (length(x) ≠ (count(fields .≠ :null) * nznx)) && error("size x")
     if (fields == [:χKI, :χrhoI, :null])
         @inbounds for i = 1:nznx
-            K = inv(χ(x[i], mod.ref[:KI], -1))
+            K = inv(χ(x[i], mod.ref[:invK], -1))
             rho = inv(χ(x[nznx+i], mod.ref[:rhoI], -1))
             mod.m[:vp][i] = sqrt(K * inv(rho))
             mod.m[:rho][i] = rho
         end
     elseif (fields == [:χKI, :null, :null])
         @inbounds for i = 1:nznx
-            K = inv(χ(x[i], mod.ref[:KI], -1))
+            K = inv(χ(x[i], mod.ref[:invK], -1))
             rho = mod.m[:rho][i]
             mod.m[:vp][i] = sqrt(K * inv(rho))
             mod.m[:rho][i] = rho
@@ -210,21 +210,21 @@ function Base.copyto!(
     fill!(δxout, 0.0)
     if (parameterization == [:χKI, :χrhoI, :null])
         @inbounds for i = 1:nznx
-            δxout[i] = δx[i] * mod.ref[:KI]
+            δxout[i] = δx[i] * mod.ref[:invK]
             δxout[nznx+i] = δx[nznx+i] * mod.ref[:rhoI]
         end
     elseif (parameterization == [:χKI, :null, :null])
         @inbounds for i = 1:nznx
-            δxout[i] = δx[i] * mod.ref[:KI]
+            δxout[i] = δx[i] * mod.ref[:invK]
         end
     elseif (parameterization == [:χvp, :χrho, :null])
         @inbounds for i = 1:nznx
-            δxout[i] = (-1.0 * δx[nznx+i] - 2.0 * δx[i]) * mod.ref[:KI]
+            δxout[i] = (-1.0 * δx[nznx+i] - 2.0 * δx[i]) * mod.ref[:invK]
             δxout[nznx+i] = (-1.0 * δx[nznx+i]) * mod.ref[:rhoI]
         end
     elseif (parameterization == [:χvp, :null, :null])
         @inbounds for i = 1:nznx
-            δxout[i] = -2.0 * δx[i] * mod.ref[:KI]
+            δxout[i] = -2.0 * δx[i] * mod.ref[:invK]
         end
     elseif (parameterization == [:null, :χrho, :null])
         @inbounds for i = 1:nznx
@@ -354,20 +354,20 @@ function Base.getindex(mod::Medium, s::Symbol)
             @inbounds for i = 1:nznx
                 x[i] = χ(
                     inv((vp[i] * vp[i] - 4.0 / 3.0 * vs[i] * vs[i]) * rho[i]),
-                    mod.ref[:KI],
+                    mod.ref[:invK],
                     1,
                 )
             end
         else
             @inbounds for i = 1:nznx
-                x[i] = χ(inv(vp[i] * vp[i] * rho[i]), mod.ref[:KI], 1)
+                x[i] = χ(inv(vp[i] * vp[i] * rho[i]), mod.ref[:invK], 1)
             end
         end
     elseif (s == :χMI)
         @inbounds for i = 1:nznx
-            x[i] = χ(inv(vp[i] * vp[i] * rho[i]), mod.ref[:KI], 1)
+            x[i] = χ(inv(vp[i] * vp[i] * rho[i]), mod.ref[:invK], 1)
         end
-    elseif (s == :KI)
+    elseif (s == :invK)
         if (:vs ∈ names(mod.m)[1])
             @inbounds for i = 1:nznx
                 x[i] = inv((vp[i] * vp[i] - 4.0 / 3.0 * vs[i] * vs[i]) * rho[i])

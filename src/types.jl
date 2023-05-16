@@ -28,7 +28,7 @@ mutable struct FdtdAcoustic{T} <: Acoustic
 end
 
 # by default, only one propagating wavefield is choosen
-# mode, either :forward or :adjoint, is choosen 
+# mode, either :forward, :forward_save or :adjoint, is choosen 
 for k in [:FdtdAcoustic, :FdtdElastic]
     @eval function $k()
         return $k{FullWave}(:forward, 1)

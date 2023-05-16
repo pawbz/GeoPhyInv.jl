@@ -19,9 +19,9 @@ for scenario in [:downhole, :pizza]
 
 		d12=F*x12
 		d1=F*x1
-		δmodKI1=copy(pa.paf.c.δmod[:KI])
+		δmodKI1=copy(pa.paf.c.δmod[:invK])
 		d2=F*x2
-		δmodKI2=copy(pa.paf.c.δmod[:KI])
+		δmodKI2=copy(pa.paf.c.δmod[:invK])
 
 
 		d12new=d1.+d2

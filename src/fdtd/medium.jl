@@ -44,13 +44,13 @@ function update!(m::AbstractVector, pa::PFdtd, mparams)
     CUDA.allowscalar(false)
 end
 
-function Medium(::FdtdAcoustic)
+function MediumParameters(::FdtdAcoustic)
     # the following medium parameters are stored on XPU
-    return [:KI, :rho]
+    return [:invK, :rho]
 end
-function Medium(::FdtdElastic)
+function MediumParameters(::FdtdElastic)
     # the following medium parameters are stored on XPU
-    return [:lambda, :M, :mu, :rho]
+    return [:lambda, :mu, :rho]
 end
 
 """
@@ -90,8 +90,8 @@ end
 function update!(pac::T, medium::Medium) where {T<:P_common}
     copyto!(pac.medium, medium)
     padarray!(pac.exmedium, pac.medium, _fd_npextend, pac.pml_faces)
-    broadcast(names(pac.mod)[1]) do name
-        copyto!(pac.mod[name], pac.exmedium, [name])
+    broadcast(AxisArrays.names(pac.mod)[1]) do name
+        copyto!(pac.mod[name], pac.exmedium, name)
     end
     return nothing
 end

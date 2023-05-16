@@ -11,9 +11,9 @@ function update_δmods!(pac::P_common, δmod::Vector{Float64})
     nz = pac.ic[:nz]
     nznxd = prod(length.(pac.medium.mgrid))
     copyto!(pac.δmodall, δmod)
-    fill!(pac.δmod[:KI], 0.0)
+    fill!(pac.δmod[:invK], 0.0)
     δmodKI =
-        view(pac.δmod[:KI], _fd_npextend+1:nz-_fd_npextend, _fd_npextend+1:nx-_fd_npextend)
+        view(pac.δmod[:invK], _fd_npextend+1:nz-_fd_npextend, _fd_npextend+1:nx-_fd_npextend)
     for i = 1:nznxd
         # put perturbation due to KI as it is
         δmodKI[i] = δmod[i]
@@ -41,7 +41,7 @@ function get_update_parameters(pa::T) where {T<:Union{PFdtd{<:FdtdAcoustic{FullW
     elseif (pa.c.ic[:npw] == 2)
         if (pa.c.attrib_mod.mode == :adjoint)
             return (; activepw=[1, 2], src_flags=[true, true], rec_flags=[false, false])
-        elseif (pa.c.attrib_mod.mode == :forward)
+        elseif (pa.c.attrib_mod.mode ∈ [:forward_save, :forward])
             return (; activepw=[1], src_flags=[true, false], rec_flags=[true, false])
         else
             error("unknown mode for $(pa.c.attrib_mod)")
@@ -82,7 +82,7 @@ Source added when src_flags is true, switch off the src_flag whenever necessary,
     initialize!(pa.c)
 
     # don't erase boundary values for adjoint simulation
-    (pa.c.attrib_mod.mode == :forward) && initialize_boundary!(pa)
+    (pa.c.attrib_mod.mode == :forward_save) && initialize_boundary!(pa)
 
     # zero out results stored per worker
     @sync begin

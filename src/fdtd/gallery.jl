@@ -1,11 +1,11 @@
 
-function SeisForwExpt(attrib::Symbol; npw=1, snaps_field=nothing )
-    @assert attrib in [:acou_homo2D, :elastic_homo2D]
+function SeisForwExpt(attrib_mod::FdtdAcoustic, ::Homogeneous; snaps_field=nothing, randn_perc=0.0)
 
-    medium = Medium(:elastic_homo2D, 15)
-    # update!(medium, [:vp, :rho, :vs], randn_perc = 5)
+    medium = AcousticMedium(Homogeneous(), 15.0)
+    update!(medium, [:vp, :rho], randn_perc = randn_perc)
+
     ageom = AGeom(medium.mgrid, :xwell, SSrcs(1), Recs(100))
-    # ageom = AGeom(medium.mgrid, :xwell, SSrcs(1), Recs(1))
+#     # ageom = AGeom(medium.mgrid, :xwell, SSrcs(1), Recs(1))
 
     wav, tgrid = ricker(medium, 10, 1.0)
     rmul!(wav, 1e6)
@@ -13,12 +13,6 @@ function SeisForwExpt(attrib::Symbol; npw=1, snaps_field=nothing )
     update!(srcwav, [:vz], wav)
 
     tsnaps = tgrid
-    if (attrib == :acou_homo2D)
-        attrib_mod = FdtdAcoustic{FullWave}(:forward, npw) 
-    elseif (attrib == :elastic_homo2D)
-        attrib_mod = FdtdElastic{FullWave}(:forward, npw)
-    end
-
     return SeisForwExpt(
         attrib_mod,
         tgrid = tgrid,
@@ -34,7 +28,8 @@ function SeisForwExpt(attrib::Symbol; npw=1, snaps_field=nothing )
         srcwav = srcwav,
         medium = medium,
     )
-
-
 end
+SeisForwExpt(attrib_mod::Union{FdtdAcoustic, FdtdElastic}, ::RandScatterer; snaps_field=nothing) = SeisForwExpt(attrib_mod, Homogeneous(); snaps_field=snaps_field, randn_perc=5)
+#     @assert attrib in [:acou_homo2D, :elastic_homo2D]
+
 

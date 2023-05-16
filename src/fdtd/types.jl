@@ -142,8 +142,8 @@ mutable struct P_common{T,N,Q1<:Data.Array{1},Q2<:Data.Array{N}}
     fc::NamedStack{Data.Number}
     ic::NamedStack{Int64}
     pml::NamedStack{NamedStack{Q1}} # e.g., pml[:dvxdx][:x][:a], pml[:dtauxxdx][:z][:b]
-    mod::NamedStack{Q2} # e.g., mod[:KI], mod[:K]
-    δmod::NamedStack{Q2} # e.g., mod[:KI], mod[:K]
+    mod::NamedStack{Q2} # e.g., mod[:invK], mod[:K]
+    δmod::NamedStack{Q2} # e.g., mod[:invK], mod[:K]
     # attenuation related parameters
     mod3::NamedStack{Array{Float64,3}} # (only used for 2-D attenuation modelling, so fixed)
     gradients::NamedStack{SharedArrays.SharedArray{Data.Number,N}}

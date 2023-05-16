@@ -106,7 +106,7 @@ end
 # 	δxI=pac.fc[:δxI]; δzI=pac.fc[:δzI]; 
 # 	δt=pac.fc[:δt]
 # 	δtI=pac.fc[:δtI]
-# 	δmodKI=pac.δmod[:KI]; modK=pac.mod[:K];
+# 	δmodKI=pac.δmod[:invK]; modK=pac.mod[:K];
 # 	δmodrhovxI=pac.δmod[:rhovxI]; δmodrhovzI=pac.δmod[:rhovzI]
 # 	nx=pac.ic[:nx]; nz=pac.ic[:nz]
 

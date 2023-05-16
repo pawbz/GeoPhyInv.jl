@@ -166,7 +166,6 @@ use this fraction to increase of reduce the maximum time
 * all the keywords arguments of the `ricker` method can be used.
 """
 function ricker(mod::Medium, nλ=10, tmaxfrac::Real=1.0, epsilon=inv(sqrt(ndims(mod))); args... )
-	@assert(!iszero(mod))
 	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac, epsilon)
 	wav=ricker(fqdom, tgrid; args...)
 	return wav, tgrid
@@ -176,7 +175,6 @@ end
 Same as ricker, but return ormsby...
 """
 function ormsby(mod::Medium, nλ=10, tmaxfrac::Real=1.0, epsilon=inv(sqrt(ndims(mod))); args... )
-	@assert(!iszero(mod))
 	fqdom, tgrid = get_fqdom_tgrid(mod, nλ, tmaxfrac, epsilon)
 	wav=ormsby(fqdom, tgrid; args...)
 	return wav, tgrid
@@ -196,7 +194,7 @@ function get_fqdom_tgrid( mod::Medium, nλ, tmaxfrac::Real, epsilon)
 	λdom=d*inv(real(nλ))
 
 	# average P velocity
-	vavg=mod.ref[:vp]
+	vavg=mod.vp.ref
 
 	fqdom = vavg/λdom
 
@@ -206,9 +204,9 @@ function get_fqdom_tgrid( mod::Medium, nλ, tmaxfrac::Real, epsilon)
 	# choose sampling interval to obey max freq of source wavelet
 	δmin = minimum(step.(mod.mgrid))
 	vmax=try
-		sqrt(mod.bounds[:vp][2]^2 + mod.bounds[:vs][2]^2) # see Virieux (1986)
+		sqrt(mod.vp.bounds[2]^2 + mod.vs.bounds[2]^2) # see Virieux (1986)
 	catch
-		mod.bounds[:vp][2]
+		mod.vp.bounds[2]
 	end
 	δt=epsilon*δmin/vmax
 

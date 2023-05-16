@@ -93,7 +93,7 @@ function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdAcoustic,2}}
 
     #compute pressure at [it] using p at [it-1] and dvxdx
     #and dvzdz at [it-1/2]
-    @parallel compute_p!(w1t[:p], w1t[:dvxdx], w1t[:dvzdz], pac.mod[:KI], pac.fc[:dt])
+    @parallel compute_p!(w1t[:p], w1t[:dvxdx], w1t[:dvzdz], pac.mod[:invK], pac.fc[:dt])
 end
 
 function update_dstress!(pap, pac::T) where {T<:P_common{<:FdtdAcoustic,3}}
@@ -246,7 +246,7 @@ function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdAcoustic,3}}
         w1t[:dvxdx],
         w1t[:dvydy],
         w1t[:dvzdz],
-        pac.mod[:KI],
+        pac.mod[:invK],
         pac.fc[:dt],
     )
 

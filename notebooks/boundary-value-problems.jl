@@ -74,7 +74,7 @@ function test_backprop(pa, fields)
     GeoPhyInv.update!(srcwav[1], [Symbol(src_field)])
 
     # save boundary and final states
-    pa.c.attrib_mod.mode = :forward
+    pa.c.attrib_mod.mode = :forward_save
 
     GeoPhyInv.update!(pa, [srcwav], [parse(Int, src_type)])
 

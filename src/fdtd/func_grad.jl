@@ -1,7 +1,7 @@
 function lossvalue(m, loss, dobs::Records, pa::PFdtd, mparams=Medium(pa.c.attrib_mod))
     update!(pa, m, mparams)
     mode_save = pa.c.attrib_mod.mode
-    pa.c.attrib_mod.mode = :forward
+    pa.c.attrib_mod.mode = :forward_save
     update!(pa, pa.c.srcwav, [1, 0], verbose=false)
     update!(pa)
     pa.c.attrib_mod.mode = mode_save
@@ -16,7 +16,7 @@ function gradient!(g, m, loss, dobs::Records, pa::PFdtd, mparams=Medium(pa.c.att
     mode_save = pa.c.attrib_mod.mode
 
     # generate data and save boundaries
-    pa.c.attrib_mod.mode = :forward
+    pa.c.attrib_mod.mode = :forward_save
     update!(pa, pa.c.srcwav, [1, 0], verbose=false)
     update!(pa)
 

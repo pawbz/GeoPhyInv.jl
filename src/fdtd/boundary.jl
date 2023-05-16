@@ -215,7 +215,7 @@ end
 function boundary_save!(args...)
 end
 function boundary_save!(
-    ::Val{:forward},
+    ::Val{:forward_save},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -230,7 +230,7 @@ function boundary_save!(
 end
 
 function boundary_save!(
-    ::Val{:forward},
+    ::Val{:forward_save},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -247,7 +247,7 @@ function boundary_save!(
 end
 
 function boundary_save!(
-    ::Val{:forward},
+    ::Val{:forward_save},
     it::Int64,
     issp::Int64,
     pac::T,
@@ -268,13 +268,13 @@ function boundary_save_snap_v!(args...)
 end
 function boundary_save_snap_tau!(args...)
 end
-function boundary_save_snap_tau!(::Val{:forward}, issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdAcoustic}}
+function boundary_save_snap_tau!(::Val{:forward_save}, issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdAcoustic}}
     w1t = pap.w1[:t]
     boundary = pap.ss[issp].boundary
     copyto!(boundary[:p][:snap][1], w1t[:p])
     rmul!(boundary[:p][:snap][1], -one(Data.Number))
 end
-function boundary_save_snap_tau!(::Val{:forward}, issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdElastic}}
+function boundary_save_snap_tau!(::Val{:forward_save}, issp::Int64, pac::T, pap) where {T<:P_common{<:FdtdElastic}}
     w1t = pap.w1[:t]
     boundary = pap.ss[issp].boundary
     for f in [:tauxx, :tauxz, :tauzz]
@@ -282,7 +282,7 @@ function boundary_save_snap_tau!(::Val{:forward}, issp::Int64, pac::T, pap) wher
         rmul!(boundary[f][:snap][1], -one(Data.Number))
     end
 end
-function boundary_save_snap_v!(::Val{:forward},
+function boundary_save_snap_v!(::Val{:forward_save},
     issp::Int64,
     pac::T,
     pap,
@@ -293,7 +293,7 @@ function boundary_save_snap_v!(::Val{:forward},
         copyto!(boundary[f][:snap][1], w1t[f])
     end
 end
-function boundary_save_snap_v!(::Val{:forward},
+function boundary_save_snap_v!(::Val{:forward_save},
     issp::Int64,
     pac::T,
     pap,

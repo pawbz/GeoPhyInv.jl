@@ -149,7 +149,7 @@ function update_pml!(pac)
         pac.pml_faces,
         pac.attrib_mod,
         pac.fc[:dt],
-        Statistics.mean(pac.exmedium.bounds[:vp]),
+        Statistics.mean(pac.exmedium[:vp].bounds),
         pac.fc[:freqpeak],
     )
 end

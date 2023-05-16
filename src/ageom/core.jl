@@ -9,7 +9,7 @@ mutable struct AGeomss
     "adding conditions that are to be false while construction"
     AGeomss(s, r, ns, nr) =
         (
-            any(names(s)[1] != names(r)[1]) |
+            any(AxisArrays.names(s)[1] != AxisArrays.names(r)[1]) |
             any([length(ss) != ns for ss in s]) |
             any([length(rr) != nr for rr in r])
         ) ? error("AGeomss construct") : new(s, r, ns, nr)
@@ -71,7 +71,7 @@ function Base.isequal(ageom1::AGeomss, ageom2::AGeomss, attrib = :all)
     names = [:sx, :sz, :ns]
     recfnames = [:rx, :rz, :nr]
     src =
-        all([(isequal(ageom1.s[name], ageom2.s[name])) for name in names(ageom1.s)[1]]) & (ageom1.ns == ageom2.ns)
+        all([(isequal(ageom1.s[name], ageom2.s[name])) for name in AxisArrays.names(ageom1.s)[1]]) & (ageom1.ns == ageom2.ns)
     rec =
         all([
             (isequal(getfield(ageom1, name), getfield(ageom2, name))) for name in recfnames
@@ -100,8 +100,8 @@ end
 
 function dim_names(ageomss::AGeomss)
     dN = dim_names(length(ageomss.s))
-    @assert all(map(in(dN), names(ageomss.s)[1]))
-    @assert all(map(in(dN), names(ageomss.r)[1]))
+    @assert all(map(in(dN), AxisArrays.names(ageomss.s)[1]))
+    @assert all(map(in(dN), AxisArrays.names(ageomss.r)[1]))
     return dN
 end
 
@@ -158,7 +158,7 @@ function spread(n, p1::Vector{T1}, p2::Vector{T2}) where {T1<:Real,T2<:Real}
     else
         knots = ([1, n],)
         itp = [
-            Interpolations.interpolate(
+            interpolate(
                 knots,
                 [Float64(p1[i]), Float64(p2[i])],
                 Gridded(Linear()),
