@@ -1,42 +1,22 @@
-
 # nothing # just put zeros, no sources added, when flag is put to zero
-# -ve values correspond to source sink, used while time reversal
 # here, size of w is (nt, ns)
 get_source(w, ::Any, ::Val{0}) = zero(w)
 
 
-function get_source(w, ::Union{vz,vx,vy}, ::Val{1})
-    ww = zero(w)
-    for is = 1:size(ww, 2)
-        for it = 1:size(ww, 1)
-            ww[it, is] = w[it, is]
-        end
-    end
-    return ww
-end
+get_source(w, ::Union{vz,vx,vy}, ::Val{1}) = copy(w)
+# -ve values correspond to source sink, used while solving boundary value problem
 function get_source(w, ::Union{vz,vx,vy}, ::Val{-1})
-    ww = zero(w)
-    for is = 1:size(ww, 2)
-        for it = 1:size(ww, 1)
-            # multiplication with -1 for subtraction #time reversal
-            ww[it, is] = -w[it, is]
-        end
-    end
+    ww = copy(w)
+
+    # multiplication with -1 for subtraction #time reversal
+    rmul!(ww, Data.number(-1))
+
     # as the source wavelet has to be subtracted before the propagation step, I shift here by one sample
     ww = circshift(ww, (-1, 0))
     reverse!(ww, dims=1)
     ww[1, :] .= zero(Data.Number)
     return ww
 end
-
-
-# get_source(w, ::p, ::Val{1}) = w
-# get_source(w, ::p, ::Val{-1}) = reverse!(w, dims=1)
-# cumsum is used for integration, but `dt` factor is ignored
-# get_source(w, f::Any, ::Val{2}) = get_source(cumsum(w, dims=1), f, Val{1}())
-# get_source(w, f::Any, ::Val{-2}) = get_source(cumsum(w, dims=1), f, Val{-1}())
-
-
 
 """
 Use input srcwav to fill wavelets and returns frequency bounds.

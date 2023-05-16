@@ -35,9 +35,6 @@ end
 # ╔═╡ f86410b5-87f7-4761-91a8-856406d00234
 @revise using GeoPhyInv
 
-# ╔═╡ 501a84e3-c4f8-4451-aba7-5df49d6eccf8
-using DistributedArrays
-
 # ╔═╡ bd68d9b1-633b-4c9b-b759-791581714306
 using Statistics, LossFunctions, LinearAlgebra, MLUtils, FiniteDifferences, SparseArrays
 
@@ -53,15 +50,6 @@ begin
 	# m2=GeoPhyInv.get_modelvector(pa_mod, [:invK])
 	# @test m1 ≈ m2
 end
-
-# ╔═╡ 89d3982a-b8d4-4f0d-8d30-db89b054aabe
-A=localpart(pa_mod.p)[2].ss[1].ssprayw
-
-# ╔═╡ ecbc28a1-4bbd-465e-a4ab-b43bcfdadb3f
-B=localpart(pa_mod.p)[1].ss[1].rinterpolatew
-
-# ╔═╡ a3e8da59-c844-4111-9f02-6eeecb7f6430
-Array(A[1]) ≈ Array(B[1])
 
 # ╔═╡ 2a737f8b-92d0-4042-96eb-6b85ea4030c7
 # @time update!(m1, pa_mod, [:invK])
@@ -81,17 +69,23 @@ mpara
 # ╔═╡ 8e9a92dc-dc58-40d7-9a38-df08852a33a0
 typeof(pa_mod.c.medium.mgrid)
 
+# ╔═╡ 9706aa59-0286-43cf-bdb7-a3d040e0e2bc
+
+
 # ╔═╡ 247896d7-6c39-4bf6-856b-7afc6f4d6655
 supertype(StepRangeLen)
 
 # ╔═╡ c6b19c3d-6ccb-436f-a191-d3cc1958a91a
 begin
-	pa_true = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 1), Homogeneous())
+	pa_true = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 1), RandScatterer())
 	update!(pa_true); dobs=deepcopy(pa_true.c.data[1]);
 end
 
 # ╔═╡ 43fb3211-9ffc-4ea5-a459-539cf55ba009
 pa_inv = SeisInvExpt(pa_mod, dobs, [N, N], [mpara])
+
+# ╔═╡ b99b6e7a-d037-4c6f-8043-fdb49102503b
+pa_true.c.srcwav[1][1].grid
 
 # ╔═╡ 4ce63c81-9367-4635-89af-27219f0fe478
 loss=L2DistLoss()
@@ -123,11 +117,8 @@ dobs[1].d[:vz] |> extrema
 # ╔═╡ 6e7d2876-4345-441d-9d29-e36fa02ca2eb
 GeoPhyInv.get_modelvector(pa_inv)
 
-# ╔═╡ f141913d-2e21-45e9-b153-78af2fdc6c2f
-searchsortedfirst
-
 # ╔═╡ aa0f7f1b-65ff-4a0b-9fb0-e6660911fdc8
-heatmap(Array(deepcopy(pa_mod.c.gradients[:invK])));
+heatmap(Array(deepcopy(pa_mod.c.gradients[mpara])));
 
 # ╔═╡ cb6ba7e9-0685-4e59-96ef-a8a7af640107
 mul!
@@ -212,10 +203,6 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═75ad24f7-8b57-401b-8170-d3e35f3c960f
 # ╠═893cd92d-3d0d-4fb2-b465-f61a237fc154
 # ╠═f86410b5-87f7-4761-91a8-856406d00234
-# ╠═501a84e3-c4f8-4451-aba7-5df49d6eccf8
-# ╠═89d3982a-b8d4-4f0d-8d30-db89b054aabe
-# ╠═ecbc28a1-4bbd-465e-a4ab-b43bcfdadb3f
-# ╠═a3e8da59-c844-4111-9f02-6eeecb7f6430
 # ╠═bd68d9b1-633b-4c9b-b759-791581714306
 # ╠═de9a4882-cba9-4707-a900-3d82b9a2faa1
 # ╠═2a737f8b-92d0-4042-96eb-6b85ea4030c7
@@ -225,8 +212,10 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═5582110f-327c-419a-8759-ca11844c0c96
 # ╠═43fb3211-9ffc-4ea5-a459-539cf55ba009
 # ╠═8e9a92dc-dc58-40d7-9a38-df08852a33a0
+# ╠═9706aa59-0286-43cf-bdb7-a3d040e0e2bc
 # ╠═247896d7-6c39-4bf6-856b-7afc6f4d6655
 # ╠═c6b19c3d-6ccb-436f-a191-d3cc1958a91a
+# ╠═b99b6e7a-d037-4c6f-8043-fdb49102503b
 # ╠═4ce63c81-9367-4635-89af-27219f0fe478
 # ╠═57bc5dd6-a33e-4439-ad27-fdbb9b3b17e3
 # ╠═6c037136-4822-438f-85ba-9d61c724f0d9
@@ -240,7 +229,6 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═6e7d2876-4345-441d-9d29-e36fa02ca2eb
 # ╠═c895f6d7-2012-4929-85dd-f0fa1bb97866
 # ╠═b57d5882-660b-4b71-b31e-8d461d70d14f
-# ╠═f141913d-2e21-45e9-b153-78af2fdc6c2f
 # ╠═8a47e8ba-08df-40bc-ad77-539c8da17943
 # ╠═aa0f7f1b-65ff-4a0b-9fb0-e6660911fdc8
 # ╠═630faaff-f7f0-46d7-a36f-31a54e589c8e

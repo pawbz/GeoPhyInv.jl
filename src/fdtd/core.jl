@@ -151,7 +151,6 @@ function PFdtd(
     )
     # need reference values for nondimensionalize and dimensionalize
     ref_mod = NamedArray([Data.Number(exmedium[name].ref) for name in MediumParameters(attrib_mod)], MediumParameters(attrib_mod))
-    @info "Add Lambda HEre"
 
     illum_stack = SharedArray{Float64}(zeros(length.(medium.mgrid)...))
 

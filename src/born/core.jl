@@ -55,7 +55,7 @@ function PBorn(
         δz = step(mesh_z)
 
         δmodKI = medium_pert[:invK] - (vp0 * vp0 * rho0)^(-1)
-        δmodrr = medium_pert[:rhoI] - (rho0)^(-1)
+        δmodrr = medium_pert[:invrho] - (rho0)^(-1)
     end
 
 

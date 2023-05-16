@@ -142,7 +142,7 @@ heatmap(Array(pa_acoustic.c.δmod[:K]))
 heatmap(pa_acoustic.c.gradients[:K])
 
 # ╔═╡ d23a59fe-45cb-4898-9e63-d4a3c61b0992
-heatmap(Array(pa_acoustic.c.δmod[:rhoI]))
+heatmap(Array(pa_acoustic.c.δmod[:invrho]))
 
 # ╔═╡ 6e59506f-9cc7-4db4-9c6c-8b4a38499074
 F = LinearMap(pa_acoustic)  	
@@ -325,7 +325,7 @@ srcwav[1].d |> names
 Iterators.flatten(pa_acoustic.c.data[2][1].d)
 
 # ╔═╡ f3046085-e49e-4e50-b93e-8a3969518852
-pa_acoustic.c.δmod[:rhoI]
+pa_acoustic.c.δmod[:invrho]
 
 # ╔═╡ 5a0e79d2-93e9-4b8e-8ef5-9045a0bf01ad
 medium[:K]

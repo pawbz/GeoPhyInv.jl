@@ -15,9 +15,6 @@ mutable struct AGeomss
         ) ? error("AGeomss construct") : new(s, r, ns, nr)
 end # type
 
-include("gallery.jl")
-
-
 """
 Randomly place a given number of source and receivers in a `mgrid`.
 """

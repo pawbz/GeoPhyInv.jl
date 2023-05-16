@@ -51,7 +51,7 @@ end
 end
 
 @parallel function combine_gmodrho!(g, vxbuffer, vzbuffer)
-    @inn(g) = @inn(g) + @av_xi(vxbuffer) + @av_zi(vzbuffer) 
+    @inn(g) = @inn(g) - @av_xi(vxbuffer) - @av_zi(vzbuffer) 
     return
 end
 

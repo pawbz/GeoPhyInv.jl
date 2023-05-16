@@ -4,7 +4,7 @@
 """
 update the perturbation vector using the perturbed medium
 in this case, medium will be treated as the background medium 
-* `δmod` is [δKI, δrhoI]
+* `δmod` is [δKI, δinvrho]
 """
 function update_δmods!(pac::P_common, δmod::Vector{Float64})
     nx = pac.ic[:nx]
@@ -18,19 +18,19 @@ function update_δmods!(pac::P_common, δmod::Vector{Float64})
         # put perturbation due to KI as it is
         δmodKI[i] = δmod[i]
     end
-    fill!(pac.δmod[:rhoI], 0.0)
+    fill!(pac.δmod[:invrho], 0.0)
     δmodrr = view(
-        pac.δmod[:rhoI],
+        pac.δmod[:invrho],
         _fd_npextend+1:nz-_fd_npextend,
         _fd_npextend+1:nx-_fd_npextend,
     )
     for i = 1:nznxd
-        # put perturbation due to rhoI here
+        # put perturbation due to invrho here
         δmodrr[i] = δmod[nznxd+i]
     end
     # project δmodrr onto the vz and vx grids
-    get_rhovxI!(pac.δmod[:rhovxI], pac.δmod[:rhoI])
-    get_rhovzI!(pac.δmod[:rhovzI], pac.δmod[:rhoI])
+    get_rhovxI!(pac.δmod[:rhovxI], pac.δmod[:invrho])
+    get_rhovzI!(pac.δmod[:rhovzI], pac.δmod[:invrho])
     return nothing
 end
 =#
@@ -245,25 +245,17 @@ o     o     o     o     o
             end
 
         end # time_loop
-        # now pressure is at [nt], velocities are at [nt-1/2]
+        # now stresses are at [nt], velocities are at [nt-1/2]
 
-        # save last snap of pressure field for solving initial-value problem later
+        # save last snap of stress field for solving initial-value problem later
         boundary_save_snap_tau!(Val(pac.attrib_mod.mode), issp, pac, pap[1])
 
-        # one more advance step to move pressure to [nt+1] and 
-        # velocities to [nt+3/2] for solving initial-value problem
+        # one more advance step to move velocities to [nt+3/2] for solving initial-value problem
         update_dstress!(pap[1], pac)
         update_v!(pap[1], pac)
 
-        # save last snap of velocity fields
+        # save last snapshot of velocity fields
         boundary_save_snap_v!(Val(pac.attrib_mod.mode), issp, pac, pap[1])
-
-        # scale gradients for each issp
-        # (pac.gmodel_flag) && scale_gradient!(
-        # issp,
-        # pap,
-        # step(pac.medium.mgrid[2]) * step(pac.medium.mgrid[1]),
-        # )
 
     end # source_loop
 end # mod_x_shot

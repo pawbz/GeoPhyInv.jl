@@ -134,20 +134,20 @@ include("media/media.jl")
 export Medium, AcousticMedium, ElasticMedium
 
 # source-receiver geometry
-include("ageom/core.jl")
+include("ageom/ageom.jl")
 export AGeom, AGeomss
 
 # 
 include("database/core.jl")
 
 # store records
-include("records/core.jl")
+include("records/records.jl")
 export Records
 
 # mutable data type for storing time-domain source wavelets
 include("srcwav/wavelets.jl")
 export ricker, ormsby
-include("srcwav/core.jl")
+include("srcwav/srcwav.jl")
 export SrcWav
 
 
@@ -169,29 +169,29 @@ export SeisForwExpt
 # export update from GeoPhyInv, as it is commonly used
 export update, update!
 
-# # include modules (note: due to dependencies, order is important!)
-# include("Operators.jl")
-# include("Smooth.jl")
-# include("IO.jl")
-
-# include("Coupling.jl")
 
 include("fwi/core.jl")
 include("fwi/func_grad.jl")
 export SeisInvExpt
 
+# ============= Gallery =================================
 abstract type Gallery end
 struct Homogeneous <: Gallery end
 struct RandScatterer <: Gallery end
 struct Marmousi2 <: Gallery end
 struct Overthrust <: Gallery end
 export Homogeneous, RandScatterer, Marmousi2, Overthrust
+include("ageom/gallery.jl")
 include("media/gallery.jl")
 include("fdtd/gallery.jl")
+# =======================================================
 
 
 # include("Poisson/Poisson.jl")
 include("plots.jl")
+
+
+end # module GeoPhyInv
 
 
 
@@ -211,4 +211,9 @@ include("plots.jl")
 # mod!(a::PoissonExpt) = GeoPhyInv.Poisson.mod!(a)
 # operator_Born(a::PoissonExpt, b) = GeoPhyInv.Poisson.operator_Born(a, b)
 
-end # module GeoPhyInv
+# # include modules (note: due to dependencies, order is important!)
+# include("Operators.jl")
+# include("Smooth.jl")
+# include("IO.jl")
+
+# include("Coupling.jl")
