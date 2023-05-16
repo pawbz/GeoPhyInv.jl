@@ -9,7 +9,7 @@ function get_source(w, ::Union{vz,vx,vy}, ::Val{-1})
     ww = copy(w)
 
     # multiplication with -1 for subtraction #time reversal
-    rmul!(ww, Data.number(-1))
+    rmul!(ww, Data.Number(-1))
 
     # as the source wavelet has to be subtracted before the propagation step, I shift here by one sample
     ww = circshift(ww, (-1, 0))

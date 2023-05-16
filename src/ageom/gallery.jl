@@ -42,7 +42,6 @@ Choose `attrib::Symbol`
 
 TODO: For 3D, just mean(ygrid) is used, need to work on more exotic gallery of 3D acquisitions.
 """
-AGeom = Array{AGeomss,1}
 
 
 function Array{AGeomss,1}(
