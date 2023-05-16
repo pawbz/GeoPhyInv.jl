@@ -9,15 +9,15 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
         i = Symbol("i", string(dim))
         # velocity-free boundary conditions    
 
-        fdh = div(_fd.order, 2)
+        fdh = div(_fd_order, 2)
         # mirror ghost cells 
         ighostmin = [
-            [replace(is, i => :($ifd)), replace(is, i => :($(_fd.order + 1 - ifd)))] for
+            [replace(is, i => :($ifd)), replace(is, i => :($(_fd_order + 1 - ifd)))] for
             ifd = 1:fdh
         ]
         ighostmax = [
             [
-                replace(is, i => :(n + $(_fd.order - ifd))),
+                replace(is, i => :(n + $(_fd_order - ifd))),
                 replace(is, i => :(n + $(ifd - 1))),
             ] for ifd = 1:fdh
         ]
@@ -29,8 +29,8 @@ for dimnames in [zip([:1, :2, :3], [:z, :y, :x]), zip([:1, :2], [:z, :x])]
             string("(", [string(s, ",") for s in filter(x -> x != i, is)]..., ")"),
         )
         v = Symbol("v", string(dim))
-        vs = broadcast(x -> Symbol(string("v", x)), getindex.(collect(dimnames), 2))
-        vrest = filter(x -> x != v, vs)
+        vels = broadcast(x -> Symbol(string("v", x)), getindex.(collect(dimnames), 2))
+        vrest = filter(x -> x != v, vels)
 
         # velocity-free boundary conditions at min edge   
         fname = Symbol("dirichlet", string(dim), "min!")

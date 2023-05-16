@@ -28,7 +28,7 @@ Some of the commonly used (and exported) mutable types to create the `Expt` vari
 * `Records` allocated the output records that are fitted during inversion.
 
 ### Loading the package
-It is important to configure GeoPhyInv with a macro `@init_parallel_stencil` before anything else.
+It is necessary to configure GeoPhyInv with a macro `@init_parallel_stencil` before using it.
 If you need to change this configuration, julia kernel must be restarted.
 ```julia
 using GeoPhyInv # load package (after installation)

@@ -104,7 +104,7 @@ function Base.show(io::Base.IO, ::MIME"text/plain", src::NamedD)
         io,
         "Data of a supersource\n",
         "  ├───────  fields: ",
-        names(src.d)[1],
+        AxisArrays.names(src.d)[1],
         '\n',
         s,
         src[:n],
@@ -123,7 +123,7 @@ function Base.show(io::Base.IO, ::MIME"text/plain", src::Vector{NamedD{T}}) wher
         io,
         "Data with $(length(src)) supersource(s)\n",
         "  ├───────  fields: ",
-        getindex.(names.(getfield.(src, :d)), 1),
+        getindex.(AxisArrays.names.(getfield.(src, :d)), 1),
         '\n',
         s,
         getindex.(src, :n),
@@ -181,7 +181,7 @@ Populate first supersource of `srcwav` by a wavelet vector `w` for `:p` and `:vx
 function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractVector)
     @assert length(w) == length(d.grid)
     @inbounds for f in fields
-        @assert f ∈ names(d.d)[1]
+        @assert f ∈ AxisArrays.names(d.d)[1]
         @inbounds for i = 1:d[:n]
             for it = 1:length(d.grid)
                 d.d[f][it, i] = w[it]
@@ -201,7 +201,7 @@ function update!(d::NamedD, fields::Vector{Symbol}, w::AbstractMatrix)
     @assert size(w, 1) == length(d.grid)
     @assert size(w, 2) == d[:n]
     @inbounds for f in fields
-        @assert f ∈ names(d.d)[1]
+        @assert f ∈ AxisArrays.names(d.d)[1]
         @inbounds for i = 1:d[:n]
             for it = 1:length(d.grid)
                 d.d[f][it, i] = w[it, i]
@@ -253,7 +253,7 @@ Return if two `NamedD`'s have same dimensions and bounds.
 """
 function issimilar(dat1::NamedD, dat2::NamedD)
     return isequal(dat1.grid, dat2.grid) &&
-           isequal(names(dat1.d), names(dat2.d)) &&
+           isequal(AxisArrays.names(dat1.d), AxisArrays.names(dat2.d)) &&
            (size(dat1.d) == size(dat2.d))
 end
 
@@ -269,7 +269,7 @@ function issimilar(dat1::VNamedD, dat2::VNamedD)
 end
 
 function Base.length(data::NamedD)
-    return length(data.grid) * data[:n] * length(names(data.d)[1])
+    return length(data.grid) * data[:n] * length(AxisArrays.names(data.d)[1])
 end
 
 """
@@ -299,7 +299,7 @@ function Base.vec(data::VNamedD)
     return v
 end
 
-function Base.copyto!(d::NamedD, v::AbstractVector{Float64}, i0 = 1)
+function Base.copyto!(d::NamedD, v::AbstractVector{Float64}, i0=1)
     #	@assert length(d)==length(v)
     for dd in d.d
         for i = 1:d[:n]
@@ -334,7 +334,7 @@ end
 
 
 
-function Base.copyto!(v::AbstractVector{Float64}, d::NamedD, i0 = 1)
+function Base.copyto!(v::AbstractVector{Float64}, d::NamedD, i0=1)
     for dd in d.d
         for i = 1:d[:n]
             for it = 1:length(d.grid)
@@ -380,7 +380,7 @@ function Random.randn!(data::VNamedD)
 end
 
 function Base.copyto!(dataout::NamedD, data::NamedD)
-    for i in names(dataout.d)[1]
+    for i in AxisArrays.names(dataout.d)[1]
         d1 = dataout.d[i]
         d2 = data.d[i]
         copyto!(d1, d2)
@@ -418,7 +418,7 @@ end
 
 function LinearAlgebra.dot(data1::NamedD, data2::NamedD)
     dotd = 0.0
-    for iff in names(data1.d)[1]
+    for iff in AxisArrays.names(data1.d)[1]
         dd1 = data1.d[iff]
         dd2 = data2.d[iff]
         dotd += LinearAlgebra.dot(dd1, dd2)
@@ -463,11 +463,9 @@ function Base.fill!(data::VNamedD, k::Float64)
 end
 
 function Base.reverse!(data::NamedD)
-    for dd in data.d
-        for i = 1:data[:n]
-            dv = view(dd, :, i)
-            reverse!(dv)
-        end
+    # time reversal
+    foreach(data.d) do d # each field
+        reverse!(d, dims=1)
     end
 end
 
@@ -478,7 +476,8 @@ reverse!(srcwav)
 Perform in-place time-reversal operation for each wavelet in `srcwav`.
 """
 function Base.reverse!(data::VNamedD)
-    for d in data
+    # time reversal
+    foreach(data) do d # each supersource
         reverse!(d)
     end
 end
@@ -498,30 +497,30 @@ srcwav_new=interp(srcwav, grid_new)
 ```
 Interpolates `srcwav` onto a new grid.
 """
-function interp(data::VNamedD, grid::StepRangeLen, Battrib = :B1)
+function interp(data::VNamedD, grid::StepRangeLen, Battrib=:B1)
     nss = length(data)
-    dataout = [NamedD(grid, data[iss].sr, names(data[iss].d, 1)) for iss = 1:nss]
+    dataout = [NamedD(grid, data[iss].sr, AxisArrays.names(data[iss].d, 1)) for iss = 1:nss]
     interp_spray!(data, dataout, :interp, Battrib)
     return dataout
 end
 
-function interp(data::NamedD, grid::StepRangeLen, Battrib = :B1)
-    dataout = NamedD(grid, data.sr, names(data.d, 1))
+function interp(data::NamedD, grid::StepRangeLen, Battrib=:B1)
+    dataout = NamedD(grid, data.sr, AxisArrays.names(data.d, 1))
     interp_spray!(data, dataout, :interp, Battrib)
     return dataout
 end
 
 
-function taper!(data::VNamedD, perc = 0.0; bperc = perc, eperc = perc)
+function taper!(data::VNamedD, perc=0.0; bperc=perc, eperc=perc)
     for d in data
-        taper!(d, perc, bperc = bperc, eperc = eperc)
+        taper!(d, perc, bperc=bperc, eperc=eperc)
     end
     return data
 end
 
-function taper!(data::NamedD, perc = 0.0; bperc = perc, eperc = perc)
+function taper!(data::NamedD, perc=0.0; bperc=perc, eperc=perc)
     for dd in data
-        Utils.taper!(dd, bperc = bperc, eperc = eperc)
+        Utils.taper!(dd, bperc=bperc, eperc=eperc)
     end
     return data
 end
@@ -541,9 +540,9 @@ Can reduce allocations =========
 function interp_spray!(
     data::NamedD,
     dataout::NamedD,
-    attrib = :interp,
-    Battrib = :B1;
-    pa = nothing,
+    attrib=:interp,
+    Battrib=:B1;
+    pa=nothing
 )
     @assert length(data.d) == length(dataout.d)
     xin = data.grid
@@ -567,15 +566,15 @@ end
 function interp_spray!(
     data::VNamedD,
     dataout::VNamedD,
-    attrib = :interp,
-    Battrib = :B1;
-    pa = nothing,
+    attrib=:interp,
+    Battrib=:B1;
+    pa=nothing
 )
     @assert length(data) == length(dataout)
     for i = 1:length(data)
         d = data[i]
         dout = dataout[i]
-        interp_spray!(d, dout, attrib, Battrib, pa = pa)
+        interp_spray!(d, dout, attrib, Battrib, pa=pa)
     end
 end
 

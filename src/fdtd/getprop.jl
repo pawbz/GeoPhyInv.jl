@@ -7,7 +7,7 @@ An instance of `SeisForwExpt`.
 * ├─── `pa[:medium]`: medium 
 * ├─ `pa[:exmedium]`: extended medium to PML regions
 """
-function Base.getindex(pa::PFdtd, s::Symbol, iss::Int = 1; ipw=1)
+function Base.getindex(pa::PFdtd, s::Symbol, iss::Int = 1; ipw = ((first(typeof(pa.c.attrib_mod).parameters) == Born) ? 2 : 1))
     @assert iss ≤ length(pa.c.ageom[1])
     @assert s in vcat([:snaps, :data], collect(fieldnames(P_common)))
     if (s == :snaps)
@@ -17,6 +17,9 @@ function Base.getindex(pa::PFdtd, s::Symbol, iss::Int = 1; ipw=1)
             p = procs(pa.p)[ip]
             @sync remotecall_wait(p) do
                 pap = localpart(pa.p)
+                # for i in eachindex(snaps_all)
+				# 	snaps_all[i]=pap[1].ss[issp].snaps[i] # only first wavefield
+				# end
                 return pap[ipw].ss[issp].snaps
             end
         end

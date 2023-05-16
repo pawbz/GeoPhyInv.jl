@@ -1,11 +1,11 @@
 ### A Pluto.jl notebook ###
-# v0.19.15
+# v0.19.21
 
 using Markdown
 using InteractiveUtils
 
 # ╔═╡ 09fe08a8-610b-11ed-1f9b-2526511c166a
-using Markdown, Pluto, PlutoUI
+using Markdown, Pluto, PlutoUI;
 
 # ╔═╡ 5b6f7d44-ac49-44e7-8c30-1fcbdcb6f1b6
 md"""
@@ -43,7 +43,7 @@ Some of the commonly used (and exported) mutable types to create the `Expt` vari
 # ╔═╡ 4425553d-21be-4d95-8430-1a8f7fd145bf
 md"""
 ### Loading the package
-It is important to configure GeoPhyInv with a macro `@init_parallel_stencil` before anything else.
+It is necessary to configure GeoPhyInv with a macro `@init_parallel_stencil` before using it.
 If you need to change this configuration, julia kernel must be restarted.
 ```julia
 using GeoPhyInv # load package (after installation)
@@ -107,18 +107,15 @@ tgrid=range(0,stop=1.0,step=0.001) # a temporal grid from 0 to 1.0 s
 	"""
 
 # ╔═╡ 8abc866c-7311-4e3c-804a-106b190e4cdc
-md"---"
+md"# Appendix"
 
 # ╔═╡ 460ad45c-23d8-4035-ac55-34691e135c0a
 notebook_files = filter(Pluto.is_pluto_notebook, readdir(joinpath(@__DIR__,"notebooks"), join=true));
 
 # ╔═╡ 88917bd4-3d7b-49da-a12c-d8d16dac84e5
 html_files = broadcast(splitext.(basename.(notebook_files))) do f
-    "https://pawbz.github.io/GeoPhyInv.jl/" * first(f) * ".html"
+    "https://pawbz.github.io/GeoPhyInv.jl/" * "notebooks/" * first(f) * ".html"
 end;
-
-# ╔═╡ 93af118c-7def-463c-ad4a-b464d0b13e5d
-splitext.(basename.(notebook_files))
 
 # ╔═╡ 0ceb57ea-d2ee-4436-be98-bfb7a3c08ed5
 function links()
@@ -571,7 +568,6 @@ version = "17.4.0+0"
 # ╟─8abc866c-7311-4e3c-804a-106b190e4cdc
 # ╠═460ad45c-23d8-4035-ac55-34691e135c0a
 # ╠═88917bd4-3d7b-49da-a12c-d8d16dac84e5
-# ╠═93af118c-7def-463c-ad4a-b464d0b13e5d
 # ╠═0ceb57ea-d2ee-4436-be98-bfb7a3c08ed5
 # ╠═09fe08a8-610b-11ed-1f9b-2526511c166a
 # ╠═f47cea55-2632-4cb7-9873-99e34c1cf3af

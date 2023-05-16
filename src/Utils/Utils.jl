@@ -7,6 +7,7 @@ using LinearAlgebra
 using Test
 using FFTW
 using AxisArrays
+using MLUtils
 
 
 for file in ["freq", "taper", "adjtest"]

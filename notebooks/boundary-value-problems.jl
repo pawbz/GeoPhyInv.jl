@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.15
+# v0.19.21
 
 using Markdown
 using InteractiveUtils
@@ -17,107 +17,118 @@ end
 # ╔═╡ 0ffd8ee4-1735-4756-befb-c7c10d08eb34
 # ╠═╡ show_logs = false
 begin
-import Pkg
-Pkg.add("PlutoLinks")
-Pkg.add("PlutoUI")
-Pkg.add("PlutoTest")
-Pkg.add("Plots")
-using PlutoLinks: @revise
-using PlutoUI, PlutoTest, Plots
+    import Pkg
+    Pkg.add("PlutoLinks")
+    Pkg.add("PlutoUI")
+    Pkg.add("PlutoTest")
+    Pkg.add("Plots")
+    Pkg.add("CUDA")
+    using PlutoLinks: @revise
+    using PlutoUI, PlutoTest, Plots, CUDA
 end
 
-# ╔═╡ 981f55af-1557-49c5-921d-2e7e343a511b
-using Statistics, LossFunctions
-
-# ╔═╡ 86d3f068-a979-42f5-a9e7-138e94c16b38
-@bind reload_geophyinv Button("using GeoPhyInv")
-
-# ╔═╡ 7687d367-f9d5-4539-9156-e26d87379f87
-# ╠═╡ show_logs = false
+# ╔═╡ 0285e307-c619-4fa1-9e12-0ba755d476fb
 begin
-	reload_geophyinv
-	Pkg.activate(Base.current_project())
-	Pkg.instantiate()
-	@revise using GeoPhyInv
+    Pkg.activate(Base.current_project())
+    Pkg.instantiate()
 end
 
-# ╔═╡ de2f97fa-f64d-4754-bd34-e44dbf13c336
-md"""
-In order to install `GeoPhyInv` enter these package manager commands in the REPL.
-```julia
-using Pkg
-Pkg.add(PackageSpec(name="GeoPhyInv",url="https://github.com/pawbz/GeoPhyInv.jl.git"))
-```
-It is important to configure GeoPhyInv with a macro `@init_parallel_stencil` before anything else. If you need to change this configuration, the julia kernel must be restarted.
-```julia
-using GeoPhyInv; @init_parallel_stencil(⋯)
-```
-"""
+# ╔═╡ 59743052-ca23-4a0d-a32d-e66adb6cd352
+@revise using GeoPhyInv
 
 # ╔═╡ d9b71485-8b64-4ad0-a242-dde6300af835
 # ╠═╡ show_logs = false
-begin
-	reload_geophyinv
-	@init_parallel_stencil(2, false, Float32, 2)
-end
+
+using Statistics, LossFunctions, LinearAlgebra
+
+
+# ╔═╡ 45656ece-32e9-488f-be20-6546017e1e94
+TableOfContents()
 
 # ╔═╡ 2c5e29cf-67cd-4c74-b7e8-8f16b1828390
-pa = SeisForwExpt(:acou_homo2D);
+pa_acoustic = SeisForwExpt(:acou_homo2D, snaps_field=:vz);
 
-# ╔═╡ 1fc8c31c-9475-4471-9826-18c895ec4942
-@test 1==2
+# ╔═╡ 4d993c22-9e5e-44e5-994b-a41a3829d94a
+nt = length(pa_acoustic.c.srcwav[1][1].grid)
+
+# ╔═╡ 85a08047-2d00-4c08-85c3-35de37e71e37
+@bind it Slider(1:nt)
 
 # ╔═╡ b236913b-5320-461a-8583-74eb4140ff27
-for i in 1:5
-	@test 1==3
-end
+pa_elastic = SeisForwExpt(:elastic_homo2D);
 
-# ╔═╡ 0c1538c1-3f11-4ac4-b59d-9328450faf65
-for field in [:p, :vx, :vz]
-    println("############ Testing Backprop for source type ", field)
+# ╔═╡ 3109122c-5a01-43b7-9ade-46deeff185a7
+@bind src_type Radio(["1" => 1, "2" => 2], default="1")
+
+# ╔═╡ 309e105e-74ca-427a-aca3-bc7212eb88fa
+@bind src_field Radio(["p" => "p", "vz" => "vz", "vx" => "vx"], default="vz")
+
+# ╔═╡ 4a153cba-fb5c-40d8-a82f-1dbbc1d7f6c6
+src_type
+
+# ╔═╡ bf23dad7-2c0a-47f1-ad52-7f38a3658ae1
+function test_backprop(pa, fields)
+    println("############ Testing Backprop for source type ", src_field)
 
     srcwav = pa[:srcwav][1]
-    GeoPhyInv.update!(srcwav[1], [field])
+    GeoPhyInv.update!(srcwav[1], [Symbol(src_field)])
 
-    for sflags in [[1, -1], [2, -2]]
-        pa.c.backprop_flag = 1 # do backpropagation
+    # save boundary and final states
+    pa.c.attrib_mod.mode = :forward_save
 
-        GeoPhyInv.update!(pa, [srcwav], [sflags[1]])
+    GeoPhyInv.update!(pa, [srcwav], [parse(Int, src_type)])
 
-        update!(pa)
-        rec1 = deepcopy(pa.c.data[1])
-        rec1 = rec1[1].d[1]
-        rec1 ./= std(rec1)
+    update!(pa)
 
-        # change source flag and update wavelets in pa
-        GeoPhyInv.update!(pa, [srcwav], [sflags[2]])
-        pa.c.backprop_flag = -1 # do backpropagation
+	snaps_forw = pa[:snaps, 1]
 
-        update!(pa)
-        rec2 = deepcopy(pa.c.data[1])
+	pa2=deepcopy(pa)
 
-        # time reverse
-        reverse!(rec2)
-        rec2 = rec2[1].d[1]
-        rec2 ./= std(rec2)
+    # change source flag and update wavelets in pa
+    GeoPhyInv.update!(pa2, [srcwav], [-parse(Int, src_type)])
 
-        # compare results
-        # compute L2dist
-        @show err = value(L2DistLoss(), rec1, rec2, AggMode.Mean())
+    # force boundary values and use saved initial state
+    pa2.c.attrib_mod.mode = :adjoint
 
-        # desired accuracy?
-        @test err < 1e-10
-    end
+    update!(pa2)
+		
+	snaps_back = pa2[:snaps, 1]
+  return snaps_forw, snaps_back
+
 end
 
+# ╔═╡ c4e9f408-8408-41b7-a788-20e50dace617
+snaps_forw, snaps_back = test_backprop(pa_acoustic, [:p, :vx, :vz])
+
+
+# ╔═╡ f2c45770-192a-475c-ab48-29b6f524946c
+A = snaps_back[nt-it+1][GeoPhyInv._fd_npextend + 2 : end - GeoPhyInv._fd_npextend - 1, GeoPhyInv._fd_npextend + 2 : end - GeoPhyInv._fd_npextend-1];
+
+# ╔═╡ 28533942-e735-4444-b897-f4a1bb82463f
+B = snaps_forw[it][GeoPhyInv._fd_npextend + 2 : end - GeoPhyInv._fd_npextend - 1, GeoPhyInv._fd_npextend + 2 : end - GeoPhyInv._fd_npextend - 1 ];
+
+# ╔═╡ 4bd8806f-5afe-48af-83cd-aa8f6220eb44
+mean(L2DistLoss().(normalize(vec(A)), normalize(vec(B))))
+
+# ╔═╡ 29ad7daf-873f-4b59-b10b-780d6798426e
+plot(heatmap(B), heatmap(A), heatmap(A - B))
+
 # ╔═╡ Cell order:
-# ╟─86d3f068-a979-42f5-a9e7-138e94c16b38
-# ╟─de2f97fa-f64d-4754-bd34-e44dbf13c336
-# ╟─0ffd8ee4-1735-4756-befb-c7c10d08eb34
-# ╟─7687d367-f9d5-4539-9156-e26d87379f87
-# ╟─d9b71485-8b64-4ad0-a242-dde6300af835
-# ╠═981f55af-1557-49c5-921d-2e7e343a511b
+# ╠═45656ece-32e9-488f-be20-6546017e1e94
+# ╠═0ffd8ee4-1735-4756-befb-c7c10d08eb34
+# ╠═0285e307-c619-4fa1-9e12-0ba755d476fb
+# ╠═59743052-ca23-4a0d-a32d-e66adb6cd352
+# ╠═d9b71485-8b64-4ad0-a242-dde6300af835
 # ╠═2c5e29cf-67cd-4c74-b7e8-8f16b1828390
-# ╟─1fc8c31c-9475-4471-9826-18c895ec4942
+# ╠═c4e9f408-8408-41b7-a788-20e50dace617
+# ╠═4d993c22-9e5e-44e5-994b-a41a3829d94a
+# ╠═f2c45770-192a-475c-ab48-29b6f524946c
+# ╠═28533942-e735-4444-b897-f4a1bb82463f
+# ╠═4bd8806f-5afe-48af-83cd-aa8f6220eb44
+# ╠═85a08047-2d00-4c08-85c3-35de37e71e37
+# ╠═29ad7daf-873f-4b59-b10b-780d6798426e
 # ╠═b236913b-5320-461a-8583-74eb4140ff27
-# ╠═0c1538c1-3f11-4ac4-b59d-9328450faf65
+# ╠═3109122c-5a01-43b7-9ade-46deeff185a7
+# ╠═309e105e-74ca-427a-aca3-bc7212eb88fa
+# ╠═4a153cba-fb5c-40d8-a82f-1dbbc1d7f6c6
+# ╠═bf23dad7-2c0a-47f1-ad52-7f38a3658ae1
