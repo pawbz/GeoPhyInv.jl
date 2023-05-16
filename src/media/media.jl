@@ -214,7 +214,7 @@ md"Replacing `vp` and `rho` fields in the medium is simple."
 medium1.vp = vp2
 
 # ╔═╡ a074cbb1-c077-4ec6-aa79-3eb78116a8ba
-md"## Re-Parameterization"
+md"## Derived Parameters"
 
 # ╔═╡ ce6ae840-21f9-45f8-a2c1-4242435b8e69
 K!(zeros(3, 3), medium1)

@@ -63,6 +63,10 @@ function Vector{AGeomss}(
     return Array{AGeomss,1}(mgrid, ss, fill(s, ss.n), fill(r, ss.n))
 end
 
+
+AGeom = Array{AGeomss,1}
+
+
 function Base.isequal(ageom1::AGeomss, ageom2::AGeomss, attrib = :all)
     @assert dims(ageom1) == dims(ageom2) "attempt to compare acquisitions of different dimensions"
     names = [:sx, :sz, :ns]
