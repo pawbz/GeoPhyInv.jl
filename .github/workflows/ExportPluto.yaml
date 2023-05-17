@@ -38,7 +38,7 @@ jobs:
                       ${{ runner.os }}-pluto_state_cache-v2-${{ hashFiles('**/Project.toml', '**/Manifest.toml', '.github/workflows/*' ) }}
 
             - name: Configure GeoPhyInv
-              run: julia -e 'import Pkg; Pkg.instantiate(); Pkg.activate(); Pkg.add(PackageSpec(name="GeoPhyInv",url="https://github.com/pawbz/GeoPhyInv.jl.git")); using GeoPhyInv; GeoPhyInv.set_preferences() '
+              run: julia -e 'using Pkg; Pkg.add(PackageSpec(name="GeoPhyInv",url="https://github.com/pawbz/GeoPhyInv.jl.git")); using GeoPhyInv; GeoPhyInv.set_preferences() '
 
             - name: Run & export Pluto notebooks
               run: |
