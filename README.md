@@ -1,6 +1,4 @@
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://pawbz.github.io/GeoPhyInv.jl/dev)
-[![Build Status](https://travis-ci.org/pawbz/GeoPhyInv.jl.svg?branch=master)](https://travis-ci.org/pawbz/GeoPhyInv.jl)
-[![codecov](https://codecov.io/gh/pawbz/GeoPhyInv.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/pawbz/GeoPhyInv.jl)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://pawbz.github.io/GeoPhyInv.jl/)
 # Toolbox for Geophysical Modeling and Inverse Problems
 
 GeoPhyInv provides architecture-agnostic elastic and acoustic wave equation solvers using either [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl) for [Base.Threads](https://docs.julialang.org/en/v1/base/multi-threading/) for high-performance computations on GPUs and CPUs, respectively.  For GPU computations, a performance similar to CUDA C is achieved, thanks to 

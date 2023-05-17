@@ -129,12 +129,21 @@ function PFdtd(
 
     # extend mediums in the PML layers
     exmedium = padarray(medium, _fd_npextend, pml_faces)
+    # mod parameters are on the stress grid, so no need to worry
     mod = NamedArray(
         [
             Data.Array(zeros(length.(exmedium.mgrid)...)) for
-            name in MediumParameters(attrib_mod)
+            name in MediumParameters(attrib_mod)[1]
         ],
-        MediumParameters(attrib_mod),
+        MediumParameters(attrib_mod)[1],
+    )
+    # dmod parameters are NOT on stress grid, so need to use get_mgrid function to get sizes
+    dmod = NamedArray(
+        [
+            Data.Array(zeros(length.(get_mgrid(field, attrib_mod, exmedium.mgrid...))...)) for
+            field in MediumParameters(attrib_mod)[3]
+        ],
+        MediumParameters(attrib_mod)[2],
     )
     δmod = deepcopy(mod) # for perturbations in medium parameters
 
@@ -145,12 +154,12 @@ function PFdtd(
     gradients = NamedArray(
         [
             SharedArray{_fd_datatype}(zeros(length.(exmedium.mgrid)...)) for
-            name in MediumParameters(attrib_mod)
+            name in MediumParameters(attrib_mod)[1]
         ],
-        MediumParameters(attrib_mod),
+        MediumParameters(attrib_mod)[1],
     )
     # need reference values for nondimensionalize and dimensionalize
-    ref_mod = NamedArray([Data.Number(exmedium[name].ref) for name in MediumParameters(attrib_mod)], MediumParameters(attrib_mod))
+    ref_mod = NamedArray([Data.Number(exmedium[name].ref) for name in MediumParameters(attrib_mod)[1]], MediumParameters(attrib_mod)[1])
 
     illum_stack = SharedArray{Float64}(zeros(length.(medium.mgrid)...))
 
@@ -193,6 +202,7 @@ function PFdtd(
         ic,
         pml,
         mod,
+        dmod,
         δmod,
         NamedArray([memcoeff1, memcoeff2], ([:memcoeff1, :memcoeff2],)),
         gradients,
@@ -413,8 +423,8 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
 
     # named array to store gradients for each supersource
     gradients = NamedArray(
-        [Data.Array(zeros(length.(pac.exmedium.mgrid)...)) for name in MediumParameters(pac.attrib_mod)],
-        MediumParameters(pac.attrib_mod),
+        [Data.Array(zeros(length.(pac.exmedium.mgrid)...)) for name in MediumParameters(pac.attrib_mod)[1]],
+        MediumParameters(pac.attrib_mod)[1],
     )
 
     # saving illum (dummy)

@@ -1,66 +1,36 @@
 ### A Pluto.jl notebook ###
 # v0.19.21
 
+#> [frontmatter]
+#> title = "SeisForwExpt"
+#> description = "This notebook demonstrates how an instance of SeisForwExpt can be used iteratively to perform forward modeling"
+
 using Markdown
 using InteractiveUtils
 
-# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
-macro bind(def, element)
-    quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
-        local el = $(esc(element))
-        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
-        el
-    end
-end
-
-# ╔═╡ 0ffd8ee4-1735-4756-befb-c7c10d08eb34
-# ╠═╡ show_logs = false
+# ╔═╡ 5fc7d3bf-418d-4487-a2d6-bc07c736374b
 begin
     import Pkg
     Pkg.add("PlutoLinks")
     Pkg.add("PlutoUI")
     Pkg.add("PlutoTest")
     Pkg.add("Plots")
+    Pkg.add("CUDA")
     using PlutoLinks: @revise
-    using PlutoUI, PlutoTest, Plots
+    using PlutoUI, PlutoTest, Plots, CUDA
 end
 
-# ╔═╡ ed1cc48c-56c2-4a34-a210-fb2237472b9a
-TableOfContents()
-
-# ╔═╡ 86d3f068-a979-42f5-a9e7-138e94c16b38
-@bind reload_geophyinv Button("using GeoPhyInv")
-
-# ╔═╡ 7687d367-f9d5-4539-9156-e26d87379f87
-# ╠═╡ show_logs = false
+# ╔═╡ 98de96ba-8a96-4039-bb9f-f52ad9ee31bc
 begin
-    reload_geophyinv
     Pkg.activate(Base.current_project())
     Pkg.instantiate()
-    @revise using GeoPhyInv
 end
 
-# ╔═╡ d9b71485-8b64-4ad0-a242-dde6300af835
-# ╠═╡ show_logs = false
-begin
-    reload_geophyinv
-    GeoPhyInv.@init_parallel_stencil(2, false, Float32, 2)
-	using Statistics
-end
+# ╔═╡ 9fd95dde-ff9e-490e-b357-d8e0d83823dc
+@revise using GeoPhyInv
 
-# ╔═╡ de2f97fa-f64d-4754-bd34-e44dbf13c336
-md"""
-In order to install `GeoPhyInv` enter these package manager commands in the REPL.
-```julia
-using Pkg
-Pkg.add(PackageSpec(name="GeoPhyInv",url="https://github.com/pawbz/GeoPhyInv.jl.git"))
-```
-It is necessary to configure GeoPhyInv with a macro `@init_parallel_stencil` before using it. If you need to change this configuration, the julia kernel must be restarted.
-```julia
-using GeoPhyInv; @init_parallel_stencil(⋯)
-```
-"""
+# ╔═╡ 68d5c87e-02a6-41ed-aac1-559d0bfde12a
+TableOfContents()
 
 # ╔═╡ a6b59ba1-ea71-467f-bf26-49a634a1bbd9
 md"""
@@ -76,7 +46,7 @@ various bundles of medium parameters. We will first load a predefined medium, a 
 
 # ╔═╡ ae4201a4-7bb1-456c-bdec-d55127324118
 # a medium with 5 m spatial sampling
-medium = Medium(:elastic_homo2D, 5)
+medium = ElasticMedium(Homogeneous(), 5)
 
 # ╔═╡ ded21d43-99d6-453b-a858-e32f3f82e605
 # surface seismic acquisition with 3 supersources and 100 receivers
@@ -111,6 +81,9 @@ md"""
 Now we have all the stuff necessary to allocate an instance of `SeisForwExpt`. 
 """
 
+# ╔═╡ c6ca9a7e-a4aa-4279-b9aa-fbd3fb77c801
+GeoPhyInv.lambda(medium)
+
 # ╔═╡ c7d96dda-17f5-4dbb-98bf-4c29fd784574
 pa = SeisForwExpt(
     FdtdElastic(),
@@ -129,7 +102,7 @@ Before modeling, we will now generate a perturbed medium, which is "similar" to 
 
 # ╔═╡ df4a4072-a91a-471a-88d9-b74ed58e7823
 begin
-	medium_box = similar(medium);
+	medium_box = deepcopy(medium);
 	update!(medium_box, [:vp, :rho, :vs], rectangle=[[-500, -500], [500, 500]], perc=5.0); # perturbed velocity box
 	
 end
@@ -172,12 +145,10 @@ plot(plot(data, 99.9), plot(data_box, 99.9), size=(800, 500))
 @test data ≠ data_box
 
 # ╔═╡ Cell order:
-# ╠═ed1cc48c-56c2-4a34-a210-fb2237472b9a
-# ╟─86d3f068-a979-42f5-a9e7-138e94c16b38
-# ╟─de2f97fa-f64d-4754-bd34-e44dbf13c336
-# ╟─0ffd8ee4-1735-4756-befb-c7c10d08eb34
-# ╟─7687d367-f9d5-4539-9156-e26d87379f87
-# ╠═d9b71485-8b64-4ad0-a242-dde6300af835
+# ╠═68d5c87e-02a6-41ed-aac1-559d0bfde12a
+# ╠═5fc7d3bf-418d-4487-a2d6-bc07c736374b
+# ╠═98de96ba-8a96-4039-bb9f-f52ad9ee31bc
+# ╠═9fd95dde-ff9e-490e-b357-d8e0d83823dc
 # ╟─a6b59ba1-ea71-467f-bf26-49a634a1bbd9
 # ╟─50494fe6-6bdf-4db1-8e61-6c9b39627b1f
 # ╠═ae4201a4-7bb1-456c-bdec-d55127324118
@@ -187,12 +158,13 @@ plot(plot(data, 99.9), plot(data_box, 99.9), size=(800, 500))
 # ╠═8e94a56e-d483-419c-adb5-7b1889677929
 # ╠═10be735e-4012-4fa8-b538-9f9a08694458
 # ╠═7fa1ddc5-fe10-44e2-b764-533be1840ab6
-# ╠═cec954f6-c278-4003-99e4-6c995f74b606
+# ╟─cec954f6-c278-4003-99e4-6c995f74b606
+# ╠═c6ca9a7e-a4aa-4279-b9aa-fbd3fb77c801
 # ╠═c7d96dda-17f5-4dbb-98bf-4c29fd784574
 # ╠═9a3360c0-72c7-420f-a7c0-5565a1383f07
 # ╠═df4a4072-a91a-471a-88d9-b74ed58e7823
 # ╠═07da9113-a518-4925-8978-8407dc60c605
-# ╠═7ac4f51d-73b4-4f9c-88a4-a48911742282
+# ╟─7ac4f51d-73b4-4f9c-88a4-a48911742282
 # ╠═033cd313-4e87-4364-a1f8-136e0e06bb65
 # ╠═fd11d02d-80cd-4373-a8d1-e0d50d93dcf8
 # ╠═368c2bbd-94fb-4826-96eb-8fa37a7e35a3

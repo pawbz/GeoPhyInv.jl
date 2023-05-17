@@ -16,20 +16,20 @@ end
 
 # ╔═╡ 75ad24f7-8b57-401b-8170-d3e35f3c960f
 begin
-import Pkg
-Pkg.add("PlutoLinks")
-Pkg.add("PlutoUI")
-Pkg.add("PlutoTest")
-Pkg.add("Plots")
-	Pkg.add("CUDA")
-using PlutoLinks: @revise
-using PlutoUI, PlutoTest, Plots, CUDA
+    import Pkg
+    Pkg.add("PlutoLinks")
+    Pkg.add("PlutoUI")
+    Pkg.add("PlutoTest")
+    Pkg.add("Plots")
+    Pkg.add("CUDA")
+    using PlutoLinks: @revise
+    using PlutoUI, PlutoTest, Plots, CUDA
 end
 
 # ╔═╡ 893cd92d-3d0d-4fb2-b465-f61a237fc154
 begin
-	Pkg.activate(Base.current_project())
-	Pkg.instantiate()
+    Pkg.activate(Base.current_project())
+    Pkg.instantiate()
 end
 
 # ╔═╡ f86410b5-87f7-4761-91a8-856406d00234
@@ -44,24 +44,24 @@ TableOfContents()
 # ╔═╡ de9a4882-cba9-4707-a900-3d82b9a2faa1
 # testing parameterization
 begin
-	pa_mod = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 2), Homogeneous())
-	# m1=GeoPhyInv.get_modelvector(pa_mod, [:invK]); 
-	# @time update!(pa_mod, m1, [:invK])
-	# m2=GeoPhyInv.get_modelvector(pa_mod, [:invK])
-	# @test m1 ≈ m2
+    pa_mod = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 2), Homogeneous())
+    # m1=GeoPhyInv.get_modelvector(pa_mod, [:invK]); 
+    # @time update!(pa_mod, m1, [:invK])
+    # m2=GeoPhyInv.get_modelvector(pa_mod, [:invK])
+    # @test m1 ≈ m2
 end
 
 # ╔═╡ 2a737f8b-92d0-4042-96eb-6b85ea4030c7
 # @time update!(m1, pa_mod, [:invK])
 
 # ╔═╡ f49439df-3db3-48ae-bf9d-1387e3c14c8f
-N=2
+N = 2
 
 # ╔═╡ 6d47ae1d-2554-4d42-af6c-02ce952bf14e
 @bind mpara Select([:invK, :rho])
 
 # ╔═╡ 9d3aeb6f-936d-4173-b41c-2159a458b8ce
-m1= GeoPhyInv.get_modelvector(pa_mod, [mpara])
+m1 = GeoPhyInv.get_modelvector(pa_mod, [mpara])
 
 # ╔═╡ 5582110f-327c-419a-8759-ca11844c0c96
 mpara
@@ -77,8 +77,9 @@ supertype(StepRangeLen)
 
 # ╔═╡ c6b19c3d-6ccb-436f-a191-d3cc1958a91a
 begin
-	pa_true = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 1), RandScatterer())
-	update!(pa_true); dobs=deepcopy(pa_true.c.data[1]);
+    pa_true = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 1), RandScatterer())
+    update!(pa_true)
+    dobs = deepcopy(pa_true.c.data[1])
 end
 
 # ╔═╡ 43fb3211-9ffc-4ea5-a459-539cf55ba009
@@ -88,7 +89,7 @@ pa_inv = SeisInvExpt(pa_mod, dobs, [N, N], [mpara])
 pa_true.c.srcwav[1][1].grid
 
 # ╔═╡ 4ce63c81-9367-4635-89af-27219f0fe478
-loss=L2DistLoss()
+loss = L2DistLoss()
 
 # ╔═╡ 57bc5dd6-a33e-4439-ad27-fdbb9b3b17e3
 GeoPhyInv.lossvalue(loss, pa_true.c.data[1], pa_mod.c.data[1])
@@ -137,10 +138,10 @@ filter(x -> x ∉ Fields(pa_mod.c.attrib_mod, "d"), Fields(pa_mod.c.attrib_mod, 
 heatmap(Array(pa_mod.c.gradients[1]), clim=(-1e-11, 1e-11), c=:seismic)
 
 # ╔═╡ 4b49262a-28a5-4182-bc46-43e567056bd6
-xs=zeros(N*N)
+xs = zeros(N * N)
 
 # ╔═╡ c895f6d7-2012-4929-85dd-f0fa1bb97866
-m=GeoPhyInv.Data.Array(xs)
+m = GeoPhyInv.Data.Array(xs)
 
 # ╔═╡ 6c037136-4822-438f-85ba-9d61c724f0d9
 GeoPhyInv.lossvalue(m, loss, dobs, pa_mod, [mpara])
@@ -150,8 +151,9 @@ m
 
 # ╔═╡ 8a47e8ba-08df-40bc-ad77-539c8da17943
 begin
-	g=similar(m);  GeoPhyInv.gradient!(g, m, pa_inv);		
-	heatmap(Array(pa_mod.c.gradients[1]))
+    g = similar(m)
+    GeoPhyInv.gradient!(g, m, pa_inv)
+    heatmap(Array(pa_mod.c.gradients[1]))
 end
 
 # ╔═╡ cd5bff59-6466-43d7-bd10-795d6f55d4ef
@@ -165,14 +167,14 @@ heatmap(Array(gKI), c=:seismic)
 
 # ╔═╡ 8b9bb7bf-2c36-41ad-bf8e-5a251e24ec96
 function Js(m)
-	return GeoPhyInv.lossvalue(GeoPhyInv.Data.Array(m), pa_inv)
+    return GeoPhyInv.lossvalue(GeoPhyInv.Data.Array(m), pa_inv)
 end
 
 # ╔═╡ 22b5fc09-5697-4599-9d27-a64a3584cb0c
 Js(GeoPhyInv.Data.Array(xs))
 
 # ╔═╡ c6626e0f-4bf1-4e29-a0c3-1e7f23805f61
-gm=grad(central_fdm(2, 1, factor=1e7), Js, xs)[1]
+gm = grad(central_fdm(2, 1, factor=1e7), Js, xs)[1]
 
 # ╔═╡ 8ec00fb7-fe18-4741-b987-813ec97d73fe
 heatmap(Array(reshape(gm, N, N)), c=:seismic)
@@ -184,7 +186,7 @@ gm1 = Array(reshape(gm, N, N))
 Array(gKI) ./ gm1
 
 # ╔═╡ 9371b452-4ad6-4d07-ae98-c86239b6c110
-gs=get_xs(g, xs)
+gs = get_xs(g, xs)
 
 # ╔═╡ 48356c93-888b-442e-b61a-5f25f24c3f8b
 pa_mod.c.ref_mod

@@ -79,15 +79,16 @@ end
     dtauzzdz,
     dtauyzdz,
     dtauxzdz,
-    dt,
-    rho,
+    dtinvavxirho,
+    dtinvavyirho,
+    dtinvavzirho,
 )
     @inn(vx) =
-        @inn(vx) - dt / @av_xi(rho) * (@all(dtauxxdx) + @all(dtauxydy) + @all(dtauxzdz))
+        @inn(vx) - @all(dtinvavxirho) * (@all(dtauxxdx) + @all(dtauxydy) + @all(dtauxzdz))
     @inn(vy) =
-        @inn(vy) - dt / @av_yi(rho) * (@all(dtauxydx) + @all(dtauyydy) + @all(dtauyzdz))
+        @inn(vy) - @all(dtinvavyirho) * (@all(dtauxydx) + @all(dtauyydy) + @all(dtauyzdz))
     @inn(vz) =
-        @inn(vz) - dt / @av_zi(rho) * (@all(dtauxzdx) + @all(dtauyzdy) + @all(dtauzzdz))
+        @inn(vz) - @all(dtinvavzirho) * (@all(dtauxzdx) + @all(dtauyzdy) + @all(dtauzzdz))
 
     return
 end
@@ -99,11 +100,11 @@ end
     dtauxzdx,
     dtauzzdz,
     dtauxzdz,
-    dt,
-    rho,
+    dtinvavxirho,
+    dtinvavzirho,
 )
-    @inn(vx) = @inn(vx) - dt / @av_xi(rho) * (@all(dtauxxdx) + @all(dtauxzdz))
-    @inn(vz) = @inn(vz) - dt / @av_zi(rho) * (@all(dtauxzdx) + @all(dtauzzdz))
+    @inn(vx) = @inn(vx) - @all(dtinvavxirho) * (@all(dtauxxdx) + @all(dtauxzdz))
+    @inn(vz) = @inn(vz) - @all(dtinvavzirho) * (@all(dtauxzdx) + @all(dtauzzdz))
 
     return
 end
@@ -158,29 +159,28 @@ end
     dvxdx,
     dvydy,
     dvzdz,
-    dt,
-    M,
-    lambda,
+    dtM,
+    dtlambda,
 )
 
     @all(tauxx) =
         @all(tauxx) -
-        dt * ((@all(M) * @all(dvxdx)) + (@all(lambda) * (@all(dvydy) + @all(dvzdz))))
+        (@all(dtM) * @all(dvxdx)) + (@all(dtlambda) * (@all(dvydy) + @all(dvzdz)))
     @all(tauyy) =
         @all(tauyy) -
-        dt * ((@all(M) * @all(dvydy)) + (@all(lambda) * (@all(dvxdx) + @all(dvzdz))))
+        (@all(dtM) * @all(dvydy)) + (@all(dtlambda) * (@all(dvxdx) + @all(dvzdz)))
     @all(tauzz) =
         @all(tauzz) -
-        dt * ((@all(M) * @all(dvzdz)) + (@all(lambda) * (@all(dvydy) + @all(dvxdx))))
+        (@all(dtM) * @all(dvzdz)) + (@all(dtlambda) * (@all(dvydy) + @all(dvxdx)))
 
     return
 end
 
-@parallel function compute_stressii!(tauxx::Data.Array{2}, tauzz, dvxdx, dvzdz, dt, M, lambda)
+@parallel function compute_stressii!(tauxx::Data.Array{2}, tauzz, dvxdx, dvzdz, dtM, dtlambda)
     @all(tauxx) =
-        @all(tauxx) - dt * ((@all(M) * @all(dvxdx)) + (@all(lambda) * (@all(dvzdz))))
+        @all(tauxx) - (@all(dtM) * @all(dvxdx)) + (@all(dtlambda) * (@all(dvzdz)))
     @all(tauzz) =
-        @all(tauzz) - dt * ((@all(M) * @all(dvzdz)) + (@all(lambda) * (@all(dvxdx))))
+        @all(tauzz) - (@all(dtM) * @all(dvzdz)) + (@all(dtlambda) * (@all(dvxdx)))
 
     return
 end
@@ -194,17 +194,18 @@ end
     dvydz,
     dvzdx,
     dvzdy,
-    dt,
-    mu,
+    dtavxzimu,
+    dtavxyimu,
+    dtavyzimu
 )
-    @all(tauxz) = @all(tauxz) - dt * (@av_xzi(mu) * (@all(dvxdz) + @all(dvzdx)))
-    @all(tauxy) = @all(tauxy) - dt * (@av_xyi(mu) * (@all(dvxdy) + @all(dvydx)))
-    @all(tauyz) = @all(tauyz) - dt * (@av_yzi(mu) * (@all(dvydz) + @all(dvzdy)))
+    @all(tauxz) = @all(tauxz) - @all(dtavxzimu) * (@all(dvxdz) + @all(dvzdx))
+    @all(tauxy) = @all(tauxy) - @all(dtavxyimu) * (@all(dvxdy) + @all(dvydx))
+    @all(tauyz) = @all(tauyz) - @all(dtavyzimu) * (@all(dvydz) + @all(dvzdy))
 
     return
 end
-@parallel function compute_stressij!(tauxz::Data.Array{2}, dvxdz, dvzdx, dt, mu)
-    @all(tauxz) = @all(tauxz) - dt * (@av(mu) * (@all(dvxdz) + @all(dvzdx)))
+@parallel function compute_stressij!(tauxz::Data.Array{2}, dvxdz, dvzdx, dtavmu)
+    @all(tauxz) = @all(tauxz) - @all(dtavmu) * (@all(dvxdz) + @all(dvzdx))
     return
 end
 
@@ -347,8 +348,9 @@ function update_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
         w1t[:dtauzzdz],
         w1t[:dtauyzdz],
         w1t[:dtauxzdz],
-        pac.fc[:dt],
-        pac.mod[:rho],
+        pac.dmod[:dtinvavxirho],
+        pac.dmod[:dtinvavyirho],
+        pac.dmod[:dtinvavzirho],
     )
 
     (:xmin ∈ pac.rigid_faces) && @parallel (1:pac.ic[:nz], 1:pac.ic[:ny]) dirichletxmin!(
@@ -498,9 +500,8 @@ function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
         w1t[:dvxdx],
         w1t[:dvydy],
         w1t[:dvzdz],
-        pac.fc[:dt],
-        pac.mod[:M],
-        pac.mod[:lambda],
+        pac.dmod[:dtM],
+        pac.dmod[:dtlambda],
     )
     @parallel compute_stressij!(
         w1t[:tauxy],
@@ -512,10 +513,9 @@ function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,3}}
         w1t[:dvydz],
         w1t[:dvzdx],
         w1t[:dvzdy],
-        pac.fc[:dt],
-        pac.mod[:mu],
-    )
-
+        pac.dmod[:dtavxzimu],
+        pac.dmod[:dtavxyimu], 
+        pac.dmod[:dtavyzimu])
     if (:zmin ∈ pac.stressfree_faces)
         @parallel (1:size(w1t[:tauzz], 2), 1:size(w1t[:tauzz], 3)) free_surface_mirror!(
             w1t[:tauzz],
@@ -593,8 +593,8 @@ function update_v!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
         w1t[:dtauxzdx],
         w1t[:dtauzzdz],
         w1t[:dtauxzdz],
-        pac.fc[:dt],
-        pac.mod[:rho],
+        pac.dmod[:dtinvavxirho],
+        pac.dmod[:dtinvavzirho],
     )
 
     (:xmin ∈ pac.rigid_faces) &&
@@ -663,16 +663,14 @@ function update_stress!(pap, pac::T) where {T<:P_common{<:FdtdElastic,2}}
         w1t[:tauzz],
         w1t[:dvxdx],
         w1t[:dvzdz],
-        pac.fc[:dt],
-        pac.mod[:M],
-        pac.mod[:lambda],
+        pac.dmod[:dtM],
+        pac.dmod[:dtlambda],
     )
     @parallel compute_stressij!(
         w1t[:tauxz],
         w1t[:dvxdz],
         w1t[:dvzdx],
-        pac.fc[:dt],
-        pac.mod[:mu],
+        pac.dmod[:dtavmu],
     )
 
 
