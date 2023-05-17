@@ -13,7 +13,7 @@ end
 
 vp0(T, mgrid) = vp(fill(T(2500.0), length.(mgrid)...))
 rho0(T, mgrid) = rho(fill(T(2500.0), length.(mgrid)...))
-vs0(T, mgrid) = vs(fill(T(2000.0), length.(mgrid)...))
+vs0(T, mgrid) = vs(fill(T(1500.0), length.(mgrid)...))
 function AcousticMedium{T,N}(::Homogeneous, δ=0.0) where {T,N}
     mgrid = repeat([range(-1000.0, stop=1000.0, length=201)], N)
     medium = AcousticMedium(mgrid, vp0(T, mgrid), rho0(T, mgrid))

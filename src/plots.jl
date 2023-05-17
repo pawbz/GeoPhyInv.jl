@@ -1,22 +1,22 @@
-@recipe function plot(medium::Medium, ageom = nothing; fields=MediumParameters(medium))
+@recipe function plot(medium::Medium, ageom=nothing; fields=MediumParameters(medium))
     mx = medium.mgrid[2]
     mz = medium.mgrid[1]
-    as=length(mz) / length(mx)
-    layout := ((as < 1) ? (length(fields),  1) : (1, length(fields)))
+    as = length(mz) / length(mx)
+    layout := ((as < 1) ? (length(fields), 1) : (1, length(fields)))
     margin --> 5Measures.mm
     framestyle := [:grid :grid :grid]
-    if(as < 0.5)
+    if (as < 0.5)
         as1 = 0.5
         lp = :outertopleft
-    elseif(as > 2)
+    elseif (as > 2)
         as1 = 2
         lp = :outertop
     else
         as1 = 1
         lp = :outertopleft
-    end 
+    end
     aspect_ratio --> (inv(as) * as1)
-    size --> ((as < 1) ? (800, length(fields)*300) : (400*length(fields), 400))
+    size --> ((as < 1) ? (800, length(fields) * 300) : (400 * length(fields), 400))
     yflip := true
     legend --> lp
     xguide --> "x"
@@ -42,7 +42,7 @@
                 title --> title1
                 label --> "R"
                 seriestype := :scatter
-                clims --> (medium.bounds[field][1], medium.bounds[field][2])
+                clims --> Tuple(getfield(medium, field).bounds)
                 ageom, Recs()
             end
             @series begin
@@ -50,7 +50,7 @@
                 title --> title1
                 label --> "S"
                 seriestype := :scatter
-                clims --> (medium.bounds[field][1], medium.bounds[field][2])
+                clims --> Tuple(getfield(medium, field).bounds)
                 ageom, SSrcs()
             end
         end
@@ -87,7 +87,7 @@ end
     tuple([ageom.r[d] for d in dnames]...)
 end
 
-@recipe function plot(dat::NamedD{Recs}, clip_perc = 0.0)
+@recipe function plot(dat::NamedD{Recs}, clip_perc=0.0)
     layout := (1, length(dat.d))
     size --> (length(dat.d) * 300, 300)
     margin --> 5Measures.mm
@@ -120,7 +120,7 @@ end
 
 @recipe function plot(dat::NamedD{Srcs})
     fgrid = FFTW.rfftfreq(length(dat.grid), inv(step(dat.grid)))
-    layout := (1,2)
+    layout := (1, 2)
     size --> (800, length(dat.d) * 200)
     margin --> 5Measures.mm
     framestyle := :grid
@@ -130,7 +130,7 @@ end
         if (!iszero(dmax))
             D = (abs.(FFTW.rfft(dp, [1])))
             D ./= maximum(D) # normalize spectrum
-            freqmax=maximum(findall(x->x>1e-6, D))[1]
+            freqmax = maximum(findall(x -> x > 1e-6, D))[1]
             @series begin
                 subplot := 1
                 seriestype := :line

@@ -28,13 +28,12 @@ For example, the
 current `Expt` types within the realm of this package include:
 
 * `SeisForwExpt` is the seismic (both acoustic and elastic) forward modeling experiment;
-* `SeisInvExpt` is the type for seismic inversion experiment, including migration;
-* `PoissonExpt` is type for the solving the Poisson experiment.
+* `SeisInvExpt` is the type for seismic inversion experiment, including migration.
 
 Some of the commonly used (and exported) mutable types to create the `Expt` variables are:
 
 * `Medium` for bundling medium parameters together;
-* `AGeom` stores acquisition geometry related parameters;
+* `AGeom` stores acquisition-geometry-related parameters;
 * `SrcWav` allocates source signals input to an experiment;
 * `Records` allocated the output records that are fitted during inversion.
 """
@@ -42,17 +41,21 @@ Some of the commonly used (and exported) mutable types to create the `Expt` vari
 
 # ╔═╡ 4425553d-21be-4d95-8430-1a8f7fd145bf
 md"""
-### Loading the package
-It is necessary to configure GeoPhyInv with a macro `@init_parallel_stencil` before using it.
+### Configuring the package
+It is necessary to configure GeoPhyInv with a `set_preferences` before using it.
+The preferences are set using [Preferences.jl](https://github.com/JuliaPackaging/Preferences.jl) package, where you can find more information.
 If you need to change this configuration, julia kernel must be restarted.
 ```julia
-using GeoPhyInv # load package (after installation)
+using GeoPhyInv
+GeoPhyInv.set_preferences(; ndims, use_gpu, datatype, order)
 ```
-```julia
-GeoPhyInv.@init_parallel_stencil
-```
+where the keyword arguments (with defaults) are 
+* `ndims::Int=2`: the number of dimensions used for the stencil computations 2D or 3D 
+* `use_gpu::Bool=false`: use GPU for stencil computations or not
+* `datatype="Float32"`: the type of numbers used by field arrays (e.g. "Float32" or "Float64")
+* `order::Int=2`: order ∈ [2,4,6,8] of the finite-difference stencil
+Once changed, these preferences will apply as long as GeoPhyInv is part of your package environment.
 """
-
 
 # ╔═╡ 1d12369e-3189-49df-9a1d-51be074af61f
 md"""
@@ -117,9 +120,20 @@ html_files = broadcast(splitext.(basename.(notebook_files))) do f
     "https://pawbz.github.io/GeoPhyInv.jl/" * "notebooks/" * first(f) * ".html"
 end;
 
-# ╔═╡ 0ceb57ea-d2ee-4436-be98-bfb7a3c08ed5
+# ╔═╡ 5a1b5b3d-bce0-41d7-b27c-18cf8f15b8c5
 function links()
-    return (broadcast(vcat, [Markdown.parse("[$(first.(splitext.(basename.(ht))))]($ht)") for ht in html_files]))
+    return mapreduce(vcat, html_files, notebook_files) do ht, nb
+		fm = Pluto.frontmatter(nb)
+		
+		if("title" ∈ keys(fm) && "description" ∈ keys(fm))
+			t = fm["title"]
+			d = fm["description"]
+			return Markdown.parse("""#### [$(t)]($ht) 
+			 $(d)""")
+		else
+			return md""
+		end
+	end
 end
 
 # ╔═╡ 823e0831-927a-4105-bff5-0eaf33956ab3
@@ -152,7 +166,7 @@ PlutoUI = "~0.7.48"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.2"
+julia_version = "1.9.0"
 manifest_format = "2.0"
 project_hash = "65587a21c6c738d26799777693f784e97f4e3d64"
 
@@ -192,7 +206,7 @@ version = "0.11.4"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "0.5.2+0"
+version = "1.0.2+0"
 
 [[deps.Configurations]]
 deps = ["ExproniconLite", "OrderedCollections", "TOML"]
@@ -321,7 +335,7 @@ version = "1.10.2+0"
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 
 [[deps.LinearAlgebra]]
-deps = ["Libdl", "libblastrampoline_jll"]
+deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[deps.Logging]]
@@ -351,14 +365,14 @@ version = "1.1.7"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
-version = "2.28.0+0"
+version = "2.28.2+0"
 
 [[deps.Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2022.2.1"
+version = "2022.10.11"
 
 [[deps.MsgPack]]
 deps = ["Serialization"]
@@ -373,7 +387,7 @@ version = "1.2.0"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.20+0"
+version = "0.3.21+4"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -399,9 +413,9 @@ uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 version = "2.5.1"
 
 [[deps.Pkg]]
-deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
+deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.8.0"
+version = "1.9.0"
 
 [[deps.Pluto]]
 deps = ["Base64", "Configurations", "Dates", "Distributed", "FileWatching", "FuzzyCompletions", "HTTP", "HypertextLiteral", "InteractiveUtils", "Logging", "MIMEs", "Markdown", "MsgPack", "Pkg", "PrecompileSignatures", "REPL", "RegistryInstances", "RelocatableFolders", "Sockets", "TOML", "Tables", "URIs", "UUIDs"]
@@ -482,17 +496,23 @@ version = "1.0.1"
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
 
 [[deps.SparseArrays]]
-deps = ["LinearAlgebra", "Random"]
+deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+version = "1.9.0"
+
+[[deps.SuiteSparse_jll]]
+deps = ["Artifacts", "Libdl", "Pkg", "libblastrampoline_jll"]
+uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
+version = "5.10.1+6"
 
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-version = "1.0.0"
+version = "1.0.3"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -509,7 +529,7 @@ version = "1.10.0"
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
-version = "1.10.1"
+version = "1.10.0"
 
 [[deps.Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
@@ -541,12 +561,12 @@ uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.12+3"
+version = "1.2.13+0"
 
 [[deps.libblastrampoline_jll]]
-deps = ["Artifacts", "Libdl", "OpenBLAS_jll"]
+deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.1.1+0"
+version = "5.7.0+0"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -568,7 +588,7 @@ version = "17.4.0+0"
 # ╟─8abc866c-7311-4e3c-804a-106b190e4cdc
 # ╠═460ad45c-23d8-4035-ac55-34691e135c0a
 # ╠═88917bd4-3d7b-49da-a12c-d8d16dac84e5
-# ╠═0ceb57ea-d2ee-4436-be98-bfb7a3c08ed5
+# ╠═5a1b5b3d-bce0-41d7-b27c-18cf8f15b8c5
 # ╠═09fe08a8-610b-11ed-1f9b-2526511c166a
 # ╠═f47cea55-2632-4cb7-9873-99e34c1cf3af
 # ╟─00000000-0000-0000-0000-000000000001

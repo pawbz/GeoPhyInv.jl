@@ -51,15 +51,15 @@ CUDA.allowscalar(false)
 """
 Setup ParallelStencil preferences.
 ```julia
-setup_parallel_stencil(ndims, use_gpu, datatype, order)
+set_preferences(; ndims, use_gpu, datatype, order)
 ```
 
 # Arguments
 
-* `ndims::Int`: the number of dimensions used for the stencil computations 2D or 3D 
-* `use_gpu::Bool` : use GPU for stencil computations or not
-* `datatype`: the type of numbers used by field arrays (e.g. Float32 or Float64)
-* `order::Int ∈ [2,4,6,8]` : order of the finite-difference stencil 
+* `ndims::Int=2`: the number of dimensions used for the stencil computations 2D or 3D 
+* `use_gpu::Bool=false`: use GPU for stencil computations or not
+* `datatype="Float32"`: the type of numbers used by field arrays (e.g. "Float32" or "Float64")
+* `order::Int=2`: order ∈ [2,4,6,8] of the finite-difference stencil 
 """
 function set_preferences(; ndims=2, use_gpu=false, datatype="Float32", order=2, verbose=false)
     @assert ndims ∈ [2, 3]
@@ -76,7 +76,6 @@ function set_preferences(; ndims=2, use_gpu=false, datatype="Float32", order=2, 
 
     @info("GeoPhyInv: new parallel stencil preferences set; restart your Julia session for this change to take effect!")
 end
-export setup_parallel_stencil
 
 const verbose = @load_preference("verbose", false)
 const _fd_order = @load_preference("order", 2)

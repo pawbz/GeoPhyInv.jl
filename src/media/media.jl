@@ -20,7 +20,7 @@ begin
     function bounds(m::Array{T}, ref::T, frac) where {T}
         return [max(zero(eltype(m)), minimum(m) - convert(eltype(m), frac) * ref), maximum(m) + convert(eltype(m), frac) * ref]
     end
-    for f in [:vp, :vs, :rho, :K, :M, :mu, :lambda, :invrho, :invK]
+    for f in [:vp, :vs, :rho, :K, :M, :mu, :lambda, :invlambda, :invmu, :invrho, :invK]
         @eval(@with_kw_noshow mutable struct $f{T,N} <: MediumParameters
             m::Array{T,N}
             @assert all(m .> 0) "negative medium parameters"
@@ -76,7 +76,7 @@ begin
     MediumParameters(::AcousticMedium) = [:vp, :rho]
     MediumParameters(::ElasticMedium) = [:vp, :vs, :rho]
 
-    for f in [:vp, :vs, :rho, :K, :M, :mu, :lambda, :invrho, :invK]
+    for f in [:vp, :vs, :rho, :K, :M, :mu, :invmu, :lambda, :invlambda, :invrho, :invK]
         f1 = Symbol(f, "!")
         @eval(function $f1(m, medium::ElasticMedium)
             broadcast!(m, medium.vp.m, medium.vs.m, medium.rho.m) do vp1, vs1, rho1
@@ -90,7 +90,7 @@ begin
             return $f(m)
         end)
     end
-    for f in [:vp, :rho, :K, :M, :mu, :lambda, :invrho, :invK]
+    for f in [:vp, :rho, :K, :M, :mu, :lambda, :invlambda, :invrho, :invK]
         f1 = Symbol(f, "!")
         @eval(function $f1(m, medium::AcousticMedium)
             broadcast!(m, medium.vp.m, medium.rho.m) do vp1, rho1
@@ -113,10 +113,13 @@ begin
     K(vp, rho) = abs2(vp) * rho
     lambda(vp, rho) = abs2(vp) * rho
     lambda(vp, vs, rho) = (abs2(vp) - 2 * abs2(vs)) * rho
+	invlambda(vp, vs, rho) = inv((abs2(vp) - 2 * abs2(vs)) * rho)
+	invlambda(vp, rho) = inv(abs2(vp) * rho)
     M(vp, vs, rho) = abs2(vp) * rho
     M(vp, rho) = abs2(vp) * rho
     mu(vp, vs, rho) = abs2(vs) * rho
     mu(vp, rho) = zero(vp)
+	invmu(vp, vs, rho) = inv(abs2(vs) * rho)
     invK(vp, vs, rho) = inv(K(vp, vs, rho))
     invK(vp, rho) = inv(K(vp, rho))
     invrho(vp, rho) = inv(rho)
@@ -189,6 +192,9 @@ bounds(randn(3, 3), 0.1, 0.1)
 # ╔═╡ b99d5714-f51a-451d-b96b-8a08866c3079
 vp1 = vp(1000.0 .+ randn(3, 3))
 
+# ╔═╡ cb5ed850-fd31-4b1f-8bc9-dc373bcd4932
+vs1 = vs(500.0 .+ randn(3, 3))
+
 # ╔═╡ 4bb4ce2c-f630-44f6-8685-6c2e2d4d5ee1
 vp2 = vp(1500.0 .+ 10.0 * randn(3, 3))
 
@@ -203,6 +209,9 @@ md"## Medium"
 
 # ╔═╡ c1b6569e-d6d8-4c77-8cc4-1507e3e70603
 medium1 = AcousticMedium([range(1, 2, length=3), range(1, 2, length=3)], vp1, rho1)
+
+# ╔═╡ e405f8f5-4cf7-43ec-b534-a7f9b71d802b
+medium2 = ElasticMedium([range(1, 2, length=3), range(1, 2, length=3)], vp1, vs1, rho1)
 
 # ╔═╡ 801cab26-9939-41e7-aa6f-ba1ba57163ab
 medium1D = AcousticMedium{Float32,1}([range(0, 100, length=10)])
@@ -224,6 +233,9 @@ rho!(zeros(3, 3), medium1)
 
 # ╔═╡ 918a0fee-77d7-4e92-80d6-83a814e0f3d3
 K(medium1)
+
+# ╔═╡ 854debee-b6e4-4b0e-acde-fc09211669d0
+invK(medium2)
 
 # ╔═╡ c626f418-9a06-43b3-8081-b3c25be8e3a8
 medium1[:K]
@@ -353,8 +365,8 @@ function update!(medium::Medium, fields::Vector{Symbol}; rectangle=nothing,  per
         )
         if (!iszero(perc))
             for field in fields
-                m = medium.m[field]
-                m0 = medium.ref[field]
+                m = getfield(medium, field).m
+                m0 = getfield(medium, field).ref
                 perturb!(m, m0, perc, rectangle_indices)
             end
         end
@@ -788,11 +800,13 @@ version = "17.4.0+0"
 # ╟─64065a7b-5bbd-4168-9eb1-fb5402076e59
 # ╠═c5dd4cd1-ace9-4e8c-b603-522f68450ea4
 # ╠═b99d5714-f51a-451d-b96b-8a08866c3079
+# ╠═cb5ed850-fd31-4b1f-8bc9-dc373bcd4932
 # ╠═4bb4ce2c-f630-44f6-8685-6c2e2d4d5ee1
 # ╠═4de56401-d88d-444b-b264-c9aea237bc09
 # ╠═8ce71374-9377-428d-b0e6-e7a75270cf97
 # ╟─5623fd01-6ec9-4fa2-b998-7db4c61d8f7e
 # ╠═c1b6569e-d6d8-4c77-8cc4-1507e3e70603
+# ╠═e405f8f5-4cf7-43ec-b534-a7f9b71d802b
 # ╠═801cab26-9939-41e7-aa6f-ba1ba57163ab
 # ╟─d35fca7c-5cdb-46be-876e-9263f3ab8e3b
 # ╠═1bd81ae0-021e-4bfc-9158-dfada19e7c00
@@ -800,6 +814,7 @@ version = "17.4.0+0"
 # ╠═ce6ae840-21f9-45f8-a2c1-4242435b8e69
 # ╠═aa816da1-4b2f-4ace-807b-93d90293b3fd
 # ╠═918a0fee-77d7-4e92-80d6-83a814e0f3d3
+# ╠═854debee-b6e4-4b0e-acde-fc09211669d0
 # ╠═c626f418-9a06-43b3-8081-b3c25be8e3a8
 # ╠═20bd3b9f-4913-44d5-b652-3e0144f1b81a
 # ╟─8d5a4eb0-7b06-4db7-b458-dfbf5d27d5da

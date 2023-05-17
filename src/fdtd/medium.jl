@@ -1,12 +1,12 @@
 # returns non-dimensionalized model vector corresponding to pa.c.mod
 function get_modelvector(pa::PFdtd, mparams)
-    m = Data.Array(zeros(length(first(pa.c.mod))*length(mparams)))
+    m = Data.Array(zeros(length(first(pa.c.mod)) * length(mparams)))
     update!(m, pa, mparams)
     return m
 end
 
 # updated pa.c.mod using a (non-dimensional) medium vector
-# this is make pa.c.exmedium inconsistent with pa.c.mod, which is used in propagate functions
+# NOTE: this makes pa.c.exmedium inconsistent with pa.c.mod, which is used in propagate functions
 function update!(pa::PFdtd, m::AbstractVector, mparams)
     CUDA.allowscalar(true)
     mchunks = chunk(m, length(mparams))
@@ -23,6 +23,10 @@ function update!(pa::PFdtd, m::AbstractVector, mparams)
         # @. mod = mod * r + r
     end
     CUDA.allowscalar(false)
+
+    # update dependencies
+    update_dmod!(pa.c)
+
 end
 
 # update m using pa.c.mod
@@ -44,13 +48,23 @@ function update!(m::AbstractVector, pa::PFdtd, mparams)
     CUDA.allowscalar(false)
 end
 
+# the following medium parameters are stored on XPU
+# averaged values of rho on velocity grid
+# these methods output the fields on which the medium parameters lie
 function MediumParameters(::FdtdAcoustic)
-    # the following medium parameters are stored on XPU
-    return [:invK, :rho]
+    @static if _fd_ndims == 2
+        return [:invK, :rho], [:dtinvavxirho, :dtinvavzirho, :dtK], [dpdx(), dpdz(), p()] # independent and dependent
+    else
+        return [:invK, :rho], [:dtinvavxirho, :dtinvavyirho, :dtinvavzirho, :dtK], [dpdx(), dpdy(), dpdz(), p()]
+    end
+
 end
 function MediumParameters(::FdtdElastic)
-    # the following medium parameters are stored on XPU
-    return [:lambda, :mu, :rho]
+    @static if _fd_ndims == 2
+        return [:invlambda, :invmu, :rho], [:dtinvavxirho, :dtinvavzirho, :dtavmu, :dtM, :dtlambda], [dtauxxdx(), dtauzzdz(), dvxdz(), tauxx(), tauxx()]
+    else
+        return [:invlambda, :invmu, :rho], [:dtinvavxirho, :dtinvavyirho, :dtinvavzirho, :dtavxzimu, :dtavxyimu, :dtavyzimu, :dtM, :dtlambda], [dtauxxdx(), dtauyydy(), dtauzzdz(), dvxdz(), dvxdy(), dvydz(), tauxx(), tauxx()]
+    end
 end
 
 """
@@ -93,5 +107,88 @@ function update!(pac::T, medium::Medium) where {T<:P_common}
     broadcast(AxisArrays.names(pac.mod)[1]) do name
         copyto!(pac.mod[name], pac.exmedium, name)
     end
+    # update dependencies
+    update_dmod!(pac)
     return nothing
+end
+
+
+function update_dmod!(pac::T) where {T<:P_common{<:FdtdAcoustic,2}}
+    mod=pac.mod; dmod=pac.dmod
+    @parallel store_invavxi!(dmod[:dtinvavxirho], mod[:rho], pac.fc[:dt])
+    @parallel store_invavzi!(dmod[:dtinvavzirho], mod[:rho], pac.fc[:dt])
+    broadcast!(inv, dmod[:dtK], mod[:invK])
+    rmul!(dmod[:dtK], pac.fc[:dt])
+end
+function update_dmod!(pac::T) where {T<:P_common{<:FdtdAcoustic,3}}
+    mod=pac.mod; dmod=pac.dmod
+    @parallel store_invavxi!(dmod[:dtinvavxirho], mod[:rho], pac.fc[:dt])
+    @parallel store_invavyi!(dmod[:dtinvavyirho], mod[:rho], pac.fc[:dt])
+    @parallel store_invavzi!(dmod[:dtinvavzirho], mod[:rho], pac.fc[:dt])
+    broadcast!(inv, dmod[:dtK], mod[:invK])
+    rmul!(dmod[:dtK], pac.fc[:dt])
+end
+
+function update_dmod!(pac::T) where {T<:P_common{<:FdtdElastic,2}}
+    mod=pac.mod; dmod=pac.dmod
+    @parallel store_invavxi!(dmod[:dtinvavxirho], mod[:rho], pac.fc[:dt])
+    @parallel store_invavzi!(dmod[:dtinvavzirho], mod[:rho], pac.fc[:dt])
+    broadcast!(inv, dmod[:dtlambda], mod[:invlambda])
+    rmul!(dmod[:dtlambda], pac.fc[:dt])
+    broadcast!(dmod[:dtM], mod[:invlambda], mod[:invmu]) do invλ, invμ
+        inv(invλ) + 2.0 * inv(invμ)
+    end
+    rmul!(dmod[:dtM], pac.fc[:dt])
+
+    @parallel store_invav!(dmod[:dtavmu], mod[:invmu], pac.fc[:dt])
+end
+function update_dmod!(pac::T) where {T<:P_common{<:FdtdElastic,3}}
+    mod=pac.mod; dmod=pac.dmod
+    @parallel store_invavxi!(dmod[:dtinvavxirho], mod[:rho], pac.fc[:dt])
+    @parallel store_invavyi!(dmod[:dtinvavyirho], mod[:rho], pac.fc[:dt])
+    @parallel store_invavzi!(dmod[:dtinvavzirho], mod[:rho], pac.fc[:dt])
+    broadcast!(inv, dmod[:dtlambda], mod[:invlambda])
+    rmul!(dmod[:dtlambda], pac.fc[:dt])
+    broadcast!(dmod[:dtM], mod[:invlambda], mod[:invmu]) do invλ, invμ
+        inv(invλ) + 2.0 * inv(invμ)
+    end
+    rmul!(dmod[:dtM], pac.fc[:dt])
+    @parallel store_invavxzi!(dmod[:dtavxzimu], mod[:invmu], pac.fc[:dt])
+    @parallel store_invavxyi!(dmod[:dtavxyimu], mod[:invmu], pac.fc[:dt])
+    @parallel store_invavyzi!(dmod[:dtavyzimu], mod[:invmu], pac.fc[:dt])
+end
+
+
+
+
+@parallel function store_invavxi!(a, b, dt)
+    @all(a) = dt / @av_xi(b)
+    return
+end
+
+@parallel function store_invavyi!(a, b, dt)
+    @all(a) = dt / @av_yi(b) 
+    return
+end
+
+@parallel function store_invavzi!(a, b, dt)
+    @all(a) = dt / @av_zi(b)
+    return
+end
+
+@parallel function store_invav!(a, b, dt)
+    @all(a) = dt / @av(b)
+    return
+end
+@parallel function store_invavxzi!(a, b, dt)
+    @all(a) = dt / @av_xzi(b)
+    return
+end
+@parallel function store_invavxyi!(a, b, dt)
+    @all(a) = dt / @av_xyi(b)
+    return
+end
+@parallel function store_invavyzi!(a, b, dt)
+    @all(a) = dt / @av_yzi(b)
+    return
 end

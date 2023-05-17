@@ -16,7 +16,7 @@ function check_stability(pa::PFdtd, verbose=true; H=div(20,_fd_order), epsilon=i
 	δt=pa.c.fc[:dt]
 
 	if(isa(attrib_mod, FdtdElastic))
-		vmin=minimum(filter(x->x ≠ 0, pa.c.medium[:vs])) # vs condition overrides (other than zero?)
+		vmin=minimum(filter(x->x ≠ 0, pa.c.medium[:vs].m)) # vs condition overrides (other than zero?)
 		vmax=sqrt(medium[:vp].bounds[2]^2 + medium[:vs].bounds[2]^2) # see Virieux (1986)
 
 	else
