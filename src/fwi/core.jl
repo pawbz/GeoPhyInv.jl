@@ -24,7 +24,7 @@ end
 function SeisInvExpt(paf::PFdtd, dobs::Records, Nigrid::Vector{Int}, mparams=Medium(paf.c.attrib); loss=L2DistLoss())
     @assert length(Nigrid) == length(paf.c.medium.mgrid)
     migrid = broadcast(paf.c.medium.mgrid, Nigrid) do m, N
-        range(first(m), stop=last(m), length=N)
+        range(first(m)+4*step(m), stop=last(m)-4*step(m), length=N)
     end
     return SeisInvExpt(paf, dobs, migrid, mparams, loss=loss)
 end
