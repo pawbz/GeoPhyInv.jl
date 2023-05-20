@@ -66,6 +66,9 @@ m1 = GeoPhyInv.get_modelvector(pa_mod, [mpara])
 # ╔═╡ 5582110f-327c-419a-8759-ca11844c0c96
 mpara
 
+# ╔═╡ 43fb3211-9ffc-4ea5-a459-539cf55ba009
+# pa_inv = SeisInvExpt(pa_mod, dobs, [N, N], [mpara])
+
 # ╔═╡ 8e9a92dc-dc58-40d7-9a38-df08852a33a0
 typeof(pa_mod.c.medium.mgrid)
 
@@ -82,8 +85,8 @@ begin
     dobs = deepcopy(pa_true.c.data[1])
 end
 
-# ╔═╡ 43fb3211-9ffc-4ea5-a459-539cf55ba009
-pa_inv = SeisInvExpt(pa_mod, dobs, [N, N], [mpara])
+# ╔═╡ 26c9f7a1-f18b-4fe3-a607-ad1f6a904bb8
+pa_inv = SeisInvExpt(pa_mod, dobs, [range(-100,100,length=N), range(-100,100,length=N)], [mpara])
 
 # ╔═╡ b99b6e7a-d037-4c6f-8043-fdb49102503b
 pa_true.c.srcwav[1][1].grid
@@ -212,6 +215,7 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═f49439df-3db3-48ae-bf9d-1387e3c14c8f
 # ╠═6d47ae1d-2554-4d42-af6c-02ce952bf14e
 # ╠═5582110f-327c-419a-8759-ca11844c0c96
+# ╠═26c9f7a1-f18b-4fe3-a607-ad1f6a904bb8
 # ╠═43fb3211-9ffc-4ea5-a459-539cf55ba009
 # ╠═8e9a92dc-dc58-40d7-9a38-df08852a33a0
 # ╠═9706aa59-0286-43cf-bdb7-a3d040e0e2bc
