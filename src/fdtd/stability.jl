@@ -6,7 +6,7 @@
 * `epsilon` : Courant number
 """
 function check_stability(pa::PFdtd, verbose=true; H=div(20,_fd_order), epsilon=inv(sqrt(ndims(pa.c.medium))))
-	mgrid=pa.c.medium.mgrid
+	mgrid=pa.c.medium.grid
 	freqmin=pa.c.fc[:freqmin]
 	freqmax=pa.c.fc[:freqmax]
 	attrib_mod=pa.c.attrib_mod

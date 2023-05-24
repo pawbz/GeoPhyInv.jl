@@ -97,7 +97,7 @@ function update!(s::Recordst,
 		tmaxfrac::Float64=1.0
 		)
 
-	x=mod.mgrid[2]; z=mod.mgrid[1]
+	x=mod.grid[2]; z=mod.grid[1]
 	# dominant wavelength using mod dimensions
 	λdom=mean([(abs(x[end]-x[1])), (abs(z[end]-z[1]))])/real(nλ)
 	# average P velocity
@@ -112,7 +112,7 @@ function update!(s::Recordst,
 	tmax=2.0*d*inv(vavg)*tmaxfrac
 
 	# choose sampling interval to obey max freq of source wavelet
-	δmin = minimum([step(mod.mgrid[2]), step(mod.mgrid[1])])
+	δmin = minimum([step(mod.grid[2]), step(mod.grid[1])])
 	vpmax = mod.bounds[:vp][2]
 	δt=0.5*δmin/vpmax
 

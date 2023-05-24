@@ -92,7 +92,7 @@ plot(medium)
 medium0=Medium(:acou_homo2D, 40)
 
 # ╔═╡ 0f2d0963-b91a-4b1c-92d5-31f077e28516
-ageom = AGeom(medium.mgrid, :surf, SSrcs(1), Recs(100));
+ageom = AGeom(medium.grid, :surf, SSrcs(1), Recs(100));
 
 # ╔═╡ d72f7155-b766-46ad-a3af-8390b3cfa1f0
 plot(medium0, ageom)
@@ -239,7 +239,7 @@ g2 = get_gradient(xs)
 g1[1] ./g2 
 
 # ╔═╡ 0f8685fc-7341-4cd5-a7cb-bf6b5b5d5ab9
-nz, nx = length.(pa_acoustic.c.exmedium.mgrid)
+nz, nx = length.(pa_acoustic.c.exmedium.grid)
 
 # ╔═╡ 158ef323-b376-46d1-aea8-c26061ee5b56
 heatmap(reshape(xtrue[1:nx*nz], nz, nx))

@@ -16,14 +16,14 @@ update!(medium, [:vp,:rho], randn_perc=1)
 medium0 = Medium(:acou_homo2);
 update!(medium0, [:vp,:rho], randn_perc=1)
 
-ageom=AGeom(medium.mgrid, :surf)
+ageom=AGeom(medium.grid, :surf)
 wav, tgrid=ricker(medium, 3, 1.0)
 srcwav=SrcWav(tgrid,ageom,[:p])
 update!(srcwav,[:p], wav)
 
 parameterization=[:χvp, :χrho, :null]
 
-mgrid=medium.mgrid
+mgrid=medium.grid
 
 @testset "test parallel implementation during gradient" begin
 	for attrib_mod in [FdtdAcoustic(), FdtdAcoustic{Born}()]

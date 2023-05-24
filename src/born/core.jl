@@ -47,8 +47,8 @@ function PBorn(
     cc = NamedArray([complex(0.0, 0.0)], [:dummy])
 
     if (scatter_flag)
-        mesh_x = medium_pert.mgrid[2]
-        mesh_z = medium_pert.mgrid[1]
+        mesh_x = medium_pert.grid[2]
+        mesh_z = medium_pert.grid[1]
         nz = length(mesh_z)
         nx = length(mesh_x)
         δx = step(mesh_x)
@@ -60,7 +60,7 @@ function PBorn(
 
 
     ic = NamedArray(
-        vcat(length.(medium.mgrid), [length(tgrid), np2]),
+        vcat(length.(medium.grid), [length(tgrid), np2]),
         vcat(dim_names(ndims(medium), "n"), [:nt, :np2]),
     )
 

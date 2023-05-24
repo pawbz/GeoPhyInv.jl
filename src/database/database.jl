@@ -484,7 +484,7 @@ end
 
 
 
-include("misfits.jl")
+include("func_grad.jl")
 include("statistics.jl")
 
 

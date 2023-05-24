@@ -39,7 +39,7 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::
     setnames!(ssprayw, sfields, 1)
 
     for sfield in sfields
-        ssprayw[sfield] = get_proj_matrix(eval(sfield)(), pac.attrib_mod, pac.exmedium.mgrid...,[[s[is] for s in ageomss.s] for is in 1:ageomss.ns])
+        ssprayw[sfield] = get_proj_matrix(eval(sfield)(), pac.attrib_mod, pac.exmedium.grid...,[[s[is] for s in ageomss.s] for is in 1:ageomss.ns])
     end
 
 end
@@ -49,7 +49,7 @@ function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::
     rinterpolatew = pass.rinterpolatew
 
     for rfield in pac.rfields
-        rinterpolatew[rfield] = get_proj_matrix(eval(rfield)(), pac.attrib_mod, pac.exmedium.mgrid...,[[r[ir] for r in ageomss.r] for ir in 1:ageomss.nr])
+        rinterpolatew[rfield] = get_proj_matrix(eval(rfield)(), pac.attrib_mod, pac.exmedium.grid...,[[r[ir] for r in ageomss.r] for ir in 1:ageomss.nr])
     end
 end
 

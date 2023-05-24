@@ -68,14 +68,14 @@ end
 Return if two `Medium` models have same dimensions and bounds.
 """
 function Base.size(mod::Medium)
-    return length.(mod.mgrid)
+    return length.(mod.grid)
 end
 
 """
 Return the number of dimensions of `Medium` 
 """
 function Base.ndims(mod::Medium)
-    return length(mod.mgrid)
+    return length(mod.grid)
 end
 
 """
@@ -115,10 +115,10 @@ function Base.show(io::Base.IO, mod::Medium)
         "-D Medium with ",
         dim_names(ndims(mod)),
         " in ",
-        [[m[1], m[end]] for m in mod.mgrid],
+        [[m[1], m[end]] for m in mod.grid],
     )
-    println(io, "> number of samples:\t", length.(mod.mgrid))
-    println(io, "> sampling intervals:\t", step.(mod.mgrid))
+    println(io, "> number of samples:\t", length.(mod.grid))
+    println(io, "> sampling intervals:\t", step.(mod.grid))
     try
         println(io, "> vp:\t", "min\t", minimum(mod[:vp]), "\tmax\t", maximum(mod[:vp]))
     catch
@@ -155,7 +155,7 @@ function Base.copyto!(
     fields::Vector{Symbol} = [:χKI, :χrhoI, :null],
 )
     iszero(mod) ? error("mod cannot be zero") : nothing
-    nznx = prod(length.(mod.mgrid))
+    nznx = prod(length.(mod.grid))
     (length(x) ≠ (count(fields .≠ :null) * nznx)) && error("size x")
     if (fields == [:χKI, :χrhoI, :null])
         @inbounds for i = 1:nznx
@@ -206,7 +206,7 @@ function Base.copyto!(
     mod::Medium,
     parameterization,
 )
-    nznx = prod(length.(mod.mgrid))
+    nznx = prod(length.(mod.grid))
     fill!(δxout, 0.0)
     if (parameterization == [:χKI, :χrhoI, :null])
         @inbounds for i = 1:nznx
@@ -427,7 +427,7 @@ copyto!(x,mod,[:vp, :rho])
 ```
 """
 function Base.copyto!(x::AbstractArray{T}, mod::Medium, fields::Vector{Symbol}) where {T}
-    nznx = prod(length.(mod.mgrid))
+    nznx = prod(length.(mod.grid))
     (length(x) ≠ (count(fields .≠ :null) * nznx)) && error("size x")
     i0 = 0
     for field in fields
@@ -450,7 +450,7 @@ x=vec(mod, field)
 """
 function Base.vec(mod::Medium, field::Symbol)
     # allocate
-    rout = zeros(length(mod.mgrid[1]), length(mod.mgrid[2]))
+    rout = zeros(length(mod.grid[1]), length(mod.grid[2]))
     copyto!(rout, mod, [field])
     return rout
 end

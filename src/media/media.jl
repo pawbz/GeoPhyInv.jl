@@ -1,6 +1,10 @@
 ### A Pluto.jl notebook ###
 # v0.19.21
 
+#> [frontmatter]
+#> title = "Medium Parameters"
+#> description = "Easy manipulation of medium parameters"
+
 using Markdown
 using InteractiveUtils
 
@@ -23,7 +27,7 @@ begin
     for f in [:vp, :vs, :rho, :K, :M, :mu, :lambda, :invlambda, :invmu, :invrho, :invK]
         @eval(@with_kw_noshow mutable struct $f{T,N} <: MediumParameters
             m::Array{T,N}
-            @assert all(m .> 0) "negative medium parameters"
+            @assert all(m .>= 0) "negative medium parameters"
             ref::T = Statistics.mean(m)
             bounds::Vector{T} = bounds(m, ref, 0.1)
         end)
@@ -34,45 +38,45 @@ begin
     abstract type Medium end
 
     mutable struct AcousticMedium{T,N} <: Medium
-        mgrid::Vector{T1} where {T1<:StepRangeLen{Float64}}
+        grid::Vector{T1} where {T1<:StepRangeLen{Float64}}
         vp::vp{T,N}
         rho::rho{T,N}
         buffer::Array{T,N}
-        function AcousticMedium{T,N}(mgrid, vp, rho, buffer) where {T,N}
-            @assert all(size(vp.m) .== length.(mgrid))
-            @assert all(size(rho.m) .== length.(mgrid))
-            @assert all(size(buffer) .== length.(mgrid))
-            new(map(StepRangeLen{Float64}, (mgrid)), vp, rho, buffer)
+        function AcousticMedium{T,N}(grid, vp, rho, buffer) where {T,N}
+            @assert all(size(vp.m) .== length.(grid))
+            @assert all(size(rho.m) .== length.(grid))
+            @assert all(size(buffer) .== length.(grid))
+            new(map(StepRangeLen{Float64}, (grid)), vp, rho, buffer)
         end
     end
 
     mutable struct ElasticMedium{T,N} <: Medium
-        mgrid::Vector{T1} where {T1<:StepRangeLen{Float64}}
+        grid::Vector{T1} where {T1<:StepRangeLen{Float64}}
         vp::vp{T,N}
         vs::vs{T,N}
         rho::rho{T,N}
         buffer::Array{T,N}
-        function ElasticMedium{T,N}(mgrid, vp, vs, rho, buffer) where {T,N}
-            @assert all(size(vp.m) .== length.(mgrid))
-            @assert all(size(vs.m) .== length.(mgrid))
-            @assert all(size(rho.m) .== length.(mgrid))
-            @assert all(size(buffer) .== length.(mgrid))
-            new(map(StepRangeLen{Float64}, (mgrid)), vp, vs, rho, buffer)
+        function ElasticMedium{T,N}(grid, vp, vs, rho, buffer) where {T,N}
+            @assert all(size(vp.m) .== length.(grid))
+            @assert all(size(vs.m) .== length.(grid))
+            @assert all(size(rho.m) .== length.(grid))
+            @assert all(size(buffer) .== length.(grid))
+            new(map(StepRangeLen{Float64}, (grid)), vp, vs, rho, buffer)
         end
     end
     # default vp, vs and rho
-    function AcousticMedium{T,N}(mgrid) where {T,N}
-        @assert length(mgrid) == N
-        return AcousticMedium{T,N}(mgrid, vp(fill(T(2500.0), length.(mgrid)...)), rho(fill(T(2500.0), length.(mgrid)...)), zeros(T, length.(mgrid)...))
+    function AcousticMedium{T,N}(grid) where {T,N}
+        @assert length(grid) == N
+        return AcousticMedium{T,N}(grid, vp(fill(T(2500.0), length.(grid)...)), rho(fill(T(2500.0), length.(grid)...)), zeros(T, length.(grid)...))
     end
-    function ElasticMedium{T,N}(mgrid) where {T,N}
-        @assert length(mgrid) == N
-        return ElasticMedium{T,N}(mgrid, vp(fill(T(2500.0), length.(mgrid)...)), vs(fill(T(2000.0), length.(mgrid)...)), rho(fill(T(2500.0), length.(mgrid)...)), zeros(T, length.(mgrid)...))
+    function ElasticMedium{T,N}(grid) where {T,N}
+        @assert length(grid) == N
+        return ElasticMedium{T,N}(grid, vp(fill(T(2500.0), length.(grid)...)), vs(fill(T(2000.0), length.(grid)...)), rho(fill(T(2500.0), length.(grid)...)), zeros(T, length.(grid)...))
     end
-    AcousticMedium(mgrid) = AcousticMedium{Data.Number,length(mgrid)}(mgrid)
-    ElasticMedium(mgrid) = ElasticMedium{Data.Number,length(mgrid)}(mgrid)
-    AcousticMedium(mgrid, vp1, rho1) = AcousticMedium{eltype(vp1.m),length(mgrid)}(mgrid, vp1, rho1, zero(vp1.m))
-    ElasticMedium(mgrid, vp1, vs1, rho1) = ElasticMedium{eltype(vp1.m),length(mgrid)}(mgrid, vp1, vs1, rho1, zero(vp1.m))
+    AcousticMedium(grid) = AcousticMedium{Data.Number,length(grid)}(grid)
+    ElasticMedium(grid) = ElasticMedium{Data.Number,length(grid)}(grid)
+    AcousticMedium(grid, vp1, rho1) = AcousticMedium{eltype(vp1.m),length(grid)}(grid, vp1, rho1, zero(vp1.m))
+    ElasticMedium(grid, vp1, vs1, rho1) = ElasticMedium{eltype(vp1.m),length(grid)}(grid, vp1, vs1, rho1, zero(vp1.m))
     MediumParameters(::AcousticMedium) = [:vp, :rho]
     MediumParameters(::ElasticMedium) = [:vp, :vs, :rho]
 
@@ -127,15 +131,12 @@ begin
 
 end;
 
-# ╔═╡ 6a2fff8e-cb1c-4aaf-9973-81bb457f600e
-TableOfContents()
-
 # ╔═╡ 2f2a3317-5a99-4ebd-b1cb-601123e6bcaa
 """
 Return the number of dimensions of `Medium` 
 """
 function Base.ndims(medium::Medium)
-    return length(medium.mgrid)
+    return length(medium.grid)
 end;
 
 # ╔═╡ 5fab3bef-cc47-43ac-af58-94851311f09c
@@ -146,6 +147,9 @@ function Base.getindex(medium::Medium, s::Symbol)
         eval(s)(medium) # derived fields
     end
 end
+
+# ╔═╡ 96da8803-8b68-44f4-979f-f7f52f129bac
+md"## Structs"
 
 # ╔═╡ 2cffedda-ce62-4328-bf66-450b28822758
 md"## Base"
@@ -174,7 +178,7 @@ Copy for `Medium`. The media should have same bounds and sizes.
 Doesn't allocate any memory. Note that only [:vp, :rho, :vs] fields are stored in structs.
 """
 function Base.copyto!(modo::T, mod::T) where {T<:Medium}
-    @assert length.(mod.mgrid) == length.(modo.mgrid)
+    @assert length.(mod.grid) == length.(modo.grid)
     for name in MediumParameters(mod)
         m1 = getfield(modo, name)
         m2 = getfield(mod, name)
@@ -182,6 +186,12 @@ function Base.copyto!(modo::T, mod::T) where {T<:Medium}
     end
     return modo
 end;
+
+# ╔═╡ 5804afc9-083b-4fe5-8538-d279b267bab1
+md"# Documentation"
+
+# ╔═╡ 6a2fff8e-cb1c-4aaf-9973-81bb457f600e
+TableOfContents()
 
 # ╔═╡ 64065a7b-5bbd-4168-9eb1-fb5402076e59
 md"## Medium Parameters"
@@ -249,7 +259,7 @@ md"## Interpolations"
 # ╔═╡ a3291f9d-88ee-4722-a5bd-a02bfae36005
 function padarray!(modex::Medium, mod::Medium, npml, edges)
     number = eltype(mod)
-    nex = length.(modex.mgrid)
+    nex = length.(modex.grid)
     ist = [
         any(edges .== Symbol(string(dim), "min")) ? -npml + 1 : 1 for
         dim in dim_names(ndims(mod))
@@ -275,14 +285,14 @@ function padarray(mod::Medium, npml, edges)
         any(edges .== Symbol(string(dim), "max")) ? npml : 0 for
         dim in dim_names(ndims(mod))
     ]
-    mgrid_new = [
+    grid_new = [
         range(
             mg[1] - minpads[i] * step(mg),
             stop=mg[end] + maxpads[i] * step(mg),
             length=length(mg) + minpads[i] + maxpads[i],
-        ) for (i, mg) in enumerate(mod.mgrid)
+        ) for (i, mg) in enumerate(mod.grid)
     ]
-    modex = typeof(mod)(mgrid_new) # initialize a new medium
+    modex = typeof(mod)(grid_new) # initialize a new medium
     padarray!(modex, mod, npml, edges)
 end
 
@@ -296,13 +306,13 @@ function update!(modex::T, mod::T) where {T<:Medium}
     number = eltype(mod)
     for mname in MediumParameters(mod)
         itp = extrapolate(
-            interpolate(Tuple(mod.mgrid), getfield(mod, mname).m, Gridded(Linear())),
+            interpolate(Tuple(mod.grid), getfield(mod, mname).m, Gridded(Linear())),
             Flat(),
         )
-        setfield!(modex, mname, eval(mname)(number.(itp[modex.mgrid...])))
+        setfield!(modex, mname, eval(mname)(number.(itp[modex.grid...])))
     end
     return modex
-end
+end;
 
 # ╔═╡ eae711d0-f690-4b95-baeb-667eb48659c7
 md"## Addon"
@@ -354,13 +364,13 @@ function update!(medium::Medium, fields::Vector{Symbol}; rectangle=nothing,  per
     end
 
 
-    mgrid = medium.mgrid
+    grid = medium.grid
     if (!(rectangle === nothing))
         @assert length(rectangle) == 2
         @assert length.(rectangle) == fill(ndims(medium), 2)
         rectangle_indices = CartesianIndices(
             Tuple([
-                argmin(abs.(mg .- rectangle[1][im])):argmin(abs.(mg .- rectangle[2][im])) for (im, mg) in enumerate(mgrid)
+                argmin(abs.(mg .- rectangle[1][im])):argmin(abs.(mg .- rectangle[2][im])) for (im, mg) in enumerate(grid)
             ]),
         )
         if (!iszero(perc))
@@ -383,7 +393,7 @@ function update!(medium::Medium, fields::Vector{Symbol}; rectangle=nothing,  per
     end
 
     return medium
-end
+end;
 
 # ╔═╡ 67f40155-47f1-471a-84b1-79950d91f2bd
 """
@@ -391,12 +401,12 @@ Similar to previous method, but with initialization.
 """
 function update(
     mod::Medium,
-    mgrid::Vector{T} where {T<:StepRangeLen{Float64}}
+    grid::Vector{T} where {T<:StepRangeLen{Float64}}
 )
-    modex = typeof(mod)(mgrid) # initialize a new medium
+    modex = typeof(mod)(grid) # initialize a new medium
     update!(modex, mod)
     return modex
-end
+end;
 
 # ╔═╡ c23b328b-003c-4cf6-81c4-28b0fa2dd2bf
 update(medium1, [range(-10, 200, length=100), range(-10, 200, length=100)])
@@ -788,8 +798,8 @@ version = "17.4.0+0"
 """
 
 # ╔═╡ Cell order:
+# ╟─96da8803-8b68-44f4-979f-f7f52f129bac
 # ╠═8bb8e5e4-8603-45f0-bbf8-2aa2011c5aa9
-# ╠═6a2fff8e-cb1c-4aaf-9973-81bb457f600e
 # ╟─2cffedda-ce62-4328-bf66-450b28822758
 # ╠═2f2a3317-5a99-4ebd-b1cb-601123e6bcaa
 # ╠═5fab3bef-cc47-43ac-af58-94851311f09c
@@ -797,6 +807,8 @@ version = "17.4.0+0"
 # ╠═a2b5a298-aca4-4bd0-b351-9534a7ea5e4f
 # ╠═97109e57-0ba5-418b-bf73-c02050a29310
 # ╠═16cc20c9-454d-454a-9e10-b8c0f9c44742
+# ╟─5804afc9-083b-4fe5-8538-d279b267bab1
+# ╠═6a2fff8e-cb1c-4aaf-9973-81bb457f600e
 # ╟─64065a7b-5bbd-4168-9eb1-fb5402076e59
 # ╠═c5dd4cd1-ace9-4e8c-b603-522f68450ea4
 # ╠═b99d5714-f51a-451d-b96b-8a08866c3079

@@ -144,8 +144,8 @@ end
 function update_pml!(pac)
     update_pml!(
         pac.pml,
-        pac.exmedium.mgrid,
-        pac.medium.mgrid,
+        pac.exmedium.grid,
+        pac.medium.grid,
         pac.pml_faces,
         pac.attrib_mod,
         pac.fc[:dt],

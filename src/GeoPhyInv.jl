@@ -41,6 +41,7 @@ using FFTW
 using HDF5
 using SpecialFunctions
 using DSP
+using FourierTools
 using CUDA
 using MLUtils
 using CUDA.CUSPARSE
@@ -138,7 +139,7 @@ include("ageom/ageom.jl")
 export AGeom, AGeomss
 
 # 
-include("database/core.jl")
+include("database/database.jl")
 
 # store records
 include("records/records.jl")
@@ -160,7 +161,7 @@ end
 # define structs for wavefields in 2D/3D
 include("fields.jl")
 export Fields
-include("fdtd/core.jl")
+include("fdtd/fdtd.jl")
 include("fdtd/func_grad.jl")
 include("born/core.jl")
 
@@ -170,7 +171,7 @@ export SeisForwExpt
 export update, update!
 
 
-include("fwi/core.jl")
+include("fwi/fwi.jl")
 include("fwi/func_grad.jl")
 export SeisInvExpt
 

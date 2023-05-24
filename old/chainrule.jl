@@ -3,7 +3,7 @@
 * `gout` : output gradients according to parameterization
 """
 function chainrule!(gout::AbstractVector, g::AbstractVector, mod::Medium, parameterization)
-	nznx=prod(length.(mod.mgrid))
+	nznx=prod(length.(mod.grid))
 	(length(gout)≠(count(parameterization.≠ :null)*nznx)) &&  error("size x")
 
 	rho=mod[:rho]; 
@@ -48,7 +48,7 @@ grad_of_rho(grhoI, vp, rho) = -1.0 * inv(abs2(rho)) * (grhoI)
 No different from the previous case, but...
 """
 function pert_chainrule!(gout::AbstractVector, g::AbstractVector, mod::Medium, parameterization)
-	nznx=prod(length.(mod.mgrid))
+	nznx=prod(length.(mod.grid))
 	(length(gout)≠(count(parameterization.≠ :null)*nznx)) &&  error("size x")
 	fill!(gout, 0.0)
 	if(parameterization == [:χKI, :χrhoI, :null]) 
@@ -110,7 +110,7 @@ function chainrule!(
 		      flag::Int64=1
 		      )
 
-	nznx=prod(length.(mod.mgrid))
+	nznx=prod(length.(mod.grid))
 	(length(g)≠(count(attribvec.≠ :null)*nznx)) &&  error("size x")
 
 	rho=mod[:rho]; vp=mod[:vp]; 

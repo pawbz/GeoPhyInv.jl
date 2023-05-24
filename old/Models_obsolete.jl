@@ -13,7 +13,7 @@ names(mod)
 ```
 
 ## Indexing
-* `mod.mgrid` : returns the spatial-grid bundle
+* `mod.grid` : returns the spatial-grid bundle
 * `mod[:vp]` : P-wave velocity
 * `mod[:vs]` : S-wave velocity
 * `mod[:rho]` : mass density
@@ -318,10 +318,10 @@ Does this library contain inplace methods?
 function update!(modex::Medium{N}, mod::Medium{N}) where {N}
     for m in names(mod.m)[1]
         itp = extrapolate(
-            interpolate(Tuple(mod.mgrid), mod[m], Gridded(Linear())),
+            interpolate(Tuple(mod.grid), mod[m], Gridded(Linear())),
             Interpolations.Flat(),
         )
-        copyto!(modex[m], itp[modex.mgrid...])
+        copyto!(modex[m], itp[modex.grid...])
     end
     update!(modex, 0.1)
     return modex
@@ -343,7 +343,7 @@ end
 
 
 function padarray!(modex::Medium{N}, mod::Medium{N}, npml, edges) where {N}
-    nex = length.(modex.mgrid)
+    nex = length.(modex.grid)
     ist = [
         any(edges .== Symbol(string(dim), "min")) ? -npml + 1 : 1 for
         dim in dim_names(ndims(mod))
@@ -374,7 +374,7 @@ function padarray(mod::Medium, npml, edges)
             mg[1] - minpads[i] * step(mg),
             stop = mg[end] + maxpads[i] * step(mg),
             length = length(mg) + minpads[i] + maxpads[i],
-        ) for (i, mg) in enumerate(mod.mgrid)
+        ) for (i, mg) in enumerate(mod.grid)
     ]
     modex = Medium(mgrid_new, names(mod)[1]) # initialize a new medium
     padarray!(modex, mod, npml, edges)
@@ -393,31 +393,31 @@ Apply smoothing to `Medium` using a Gaussian filter of zwidth and xwidth
 
 # Keyword Arguments
 
-* `zmin::Real=mod.mgrid[1][1]` : 
-* `zmax::Real=mod.mgrid[1][end]` : 
-* `xmin::Real=mod.mgrid[2][1]` : 
-* `xmax::Real=mod.mgrid[2][end]` : 
+* `zmin::Real=mod.grid[1][1]` : 
+* `zmax::Real=mod.grid[1][end]` : 
+* `xmin::Real=mod.grid[2][1]` : 
+* `xmax::Real=mod.grid[2][end]` : 
 * `fields` : fields of seismic model that are to be smooth
 """
 function Medium_smooth(
     mod::Medium,
     zperc::Real,
     xperc::Real = zperc;
-    zmin::Real = mod.mgrid[1][1],
-    zmax::Real = mod.mgrid[1][end],
-    xmin::Real = mod.mgrid[2][1],
-    xmax::Real = mod.mgrid[2][end],
+    zmin::Real = mod.grid[1][1],
+    zmax::Real = mod.grid[1][end],
+    xmin::Real = mod.grid[2][1],
+    xmax::Real = mod.grid[2][end],
     fields = [:vp, :rho],
 )
-    xwidth = Float64(xperc) * 0.01 * abs(mod.mgrid[2][end] - mod.mgrid[2][1])
-    zwidth = Float64(zperc) * 0.01 * abs(mod.mgrid[1][end] - mod.mgrid[1][1])
-    xnwin = Int(div(xwidth, step(mod.mgrid[2]) * 2.0))
-    znwin = Int(div(zwidth, step(mod.mgrid[1]) * 2.0))
+    xwidth = Float64(xperc) * 0.01 * abs(mod.grid[2][end] - mod.grid[2][1])
+    zwidth = Float64(zperc) * 0.01 * abs(mod.grid[1][end] - mod.grid[1][1])
+    xnwin = Int(div(xwidth, step(mod.grid[2]) * 2.0))
+    znwin = Int(div(zwidth, step(mod.grid[1]) * 2.0))
 
-    izmin = Interpolation.indminn(mod.mgrid[1], Float64(zmin), 1)[1]
-    izmax = Interpolation.indminn(mod.mgrid[1], Float64(zmax), 1)[1]
-    ixmin = Interpolation.indminn(mod.mgrid[2], Float64(xmin), 1)[1]
-    ixmax = Interpolation.indminn(mod.mgrid[2], Float64(xmax), 1)[1]
+    izmin = Interpolation.indminn(mod.grid[1], Float64(zmin), 1)[1]
+    izmax = Interpolation.indminn(mod.grid[1], Float64(zmax), 1)[1]
+    ixmin = Interpolation.indminn(mod.grid[2], Float64(xmin), 1)[1]
+    ixmax = Interpolation.indminn(mod.grid[2], Float64(xmax), 1)[1]
 
     # @warn "check this routine, smooth contrast values instead?"
 
@@ -449,8 +449,8 @@ function interp_spray!(
 )
     if (pa === nothing)
         pa = Interpolation.Kernel(
-            [mod.mgrid[2], mod.mgrid[1]],
-            [modi.mgrid[2], modi.mgrid[1]],
+            [mod.grid[2], mod.grid[1]],
+            [modi.grid[2], modi.grid[1]],
             Battrib,
         )
     end
@@ -469,11 +469,11 @@ function save(mod::Medium, folder; N = 100)
     !(isdir(folder)) && error("invalid directory")
     error("need to be updated")
 
-    nx = length(mod.mgrid[2])
-    nz = length(mod.mgrid[1])
+    nx = length(mod.grid[2])
+    nz = length(mod.grid[1])
     n = max(nx, nz)
     fact = (n > N) ? round(Int, n / N) : 1
-    #mgrid=resamp(mod.mgrid, step(mod.mgrid[2])*fact, step(mod.mgrid[1])*fact)
+    #mgrid=resamp(mod.grid, step(mod.grid[2])*fact, step(mod.grid[1])*fact)
     x = mgrid[2]
     z = mgrid[1]
     nx = length(x)
@@ -603,8 +603,8 @@ Print information about `Seismic`
 """
 function Base.print(mod::Seismic, name::String="")
 	println("\tSeismic Model:\t",name)
-	println("\t> number of samples:\t","x\t",length(mod.mgrid[2]),"\tz\t",length(mod.mgrid[1]))
-	println("\t> sampling intervals:\t","x\t",step(mod.mgrid[2]),"\tz\t",step(mod.mgrid[1]))
+	println("\t> number of samples:\t","x\t",length(mod.grid[2]),"\tz\t",length(mod.grid[1]))
+	println("\t> sampling intervals:\t","x\t",step(mod.grid[2]),"\tz\t",step(mod.grid[1]))
 	println("\t> vp:\t","min\t",minimum(Seismic_get(mod,:vp)),"\tmax\t",maximum(Seismic_get(mod,:vp)))
 	println("\t> vp bounds:\t","min\t",mod.vp0[1],"\tmax\t",mod.vp0[2])
 	println("\t> ρ:\t","min\t",minimum(Seismic_get(mod,:ρ)),"\tmax\t",maximum(Seismic_get(mod,:ρ)))
@@ -705,7 +705,7 @@ function Base.isapprox(mod1::Seismic, mod2::Seismic)
        		(size(mod1.χvp)==size(mod2.χvp)), 
        		(size(mod1.χvs)==size(mod2.χvs)), 
        		(size(mod1.χρ)==size(mod2.χρ)), 
-		isequal(mod1.mgrid, mod2.mgrid),
+		isequal(mod1.grid, mod2.grid),
 		])
 	return all(vec)
 end
@@ -729,7 +729,7 @@ end
 
 function Seismic_get(mod::Seismic, attrib::Symbol)
 	# allocate
-	rout=zeros(length(mod.mgrid[1]), length(mod.mgrid[2]))
+	rout=zeros(length(mod.grid[1]), length(mod.grid[2]))
 	Seismic_get!(rout, mod, [attrib])
 	return rout
 end
@@ -902,10 +902,10 @@ function Seismic_addon!(mod::Seismic;
 	rect_loc=convert.(Float64,rect_loc);
 	ellip_loc=convert.(Float64,ellip_loc);
 
-	temp = zeros(length(mod.mgrid[1]), length(mod.mgrid[2]))
+	temp = zeros(length(mod.grid[1]), length(mod.grid[2]))
 
-	ipointlocx = Interpolation.indminn(mod.mgrid[2], Float64(point_loc[2]), 1)[1] 
-	ipointlocz = Interpolation.indminn(mod.mgrid[1], Float64(point_loc[1]), 1)[1] 
+	ipointlocx = Interpolation.indminn(mod.grid[2], Float64(point_loc[2]), 1)[1] 
+	ipointlocz = Interpolation.indminn(mod.grid[1], Float64(point_loc[1]), 1)[1] 
 	temp[ipointlocz, ipointlocx] += point_pert
 
 	if(!(ellip_pert == 0.0))
@@ -913,16 +913,16 @@ function Seismic_addon!(mod::Seismic;
 		# circle or ellipse
 		rads= (length(ellip_rad)==1) ? [ellip_rad[1],ellip_rad[1]] : [ellip_rad[1],ellip_rad[2]]
 
-		temp += [(((((mod.mgrid[2][ix]-ellip_loc[2])*cos(α)+(mod.mgrid[1][iz]-ellip_loc[1])*sin(α))^2*inv(rads[1]^2) + 
-	      ((-mod.mgrid[1][iz]+ellip_loc[1])*cos(α)+(mod.mgrid[2][ix]-ellip_loc[2])*sin(α))^2*inv(rads[2]^2)) <= 1.) ? ellip_pert : 0.0)  for 
-	   		iz in 1:length(mod.mgrid[1]), ix in 1:length(mod.mgrid[2]) ]
+		temp += [(((((mod.grid[2][ix]-ellip_loc[2])*cos(α)+(mod.grid[1][iz]-ellip_loc[1])*sin(α))^2*inv(rads[1]^2) + 
+	      ((-mod.grid[1][iz]+ellip_loc[1])*cos(α)+(mod.grid[2][ix]-ellip_loc[2])*sin(α))^2*inv(rads[2]^2)) <= 1.) ? ellip_pert : 0.0)  for 
+	   		iz in 1:length(mod.grid[1]), ix in 1:length(mod.grid[2]) ]
 	end
 	if(!(rect_pert == 0.0))
 		temp += [
-			(((mod.mgrid[2][ix]-rect_loc[4]) * (mod.mgrid[2][ix]-rect_loc[2]) < 0.0) & 
-			((mod.mgrid[1][iz]-rect_loc[3]) * (mod.mgrid[1][iz]-rect_loc[1]) < 0.0)) ?
+			(((mod.grid[2][ix]-rect_loc[4]) * (mod.grid[2][ix]-rect_loc[2]) < 0.0) & 
+			((mod.grid[1][iz]-rect_loc[3]) * (mod.grid[1][iz]-rect_loc[1]) < 0.0)) ?
 			rect_pert : 0.0  for
-			iz in 1:length(mod.mgrid[1]), ix in 1:length(mod.mgrid[2]) ]
+			iz in 1:length(mod.grid[1]), ix in 1:length(mod.grid[2]) ]
 	end
 	if(!(constant_pert == 0.0))
 		temp .+= constant_pert
@@ -963,26 +963,26 @@ Apply smoothing to `Seismic` using a Gaussian filter of zwidth and xwidth
 
 # Keyword Arguments
 
-* `zmin::Real=mod.mgrid[1][1]` : 
-* `zmax::Real=mod.mgrid[1][end]` : 
-* `xmin::Real=mod.mgrid[2][1]` : 
-* `xmax::Real=mod.mgrid[2][end]` : 
+* `zmin::Real=mod.grid[1][1]` : 
+* `zmax::Real=mod.grid[1][end]` : 
+* `xmin::Real=mod.grid[2][1]` : 
+* `xmax::Real=mod.grid[2][end]` : 
 * `fields` : fields of seismic model that are to be smooth
 """
 function Seismic_smooth(mod::Seismic, zperc::Real, xperc::Real=zperc;
-		 zmin::Real=mod.mgrid[1][1], zmax::Real=mod.mgrid[1][end],
-		 xmin::Real=mod.mgrid[2][1], xmax::Real=mod.mgrid[2][end],
+		 zmin::Real=mod.grid[1][1], zmax::Real=mod.grid[1][end],
+		 xmin::Real=mod.grid[2][1], xmax::Real=mod.grid[2][end],
 		 fields=[:χvp, :χρ, :χvs]
 			)
-	xwidth = Float64(xperc) * 0.01 * abs(mod.mgrid[2][end]-mod.mgrid[2][1])
-	zwidth = Float64(zperc) * 0.01 * abs(mod.mgrid[1][end]-mod.mgrid[1][1])
-	xnwin=Int(div(xwidth,step(mod.mgrid[2])*2.))
-	znwin=Int(div(zwidth,step(mod.mgrid[1])*2.))
+	xwidth = Float64(xperc) * 0.01 * abs(mod.grid[2][end]-mod.grid[2][1])
+	zwidth = Float64(zperc) * 0.01 * abs(mod.grid[1][end]-mod.grid[1][1])
+	xnwin=Int(div(xwidth,step(mod.grid[2])*2.))
+	znwin=Int(div(zwidth,step(mod.grid[1])*2.))
 
-	izmin = Interpolation.indminn(mod.mgrid[1], Float64(zmin), 1)[1]
-	izmax = Interpolation.indminn(mod.mgrid[1], Float64(zmax), 1)[1]
-	ixmin = Interpolation.indminn(mod.mgrid[2], Float64(xmin), 1)[1]
-	ixmax = Interpolation.indminn(mod.mgrid[2], Float64(xmax), 1)[1]
+	izmin = Interpolation.indminn(mod.grid[1], Float64(zmin), 1)[1]
+	izmax = Interpolation.indminn(mod.grid[1], Float64(zmax), 1)[1]
+	ixmin = Interpolation.indminn(mod.grid[2], Float64(xmin), 1)[1]
+	ixmax = Interpolation.indminn(mod.grid[2], Float64(xmax), 1)[1]
 
 	modg=deepcopy(mod)
 	for (i,iff) in enumerate(fields)
@@ -1003,23 +1003,23 @@ the input bounds cannot be strictly imposed.
 
 # Keyword Arguments
 
-* `zmin::Float64=mod.mgrid[1][1]` : 
-* `zmax::Float64=mod.mgrid[1][end]` : 
-* `xmin::Float64=mod.mgrid[2][1]` : 
-* `xmax::Float64=mod.mgrid[2][end]` : 
+* `zmin::Float64=mod.grid[1][1]` : 
+* `zmax::Float64=mod.grid[1][end]` : 
+* `xmin::Float64=mod.grid[2][1]` : 
+* `xmax::Float64=mod.grid[2][end]` : 
 """
 function Seismic_trun(mod::Seismic;
-			 zmin::Float64=mod.mgrid[1][1], zmax::Float64=mod.mgrid[1][end],
-			 xmin::Float64=mod.mgrid[2][1], xmax::Float64=mod.mgrid[2][end],
+			 zmin::Float64=mod.grid[1][1], zmax::Float64=mod.grid[1][end],
+			 xmin::Float64=mod.grid[2][1], xmax::Float64=mod.grid[2][end],
 			 )
 
-	izmin = Interpolation.indminn(mod.mgrid[1], zmin, 1)[1]
-	izmax = Interpolation.indminn(mod.mgrid[1], zmax, 1)[1]
-	ixmin = Interpolation.indminn(mod.mgrid[2], xmin, 1)[1]
-	ixmax = Interpolation.indminn(mod.mgrid[2], xmax, 1)[1]
+	izmin = Interpolation.indminn(mod.grid[1], zmin, 1)[1]
+	izmax = Interpolation.indminn(mod.grid[1], zmax, 1)[1]
+	ixmin = Interpolation.indminn(mod.grid[2], xmin, 1)[1]
+	ixmax = Interpolation.indminn(mod.grid[2], xmax, 1)[1]
 
-	x = mod.mgrid[2][ixmin:ixmax]
-	z = mod.mgrid[1][izmin:izmax]
+	x = mod.grid[2][ixmin:ixmax]
+	z = mod.grid[1][izmin:izmax]
 
 	# allocate model
 	mod_trun = Seismic_zeros([z,x])
@@ -1039,7 +1039,7 @@ Extend a seismic model into PML layers
 """
 function Seismic_pml_pad_trun(mod::Seismic, nlayer_rand, npml)
 
-	mg=mod.mgrid
+	mg=mod.grid
 	mgex=[
         range(mg[1][1] - npml*step(mg[1]),
 	     stop=mg[1][end] + npml*step(mg[1]), length=length(mg[1])+2*npml),
@@ -1176,7 +1176,7 @@ function to resample in the model domain
 """
 function interp_spray!(mod::Seismic, modi::Seismic, attrib::Symbol, Battrib::Symbol=:B2; pa=nothing)
 	if(pa===nothing)
-		pa=Interpolation.Kernel([mod.mgrid[2], mod.mgrid[1]], [modi.mgrid[2], modi.mgrid[1]], Battrib)
+		pa=Interpolation.Kernel([mod.grid[2], mod.grid[1]], [modi.grid[2], modi.grid[1]], Battrib)
 	end
 
 	"loop over fields in `Seismic`"
@@ -1193,11 +1193,11 @@ function save(mod::Seismic, folder; N=100)
 	!(isdir(folder)) && error("invalid directory")
 	error("need to be updated")
 
-	nx=length(mod.mgrid[2])
-	nz=length(mod.mgrid[1])
+	nx=length(mod.grid[2])
+	nz=length(mod.grid[1])
 	n=max(nx,nz);
 	fact=(n>N) ? round(Int,n/N) : 1
-	#mgrid=resamp(mod.mgrid, step(mod.mgrid[2])*fact, step(mod.mgrid[1])*fact)
+	#mgrid=resamp(mod.grid, step(mod.grid[2])*fact, step(mod.grid[1])*fact)
 	x=mgrid[2]
 	z=mgrid[1]
 	nx=length(x)
@@ -1227,23 +1227,23 @@ the input bounds cannot be strictly imposed.
 
 # Keyword Arguments
 
-* `zmin::Real=mod.mgrid[1][1]` : 
-* `zmax::Real=mod.mgrid[1][end]` : 
-* `xmin::Real=mod.mgrid[2][1]` : 
-* `xmax::Real=mod.mgrid[2][end]` : 
+* `zmin::Real=mod.grid[1][1]` : 
+* `zmax::Real=mod.grid[1][end]` : 
+* `xmin::Real=mod.grid[2][1]` : 
+* `xmax::Real=mod.grid[2][end]` : 
 """
 function Medium_trun(mod::Medium;
-			 zmin::Real=mod.mgrid[1][1], zmax::Real=mod.mgrid[1][end],
-			 xmin::Real=mod.mgrid[2][1], xmax::Real=mod.mgrid[2][end],
+			 zmin::Real=mod.grid[1][1], zmax::Real=mod.grid[1][end],
+			 xmin::Real=mod.grid[2][1], xmax::Real=mod.grid[2][end],
 			 )
 
-	izmin = Interpolation.indminn(mod.mgrid[1], Float64(zmin), 1)[1]
-	izmax = Interpolation.indminn(mod.mgrid[1], Float64(zmax), 1)[1]
-	ixmin = Interpolation.indminn(mod.mgrid[2], Float64(xmin), 1)[1]
-	ixmax = Interpolation.indminn(mod.mgrid[2], Float64(xmax), 1)[1]
+	izmin = Interpolation.indminn(mod.grid[1], Float64(zmin), 1)[1]
+	izmax = Interpolation.indminn(mod.grid[1], Float64(zmax), 1)[1]
+	ixmin = Interpolation.indminn(mod.grid[2], Float64(xmin), 1)[1]
+	ixmax = Interpolation.indminn(mod.grid[2], Float64(xmax), 1)[1]
 
-	x = mod.mgrid[2][ixmin:ixmax]
-	z = mod.mgrid[1][izmin:izmax]
+	x = mod.grid[2][ixmin:ixmax]
+	z = mod.grid[1][izmin:izmax]
 
 	# allocate model
 	mod_trun = Medium([z,x], names(mod.m)[1])

@@ -4,8 +4,8 @@ function SeisForwExpt(attrib_mod::FdtdAcoustic, ::Homogeneous; snaps_field=nothi
     medium = AcousticMedium(Homogeneous(), 15.0)
     update!(medium, [:vp, :rho], randn_perc=randn_perc)
 
-    ageom = AGeom(medium.mgrid, :xwell, SSrcs(1), Recs(100))
-    # ageom = AGeom(medium.mgrid, :xwell, SSrcs(1), Recs(1))
+    ageom = AGeom(medium.grid, :xwell, SSrcs(1), Recs(100))
+    # ageom = AGeom(medium.grid, :xwell, SSrcs(1), Recs(1))
     tgrid = range(0, stop=2.0, step=0.003)
     wav = ricker(10.0, tgrid)
     rmul!(wav, 1e6)

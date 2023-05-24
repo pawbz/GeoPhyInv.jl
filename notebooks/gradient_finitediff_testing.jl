@@ -38,6 +38,9 @@ end
 # ╔═╡ bd68d9b1-633b-4c9b-b759-791581714306
 using Statistics, LossFunctions, LinearAlgebra, MLUtils, FiniteDifferences, SparseArrays
 
+# ╔═╡ 1c595ede-34a8-41f3-8067-6fb0b864f7fa
+using FourierTools
+
 # ╔═╡ bbfa8c8e-1ef5-459b-b5f5-edb15ff38fa8
 TableOfContents()
 
@@ -69,8 +72,23 @@ mpara
 # ╔═╡ 43fb3211-9ffc-4ea5-a459-539cf55ba009
 # pa_inv = SeisInvExpt(pa_mod, dobs, [N, N], [mpara])
 
+# ╔═╡ 5297741a-60dc-45b8-8334-bbbc9a2a96c7
+aa=randn(5,4)
+
+# ╔═╡ 802fb101-09f6-44b6-9a46-4fa94724b6f1
+vv=[1, 0, 0, 0]
+
+# ╔═╡ 110ee9ed-6e28-4b15-8102-a75e42d26d07
+stack([randn(3), randn(3)], dims=2)
+
+# ╔═╡ ef26bf0c-cc19-474e-bcf9-9007547bcc56
+pp = plan_conv(randn(3,10), randn(3), 1) |> typeof
+
+# ╔═╡ 11bd4ea4-f4de-4118-b354-02f83cebf47d
+conv(aa, vv)
+
 # ╔═╡ 8e9a92dc-dc58-40d7-9a38-df08852a33a0
-typeof(pa_mod.c.medium.mgrid)
+typeof(pa_mod.c.medium.grid)
 
 # ╔═╡ 9706aa59-0286-43cf-bdb7-a3d040e0e2bc
 
@@ -86,7 +104,10 @@ begin
 end
 
 # ╔═╡ 26c9f7a1-f18b-4fe3-a607-ad1f6a904bb8
-pa_inv = SeisInvExpt(pa_mod, dobs, [range(-100,100,length=N), range(-100,100,length=N)], [mpara])
+pa_inv, _ = SeisInvExpt(pa_mod, dobs, [range(-100,100,length=N), range(-100,100,length=N)], [mpara])
+
+# ╔═╡ e6339233-2d9f-45d0-bcb1-2320a4ad28fc
+dobs
 
 # ╔═╡ b99b6e7a-d037-4c6f-8043-fdb49102503b
 pa_true.c.srcwav[1][1].grid
@@ -128,7 +149,7 @@ heatmap(Array(deepcopy(pa_mod.c.gradients[mpara])));
 mul!
 
 # ╔═╡ 839cf146-639c-4d13-9470-d25882837169
-# prod(step.(pa_true.c.medium.mgrid)) #
+# prod(step.(pa_true.c.medium.grid)) #
 pa_true.c.srcwav[1][1].grid |> step |> abs2
 
 # ╔═╡ d3b4cd08-eca1-4fac-915f-a64dc29b870f
@@ -177,7 +198,7 @@ end
 Js(GeoPhyInv.Data.Array(xs))
 
 # ╔═╡ c6626e0f-4bf1-4e29-a0c3-1e7f23805f61
-gm = grad(central_fdm(2, 1, factor=1e7), Js, xs)[1]
+gm = grad(central_fdm(2, 1, factor=1e8), Js, xs)[1]
 
 # ╔═╡ 8ec00fb7-fe18-4741-b987-813ec97d73fe
 heatmap(Array(reshape(gm, N, N)), c=:seismic)
@@ -217,6 +238,13 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═5582110f-327c-419a-8759-ca11844c0c96
 # ╠═26c9f7a1-f18b-4fe3-a607-ad1f6a904bb8
 # ╠═43fb3211-9ffc-4ea5-a459-539cf55ba009
+# ╠═1c595ede-34a8-41f3-8067-6fb0b864f7fa
+# ╠═5297741a-60dc-45b8-8334-bbbc9a2a96c7
+# ╠═802fb101-09f6-44b6-9a46-4fa94724b6f1
+# ╠═110ee9ed-6e28-4b15-8102-a75e42d26d07
+# ╠═ef26bf0c-cc19-474e-bcf9-9007547bcc56
+# ╠═11bd4ea4-f4de-4118-b354-02f83cebf47d
+# ╠═e6339233-2d9f-45d0-bcb1-2320a4ad28fc
 # ╠═8e9a92dc-dc58-40d7-9a38-df08852a33a0
 # ╠═9706aa59-0286-43cf-bdb7-a3d040e0e2bc
 # ╠═247896d7-6c39-4bf6-856b-7afc6f4d6655

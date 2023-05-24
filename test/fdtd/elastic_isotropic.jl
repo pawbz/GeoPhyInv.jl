@@ -29,7 +29,7 @@ update!(medium_new, [:vp,:rho], randn_perc=5.) # add some noise
 update!(medium_new, [:vp], constant_pert=500.) # perturb velocity
 
 # ### AGeom
-ageom=AGeom(medium.mgrid,:surf, SSrcs(3), Recs(30)); # surface seismic
+ageom=AGeom(medium.grid,:surf, SSrcs(3), Recs(30)); # surface seismic
 
 # ### Plotting #1
 #md p1=heatmap(medium, :vp) 

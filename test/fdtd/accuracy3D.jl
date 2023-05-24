@@ -40,7 +40,7 @@ end
 
 
 medium = Medium(:elastic_homo3D);
-ageom=AGeom(medium.mgrid, SSrcs(2), [Srcs(3), Srcs(2)], [Recs(10), Recs(20)])
+ageom=AGeom(medium.grid, SSrcs(2), [Srcs(3), Srcs(2)], [Recs(10), Recs(20)])
 wav, tgrid=ricker(medium, 4, 1, 0.4)
 srcwav = SrcWav(tgrid, ageom, [:p])
 update!(srcwav, [:p], wav)
