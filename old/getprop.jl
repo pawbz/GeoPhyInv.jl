@@ -19,7 +19,7 @@ function Base.getindex(pa::PFWI, s::Symbol)
 
 	#=
 	if(s==:snaps)
-		nzd,nxd=length.(pa.c.model.mgrid)
+		nzd,nxd=length.(pa.c.model.grid)
 		snaps_all=zeros(nzd,nxd,length(pa.c.itsnaps))
 		ip=findall(in.(iss,pa.sschunks))[1]
 		issp=findall(x->x==iss,pa.sschunks[ip])[]

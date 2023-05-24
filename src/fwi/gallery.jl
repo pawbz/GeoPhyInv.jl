@@ -10,7 +10,7 @@
 # 		model = Medium(:pizza);
 # 		model0 = similar(model)
 
-# 		ageom=AGeom(model.mgrid, SSrcs(5), Srcs(1), Recs(20))
+# 		ageom=AGeom(model.grid, SSrcs(5), Srcs(1), Recs(20))
 # 		update!(ageom, SSrcs(),[0,0],900.0,[0, 2π])
 # 		update!(ageom, Recs(),[0,0],900.0,[0, 2π])
 
@@ -19,7 +19,7 @@
 # 		srcwav = SrcWav(tgrid, ageom, [:p])
 # 		update!(srcwav, [:p], wav)
 
-# 		igrid=broadcast(x->range(x[1],stop=x[end],step=50.),model.mgrid)
+# 		igrid=broadcast(x->range(x[1],stop=x[end],step=50.),model.grid)
 # 		igrid_interp_scheme=:B2
 # 	elseif(attrib==:downhole)
 # 		gri = [range(-120.,stop=30.,step=1.0), range(-30.,stop=30.,step=1.0)]
@@ -33,7 +33,7 @@
 # 		update!(model, [:vp], ellip_rad=[2000., 5.], ellip_loc=[0.,0.],ellip_pert=0.1, ellip_α=α)
 
 
-# 		ageom=AGeom(model.mgrid, SSrcs(2), Srcs(1), Recs(20))
+# 		ageom=AGeom(model.grid, SSrcs(2), Srcs(1), Recs(20))
 
 # 		update!(ageom, SSrcs(),[-75,0],[-50,0])
 # 		update!(ageom, Recs(),[-100,0],[-50,0])

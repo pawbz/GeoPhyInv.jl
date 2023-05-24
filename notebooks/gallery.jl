@@ -41,7 +41,7 @@ medium1 = AcousticMedium(Homogeneous(), 5.0)
 medium2 = ElasticMedium(Homogeneous(), 5.0)
 
 # ╔═╡ eb5fcc15-c076-4d0f-8f53-b5ba4d826063
-medium1.mgrid
+medium1.grid
 
 # ╔═╡ d77093ed-e18b-4d4d-b3b4-2011fe0fa465
 plot(medium1)

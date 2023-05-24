@@ -31,7 +31,21 @@ function Base.getindex(pa::PFdtd, s::Symbol, iss::Int = 1; ipw = ((first(typeof(
 end
 
 function Base.show(io::Base.IO, ::MIME"text/plain", pa::PFdtd)
-    return println(@doc Base.getindex(::GeoPhyInv.PFdtd, ::Symbol, ::Int))
+    print(
+        io,
+        "Instance of SeisForwExpt\n",
+        "  ├───── attribute: ",
+        pa.c.attrib_mod,
+        '\n',
+        "  ├─────────── pml: ",
+        pa.c.pml_faces,
+        '\n',
+        "  ├───────── rigid: ",
+        pa.c.rigid_faces,
+        '\n',
+        "  ├─── stress-free: ",
+        pa.c.stressfree_faces,
+    )
 end
 
 Base.show(io::Base.IO, ::MIME"text/plain", pa::Vector{P_x_worker_x_pw{N}}) where {N} =

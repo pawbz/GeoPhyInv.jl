@@ -46,8 +46,8 @@ end
 
 # Generic objective function evaluation
 function function_eval(x, paE, x0, c_y, Cinv; layered=false, log_normal_param=false)
-    nz = size(paE.mgrid[1],1)
-    nx = size(paE.mgrid[2],1)
+    nz = size(paE.grid[1],1)
+    nx = size(paE.grid[2],1)
     
 #     If layered model, then build 2D model
     if layered
@@ -84,8 +84,8 @@ end
 
 # Generic gradient eval
 function gradient_eval(x, grad_f, paE, x0, c_y, Cinv; layered=true, log_normal_param=false)
-    nz = size(paE.mgrid[1],1)
-    nx = size(paE.mgrid[2],1)
+    nz = size(paE.grid[1],1)
+    nx = size(paE.grid[2],1)
     
 #     If layered model, then build 2D model
     if layered
@@ -132,8 +132,8 @@ end
 
 # Optimization routine
 function solve_inverse_problem(paE, x0, c_y, Cinv; layered=true, log_normal_param=false)
-    nz = size(paE.mgrid[1],1)
-    nx = size(paE.mgrid[2],1)
+    nz = size(paE.grid[1],1)
+    nx = size(paE.grid[2],1)
     
     if layered
         x = copy(paE.σ[:,1])

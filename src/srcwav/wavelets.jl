@@ -188,7 +188,7 @@ The model has `nλ` wavelengths along the (body) diagonal, and the maximum model
 function get_fqdom_tgrid( mod::Medium, nλ, tmaxfrac::Real, epsilon)
 
 	# maximum distance (diagnol) the wave travels
-	d = sqrt(sum([(m[1]-m[end])^2 for m in mod.mgrid]))
+	d = sqrt(sum([(m[1]-m[end])^2 for m in mod.grid]))
 
 	# dominant wavelength using mod dimensions
 	λdom=d*inv(real(nλ))
@@ -202,7 +202,7 @@ function get_fqdom_tgrid( mod::Medium, nλ, tmaxfrac::Real, epsilon)
 	tmax=2.0*d*inv(vavg)*tmaxfrac
 
 	# choose sampling interval to obey max freq of source wavelet
-	δmin = minimum(step.(mod.mgrid))
+	δmin = minimum(step.(mod.grid))
 	vmax=try
 		sqrt(mod.vp.bounds[2]^2 + mod.vs.bounds[2]^2) # see Virieux (1986)
 	catch

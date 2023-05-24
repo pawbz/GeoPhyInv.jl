@@ -37,7 +37,7 @@ function update!(
     randn_perc = 0.0,
 )
 
-    mgrid = medium.mgrid
+    mgrid = medium.grid
     if (!(rectangle === nothing))
         @assert length(rectangle)==2 
         @assert length.(rectangle)==fill(ndims(medium),2)
@@ -110,11 +110,11 @@ end
 #     rect_loc = convert.(Float64, rect_loc)
 #     ellip_loc = convert.(Float64, ellip_loc)
 
-#     temp = zeros(length.(medium.mgrid)...)
+#     temp = zeros(length.(medium.grid)...)
 
 #     ipointloc = [
-#         Interpolation.indminn(medium.mgrid[i], Float64(point_loc[i]), 1)[1] for
-#         i = 1:length(medium.mgrid)
+#         Interpolation.indminn(medium.grid[i], Float64(point_loc[i]), 1)[1] for
+#         i = 1:length(medium.grid)
 #     ]
 #     temp[ipointloc...] += point_pert
 
@@ -130,28 +130,28 @@ end
 #                 (
 #                     (
 #                         (
-#                             (medium.mgrid[2][ix] - ellip_loc[2]) * cos(α) +
-#                             (medium.mgrid[1][iz] - ellip_loc[1]) * sin(α)
+#                             (medium.grid[2][ix] - ellip_loc[2]) * cos(α) +
+#                             (medium.grid[1][iz] - ellip_loc[1]) * sin(α)
 #                         )^2 * inv(rads[1]^2) +
 #                         (
-#                             (-medium.mgrid[1][iz] + ellip_loc[1]) * cos(α) +
-#                             (medium.mgrid[2][ix] - ellip_loc[2]) * sin(α)
+#                             (-medium.grid[1][iz] + ellip_loc[1]) * cos(α) +
+#                             (medium.grid[2][ix] - ellip_loc[2]) * sin(α)
 #                         )^2 * inv(rads[2]^2)
 #                     ) <= 1.0
 #                 ) ? Float64(ellip_pert) : 0.0
-#             ) for iz = 1:length(medium.mgrid[1]), ix = 1:length(medium.mgrid[2])
+#             ) for iz = 1:length(medium.grid[1]), ix = 1:length(medium.grid[2])
 #         ]
 #     end
 #     if (!(rect_pert == 0.0))
 #         temp += [
 #             (
 #                 (
-#                     (medium.mgrid[2][ix] - rect_loc[4]) * (medium.mgrid[2][ix] - rect_loc[2]) < 0.0
+#                     (medium.grid[2][ix] - rect_loc[4]) * (medium.grid[2][ix] - rect_loc[2]) < 0.0
 #                 ) & (
-#                     (medium.mgrid[1][iz] - rect_loc[3]) * (medium.mgrid[1][iz] - rect_loc[1]) < 0.0
+#                     (medium.grid[1][iz] - rect_loc[3]) * (medium.grid[1][iz] - rect_loc[1]) < 0.0
 #                 )
-#             ) ? rect_pert : 0.0 for iz = 1:length(medium.mgrid[1]),
-#             ix = 1:length(medium.mgrid[2])
+#             ) ? rect_pert : 0.0 for iz = 1:length(medium.grid[1]),
+#             ix = 1:length(medium.grid[2])
 #         ]
 #     end
 #     if (!(constant_pert == 0.0))
@@ -164,8 +164,8 @@ end
 #         if (!(layerlocations === nothing))
 #             onlyatvalues = []
 #             for ipos in layerlocations
-#                 ipx = Interpolation.indminn(medium.mgrid[2], Float64(ipos[2]), 1)[1]
-#                 ipz = Interpolation.indminn(medium.mgrid[1], Float64(ipos[1]), 1)[1]
+#                 ipx = Interpolation.indminn(medium.grid[2], Float64(ipos[2]), 1)[1]
+#                 ipz = Interpolation.indminn(medium.grid[1], Float64(ipos[1]), 1)[1]
 #                 push!(onlyatvalues, m[ipz, ipx])
 #             end
 #         end

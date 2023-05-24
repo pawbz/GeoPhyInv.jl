@@ -253,10 +253,10 @@ end
 		Harvest the Optim result to plot functional and gradient --- to be updated later
 		if(extended_trace)
 			# convert gradient vector to model
-			gmediumi = [Medium_zeros(pa.mediumi.mgrid) for itr=1:Optim.iterations(res)]
-			gmediumm = [Medium_zeros(pa.mediumm.mgrid) for itr=1:Optim.iterations(res)] 
-			mediumi = [Medium_zeros(pa.mediumi.mgrid) for itr=1:Optim.iterations(res)]
-			mediumm = [Medium_zeros(pa.mediumm.mgrid) for itr=1:Optim.iterations(res)]
+			gmediumi = [Medium_zeros(pa.mediumi.grid) for itr=1:Optim.iterations(res)]
+			gmediumm = [Medium_zeros(pa.mediumm.grid) for itr=1:Optim.iterations(res)] 
+			mediumi = [Medium_zeros(pa.mediumi.grid) for itr=1:Optim.iterations(res)]
+			mediumm = [Medium_zeros(pa.mediumm.grid) for itr=1:Optim.iterations(res)]
 			for itr=1:Optim.iterations(res)
 				# update mediumm and mediumi
 				Seismic_x!(mediumm[itr], mediumi[itr], Optim.x_trace(res)[itr], pa, -1)

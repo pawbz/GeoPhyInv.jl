@@ -121,7 +121,7 @@ function PFdtd(
     (fill(nss, npw) != [length(ageom[ip]) for ip = 1:npw]) && error("different supersources")
 
     # check if all sources are receivers are inside medium
-    any(.![(ageom[ip] ∈ medium.mgrid) for ip = 1:npw]) && error("sources or receivers not inside medium")
+    any(.![(ageom[ip] ∈ medium.grid) for ip = 1:npw]) && error("sources or receivers not inside medium")
 
     all([issimilar(ageom[ip], srcwav[ip]) for ip = 1:npw]) || error("ageom and srcwav mismatch")
 
@@ -132,7 +132,7 @@ function PFdtd(
     # mod parameters are on the stress grid, so no need to worry
     mod = NamedArray(
         [
-            Data.Array(zeros(length.(exmedium.mgrid)...)) for
+            Data.Array(zeros(length.(exmedium.grid)...)) for
             name in MediumParameters(attrib_mod)[1]
         ],
         MediumParameters(attrib_mod)[1],
@@ -140,7 +140,7 @@ function PFdtd(
     # dmod parameters are NOT on stress grid, so need to use get_mgrid function to get sizes
     dmod = NamedArray(
         [
-            Data.Array(zeros(length.(get_mgrid(field, attrib_mod, exmedium.mgrid...))...)) for
+            Data.Array(zeros(length.(get_mgrid(field, attrib_mod, exmedium.grid...))...)) for
             field in MediumParameters(attrib_mod)[3]
         ],
         MediumParameters(attrib_mod)[2],
@@ -148,12 +148,12 @@ function PFdtd(
     δmod = deepcopy(mod) # for perturbations in medium parameters
 
     # PML
-    pml = get_pml(attrib_mod, exmedium.mgrid)
+    pml = get_pml(attrib_mod, exmedium.grid)
 
     # shared arrays required to reduce all the gradient from individual workers
     gradients = NamedArray(
         [
-            SharedArray{_fd_datatype}(zeros(length.(exmedium.mgrid)...)) for
+            SharedArray{_fd_datatype}(zeros(length.(exmedium.grid)...)) for
             name in MediumParameters(attrib_mod)[1]
         ],
         MediumParameters(attrib_mod)[1],
@@ -161,7 +161,7 @@ function PFdtd(
     # need reference values for nondimensionalize and dimensionalize
     ref_mod = NamedArray([Data.Number(exmedium[name].ref) for name in MediumParameters(attrib_mod)[1]], MediumParameters(attrib_mod)[1])
 
-    illum_stack = SharedArray{Float64}(zeros(length.(medium.mgrid)...))
+    illum_stack = SharedArray{Float64}(zeros(length.(medium.grid)...))
 
     if (!(snaps_field === nothing))
         @assert eval(snaps_field) <: Fields "invalid snaps field"
@@ -273,7 +273,7 @@ The idea is to use them later for a cleaner code.
 function get_ic(medium, tgrid, nsls, npw)
     N = ndims(medium)
     return NamedArray(
-        vcat(length.(medium.mgrid), [length(tgrid), nsls, npw]),
+        vcat(length.(medium.grid), [length(tgrid), nsls, npw]),
         vcat(dim_names(N, "n"), [:nt, :nsls, :npw]),
     )
 end
@@ -284,7 +284,7 @@ The idea is to use them later inside the loops for faster modelling.
 """
 function get_fc(medium, tgrid)
     N = ndims(medium)
-    ds = step.(medium.mgrid)
+    ds = step.(medium.grid)
     # denominator depending on _fd_order
     dsI = inv.(ds)
     if (_fd_order == 4)
@@ -310,7 +310,7 @@ Each worker performs the modeling of supersources in `sschunks`.
 The parameters common to all workers are stored in `pac`.
 """
 function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) where {T,N}
-    n = length.(pac.exmedium.mgrid)
+    n = length.(pac.exmedium.grid)
 
 
     fields = Fields(pac.attrib_mod) # for current time step
@@ -359,7 +359,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
     rfields = pac.rfields
     sfields = AxisArrays.names(pac.srcwav[ipw][iss].d)[1]
     nt = pac.ic[:nt]
-    n = length.(pac.exmedium.mgrid)
+    n = length.(pac.exmedium.grid)
     ageom = pac.ageom
     srcwav = pac.srcwav
 
@@ -398,7 +398,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
         [
             spzeros(
                 Data.Number,
-                prod(length.(get_mgrid(eval(sf)(), T(), pac.exmedium.mgrid...))),
+                prod(length.(get_mgrid(eval(sf)(), T(), pac.exmedium.grid...))),
                 ageom[ipw][iss].ns,
             ) for sf in sfields
         ],
@@ -408,7 +408,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
         [
             spzeros(
                 Data.Number,
-                prod(length.(get_mgrid(eval(rf)(), T(), pac.exmedium.mgrid...))),
+                prod(length.(get_mgrid(eval(rf)(), T(), pac.exmedium.grid...))),
                 ageom[ipw][iss].nr,
             ) for rf in rfields
         ],
@@ -423,7 +423,7 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
 
     # named array to store gradients for each supersource
     gradients = NamedArray(
-        [Data.Array(zeros(length.(pac.exmedium.mgrid)...)) for name in MediumParameters(pac.attrib_mod)[1]],
+        [Data.Array(zeros(length.(pac.exmedium.grid)...)) for name in MediumParameters(pac.attrib_mod)[1]],
         MediumParameters(pac.attrib_mod)[1],
     )
 

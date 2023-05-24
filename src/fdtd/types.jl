@@ -115,7 +115,7 @@ Modelling parameters common for all supersources
 # Keyword Arguments that are modified by the method (some of them are returned as well)
 
 * `Records::Vector{Records.TD}=[Records(rfields,tgridmod,ageom[ip]) for ip in 1:length(findn(rflags))]`
-* `illum::Array{Float64,2}=zeros(length(medium.mgrid[1]), length(medium.mgrid[2]))` : source energy if `illum_flag`
+* `illum::Array{Float64,2}=zeros(length(medium.grid[1]), length(medium.grid[2]))` : source energy if `illum_flag`
 * `boundary::Array{Array{Float64,4},1}` : stored boundary values for first propagating wavefield 
 * `snaps::NamedArray{Array{Float64}}` :snapshots saved at `tsnaps`
 

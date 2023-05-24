@@ -45,7 +45,7 @@ end
 
 # without attenuation 
 medium = Medium(:acou_homo2D, 5);
-ageom = AGeom(medium.mgrid, :xwell);
+ageom = AGeom(medium.grid, :xwell);
 tgrid = range(0.0, stop = 2.0, length = 2000)
 wav = ricker(10.0, tgrid, tpeak = 0.25);
 srcwav = SrcWav(tgrid, ageom, [:p])
@@ -84,11 +84,11 @@ check()
 
 # @info "testing with attenuation" 
 # medium = Medium(:acou_homo2D);
-# medium = Medium(medium.mgrid, [:vp, :rho, :Q])
+# medium = Medium(medium.grid, [:vp, :rho, :Q])
 # update!(medium, [:vp, :rho, :Q], [[1500, 2500], [1500, 2500], [10, 10]])
 # fill!(medium)
 
-# ageom = AGeom(medium.mgrid, :xwell);
+# ageom = AGeom(medium.grid, :xwell);
 # tgrid = range(0.0, stop = 2.0, length = 1000)
 # wav = ricker(10.0, tgrid, tpeak = 0.25);
 # srcwav = SrcWav(tgrid, ageom, [:p])

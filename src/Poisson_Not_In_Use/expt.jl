@@ -99,8 +99,8 @@ function ParamExpt(snaps, tgrid, mgrid,  Qv, k, η, σ, ACQmat=nothing; σobs=no
 	    zero(σ),zeros(length(σ)))
 
 	# record P and LP
-#	record!(pa.datP, pa.P, pa.mgrid)
-#	record!(pa.datLP, pa.LP, pa.mgrid)
+#	record!(pa.datP, pa.P, pa.grid)
+#	record!(pa.datLP, pa.LP, pa.grid)
 
 	# 
 	if(!(σobs===nothing) && !(Qobs===nothing))

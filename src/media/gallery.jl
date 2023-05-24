@@ -2,7 +2,7 @@ function update_using_δ(medium, δ)
     if (δ == 0.0)
         return medium
     elseif (δ > 0.0)
-        mgrid_out = broadcast(x -> range(x[1], stop=x[end], step=δ), medium.mgrid)
+        mgrid_out = broadcast(x -> range(x[1], stop=x[end], step=δ), medium.grid)
         medium_out = update(medium, mgrid_out)
         return medium_out
     else
@@ -52,12 +52,11 @@ function get_marmousi()
         xgrid = read(file, "xgrid")
         zgrid = read(file, "zgrid")
         mgrid = [
-            range(zgrid[1], stop=zgrid[end], length=size(vp, 1)),
-            range(xgrid[1], stop=xgrid[end], length=size(vp, 2)),
+            range(zgrid[1], stop=zgrid[end], length=size(vpm, 1)),
+            range(xgrid[1], stop=xgrid[end], length=size(vpm, 2)),
         ]
-    end
-
     return mgrid, vpm, vsm, rhom
+    end
 end
 
 function AcousticMedium{T,N}(::Marmousi2, δ=0.0) where {T,N}
@@ -72,7 +71,7 @@ end
 
 # elseif (attrib == :marmousi2_small)
 #     fmodel = Medium(:marmousi2)
-#     fmgrid = fmodel.mgrid
+#     fmgrid = fmodel.grid
 #     mgrid = [
 #         range(500, stop = 3500, step = step(fmgrid[1])),
 #         range(4000, step = step(fmgrid[2]), stop = 13000),

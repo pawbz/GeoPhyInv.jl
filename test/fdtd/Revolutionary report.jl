@@ -47,7 +47,7 @@ update!(medium, [:vp, :rho], randn_perc = 5); # add some random noise to the med
 println(medium)
 
 	# ### AGeom
-ageom = AGeom(medium.mgrid, :xwell, SSrcs(2)); # load a simple acquisition using `mgrid` of the medium
+ageom = AGeom(medium.grid, :xwell, SSrcs(2)); # load a simple acquisition using `mgrid` of the medium
 println(ageom)
 
 

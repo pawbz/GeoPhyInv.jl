@@ -1,6 +1,6 @@
 @recipe function plot(medium::Medium, ageom=nothing; fields=MediumParameters(medium))
-    mx = medium.mgrid[2]
-    mz = medium.mgrid[1]
+    mx = medium.grid[2]
+    mz = medium.grid[1]
     as = length(mz) / length(mx)
     layout := ((as < 1) ? (length(fields), 1) : (1, length(fields)))
     margin --> 5Measures.mm
@@ -230,8 +230,8 @@ Plot the velocity and density seismic models.
 
 # Keyword Arguments
 
-* `xlim::Vector{Float64}=[model.mgrid[2][1],model.mgrid[2][end]]` : minimum and maximum limits of the second dimension while plotting
-* `zlim::Vector{Float64}=[model.mgrid[1][1],model.mgrid[1][end]]` : minimum and maximum limits of the first dimension while plotting
+* `xlim::Vector{Float64}=[model.grid[2][1],model.grid[2][end]]` : minimum and maximum limits of the second dimension while plotting
+* `zlim::Vector{Float64}=[model.grid[1][1],model.grid[1][end]]` : minimum and maximum limits of the first dimension while plotting
 * `fields::Vector{Symbol}=[:vp, :ρ]` : fields that are to be plotted
 * `contrast_flag=false` : plot only the edges of the model
 * `use_bounds=false` : adjust `clim` to the bounds in the seismic model
@@ -246,7 +246,7 @@ Plot the velocity and density seismic models.
 		warn("ImageFiltering bug needs to be fixed")
 	end
 	model=p.args[1]
-	nz,nx=length.(model.mgrid)
+	nz,nx=length.(model.grid)
 
 	nrow = (nx <= nz) ? 1 : length(fields)
 	ncol = (nx <= nz) ? length(fields) : 1
@@ -257,8 +257,8 @@ Plot the velocity and density seismic models.
 		name=string(iff)
 
 		m = model[iff]
-		mx = model.mgrid[2]
-		mz = model.mgrid[1]
+		mx = model.grid[2]
+		mz = model.grid[1]
 		if(contrast_flag)
 			mmin=minimum(m)
 			mmax=maximum(m)

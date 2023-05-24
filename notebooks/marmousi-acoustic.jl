@@ -4,66 +4,38 @@
 using Markdown
 using InteractiveUtils
 
-# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
-macro bind(def, element)
-    quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
-        local el = $(esc(element))
-        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
-        el
-    end
-end
-
-# ╔═╡ 19ca0fd6-a97e-47e2-a950-d7e8a6ba8b88
+# ╔═╡ 28f0f643-aa80-4f92-a0f1-10cf88be3383
 begin
     import Pkg
     Pkg.add("PlutoLinks")
     Pkg.add("PlutoUI")
     Pkg.add("PlutoTest")
     Pkg.add("Plots")
+    Pkg.add("CUDA")
     using PlutoLinks: @revise
-    using PlutoUI, PlutoTest, Plots
+    using PlutoUI, PlutoTest, Plots, CUDA
 end
 
-# ╔═╡ 00333dab-a753-4073-ae6a-36aee85b93c9
-TableOfContents()
-
-# ╔═╡ 7ceb8cb6-5976-4efd-aed9-d54772968de2
-@bind reload_geophyinv Button("using GeoPhyInv")
-
-# ╔═╡ e2ddc23f-99f8-405e-8846-dd074e306630
+# ╔═╡ ca53ee61-98ad-436a-bd10-14290c0ca01e
 begin
-    reload_geophyinv
     Pkg.activate(Base.current_project())
     Pkg.instantiate()
-    @revise using GeoPhyInv
 end
 
-# ╔═╡ d61191f0-4bc4-466b-995c-96a137056ccb
-begin
-    reload_geophyinv
-    GeoPhyInv.@init_parallel_stencil(2, false, Float32, 2)
-	using Statistics
-end
+# ╔═╡ 58ec85a4-792a-4294-9147-e3c9637e466e
+@revise using GeoPhyInv
 
-# ╔═╡ 3b47fd1e-3d24-4346-884d-4e0c0db228cf
-md"""
-In order to install `GeoPhyInv` enter these package manager commands in the REPL.
-```julia
-using Pkg
-Pkg.add(PackageSpec(name="GeoPhyInv",url="https://github.com/pawbz/GeoPhyInv.jl.git"))
-```
-It is necessary to configure GeoPhyInv with a macro `@init_parallel_stencil` before using it. If you need to change this configuration, the julia kernel must be restarted.
-```julia
-using GeoPhyInv; @init_parallel_stencil(⋯)
-```
-"""
+# ╔═╡ 2520f1ee-a102-4b08-9ebd-1b9668346569
+TableOfContents()
+
+# ╔═╡ df39c4c2-3be8-4675-ad8d-1262c280bbc3
+Pkg.activate
 
 # ╔═╡ 6d1c8a37-b872-4041-8544-a3437ebe01a1
-marm=Medium(:marmousi2)
+marm=ElasticMedium(Marmousi2())
 
 # ╔═╡ b4ba72d6-0916-4738-8d25-c807e636ce2b
-ageom = AGeom(marm.mgrid, :surf, SSrcs(1), Recs(100));
+ageom = AGeom(marm.grid, :surf, SSrcs(1), Recs(100));
 
 # ╔═╡ 0c8c94c7-c2aa-457f-9ab2-2f80935b1534
 plot(marm, ageom, fields=[:vp, :rho])
@@ -97,12 +69,11 @@ update!(pa_acoustic)
 plot(pa_acoustic[:data], 99.9)
 
 # ╔═╡ Cell order:
-# ╟─00333dab-a753-4073-ae6a-36aee85b93c9
-# ╟─7ceb8cb6-5976-4efd-aed9-d54772968de2
-# ╟─3b47fd1e-3d24-4346-884d-4e0c0db228cf
-# ╟─19ca0fd6-a97e-47e2-a950-d7e8a6ba8b88
-# ╟─e2ddc23f-99f8-405e-8846-dd074e306630
-# ╠═d61191f0-4bc4-466b-995c-96a137056ccb
+# ╠═2520f1ee-a102-4b08-9ebd-1b9668346569
+# ╠═28f0f643-aa80-4f92-a0f1-10cf88be3383
+# ╠═df39c4c2-3be8-4675-ad8d-1262c280bbc3
+# ╠═ca53ee61-98ad-436a-bd10-14290c0ca01e
+# ╠═58ec85a4-792a-4294-9147-e3c9637e466e
 # ╠═6d1c8a37-b872-4041-8544-a3437ebe01a1
 # ╠═b4ba72d6-0916-4738-8d25-c807e636ce2b
 # ╠═0c8c94c7-c2aa-457f-9ab2-2f80935b1534

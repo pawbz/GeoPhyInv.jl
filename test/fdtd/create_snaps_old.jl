@@ -10,7 +10,7 @@ update!(medium, [:vp, :rho], randn_perc = 5); # add some random noise to the med
 println(medium)
 
 # ### AGeom
-ageom = AGeom(medium.mgrid, :xwell, SSrcs(2)); # load a simple acquisition using `mgrid` of the medium
+ageom = AGeom(medium.grid, :xwell, SSrcs(2)); # load a simple acquisition using `mgrid` of the medium
 println(ageom)
 
 # ### SrcWav
@@ -90,7 +90,7 @@ snaps2 = pa[:snaps, 2]; # second supersource
 medium = Medium(:elastic_homo2D, 5); # load a simple homogeneous elastic medium from the gallery
 update!(medium, [:vp, :vs, :rho], randn_perc = 5); # add some random noise to the medium
 println(medium)
-ageom = AGeom(medium.mgrid, :xwell, SSrcs(2)); # load a simple acquisition using `mgrid` of the medium
+ageom = AGeom(medium.grid, :xwell, SSrcs(2)); # load a simple acquisition using `mgrid` of the medium
 println(ageom)
 # Add source term on `:vz` grid
 srcwav = SrcWav(tgrid, ageom, [:vz]);

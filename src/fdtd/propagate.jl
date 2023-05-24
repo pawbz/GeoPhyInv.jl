@@ -9,7 +9,7 @@ in this case, medium will be treated as the background medium
 function update_δmods!(pac::P_common, δmod::Vector{Float64})
     nx = pac.ic[:nx]
     nz = pac.ic[:nz]
-    nznxd = prod(length.(pac.medium.mgrid))
+    nznxd = prod(length.(pac.medium.grid))
     copyto!(pac.δmodall, δmod)
     fill!(pac.δmod[:invK], 0.0)
     δmodKI =

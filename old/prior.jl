@@ -14,7 +14,7 @@ function update_prior!(pa; priori=nothing, priorm=nothing)
 			copyto!(pa.priori, pa.mediumi)
 		end
 	else
-		!(isequal(priori.mgrid,pa.mediumi.mgrid)) && error("priori model has to be on igrid")
+		!(isequal(priori.grid,pa.mediumi.grid)) && error("priori model has to be on igrid")
 		copyto!(pa.priori, priori)
 	end
 	# update pa.mx.prior

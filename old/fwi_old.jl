@@ -195,7 +195,7 @@ Constructor for `PFWI`
 
 # Optional Keyword Arguments 
 * `tgrid_obs::StepRangeLen` : time grid for observed data
-* `igrid::Vector{StepRangeLen}=mediumm.mgrid` : inversion grid if different from the modelling grid, i.e., `mediumm.mgrid`
+* `igrid::Vector{StepRangeLen}=mediumm.grid` : inversion grid if different from the modelling grid, i.e., `mediumm.grid`
 * `igrid_interp_scheme` : interpolation scheme
   * `=:B1` linear 
   * `=:B2` second order 
@@ -245,11 +245,11 @@ function PFWI(
 	mediumm=deepcopy(mediumm)
 
 	if(igrid===nothing)
-		igrid=deepcopy(mediumm.mgrid)
+		igrid=deepcopy(mediumm.grid)
 	end
 	# igrid has to truncated because the gradient evaluation 
 	# is inaccurate on boundaries
-	mg=mediumm.mgrid
+	mg=mediumm.grid
 	amin=max(igrid[1][1],mg[1][3])
 	amax=min(igrid[1][end],mg[1][end-2])
 	if(length(igrid[1])==1)
@@ -308,8 +308,8 @@ function PFWI(
 		tgrid=tgrid, gmodel_flag=true, verbose=verbose, illum_flag=false, nworker=nworker)
 
 
-	gmediumm=Medium(mediumm.mgrid,[:χvp,:χrho])
-	gmediumi=Medium(mediumi.mgrid,[:χvp,:χrho])
+	gmediumm=Medium(mediumm.grid,[:χvp,:χrho])
+	gmediumi=Medium(mediumi.grid,[:χvp,:χrho])
 
 	#println("added fake precon")
 	#dprecon=deepcopy(dobs)
@@ -340,10 +340,10 @@ function PFWI(
 
 	paTD=VNamedD_misfit(Records(tgrid,ageom,rfields),dobs,w=dprecon);
 
-	paminterp=Interpolation.Kernel([mediumi.mgrid[2], mediumi.mgrid[1]], [mediumm.mgrid[2], mediumm.mgrid[1]], igrid_interp_scheme)
+	paminterp=Interpolation.Kernel([mediumi.grid[2], mediumi.grid[1]], [mediumm.grid[2], mediumm.grid[1]], igrid_interp_scheme)
 
-	mx=X(prod(length.(mediumi.mgrid))*count(parameterization.≠:null),2)
-	mxm=X(prod(length.(mediumm.mgrid))*count(parameterization.≠:null),2)
+	mx=X(prod(length.(mediumi.grid))*count(parameterization.≠:null),2)
+	mxm=X(prod(length.(mediumm.grid))*count(parameterization.≠:null),2)
 
 
 	# put mediumm as a vector, according to parameterization in mxm.x
@@ -439,7 +439,7 @@ function build_mprecon!(pa,illum::Array{Float64}, mprecon_factor=1.0)
 	(any(illum .<= 0.0)) && error("illum cannot be negative or zero")
 	(mprecon_factor < 1.0)  && error("invalid mprecon_factor")
 
-	illumi = zeros(length(pa.mediumi.mgrid[1]), length(pa.mediumi.mgrid[2]))
+	illumi = zeros(length(pa.mediumi.grid[1]), length(pa.mediumi.grid[2]))
 	Interpolation.interp_spray!(illumi, illum, pa.paminterp, :spray)
 	(any(illumi .<= 0.0)) && error("illumi cannot be negative or zero")
 
@@ -520,7 +520,7 @@ Return bound vectors for the `Medium` model,
 depeding on paramaterization
 """
 function Seismic_xbound!(lower_x, upper_x, pa)
-	nznx = prod(length.(pa.mediumi.mgrid))
+	nznx = prod(length.(pa.mediumi.grid))
 
 	bound1 = similar(lower_x)
 	# create a Seismic model with minimum possible values

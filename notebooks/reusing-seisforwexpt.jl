@@ -53,7 +53,7 @@ medium = ElasticMedium(Homogeneous(), 5)
 
 # ╔═╡ ded21d43-99d6-453b-a858-e32f3f82e605
 # surface seismic acquisition with 3 supersources and 100 receivers
-ageom = AGeom(medium.mgrid, :surf, SSrcs(1), Recs(100))
+ageom = AGeom(medium.grid, :surf, SSrcs(1), Recs(100))
 
 # ╔═╡ a47b1e5d-a08c-4750-b1f3-f8a62225a19f
 # lets choose a time grid
