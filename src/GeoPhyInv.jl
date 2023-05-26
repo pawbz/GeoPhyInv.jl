@@ -10,6 +10,7 @@ using TimerOutputs
 using LinearMaps
 using Luxor
 using Ipopt
+using IterativeSolvers
 using Optim, LineSearches
 using DistributedArrays
 using Calculus

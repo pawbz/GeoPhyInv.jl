@@ -43,7 +43,7 @@
                 label --> "R"
                 seriestype := :scatter
                 clims --> Tuple(getfield(medium, field).bounds)
-                ageom, Recs()
+                ageom, Recs(0)
             end
             @series begin
                 subplot := j
@@ -51,7 +51,7 @@
                 label --> "S"
                 seriestype := :scatter
                 clims --> Tuple(getfield(medium, field).bounds)
-                ageom, SSrcs()
+                ageom, SSrcs(0)
             end
         end
     end

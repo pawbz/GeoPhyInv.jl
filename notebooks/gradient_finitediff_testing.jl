@@ -100,6 +100,12 @@ pa_inv, pa_src = SeisInvExpt(pa_mod, dobs, [range(-100,100,length=N), range(-100
 # ╔═╡ 0e5eb59a-aad6-4c84-a0e4-c8558964719f
 update!(pa_src)
 
+# ╔═╡ 4abab9d7-c990-420c-8949-2644682ff2f4
+plot(pa_src.dobs[1].d)
+
+# ╔═╡ 0cdc1afb-ef74-4156-a895-11f4cf08a256
+plot(pa_src.dcal[1].d)
+
 # ╔═╡ e6339233-2d9f-45d0-bcb1-2320a4ad28fc
 dobs
 
@@ -232,6 +238,8 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═5582110f-327c-419a-8759-ca11844c0c96
 # ╠═26c9f7a1-f18b-4fe3-a607-ad1f6a904bb8
 # ╠═0e5eb59a-aad6-4c84-a0e4-c8558964719f
+# ╠═4abab9d7-c990-420c-8949-2644682ff2f4
+# ╠═0cdc1afb-ef74-4156-a895-11f4cf08a256
 # ╠═43fb3211-9ffc-4ea5-a459-539cf55ba009
 # ╠═5297741a-60dc-45b8-8334-bbbc9a2a96c7
 # ╠═802fb101-09f6-44b6-9a46-4fa94724b6f1

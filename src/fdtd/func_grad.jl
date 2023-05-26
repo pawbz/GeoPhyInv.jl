@@ -1,4 +1,4 @@
-function lossvalue(m, loss, dobs::Recs, pa::PFdtd, mparams=Medium(pa.c.attrib_mod))
+function lossvalue(m, loss, dobs::Records, pa::PFdtd, mparams=Medium(pa.c.attrib_mod))
     update!(pa, m, mparams)
     mode_save = pa.c.attrib_mod.mode
     pa.c.attrib_mod.mode = :forward_save
@@ -8,7 +8,7 @@ function lossvalue(m, loss, dobs::Recs, pa::PFdtd, mparams=Medium(pa.c.attrib_mo
     return lossvalue(loss, dobs, pa.c.data[1])
 end
 
-function gradient!(g, m, loss, dobs::Recs, pa::PFdtd, mparams=Medium(pa.c.attrib_mod))
+function gradient!(g, m, loss, dobs::Records, pa::PFdtd, mparams=Medium(pa.c.attrib_mod))
 
     # put m into pac.mod
     update!(pa, m, mparams)

@@ -34,8 +34,8 @@ ageom2 = AGeom(mgrid2, :xwell, SSrcs(10), Recs(10));
 @test (ageom3 ∈ mgrid3)
 
 # The source and receiver positions can be updated as desired.  
-update!(ageom2[1], Srcs(), [0, 1], [10, 20]);
-update!(ageom2[1], Recs(), [0, 0], [10, 20]);
+update!(ageom2[1], Srcs(1), [0, 1], [10, 20]);
+update!(ageom2[1], Recs(1), [0, 0], [10, 20]);
 update!(ageom2, SSrcs(), [0, 1], [10, 20]);
 
 # It is easy to combine supersources. Now `ageom2` has 20 supersources.

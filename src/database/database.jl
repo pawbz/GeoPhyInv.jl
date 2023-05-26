@@ -14,7 +14,7 @@ TableOfContents()
 begin
     for f in [:Srcs, :Recs]
         @eval(@with_kw_noshow mutable struct $f{T}
-            n::Int = 0
+            n::Int
             grid::K where {K<:StepRangeLen{Float64}} = range(0.0, 1.0, length=2)
             fields::Vector{Symbol} = [:vz]
             d::NamedArrays.NamedArray{
@@ -29,7 +29,6 @@ begin
             end
         end)
         # if only one positional argument is given
-		@eval $f() = $f{Data.Number}()
         @eval $f(n) = $f{Data.Number}(n=n)
         @eval $f{T}(n) where {T} = $f{T}(n=n)
         @eval $f(n, grid, fields) = $f{Data.Number}(n=n, grid=grid, fields=fields)

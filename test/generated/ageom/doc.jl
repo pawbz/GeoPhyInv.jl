@@ -15,8 +15,8 @@ ageom2 = AGeom(mgrid2, :xwell, SSrcs(10), Recs(10));
 @test (ageom2 ∈ mgrid2)
 @test (ageom3 ∈ mgrid3)
 
-update!(ageom2[1], Srcs(), [0, 1], [10, 20]);
-update!(ageom2[1], Recs(), [0, 0], [10, 20]);
+update!(ageom2[1], Srcs(1), [0, 1], [10, 20]);
+update!(ageom2[1], Recs(1), [0, 0], [10, 20]);
 update!(ageom2, SSrcs(), [0, 1], [10, 20]);
 
 ageom2_new = vcat(ageom2, ageom2);
