@@ -20,7 +20,7 @@ function SeisInvExpt(paf::PFdtd, dobs::Records, migrid::Vector{<:AbstractRange}=
     mfull=get_modelvector(paf, mparams)
 
     paconv = [Conv.Pconv(Data.Number, dsize=size(d), ssize=(div(length(d.grid), 2), ), gsize=size(d)) for d in dobs]
-    return (; paf, dobs, P, migrid, mparams, loss, mfull, gmfull=similar(mfull)), (; paconv, dobs, dcal=paf.c.data, dobs0=deepcopy(dobs))
+    return (; paf, dobs, dobs0=deepcopy(dobs), P, migrid, mparams, loss, mfull, gmfull=similar(mfull)), paconv
 end
 
 # same as above, but make migrid using the number of cells Nigrid
@@ -33,11 +33,17 @@ function SeisInvExpt(paf::PFdtd, dobs::Records, Nigrid::Vector{Int}, mparams=Med
 end
 
 
-# core algorithm using IterativeSolvers.jl
+# core algorithm using IterativeSolvers.jl to update the source wavelets so that dobs is modified
 
-function update!(pa::T) where {T<:NamedTuple{<:Any,<:Tuple{<:Vector{<:Conv.Pconv},<:Records,Vararg}}}
+function update!(paw::T1, pac::T2) where {T1<:NamedTuple{<:Any,<:Tuple{<:PFdtd,<:Records,Vararg}}, T2::Vector{<:Conv.Pconv}}
+
+    # need to generate observed data first
+    get_modelvector(paw)
+    J1 = lossvalue(m, paw)
+
     # broadcast over supersources
-    broadcast(pa.paconv, pa.dobs0, pa.dobs, pa.dcal) do paconv, dobs0, dobs, dcal
+    broadcast(pac, paw.dobs0, paw.dobs, paw.paf.c.data[1]) do paconv, dobs0, dobs, dcal
+        @show typeof(paconv.d), size(paconv.d), typeof(dcal), size(dcal)
         copyto!(paconv.d, dcal)
         copyto!(paconv.g, dobs0)
    
@@ -45,12 +51,12 @@ function update!(pa::T) where {T<:NamedTuple{<:Any,<:Tuple{<:Vector{<:Conv.Pconv
         w = view(paconv.s, :)
 
         # create operator
-        A=Conv.operator(paconv[1], Conv.G());
+        A=Conv.operator(paconv, Conv.G());
 
-        IterativeSolvers.lsmr!(w, A, dvec)
-
+        IterativeSolvers.lsmr!(w, A, dvec, maxiter=5)
+@show w
         copyto!(paconv.s, w)
-        Conv.mod!(paconv, Conv.D())
-        copyto!(dobs, paconv.d)
+        # Conv.mod!(paconv, Conv.D())
+        # copyto!(dobs, paconv.d)
     end
 end
