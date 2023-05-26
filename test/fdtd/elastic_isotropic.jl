@@ -40,10 +40,10 @@ ageom=AGeom(medium.grid,:surf, SSrcs(3), Recs(30)); # surface seismic
 #md scatter!(ageom, Recs())
 #md plot(p1, p2, size=(800,300))
 
-# ### SrcWav
+# ### Srcs
 tgrid = range(0.0,stop=1.0,length=1000) # generate a temporal grid
 wav = ricker(10.0, tgrid, tpeak=0.25,); # Choose a source wavelet
-srcwav = SrcWav(tgrid, ageom, [:p]) # initialize 
+srcwav = Srcs(tgrid, ageom, [:p]) # initialize 
 update!(srcwav, [:p], wav) # distribute to all supersources
 
 # ### SeisForwExpt

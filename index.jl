@@ -34,8 +34,8 @@ Some of the commonly used (and exported) mutable types to create the `Expt` vari
 
 * `Medium` for bundling medium parameters together;
 * `AGeom` stores acquisition-geometry-related parameters;
-* `SrcWav` allocates source signals input to an experiment;
-* `Records` allocated the output records that are fitted during inversion.
+* `Srcs` allocates source signals input to an experiment;
+* `Recs` allocated the output records that are fitted during inversion.
 """
 
 
@@ -72,7 +72,7 @@ update!(pa, solver=:ipopt)
 
 For a given `attrib_mod` and `ndims`, you can always print a list of scalar fields that are active. 
 The idea is that these symbols will be used 
-* to generate mutable types like `SrcWav` or `Records`;
+* to generate mutable types like `Srcs` or `Recs`;
 * as input to keywords like `rfields` or `snaps_field`.
 First, lets look at the list of all the scalar fields defined in this package.
 ````@example

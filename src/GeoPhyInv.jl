@@ -48,6 +48,8 @@ using CUDA.CUSPARSE
 import Base.@doc
 CUDA.allowscalar(false)
 
+# module to do convolutions using FFTW
+include("Conv.jl")
 
 """
 Setup ParallelStencil preferences.
@@ -122,9 +124,16 @@ NamedStack{T} =
 include("Utils/Utils.jl")
 include("proj_mat.jl")
 
+# supersources used in both database and ageom
+struct SSrcs
+    n::Int
+end
+SSrcs() = SSrcs(0)
+include("database/database.jl")
+export SSrcs, Srcs, Recs
+
 # some structs used for multiple dispatch throughout this package
-include("types.jl")
-export Srcs, Recs, SSrcs
+include("physics_types.jl")
 export FdtdAcoustic, FdtdElastic, Born, FullWave, AcousticBorn, ElasticBorn, FdtdAcousticVisco
 
 # mutable data type for seismic medium + related methods
@@ -138,18 +147,14 @@ export Medium, AcousticMedium, ElasticMedium
 include("ageom/ageom.jl")
 export AGeom, AGeomss
 
-# 
-include("database/database.jl")
 
 # store records
 include("records/records.jl")
-export Records
 
 # mutable data type for storing time-domain source wavelets
 include("srcwav/wavelets.jl")
 export ricker, ormsby
 include("srcwav/srcwav.jl")
-export SrcWav
 
 
 @static if _fd_ndims == 3

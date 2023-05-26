@@ -13,7 +13,7 @@ using Random
 # Intro
 
 ```@docs
-Records
+Recs
 ```
 
 # Examples
@@ -35,7 +35,7 @@ nothing #hide
 Lets initialize records for `:P` and `:vz` fields.
 
 ````@example doc
-data=Records(tgrid, ageom, [:p,:vz]);
+data=Recs(tgrid, ageom, [:p,:vz]);
 nothing #hide
 ````
 
@@ -47,5 +47,5 @@ nothing #hide
 ````
 
 # Methods
-Methods listed for `SrcWav` can used on instances of `Records` too.
+Methods listed for `Srcs` can used on instances of `Recs` too.
 

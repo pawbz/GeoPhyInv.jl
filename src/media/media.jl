@@ -3,7 +3,7 @@
 
 #> [frontmatter]
 #> title = "Medium Parameters"
-#> description = "Easy manipulation of medium parameters"
+#> description = "Easy manipulation of Earth medium parameters"
 
 using Markdown
 using InteractiveUtils

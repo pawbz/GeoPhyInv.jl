@@ -13,7 +13,7 @@ using LinearAlgebra
 # Intro
 
 ```@docs
-SrcWav
+Srcs
 ```
 
 # Examples
@@ -35,7 +35,7 @@ nothing #hide
 Lets initialize records for `:p` field.
 
 ````@example doc
-srcwav=SrcWav(tgrid, ageom, [:p]);
+srcwav=Srcs(tgrid, ageom, [:p]);
 nothing #hide
 ````
 

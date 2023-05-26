@@ -23,8 +23,8 @@ makedocs(
         "Home" => "index.md",
         "Medium" => "generated/media/doc.md",
         "AGeom" => "generated/ageom/doc.md",
-        "SrcWav" => "generated/srcwav/doc.md",
-        "Records" => "generated/data/doc.md",
+        "Srcs" => "generated/srcwav/doc.md",
+        "Recs" => "generated/data/doc.md",
         "SeisForwExpt" => Any[
             "Description"=>"generated/fdtd/doc.md",
             "Staggered Fields"=>"generated/fdtd/grid_visualize.md",

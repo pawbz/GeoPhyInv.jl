@@ -41,8 +41,8 @@ sources and receivers in `mgrid`.
 function Vector{AGeomss}(
     mgrid::Vector{T},
     ss::SSrcs,
-    s::Vector{Srcs},
-    r::Vector{Recs},
+    s::Vector{S} where {S<:Srcs},
+    r::Vector{R} where {R<:Recs},
 ) where {T<:StepRangeLen}
     return [AGeomss(mgrid, s[i], r[i]) for i = 1:ss.n]
 end

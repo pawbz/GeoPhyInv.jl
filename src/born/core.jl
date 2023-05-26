@@ -15,7 +15,7 @@ function PBorn(
     scatter_flag::Bool = false,
     tgrid::StepRangeLen = nothing,
     ageom::AGeom = nothing,
-    srcwav::SrcWav = nothing,
+    srcwav::Srcs = nothing,
     rfields::Vector{Symbol} = [:vz],
     sflag::Int64 = 2,
 )
@@ -67,7 +67,7 @@ function PBorn(
     fc = NamedArray([step(tgrid)], [:dt])
 
 
-    data = Records(tgrid, ageom, rfields)
+    data = Recs(tgrid, ageom, rfields)
     w = NamedArray(vcat([complex.(zeros(np2), zeros(np2)) for i = 1:3]), [:G, :S, :D])
 
     return PBorn(attrib_mod, medium, ageom, srcwav, fc, ic, cc, fnpow2grid, w, m, data)

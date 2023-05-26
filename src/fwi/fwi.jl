@@ -19,8 +19,8 @@ function SeisInvExpt(paf::PFdtd, dobs::Records, migrid::Vector{<:AbstractRange}=
     # P will be repeated based on the number of medium parameters, e.g., KI and rho
     mfull=get_modelvector(paf, mparams)
 
-    paconv = Conv.P(Data.Number)
-    return (; paf, dobs, P, migrid, mparams, loss, mfull, gmfull=similar(mfull)), (; paconv, dobs, dobs0=deepcopy(dobs))
+    paconv = [Conv.Pconv(Data.Number, dsize=size(d), ssize=(div(length(d.grid), 2), ), gsize=size(d)) for d in dobs]
+    return (; paf, dobs, P, migrid, mparams, loss, mfull, gmfull=similar(mfull)), (; paconv, dobs, dcal=paf.c.data, dobs0=deepcopy(dobs))
 end
 
 # same as above, but make migrid using the number of cells Nigrid
@@ -30,4 +30,27 @@ function SeisInvExpt(paf::PFdtd, dobs::Records, Nigrid::Vector{Int}, mparams=Med
         range(first(m)+4*step(m), stop=last(m)-4*step(m), length=N)
     end
     return SeisInvExpt(paf, dobs, migrid, mparams, loss=loss)
+end
+
+
+# core algorithm using IterativeSolvers.jl
+
+function update!(pa::T) where {T<:NamedTuple{<:Any,<:Tuple{<:Vector{<:Conv.Pconv},<:Records,Vararg}}}
+    # broadcast over supersources
+    broadcast(pa.paconv, pa.dobs0, pa.dobs, pa.dcal) do paconv, dobs0, dobs, dcal
+        copyto!(paconv.d, dcal)
+        copyto!(paconv.g, dobs0)
+   
+        dvec = view(paconv.d, :)
+        w = view(paconv.s, :)
+
+        # create operator
+        A=Conv.operator(paconv[1], Conv.G());
+
+        IterativeSolvers.lsmr!(w, A, dvec)
+
+        copyto!(paconv.s, w)
+        Conv.mod!(paconv, Conv.D())
+        copyto!(dobs, paconv.d)
+    end
 end

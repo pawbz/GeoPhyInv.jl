@@ -66,7 +66,7 @@ function PFdtd(
     rigid_faces=pml_faces,
     tgrid::StepRangeLen=nothing,
     ageom::Union{AGeom,Vector{AGeom}}=nothing,
-    srcwav::Union{SrcWav,Vector{SrcWav}}=nothing,
+    srcwav::Union{S,Vector{S}} where {S<:Srcs}=nothing,
     rfields::Vector{Symbol}=[:vz],
     stressfree_faces=[:dummy],
     backprop_flag::Symbol=:null,
@@ -82,12 +82,12 @@ function PFdtd(
     npw = attrib_mod.npw
 
     # convert to vectors of length npw
-    if (typeof(ageom) == AGeom) && (typeof(srcwav) == SrcWav)
+    if (typeof(ageom) == AGeom) && isa(srcwav, Vector{<:Srcs})
         if (npw == 2)
             # acquisition geometry for the adjoint wavefield
             ageom = [ageom, get_adjoint_ageom(ageom)]
             # source wavelets for adjoint wavefield
-            srcwav = [srcwav, SrcWav(tgrid, get_adjoint_ageom(ageom[1]), rfields)]
+            srcwav = [srcwav, Srcs(tgrid, get_adjoint_ageom(ageom[1]), rfields)]
         else
             ageom = fill(ageom, npw)
             srcwav = fill(srcwav, npw)
@@ -95,7 +95,6 @@ function PFdtd(
     else
         @assert length(ageom) == length(srcwav)
     end
-
 
     # check if fields input are meaningful for given attrib_mod and ndims
     @assert (N == _fd_ndims) "Cannot initiate SeisForwExpt due to ndims inconsistency with @init_parallel_stencil"
@@ -176,7 +175,7 @@ function PFdtd(
 
     nrmat = [ageom[ipw][iss].nr for ipw = 1:npw, iss = 1:nss]
     datamat = SharedArray{_fd_datatype}(length(tgrid), maximum(nrmat), nss)
-    data = [Records(tgrid, ageom[ip], rfields) for ip = 1:npw]
+    data = [Recs(tgrid, ageom[ip], rfields) for ip = 1:npw]
 
     # dont need visco parameters, initialize with proper sizes later
     nsls = Int32(0)
@@ -464,14 +463,14 @@ include("boundary.jl")
 #	ipropout=0;
 #	for iprop in 1:pac.ic[:npw]
 #			ipropout += 1
-##			Records.TD_resamp!(pac.data[ipropout], Records.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, ageom[iprop],
+##			Recs.TD_resamp!(pac.data[ipropout], Recs.TD_urpos((Array(records[:,:,iprop,:,:])), rfields, tgridmod, ageom[iprop],
 ##				ageom_urpos[1].nr[1],
 ##				(ageom_urpos[1].r[:z][1], ageom_urpos[1].r[:x][1])
 ##				)) 
 #		end
 #	end
 # return without resampling for testing
-#return [Records.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
+#return [Recs.TD(reshape(records[1+(iprop-1)*nd : iprop*nd],tgridmod.nx,recv_n,nss),
 #		       tgridmod, ageom[1]) for iprop in 1:npw]
 
 function stack_illums!(pac::P_common, pap::Vector{P_x_worker_x_pw{N}}) where {N}

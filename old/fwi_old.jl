@@ -41,9 +41,9 @@ mutable struct PFWI{Tmod, Tdatamisfit, Tinv}
 	"forward modelling parameters for"
 	paf::PFdtd{Tmod}
 	"base source wavelet"
-	srcwav::SrcWav
+	srcwav::Srcs
 	"adjoint source functions"
-	adjsrc::SrcWav
+	adjsrc::Srcs
 	"acquisition ageometry"
 	ageom::AGeom
 	"acquisition ageometry for adjoint propagation"
@@ -93,11 +93,11 @@ pa=SeisInvExpt(attrib_mod, attrib_inv; srcwav, ageom, tgrid, mediumm, mediumm_ob
   * `=Migr_FD()` : finite-difference gradient (used for testing only)
 
 # Keyword Arguments
-* `srcwav::SrcWav` : source wavelets
+* `srcwav::Srcs` : source wavelets
 * `ageom::AGeom` : acquisition 
 * `tgrid::StepRangeLen` : modelling time grid
 * `mediumm::Medium` : an instance of `Medium` (used to generate initial model on the inversion grid)
-* `dobs::Records` : observed data (required only when `attrib==:field`)
+* `dobs::Recs` : observed data (required only when `attrib==:field`)
 * `mediumm_obs::Medium` : medium used for generating *observed data* (required only when `attrib==:synthetic`)
 
 # Optional Keyword Arguments 
@@ -148,9 +148,9 @@ include("xwfwi.jl")
 include("gallery.jl")
 
 """
-Convert the data `Records` to `SrcWav` after time reversal.
+Convert the data `Recs` to `Srcs` after time reversal.
 """
-function update_adjsrc!(adjsrc, δdat::Records, adjageom)
+function update_adjsrc!(adjsrc, δdat::Recs, adjageom)
 	for i in 1:length(adjageom)
 		for field in names(δdat[i].d)[1]
 			wav=adjsrc[i].d[field] 
@@ -172,7 +172,7 @@ value_adjsrc(s, ::vz) = -1.0*s
 
 
 function generate_adjsrc(fields, tgrid, adjageom)
-	adjsrc=SrcWav(tgrid,adjageom,fields)
+	adjsrc=Srcs(tgrid,adjageom,fields)
 	return adjsrc
 end
 
@@ -187,7 +187,7 @@ Constructor for `PFWI`
 
 
 # Keyword Arguments
-* `srcwav::SrcWav` : source time functions
+* `srcwav::Srcs` : source time functions
 * `ageom::AGeom` : acquisition ageometry
 * `tgrid::StepRangeLen` : modeling time grid
 * `mediumm::Medium` : seismic model on modeling mesh 
@@ -202,11 +202,11 @@ Constructor for `PFWI`
 * `mprecon_factor::Float64=1` : factor to control model preconditioner, always greater than 1
   * `=1` means the preconditioning is switched off
   * `>1` means the preconditioning is switched on, larger the mprecon_factor, stronger the applied preconditioner becomes
-* `dobs::Records` : observed data
-* `dprecon::Records=ones(Records)` : data preconditioning, defaults to one 
+* `dobs::Recs` : observed data
+* `dprecon::Recs=ones(Recs)` : data preconditioning, defaults to one 
 * `tlagssf_fracs=0.0` : maximum lagtime of unknown source filter
 * `tlagrf_fracs=0.0` : maximum lagtime of unknown receiver filter
-* `srcwav_obs::SrcWav=srcwav` : source wavelets to generate *observed data*; can be different from `srcwav`
+* `srcwav_obs::Srcs=srcwav` : source wavelets to generate *observed data*; can be different from `srcwav`
 * `mediumm0::Medium=fill!(mediumm,0.0)` : background seismic model for Born modelling and inversion
 * `parameterization::Vector{Symbol}` : subsurface parameterization
   * `=[:χvp, :χrho, :null]` for velocity and density inversion
@@ -218,7 +218,7 @@ Constructor for `PFWI`
 function PFWI(
 	      attrib_mod::Union{FdtdAcoustic, FdtdAcoustic{Born}}, 
 	      attrib_inv::Union{LS,LS_prior,Migr,Migr_FD};
-	      srcwav::SrcWav=nothing,
+	      srcwav::Srcs=nothing,
 	      ageom::AGeom=nothing,
 	      tgrid::StepRangeLen=nothing,
 	      mediumm::Medium=nothing,
@@ -228,11 +228,11 @@ function PFWI(
 	      igrid=nothing,
 	      igrid_interp_scheme::Symbol=:B2,
 	      mprecon_factor::Float64=1.0,
-	      dobs::Records=Records(tgrid_obs, ageom, rfields),
+	      dobs::Recs=Recs(tgrid_obs, ageom, rfields),
 	      dprecon=nothing,
 	      tlagssf_fracs=0.0,
 	      tlagrf_fracs=0.0,
-	      srcwav_obs::SrcWav=deepcopy(srcwav),
+	      srcwav_obs::Srcs=deepcopy(srcwav),
 	      mediumm_obs::Medium=mediumm,
 	      mediumm0=nothing,
 	      parameterization::Vector{Symbol}=[:χvp, :χrho, :null],
@@ -314,7 +314,7 @@ function PFWI(
 	#println("added fake precon")
 	#dprecon=deepcopy(dobs)
 	#fill!(dprecon, 1.0)
-	#Records.taper!(dprecon, 20.)
+	#Recs.taper!(dprecon, 20.)
 
 	# check dprecon
 	if(!(dprecon===nothing))
@@ -326,7 +326,7 @@ function PFWI(
 	# choose the data misfit
 	#	(iszero(tlagssf_fracs)) 
  	# tlagssf_fracs==[0.0] | tlagssf_fracs=[0.0])
-	# paTD=Records.P_misfit(Records.TD_zeros(rfields,tgrid,ageom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
+	# paTD=Recs.P_misfit(Recs.TD_zeros(rfields,tgrid,ageom),dobs,w=dprecon,coup=coup, func_attrib=optims[1]);
 
 	if((attrib == :synthetic))
 		if(iszero(dobs))
@@ -338,7 +338,7 @@ function PFWI(
 		end
 	end
 
-	paTD=VNamedD_misfit(Records(tgrid,ageom,rfields),dobs,w=dprecon);
+	paTD=VNamedD_misfit(Recs(tgrid,ageom,rfields),dobs,w=dprecon);
 
 	paminterp=Interpolation.Kernel([mediumi.grid[2], mediumi.grid[1]], [mediumm.grid[2], mediumm.grid[1]], igrid_interp_scheme)
 
@@ -354,7 +354,7 @@ function PFWI(
 	     mx, mxm,
 	     paf,
 	     deepcopy(srcwav), 
-	     SrcWav(tgrid,adjageom, rfields),
+	     Srcs(tgrid,adjageom, rfields),
 	     deepcopy(ageom), 
 	     adjageom,
 	     deepcopy(mediumm), deepcopy(mediumm0), mediumi, mod_initial,
@@ -596,10 +596,10 @@ function func_grad_Coupling!(storage, x::Vector{Float64},pa::PFWI)
 
 	if(storage === nothing)
 		# compute misfit 
-		f = Records.error!(pa.paTD)
+		f = Recs.error!(pa.paTD)
 		return f
 	else
-		f = Records.error!(pa.paTD, :dJssf)
+		f = Recs.error!(pa.paTD, :dJssf)
 		Coupling_gx!(storage, pa.paTD.dJssf)
 		return storage
 	end

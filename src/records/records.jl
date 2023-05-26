@@ -1,8 +1,9 @@
 
+Records = Vector{Recs{Data.Number}}
 """
 A mutable type that bundles multi-component records at receiver array.
 ```julia
-records=Records(tgrid, ageom, [:p, :vx])
+records=Recs(tgrid, ageom, [:p, :vx])
 
 ```
 Here, we initialized records, of `:p` and `:vx` fields, in time domain for receivers and supersources in `ageom`.
@@ -14,9 +15,9 @@ Here, we initialized records, of `:p` and `:vx` fields, in time domain for recei
 * `records.grid` : returns `tgrid` 
 As mutable objects in Julia are like containers that might hold different values over time, `records` can be modified.
 """
-Records = Array{NamedD{Recs},1}
-
-
-function Array{NamedD{Recs},1}(grid::StepRangeLen, ageom::AGeom, fields::Vector{Symbol})
-    return [NamedD(grid, Recs(ageom[i].nr), fields) for i = 1:length(ageom)]
+function Recs(grid::StepRangeLen, ageom::AGeom, fields::Vector{Symbol})
+    return [Recs(ageom[i].nr, grid, fields) for i = 1:length(ageom)]
+end
+function Recs(grid::StepRangeLen, ageomss::AGeomss, fields::Vector{Symbol})
+    return Recs(ageomss.nr, grid, fields)
 end

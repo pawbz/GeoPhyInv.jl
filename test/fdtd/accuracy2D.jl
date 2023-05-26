@@ -48,7 +48,7 @@ medium = Medium(:acou_homo2D, 5);
 ageom = AGeom(medium.grid, :xwell);
 tgrid = range(0.0, stop = 2.0, length = 2000)
 wav = ricker(10.0, tgrid, tpeak = 0.25);
-srcwav = SrcWav(tgrid, ageom, [:p])
+srcwav = Srcs(tgrid, ageom, [:p])
 update!(srcwav, [:p], wav)
 
 
@@ -91,7 +91,7 @@ check()
 # ageom = AGeom(medium.grid, :xwell);
 # tgrid = range(0.0, stop = 2.0, length = 1000)
 # wav = ricker(10.0, tgrid, tpeak = 0.25);
-# srcwav = SrcWav(tgrid, ageom, [:p])
+# srcwav = Srcs(tgrid, ageom, [:p])
 # update!(srcwav, [:p], wav)
 
 # pa = SeisForwExpt(

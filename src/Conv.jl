@@ -21,9 +21,9 @@ Model : d = convolution(g, s)
 d, g and s can have arbitary +ve and -ve lags
 """
 mutable struct Pconv{T<:Real,Nd,Ng,Ns}
-    dsize::Vector{Int}
-    gsize::Vector{Int}
-    ssize::Vector{Int}
+    dsize::NTuple{Nd,Int}
+    gsize::NTuple{Ng,Int}
+    ssize::NTuple{Ns,Int}
     "length after zero padding"
     np2::Int # nfastfft length
     d::AbstractArray{T,Nd}
@@ -42,17 +42,17 @@ mutable struct Pconv{T<:Real,Nd,Ng,Ns}
     sfftp::FFTW.rFFTWPlan
     sifftp::FFTW.Plan
     "+ve and -ve lags of g"
-    glags::Vector{Int}
+    glags::NTuple{2,Int}
     "+ve and -ve lags of s"
-    slags::Vector{Int}
+    slags::NTuple{2,Int}
     "+ve and -ve lags of d"
-    dlags::Vector{Int}
+    dlags::NTuple{2,Int}
 end
 
 function Pconv(T=Float64;
-    dsize::Vector{Int64}=[1],
-    ssize::Vector{Int64}=[1],
-    gsize::Vector{Int64}=[1],
+    dsize=(1,),
+    ssize=(1,),
+    gsize=(1,),
     d=zeros(T, dsize...),
     s=zeros(T, ssize...),
     g=zeros(T, gsize...),
@@ -62,9 +62,9 @@ function Pconv(T=Float64;
     np2=nextfastfft(ssize[1] + gsize[1] - 1), # fft dimension for plan, such that circular convolution is same as linear convolution
     fftwflag=FFTW.ESTIMATE
 )
-    @assert size(s) == tuple(ssize...)
-    @assert size(g) == tuple(gsize...)
-    @assert size(d) == tuple(dsize...)
+    @assert size(s) == ssize
+    @assert size(g) == gsize
+    @assert size(d) == dsize
 
     Nd = length(dsize)
     Ns = length(ssize)
@@ -78,19 +78,19 @@ function Pconv(T=Float64;
         # equal +ve and -ve lags for s
         nwplags = div(nts - 1, 2)
         nwnlags = nts - 1 - nwplags
-        slags = [nwplags, nwnlags]
+        slags = (nwplags, nwnlags)
     end
     if (dlags === nothing)
         # no negative lags
         nsplags = ntd - 1
         nsnlags = ntd - 1 - nsplags
-        dlags = [nsplags, nsnlags]
+        dlags = (nsplags, nsnlags)
     end
     if (glags === nothing)
         # no negative lags
         nrplags = ntg - 1
         nrnlags = ntg - 1 - nrplags
-        glags = [nrplags, nrnlags]
+        glags = (nrplags, nrnlags)
     end
 
 
@@ -408,16 +408,28 @@ end
 """
 A linear operator corresponding to convolution with either s or g
 """
-function operator(pa, attrib)
+function operator(pa, attrib::S)
 
     fw = (y, x) -> F!(y, x, pa, attrib)
     bk = (y, x) -> Fadj!(y, x, pa, attrib)
 
     return LinearMap{collect(typeof(pa).parameters)[1]}(fw, bk,
         length(pa.d),  # length of output
-        length(pa.g),  # length of output
+        length(pa.g),  # length of input
         ismutating=true)
 end
+
+function operator(pa, attrib::G)
+
+    fw = (y, x) -> F!(y, x, pa, attrib)
+    bk = (y, x) -> Fadj!(y, x, pa, attrib)
+
+    return LinearMap{collect(typeof(pa).parameters)[1]}(fw, bk,
+        length(pa.d),  # length of output
+        length(pa.s),  # length of input
+        ismutating=true)
+end
+
 
 function F!(y, x, pa, ::S)
     copyto!(pa.g, x)
@@ -463,6 +475,15 @@ end
 
 
 end # module
+
+# ╔═╡ 583445f3-4704-4465-ba48-fc1e78d370e4
+pa=Conv.Pconv(dsize=(100, 10), gsize=(100,10), ssize=(30,))
+
+# ╔═╡ d6883a4a-db29-476e-900a-a5750cc52098
+Conv.mod!(pa, Conv.D())
+
+# ╔═╡ d9020093-5f33-4671-aff3-498f39733011
+Conv.operator(pa, Conv.S())
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -812,6 +833,9 @@ version = "17.4.0+0"
 """
 
 # ╔═╡ Cell order:
+# ╠═583445f3-4704-4465-ba48-fc1e78d370e4
+# ╠═d6883a4a-db29-476e-900a-a5750cc52098
+# ╠═d9020093-5f33-4671-aff3-498f39733011
 # ╠═f01b439a-5641-488c-b175-a37da23dd94c
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

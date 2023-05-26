@@ -38,9 +38,6 @@ end
 # ╔═╡ bd68d9b1-633b-4c9b-b759-791581714306
 using Statistics, LossFunctions, LinearAlgebra, MLUtils, FiniteDifferences, SparseArrays
 
-# ╔═╡ 1c595ede-34a8-41f3-8067-6fb0b864f7fa
-using FourierTools
-
 # ╔═╡ bbfa8c8e-1ef5-459b-b5f5-edb15ff38fa8
 TableOfContents()
 
@@ -81,12 +78,6 @@ vv=[1, 0, 0, 0]
 # ╔═╡ 110ee9ed-6e28-4b15-8102-a75e42d26d07
 stack([randn(3), randn(3)], dims=2)
 
-# ╔═╡ ef26bf0c-cc19-474e-bcf9-9007547bcc56
-pp = plan_conv(randn(3,10), randn(3), 1) |> typeof
-
-# ╔═╡ 11bd4ea4-f4de-4118-b354-02f83cebf47d
-conv(aa, vv)
-
 # ╔═╡ 8e9a92dc-dc58-40d7-9a38-df08852a33a0
 typeof(pa_mod.c.medium.grid)
 
@@ -104,7 +95,10 @@ begin
 end
 
 # ╔═╡ 26c9f7a1-f18b-4fe3-a607-ad1f6a904bb8
-pa_inv, _ = SeisInvExpt(pa_mod, dobs, [range(-100,100,length=N), range(-100,100,length=N)], [mpara])
+pa_inv, pa_src = SeisInvExpt(pa_mod, dobs, [range(-100,100,length=N), range(-100,100,length=N)], [mpara])
+
+# ╔═╡ 0e5eb59a-aad6-4c84-a0e4-c8558964719f
+update!(pa_src)
 
 # ╔═╡ e6339233-2d9f-45d0-bcb1-2320a4ad28fc
 dobs
@@ -237,13 +231,11 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═6d47ae1d-2554-4d42-af6c-02ce952bf14e
 # ╠═5582110f-327c-419a-8759-ca11844c0c96
 # ╠═26c9f7a1-f18b-4fe3-a607-ad1f6a904bb8
+# ╠═0e5eb59a-aad6-4c84-a0e4-c8558964719f
 # ╠═43fb3211-9ffc-4ea5-a459-539cf55ba009
-# ╠═1c595ede-34a8-41f3-8067-6fb0b864f7fa
 # ╠═5297741a-60dc-45b8-8334-bbbc9a2a96c7
 # ╠═802fb101-09f6-44b6-9a46-4fa94724b6f1
 # ╠═110ee9ed-6e28-4b15-8102-a75e42d26d07
-# ╠═ef26bf0c-cc19-474e-bcf9-9007547bcc56
-# ╠═11bd4ea4-f4de-4118-b354-02f83cebf47d
 # ╠═e6339233-2d9f-45d0-bcb1-2320a4ad28fc
 # ╠═8e9a92dc-dc58-40d7-9a38-df08852a33a0
 # ╠═9706aa59-0286-43cf-bdb7-a3d040e0e2bc
