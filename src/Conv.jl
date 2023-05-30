@@ -10,6 +10,8 @@ using FFTW
 using DSP
 using LinearAlgebra
 using LinearMaps
+using IterativeSolvers
+using PlutoTest
 
 using DSP: nextfastfft
 struct D end
@@ -476,27 +478,86 @@ end
 
 end # module
 
+# ╔═╡ 6c5788a6-a4e7-4edb-be5f-4203d9fe7a36
+md"""
+```math
+D = Conv(G, S)
+```
+"""
+
+# ╔═╡ 682f12c9-3753-4398-9135-ad62ea0995c0
+s0=zeros(3); s0[3]=1.0;
+
 # ╔═╡ 583445f3-4704-4465-ba48-fc1e78d370e4
-pa=Conv.Pconv(dsize=(100, 10), gsize=(100,10), ssize=(30,))
+pa=Conv.Pconv(dsize=(10, 2), gsize=(10,2), ssize=(3,), s=randn(3), g=randn(10,2), d=randn(10,2))
 
 # ╔═╡ d6883a4a-db29-476e-900a-a5750cc52098
 Conv.mod!(pa, Conv.D())
 
 # ╔═╡ d9020093-5f33-4671-aff3-498f39733011
-Conv.operator(pa, Conv.S())
+A=Conv.operator(pa, Conv.G())
+
+# ╔═╡ 5d76cc87-5134-4a60-9f7b-55481e0a2442
+strue = randn(3)
+
+# ╔═╡ 06ffb8ad-a456-4140-877f-778299d8455c
+dtrue = A*strue
+
+# ╔═╡ 4b9df61f-d5ff-41b9-a623-d7220bcdb513
+w=zero(strue); IterativeSolvers.lsmr!(w, A, vec(dtrue), verbose=true)
+
+# ╔═╡ 4fa17014-2cd7-4ed2-8424-67bf42e971ca
+w, strue
+
+# ╔═╡ 9bf0c426-93fa-4634-8e23-cb21d48a3d92
+# adj_test(A)
+
+# ╔═╡ 8645858f-eba8-4824-9ab2-1c3ac853a8b7
+Array(A)
+
+# ╔═╡ 013510e5-b81f-425b-8a38-1c36f2f7178e
+Array(A')
+
+# ╔═╡ 64bb10c8-c021-4167-bbc4-09f236fc8e0a
+gtest=randn(10,2)
+
+# ╔═╡ 9f3c1ea0-e590-42ef-bbc8-db4d13f6f5cf
+# reshape(A*vec(gtest), 10, 2)
+
+# ╔═╡ b78e3c5d-23ce-4bb7-bef1-ea41cd831526
+Conv.operator(pa, Conv.G())
+
+# ╔═╡ a9a53efa-86d9-4fd4-adc7-672889b58e26
+function adj_test(F)
+    x = randn(size(F, 2))
+    y = randn(size(F, 1))
+    a = LinearAlgebra.dot(y, F * x)
+    b = LinearAlgebra.dot(x, adjoint(F) * y)
+    c = LinearAlgebra.dot(x, transpose(F) * F * x)
+    println("must be positive: ", c)
+    println("adjoint test: ", a, "\t", b)
+    @test isapprox(a, b, rtol=1e-5)
+    @test c > 0.0
+    return nothing
+end
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
+PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 
 [compat]
 DSP = "~0.7.8"
 FFTW = "~1.6.0"
+IterativeSolvers = "~0.9.2"
 LinearMaps = "~3.10.0"
+PlutoTest = "~0.2.2"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -505,7 +566,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.0"
 manifest_format = "2.0"
-project_hash = "08f8d8217cea85c47b26952b0c80d24ef823a8dd"
+project_hash = "0dd2035418e90599c8947a44f208b5a46e8167fb"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -584,6 +645,12 @@ version = "3.3.10+0"
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
+[[deps.HypertextLiteral]]
+deps = ["Tricks"]
+git-tree-sha1 = "c47c5fa4c5308f27ccaac35504858d8914e102f9"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.4"
+
 [[deps.IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "0cb9352ef2e01574eeebdb102948a58740dcaf83"
@@ -603,6 +670,12 @@ version = "0.2.2"
 git-tree-sha1 = "fa6287a4469f5e048d763df38279ee729fbd44e5"
 uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 version = "1.4.0"
+
+[[deps.IterativeSolvers]]
+deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays"]
+git-tree-sha1 = "1169632f425f79429f245113b775a0e3d121457c"
+uuid = "42fd0dbc-a981-5370-80f2-aaf504508153"
+version = "0.9.2"
 
 [[deps.JLLWrappers]]
 deps = ["Preferences"]
@@ -709,6 +782,12 @@ deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 version = "1.9.0"
 
+[[deps.PlutoTest]]
+deps = ["HypertextLiteral", "InteractiveUtils", "Markdown", "Test"]
+git-tree-sha1 = "17aa9b81106e661cffa1c4c36c17ee1c50a86eda"
+uuid = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
+version = "0.2.2"
+
 [[deps.Polynomials]]
 deps = ["LinearAlgebra", "RecipesBase"]
 git-tree-sha1 = "2857c96cdd343a13e8d78f77823bacc8266278ed"
@@ -804,6 +883,15 @@ deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
 version = "1.10.0"
 
+[[deps.Test]]
+deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
+uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[[deps.Tricks]]
+git-tree-sha1 = "aadb748be58b492045b4f56166b5188aa63ce549"
+uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
+version = "0.1.7"
+
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
@@ -833,9 +921,22 @@ version = "17.4.0+0"
 """
 
 # ╔═╡ Cell order:
+# ╟─6c5788a6-a4e7-4edb-be5f-4203d9fe7a36
+# ╠═682f12c9-3753-4398-9135-ad62ea0995c0
 # ╠═583445f3-4704-4465-ba48-fc1e78d370e4
 # ╠═d6883a4a-db29-476e-900a-a5750cc52098
 # ╠═d9020093-5f33-4671-aff3-498f39733011
+# ╠═5d76cc87-5134-4a60-9f7b-55481e0a2442
+# ╠═06ffb8ad-a456-4140-877f-778299d8455c
+# ╠═4fa17014-2cd7-4ed2-8424-67bf42e971ca
+# ╠═4b9df61f-d5ff-41b9-a623-d7220bcdb513
+# ╠═9bf0c426-93fa-4634-8e23-cb21d48a3d92
+# ╠═8645858f-eba8-4824-9ab2-1c3ac853a8b7
+# ╠═013510e5-b81f-425b-8a38-1c36f2f7178e
+# ╠═64bb10c8-c021-4167-bbc4-09f236fc8e0a
+# ╠═9f3c1ea0-e590-42ef-bbc8-db4d13f6f5cf
+# ╠═b78e3c5d-23ce-4bb7-bef1-ea41cd831526
 # ╠═f01b439a-5641-488c-b175-a37da23dd94c
+# ╠═a9a53efa-86d9-4fd4-adc7-672889b58e26
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

@@ -69,6 +69,15 @@ end;
 
 # ╔═╡ 2e99149d-bbb4-466c-bcf6-d04381d83aec
 begin
+	"""
+   	Flatten
+    """
+    function Iterators.flatten(data::Union{Srcs,Recs})
+        return Iterators.flatten(data.d.array)
+    end
+	function Iterators.flatten(data::Vector{T}) where {T<:Union{Srcs,Recs}}
+        return Iterators.flatten(map(Iterators.flatten, data))
+    end
     """
     Return a vec of data object sorted in the order
     time, channels
@@ -612,13 +621,19 @@ length(data)
 size(data)
 
 # ╔═╡ 20bc27ea-1df4-4848-b854-1a428e65b28a
-hcat([data, data])
+stack
+
+# ╔═╡ 4bece999-623e-4695-a85b-8937f44e48ee
+vcat(view(randn(10,10), :))
 
 # ╔═╡ 81af3b1a-e61e-44a0-82f7-4cca66fc480a
 hcat(data)
 
 # ╔═╡ e6070bc0-27d0-453f-a1bc-662321321e45
 dv = vec(data)
+
+# ╔═╡ c661d5a8-8b4e-4d48-ac4b-10c9c5cddb7b
+Iterators.flatten([data, data]) |> collect
 
 # ╔═╡ 4bb3be76-7c4d-416f-bc2d-968fbcf3968e
 @btime copyto!(dv, data)
@@ -1408,8 +1423,10 @@ version = "17.4.0+0"
 # ╠═00bc946c-a071-43be-9cc5-f7e153371d0a
 # ╠═7fbb9b5a-e921-4a30-b45e-7ba84a24829d
 # ╠═20bc27ea-1df4-4848-b854-1a428e65b28a
+# ╠═4bece999-623e-4695-a85b-8937f44e48ee
 # ╠═81af3b1a-e61e-44a0-82f7-4cca66fc480a
 # ╠═e6070bc0-27d0-453f-a1bc-662321321e45
+# ╠═c661d5a8-8b4e-4d48-ac4b-10c9c5cddb7b
 # ╠═4bb3be76-7c4d-416f-bc2d-968fbcf3968e
 # ╠═bd32bfeb-d9f9-4eb5-b578-cccef76963d7
 # ╟─20542ff1-c23e-41a4-b457-9adb3575bccf
