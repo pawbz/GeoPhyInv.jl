@@ -9,7 +9,7 @@ function SeisForwExpt(attrib_mod::FdtdAcoustic, ::Homogeneous; snaps_field=nothi
     tgrid = range(0, stop=2.0, step=0.003)
     wav = ricker(10.0, tgrid)
     rmul!(wav, 1e6)
-    srcwav = SrcWav(tgrid, ageom, [:vz])
+    srcwav = Srcs(tgrid, ageom, [:vz])
     update!(srcwav, [:vz], wav)
 
     tsnaps = tgrid

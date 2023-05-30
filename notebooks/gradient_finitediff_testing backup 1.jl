@@ -45,7 +45,7 @@ begin
 end
 
 # ╔═╡ 15654987-9979-46cb-bae6-1fd631bae58b
-Records
+Recs
 
 # ╔═╡ c6b19c3d-6ccb-436f-a191-d3cc1958a91a
 begin

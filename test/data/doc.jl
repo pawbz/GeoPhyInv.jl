@@ -8,7 +8,7 @@ using Random
 # # Intro
 
 #md # ```@docs
-#md # Records
+#md # Recs
 #md # ```
 
 
@@ -22,11 +22,11 @@ ageom=AGeom(mgrid, SSrcs(10), Srcs(10), Recs(10));
 tgrid=range(0, stop=1.0, step=0.1);
 
 # Lets initialize records for `:P` and `:vz` fields.
-data=Records(tgrid, ageom, [:p,:vz]);
+data=Recs(tgrid, ageom, [:p,:vz]);
 
 # Fill the `:P` field of 3rd supersource with random numbers.
 Random.randn!(data[3][:p]);
 
 
 # # Methods 
-# Methods listed for `SrcWav` can used on instances of `Records` too.
+# Methods listed for `Srcs` can used on instances of `Recs` too.

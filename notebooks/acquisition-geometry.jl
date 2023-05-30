@@ -87,7 +87,7 @@ We can simply initialize an acquisition on `mgrid`, where the positions will be 
 ageom2D = AGeom(mgrid2D, SSrcs(2), Srcs(10), Recs(10))
 
 # ╔═╡ 8292ec17-0f70-4d7b-a1a0-28c9bbb57166
-plot(ageom2D, SSrcs()); plot!(ageom2D, Recs())
+plot(ageom2D, SSrcs()); plot!(ageom2D, Recs(0))
 
 # ╔═╡ 5d045903-cd72-416d-b5d3-65177bc78d81
 md"The acquisition geometry above has 2 supersources, 10 sources, and 10 receiver. Similarly, we can redo for a 3-D grid."
@@ -99,7 +99,7 @@ begin
 end
 
 # ╔═╡ 9a798cae-5cb0-4508-ad57-db50e07f2055
-plot(ageom3D, SSrcs()); plot!(ageom3D, Recs())
+plot(ageom3D, SSrcs()); plot!(ageom3D, Recs(0))
 
 # ╔═╡ f446b1cd-b1c6-4da0-907e-44028ca858ba
 md"""
@@ -110,7 +110,7 @@ In the case of the 2-D grid, we can also use one of the predefined acquisitions.
 ageom_xwell = AGeom(mgrid2D, :xwell, SSrcs(3), Recs(10))
 
 # ╔═╡ fe64563a-582d-4ff8-be50-4e2541cdd1f4
-plot(ageom_xwell, SSrcs()); plot!(ageom_xwell, Recs())
+plot(ageom_xwell, SSrcs()); plot!(ageom_xwell, Recs(0))
 
 # ╔═╡ f5f697fb-a465-4ce3-b394-03025f0a88bd
 md"""
@@ -128,8 +128,8 @@ md"The source and receiver positions can be updated as desired."
 
 # ╔═╡ 1fb65b26-49be-4f22-8c93-3b63fe6dd8f8
 begin
-	update!(ageom2D[1], Srcs(), [0, 1], [10, 20]);
-	update!(ageom2D[1], Recs(), [0, 0], [10, 20]);
+	update!(ageom2D[1], Srcs(1), [0, 1], [10, 20]);
+	update!(ageom2D[1], Recs(1), [0, 0], [10, 20]);
 	update!(ageom2D, SSrcs(), [0, 1], [10, 20]);
 end
 

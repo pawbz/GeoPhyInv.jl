@@ -96,7 +96,7 @@ function Array{AGeomss,1}(
     end
     if (N == 2)
         update!(ageom, SSrcs(), getp(mgrid, sp1), getp(mgrid, sp2))
-        update!(ageom, Recs(), getp(mgrid, rp1), getp(mgrid, rp2))
+        update!(ageom, Recs(1), getp(mgrid, rp1), getp(mgrid, rp2))
     else # just use mean y for 3D 
         update!(
             ageom,
@@ -106,7 +106,7 @@ function Array{AGeomss,1}(
         )
         update!(
             ageom,
-            Recs(),
+            Recs(1),
             getp(mgrid, [rp1[1], 0.5, rp1[2]]),
             getp(mgrid, [rp2[1], 0.5, rp2[2]]),
         )

@@ -43,7 +43,7 @@
                 label --> "R"
                 seriestype := :scatter
                 clims --> Tuple(getfield(medium, field).bounds)
-                ageom, Recs()
+                ageom, Recs(0)
             end
             @series begin
                 subplot := j
@@ -51,7 +51,7 @@
                 label --> "S"
                 seriestype := :scatter
                 clims --> Tuple(getfield(medium, field).bounds)
-                ageom, SSrcs()
+                ageom, SSrcs(0)
             end
         end
     end
@@ -87,7 +87,7 @@ end
     tuple([ageom.r[d] for d in dnames]...)
 end
 
-@recipe function plot(dat::NamedD{Recs}, clip_perc=0.0)
+@recipe function plot(dat::Recs, clip_perc=0.0)
     layout := (1, length(dat.d))
     size --> (length(dat.d) * 300, 300)
     margin --> 5Measures.mm
@@ -118,7 +118,7 @@ end
 end
 
 
-@recipe function plot(dat::NamedD{Srcs})
+@recipe function plot(dat::Srcs)
     fgrid = FFTW.rfftfreq(length(dat.grid), inv(step(dat.grid)))
     layout := (1, 2)
     size --> (800, length(dat.d) * 200)
@@ -161,10 +161,10 @@ end
 
 
 #=
-Plot time-domain data of type `Records.TD`
+Plot time-domain data of type `Recs.TD`
 
 # Arguments
-* `td::Vector{Records.TD}` : time-domain data to be compared
+* `td::Vector{Recs.TD}` : time-domain data to be compared
 
 # Keyword Arguments
 * `ssvec::Vector{Vector{Int64}}=fill([1], length(td))` : supersource vector to be plotted

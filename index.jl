@@ -34,8 +34,8 @@ Some of the commonly used (and exported) mutable types to create the `Expt` vari
 
 * `Medium` for bundling medium parameters together;
 * `AGeom` stores acquisition-geometry-related parameters;
-* `SrcWav` allocates source signals input to an experiment;
-* `Records` allocated the output records that are fitted during inversion.
+* `Srcs` allocates source signals input to an experiment;
+* `Recs` allocated the output records that are fitted during inversion.
 """
 
 
@@ -72,7 +72,7 @@ update!(pa, solver=:ipopt)
 
 For a given `attrib_mod` and `ndims`, you can always print a list of scalar fields that are active. 
 The idea is that these symbols will be used 
-* to generate mutable types like `SrcWav` or `Records`;
+* to generate mutable types like `Srcs` or `Recs`;
 * as input to keywords like `rfields` or `snaps_field`.
 First, lets look at the list of all the scalar fields defined in this package.
 ````@example
@@ -112,12 +112,18 @@ tgrid=range(0,stop=1.0,step=0.001) # a temporal grid from 0 to 1.0 s
 # ╔═╡ 8abc866c-7311-4e3c-804a-106b190e4cdc
 md"# Appendix"
 
-# ╔═╡ 460ad45c-23d8-4035-ac55-34691e135c0a
-notebook_files = filter(Pluto.is_pluto_notebook, readdir(joinpath(@__DIR__,"notebooks"), join=true));
+# ╔═╡ 40f93407-05a3-4672-b314-f911a26c2072
+notebook_files = mapreduce(vcat, walkdir(@__DIR__)) do (root, dirs, files)
+	mapreduce(vcat, dirs, init=[]) do dir 
+		filter(Pluto.is_pluto_notebook, readdir(joinpath(root, dir), join=true));
+	end
+end
 
 # ╔═╡ 88917bd4-3d7b-49da-a12c-d8d16dac84e5
-html_files = broadcast(splitext.(basename.(notebook_files))) do f
-    "https://pawbz.github.io/GeoPhyInv.jl/" * "notebooks/" * first(f) * ".html"
+html_files = broadcast(notebook_files) do f
+	dir = basename(dirname(f))
+	filebase = first(splitext(basename(f)))
+    "https://pawbz.github.io/GeoPhyInv.jl/" * dir * "/" * filebase * ".html"
 end;
 
 # ╔═╡ 5a1b5b3d-bce0-41d7-b27c-18cf8f15b8c5
@@ -586,7 +592,7 @@ version = "17.4.0+0"
 # ╟─4425553d-21be-4d95-8430-1a8f7fd145bf
 # ╟─1d12369e-3189-49df-9a1d-51be074af61f
 # ╟─8abc866c-7311-4e3c-804a-106b190e4cdc
-# ╠═460ad45c-23d8-4035-ac55-34691e135c0a
+# ╠═40f93407-05a3-4672-b314-f911a26c2072
 # ╠═88917bd4-3d7b-49da-a12c-d8d16dac84e5
 # ╠═5a1b5b3d-bce0-41d7-b27c-18cf8f15b8c5
 # ╠═09fe08a8-610b-11ed-1f9b-2526511c166a

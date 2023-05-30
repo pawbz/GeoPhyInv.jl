@@ -27,8 +27,8 @@ This function updates spray and interpolation matrices. Call it whenever there i
 their fields.
 """
 function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac)
-    update!(pass, ipw, iss, ageomss, pac, Srcs())
-    update!(pass, ipw, iss, ageomss, pac, Recs())
+    update!(pass, ipw, iss, ageomss, pac, Srcs(0))
+    update!(pass, ipw, iss, ageomss, pac, Recs(0))
 end
 function update!(pass::P_x_worker_x_pw_x_ss, ipw, iss, ageomss::AGeomss, pac, ::Srcs)
     @assert ageomss.ns == pac.ageom[ipw][iss].ns
@@ -56,12 +56,12 @@ end
 
 # if just one propagating field
 update!(pa::PFdtd, ageom::AGeom) = update!(pa, [ageom])
-update!(pa::PFdtd, ageom::AGeom, ::Srcs) = update!(pa, [ageom], Srcs())
-update!(pa::PFdtd, ageom::AGeom, ::Recs) = update!(pa, [ageom], Recs())
+update!(pa::PFdtd, ageom::AGeom, ::Srcs) = update!(pa, [ageom], Srcs(0))
+update!(pa::PFdtd, ageom::AGeom, ::Recs) = update!(pa, [ageom], Recs(0))
 
 function update!(pa::PFdtd, ageom::Vector{AGeom})
-    update!(pa, ageom, Srcs())
-    update!(pa, ageom, Recs())
+    update!(pa, ageom, Srcs(0))
+    update!(pa, ageom, Recs(0))
 end
 function update!(pa::PFdtd, ageom::Vector{AGeom}, ::Srcs)
     for ipw = 1:pa.c.ic[:npw]

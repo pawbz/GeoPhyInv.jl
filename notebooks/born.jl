@@ -100,7 +100,7 @@ plot(medium0, ageom)
 # ╔═╡ 120e51bc-cfd4-4a2a-bcd1-fe942ef224d7
 begin
 	wav, tgrid = ricker(medium, 2, 2)
-	srcwav = SrcWav(tgrid, ageom, [:p]); 
+	srcwav = Srcs(tgrid, ageom, [:p]); 
 	update!(srcwav, [:p], wav)
 end
 

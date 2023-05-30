@@ -16,7 +16,7 @@ using Test
 #md # ```@docs
 #md # update!(::GeoPhyInv.PFdtd)
 #md # update!(::GeoPhyInv.PFdtd, ::Medium)
-#md # update!(::GeoPhyInv.PFdtd, ::SrcWav, ::Any)
+#md # update!(::GeoPhyInv.PFdtd, ::Srcs, ::Any)
 #md # ```
 #
 #

@@ -63,18 +63,5 @@ struct AcousticBorn <: Acoustic end
 """
 struct ElasticBorn <: Elastic end
 
-# define supersource, source and receiver structs
-struct Srcs
-    n::Int
-end
-Srcs() = Srcs(0)
-struct SSrcs
-    n::Int
-end
-SSrcs() = SSrcs(0)
-struct Recs
-    n::Int
-end
-Recs() = Recs(0)
 
 

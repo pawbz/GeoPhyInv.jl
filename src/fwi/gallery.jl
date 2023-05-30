@@ -16,7 +16,7 @@
 
 
 # 		wav, tgrid=ricker(model, 3, 1.0)
-# 		srcwav = SrcWav(tgrid, ageom, [:p])
+# 		srcwav = Srcs(tgrid, ageom, [:p])
 # 		update!(srcwav, [:p], wav)
 
 # 		igrid=broadcast(x->range(x[1],stop=x[end],step=50.),model.grid)
@@ -39,7 +39,7 @@
 # 		update!(ageom, Recs(),[-100,0],[-50,0])
 
 # 		wav, tgrid=ricker(model, 8, 0.8)
-# 		srcwav = SrcWav(tgrid, ageom, [:p])
+# 		srcwav = Srcs(tgrid, ageom, [:p])
 # 		update!(srcwav, [:p], wav)
 
 # 		igrid=[range(-40.,stop=30.,length=100), range(-30.,length=1,step=60.)]

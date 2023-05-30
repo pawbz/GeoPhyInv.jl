@@ -41,8 +41,8 @@ sources and receivers in `mgrid`.
 function Vector{AGeomss}(
     mgrid::Vector{T},
     ss::SSrcs,
-    s::Vector{Srcs},
-    r::Vector{Recs},
+    s::Vector{S} where {S<:Srcs},
+    r::Vector{R} where {R<:Recs},
 ) where {T<:StepRangeLen}
     return [AGeomss(mgrid, s[i], r[i]) for i = 1:ss.n]
 end
@@ -261,7 +261,7 @@ function update!(ageom::AGeom, ::SSrcs, args...)
     p = spread(length(ageom), args...)
     pz = collect(zip(p...))
     for iss = 1:length(ageom)
-        update!(ageom[iss], Srcs(), collect(pz[iss]), collect(pz[iss]))
+        update!(ageom[iss], Srcs(1), collect(pz[iss]), collect(pz[iss]))
     end
     return ageom
 end
@@ -275,7 +275,7 @@ Update receiver positions for all supersources.
 """
 function update!(ageom::AGeom, ::Recs, args...)
     for iss = 1:length(ageom)
-        update!(ageom[iss], Recs(), args...)
+        update!(ageom[iss], Recs(0), args...)
     end
     return ageom
 end

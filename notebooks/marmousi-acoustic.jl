@@ -44,7 +44,7 @@ plot(marm, ageom, fields=[:vp, :rho])
 wav, tgrid = ricker(marm, 10, 2)
 
 # ╔═╡ 2095e9a7-a6bc-4399-989b-4c57b3de7afd
-srcwav = SrcWav(tgrid, ageom, [:p])
+srcwav = Srcs(tgrid, ageom, [:p])
 
 # ╔═╡ ee9aa323-80f0-4bf3-b82d-df572cf58174
 update!(srcwav, [:p], wav)

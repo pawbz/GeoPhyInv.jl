@@ -154,7 +154,7 @@ function update!(pa::PFdtd, srcwav::Vector{SrcWav}, src_types=fill(1, length(src
         end
 
         # after srcwav is updated, sfields might have changed, so need to update spray and interpolation matrices as well
-        update!(pa, pa.c.ageom, Srcs())
+        update!(pa, pa.c.ageom, Srcs(0))
 
         freqpeak = Statistics.mean(freqpeaks)
         # store frequency (in Hz) bounds for first propagating wavefield

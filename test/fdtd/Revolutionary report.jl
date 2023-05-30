@@ -53,7 +53,7 @@ println(ageom)
 
 	tgrid = range(0.0, stop = 2.0, length = 2500); # generate a time grid
 wav = ricker(15.0, tgrid, tpeak = 0.25); # ricker wavelet
-srcwav = SrcWav(tgrid, ageom, [:p]);
+srcwav = Srcs(tgrid, ageom, [:p]);
 update!(srcwav, [:p], wav);
 	
 	tsnaps=tgrid[1:div(length(tgrid),20):end] 

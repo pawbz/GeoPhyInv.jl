@@ -1,13 +1,8 @@
-
-function Array{NamedD{Srcs},1}(grid::StepRangeLen, ageom::AGeom, fields::Vector{Symbol}) 
-	return [NamedD(grid,Srcs(ageom[i].ns),fields) for i in 1:length(ageom)]
-end
-
-
+SrcWav = Vector{Srcs{Data.Number}}
 """
 A mutable type that bundles multi-component source wavelets. 
 ```julia
-srcwav=SrcWav(tgrid, ageom, [:p, :vx])
+srcwav=Srcs(tgrid, ageom, [:p, :vx])
 
 ```
 Here, we initialized wavelets, for `:p` and `:vx` fields, in time domain for sources and supersources in `ageom`.
@@ -19,35 +14,42 @@ Here, we initialized wavelets, for `:p` and `:vx` fields, in time domain for sou
 * `srcwav.grid` : returns `tgrid` 
 As mutable objects in Julia are like containers that might hold different values over time, `srcwav` can be modified.
 """
-SrcWav=Array{NamedD{Srcs},1}
+function Srcs(grid::StepRangeLen, ageom::AGeom, fields::Vector{Symbol}) 
+	return [Srcs(ageom[i].ns, grid, fields) for i in 1:length(ageom)]
+end
 
-function issimilar(ageom::AGeom, srcwav::SrcWav)
+function Srcs(grid::StepRangeLen, ageomss::AGeomss, fields::Vector{Symbol}) 
+	return Srcs(ageomss.ns, grid, fields)
+end
+
+
+function issimilar(ageom::AGeom, srcwav::Vector{<:Srcs})
 	test=[]
 	push!(test, length(ageom)==length(srcwav))
 	nss=length(ageom)
 	push!(test, [ageom[i].ns for i in 1:nss]==[srcwav[i][:n] for i in 1:nss])
 	return all(test)
 end
-issimilar(srcwav::SrcWav, ageom::AGeom)=issimilar(ageom, srcwav)
+issimilar(srcwav::Vector{<:Srcs}, ageom::AGeom)=issimilar(ageom, srcwav)
 
 
 
 #=
 
 #"""
-#Allocate `SrcWav` with zeros depending on the acquisition ageometry.
+#Allocate `Srcs` with zeros depending on the acquisition ageometry.
 #"""
-#function SrcWav_zeros(ageom::AGeom,  fields::Vector{Symbol}, tgrid::StepRangeLen)
+#function Srcs_zeros(ageom::AGeom,  fields::Vector{Symbol}, tgrid::StepRangeLen)
 #	wavsrc = [zeros(length(tgrid),ageom.ns[iss]) for iss=1:ageom.nss, ifield=1:length(fields)] 
-#	return SrcWav(ageom.nss, ageom.ns, fields, wavsrc, deepcopy(tgrid))
+#	return Srcs(ageom.nss, ageom.ns, fields, wavsrc, deepcopy(tgrid))
 #end
 
 
 
 """
-Return minimum, maximum and peak frequencies of `SrcWav`
+Return minimum, maximum and peak frequencies of `Srcs`
 """
-#function freqs(src::SrcWav)
+#function freqs(src::Srcs)
 #	freqmin = minimum([Utils.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:min) for i in 1:src.nss, j in 1:length(src.fields)])
 #	freqmax = maximum([Utils.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:max) for i in 1:src.nss, j in 1:length(src.fields)])
 #	freqpeak = mean([Utils.findfreq(src.wav[i,j][:,:],src.tgrid,attrib=:peak) for i in 1:src.nss, j in 1:length(src.fields)])
@@ -56,7 +58,7 @@ Return minimum, maximum and peak frequencies of `SrcWav`
 
 
 """
-Constructor for `SrcWav` data type.
+Constructor for `Srcs` data type.
 Uses same source wavelet, i.e., `wav` for all sources and supersources
 
 # Arguments
@@ -73,7 +75,7 @@ Uses same source wavelet, i.e., `wav` for all sources and supersources
 
 #=
 """
-Constructor of `SrcWav`, which is typical for a input model such that 
+Constructor of `Srcs`, which is typical for a input model such that 
 the model has `nλ` wavelengths.
 
 # Arguments
@@ -89,7 +91,7 @@ the model has `nλ` wavelengths.
 * `wav_func::Function=(fqdom, tgrid)->Utils.Wavelets.ricker(fqdom,tgrid)` : which wavelet to generate, see Utils.Wavelets.jl
 * `tmaxfrac::Float64=1.0` : by default the maximum modelling time is computed using the average velocity and the diagonal distance of the model, use this fraction to increase of reduce the maximum time
 """
-function update!(s::Recordst, 
+function update!(s::Recst, 
 		fields::Vector{Symbol},
 		mod::Medium, 
 		nλ::Int64,
@@ -124,7 +126,7 @@ function update!(s::Recordst,
 
 
 	wavsrc = [hcat([wav_func(fqdom, tgrid) for is in 1:ns]...) for iss=1:nss, ifield=1:length(fields)] 
-	src=SrcWav(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
+	src=Srcs(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
 	print(src)
 	# choose ricker waveletes of fdom
 	return src
@@ -136,7 +138,7 @@ end
 """
 Generate band-limited random source signals 
 """
-function SrcWav_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol}; 
+function Srcs_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol}; 
 			  distvec=[Normal() for iss in 1:nss],
 			  sparsepvec=[1. for iss in 1:nss],
 			  fmin::Float64=0.0, 
@@ -148,27 +150,27 @@ function SrcWav_fixed_random(nss::Int64, ns::Int64, fields::Vector{Symbol};
 		wavsrc[iss, ifield][:,is] = Utils.get_tapered_random_tmax_signal(tgrid, fmin=fmin, fmax=fmax, tmaxfrac=tmaxfrac, dist=distvec[iss], 
 								 sparsep=sparsepvec[iss])
 	end
-	src=SrcWav(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
+	src=Srcs(nss, fill(ns, nss), fields, wavsrc, deepcopy(tgrid))
 	print(src)
 	return src
 end
 
 
 """
-Function that returns SrcWav after time reversal
+Function that returns Srcs after time reversal
 """
-function SrcWav_tr(src::SrcWav)
-	return SrcWav(src.nss,src.ns,src.fields,
+function Srcs_tr(src::Srcs)
+	return Srcs(src.nss,src.ns,src.fields,
 	    [reverse(src.wav[i,j],dims=1) for i in 1:src.nss, j in 1:length(src.fields)],deepcopy(src.tgrid))
 end
 
 
 
 """
-Pad `SrcWav` 
-tgrids should be same in all SrcWav
+Pad `Srcs` 
+tgrids should be same in all Srcs
 """
-function SrcWav_uspos(src::Vector{SrcWav}, acq::Vector{AGeom})
+function Srcs_uspos(src::Vector{S} where {S<:Srcs}, acq::Vector{AGeom})
 	np = length(src) == length(acq) ? length(src) : error("unequal sizez")
 
 	# unique source positions
@@ -186,7 +188,7 @@ function SrcWav_uspos(src::Vector{SrcWav}, acq::Vector{AGeom})
 		end
 	end
 	# output src
-	return [SrcWav(src[ip].nss,fill(nus, src[ip].nss),
+	return [Srcs(src[ip].nss,fill(nus, src[ip].nss),
 	     src[ip].fields,wavout[ip],src[ip].tgrid) for ip=1:np]
 end
 
@@ -197,7 +199,7 @@ end
 return a vector of the order 
 
 """
-function SrcWav_getvec(src::Vector{SrcWav}, field::Symbol)
+function Srcs_getvec(src::Vector{S} where {S<:Srcs}, field::Symbol)
 	np = length(src);
 	vect = [getfield(src[ip],field) for ip=1:np]
 	return vec(hcat(hcat(vect...)...))

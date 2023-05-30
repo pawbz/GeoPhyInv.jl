@@ -20,6 +20,6 @@ Base.getindex(::GeoPhyInv.PFdtd, ::Symbol, ::Int)
 ```@docs
 update!(::GeoPhyInv.PFdtd)
 update!(::GeoPhyInv.PFdtd, ::Medium)
-update!(::GeoPhyInv.PFdtd, ::SrcWav, ::Any)
+update!(::GeoPhyInv.PFdtd, ::Srcs, ::Any)
 ```
 

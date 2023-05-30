@@ -18,7 +18,7 @@ update!(medium0, [:vp,:rho], randn_perc=1)
 
 ageom=AGeom(medium.grid, :surf)
 wav, tgrid=ricker(medium, 3, 1.0)
-srcwav=SrcWav(tgrid,ageom,[:p])
+srcwav=Srcs(tgrid,ageom,[:p])
 update!(srcwav,[:p], wav)
 
 parameterization=[:χvp, :χrho, :null]

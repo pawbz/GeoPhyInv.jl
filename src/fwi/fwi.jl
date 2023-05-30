@@ -1,4 +1,3 @@
-
 """
 ```julia
 pa=SeisInvExpt(paf, dobs, migrid, mparams; loss)
@@ -19,8 +18,9 @@ function SeisInvExpt(paf::PFdtd, dobs::Records, migrid::Vector{<:AbstractRange}=
     # P will be repeated based on the number of medium parameters, e.g., KI and rho
     mfull=get_modelvector(paf, mparams)
 
-    paconv = Conv.P(Data.Number)
-    return (; paf, dobs, P, migrid, mparams, loss, mfull, gmfull=similar(mfull)), (; paconv, dobs, dobs0=deepcopy(dobs))
+    dobs0 = deepcopy(dobs)
+    paconv = [Conv.Pconv(Data.Number, dsize=size(d), ssize=(length(d.grid), ), gsize=size(d)) for d in dobs0]
+    return (; paf, dobs, dobs0, P, migrid, mparams, loss, mfull, gmfull=similar(mfull)), paconv
 end
 
 # same as above, but make migrid using the number of cells Nigrid
@@ -30,4 +30,35 @@ function SeisInvExpt(paf::PFdtd, dobs::Records, Nigrid::Vector{Int}, mparams=Med
         range(first(m)+4*step(m), stop=last(m)-4*step(m), length=N)
     end
     return SeisInvExpt(paf, dobs, migrid, mparams, loss=loss)
+end
+
+
+# core algorithm using IterativeSolvers.jl to update the source wavelets so that dobs is modified
+function update!(paw::T1, pac::T2) where {T1<:NamedTuple{<:Any,<:Tuple{<:PFdtd,<:Records,Vararg}}, T2<:Vector{<:Conv.Pconv}}
+
+    # need to generate data first, paw.paf.c.data, will be used later
+    m = get_modelvector(paw)
+    loss_initial = lossvalue(m, paw)
+
+    # broadcast over supersources
+    broadcast(pac, paw.dobs0, paw.dobs, paw.paf.c.data[1]) do paconv, dobs0, dobs, dcal
+        # the G is same as observed data (g=dobs0)
+        copyto!(paconv.g, dobs0)
+        # can we avoid these allocations?
+        dvec = vec(dcal)
+        w = zero(paconv.s)
+        # matrix-free operator
+        A=Conv.operator(paconv, Conv.G());
+        IterativeSolvers.lsmr!(w, A, dvec)
+        copyto!(paconv.s, w)
+        # do conv with estimated w
+        Conv.mod!(paconv, Conv.D())
+        # update dobs in paw
+        copyto!(dobs, paconv.d)
+    end
+
+    # estimate loss again with new dobs
+    loss_final = lossvalue(m, paw)
+
+    return (; loss_initial, loss_final)
 end

@@ -13,10 +13,10 @@ println(medium)
 ageom = AGeom(medium.grid, :xwell, SSrcs(2)); # load a simple acquisition using `mgrid` of the medium
 println(ageom)
 
-# ### SrcWav
+# ### Srcs
 tgrid = range(0.0, stop = 2.0, length = 2500); # generate a time grid
 wav = ricker(15.0, tgrid, tpeak = 0.25); # ricker wavelet
-srcwav = SrcWav(tgrid, ageom, [:p]);
+srcwav = Srcs(tgrid, ageom, [:p]);
 update!(srcwav, [:p], wav);
 
 # ### Plotting the `vp` model
@@ -93,7 +93,7 @@ println(medium)
 ageom = AGeom(medium.grid, :xwell, SSrcs(2)); # load a simple acquisition using `mgrid` of the medium
 println(ageom)
 # Add source term on `:vz` grid
-srcwav = SrcWav(tgrid, ageom, [:vz]);
+srcwav = Srcs(tgrid, ageom, [:vz]);
 update!(srcwav, [:vz], wav);
 # Perform modelling 
 pa = SeisForwExpt(

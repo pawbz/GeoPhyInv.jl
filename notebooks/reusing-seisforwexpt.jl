@@ -65,8 +65,8 @@ wav = ricker(15.0, tgrid, tpeak=0.25);
 
 # ╔═╡ 8e94a56e-d483-419c-adb5-7b1889677929
 begin
-    # allocate an instance of `SrcWav` on `:vz` field
-    srcwav = SrcWav(tgrid, ageom, [:vz])
+    # allocate an instance of `Srcs` on `:vz` field
+    srcwav = Srcs(tgrid, ageom, [:vz])
     # use the Ricker wavelet for all supersources
     update!(srcwav, [:vz], wav)
 end
