@@ -203,9 +203,6 @@ include("plots.jl")
 
 # ============= Precompile =================================
 @setup_workload begin
-    @show CUDA.functional()
-    @show _fd_use_gpu
-    @show Data.Array(randn(2,2))
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the
     # precompile file and potentially make loading faster.
     pa_test = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 1), RandScatterer())

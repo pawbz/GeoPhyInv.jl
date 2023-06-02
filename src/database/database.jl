@@ -1,6 +1,10 @@
 ### A Pluto.jl notebook ###
 # v0.19.21
 
+#> [frontmatter]
+#> title = "Data"
+#> description = "Structs that are used to bundle seismic data"
+
 using Markdown
 using InteractiveUtils
 

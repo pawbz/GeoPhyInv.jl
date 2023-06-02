@@ -4,14 +4,19 @@
 using Markdown
 using InteractiveUtils
 
+# ╔═╡ a9dd629b-e19e-464f-a9e6-a9675f9ee4ea
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using IterativeSolvers, PlutoTest, PlutoUI
+  ╠═╡ =#
+
 # ╔═╡ f01b439a-5641-488c-b175-a37da23dd94c
 module Conv
 using FFTW
 using DSP
 using LinearAlgebra
 using LinearMaps
-using IterativeSolvers
-using PlutoTest
+
 
 using DSP: nextfastfft
 struct D end
@@ -20,7 +25,7 @@ struct S end
 
 """
 Model : d = convolution(g, s)
-d, g and s can have arbitary +ve and -ve lags
+d, g and s can have arbitrary +ve and -ve lags
 """
 mutable struct Pconv{T<:Real,Nd,Ng,Ns}
     dsize::NTuple{Nd,Int}
@@ -61,7 +66,7 @@ function Pconv(T=Float64;
     slags=nothing,
     dlags=nothing,
     glags=nothing,
-    np2=nextfastfft(ssize[1] + gsize[1] - 1), # fft dimension for plan, such that circular convolution is same as linear convolution
+    np2=nextfastfft(ssize[1] + gsize[1] - 1), # zero-padded fft dimension for the plan, such that circular convolution approximates linear convolution
     fftwflag=FFTW.ESTIMATE
 )
     @assert size(s) == ssize
@@ -478,6 +483,14 @@ end
 
 end # module
 
+# ╔═╡ 16250068-0132-45c6-9de8-971afcb7bf78
+md"# Documentation"
+
+# ╔═╡ c6d68e26-e95d-41d8-b860-6bc4d9c1514e
+#=╠═╡
+TableOfContents()
+  ╠═╡ =#
+
 # ╔═╡ 6c5788a6-a4e7-4edb-be5f-4203d9fe7a36
 md"""
 ```math
@@ -489,10 +502,10 @@ D = Conv(G, S)
 s0=zeros(3); s0[3]=1.0;
 
 # ╔═╡ 583445f3-4704-4465-ba48-fc1e78d370e4
-pa=Conv.Pconv(dsize=(10, 2), gsize=(10,2), ssize=(3,), s=randn(3), g=randn(10,2), d=randn(10,2))
-
-# ╔═╡ d6883a4a-db29-476e-900a-a5750cc52098
-Conv.mod!(pa, Conv.D())
+begin
+	pa=Conv.Pconv(dsize=(10, 2), gsize=(10,2), ssize=(3,), s=randn(3), g=randn(10,2), d=randn(10,2));
+	Conv.mod!(pa, Conv.D())
+end
 
 # ╔═╡ d9020093-5f33-4671-aff3-498f39733011
 A=Conv.operator(pa, Conv.G())
@@ -504,10 +517,14 @@ strue = randn(3)
 dtrue = A*strue
 
 # ╔═╡ 4b9df61f-d5ff-41b9-a623-d7220bcdb513
-w=zero(strue); IterativeSolvers.lsmr!(w, A, vec(dtrue), verbose=true)
+#=╠═╡
+w=zero(strue); IterativeSolvers.lsmr!(w, A, vec(dtrue))
+  ╠═╡ =#
 
 # ╔═╡ 4fa17014-2cd7-4ed2-8424-67bf42e971ca
+#=╠═╡
 w, strue
+  ╠═╡ =#
 
 # ╔═╡ 9bf0c426-93fa-4634-8e23-cb21d48a3d92
 # adj_test(A)
@@ -527,7 +544,12 @@ gtest=randn(10,2)
 # ╔═╡ b78e3c5d-23ce-4bb7-bef1-ea41cd831526
 Conv.operator(pa, Conv.G())
 
+# ╔═╡ c190136a-4993-402c-8ba7-8e03e658b6c9
+md"## Appendix"
+
 # ╔═╡ a9a53efa-86d9-4fd4-adc7-672889b58e26
+# ╠═╡ skip_as_script = true
+#=╠═╡
 function adj_test(F)
     x = randn(size(F, 2))
     y = randn(size(F, 1))
@@ -540,7 +562,7 @@ function adj_test(F)
     @test c > 0.0
     return nothing
 end
-
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -551,6 +573,7 @@ IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
+PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 
 [compat]
 DSP = "~0.7.8"
@@ -558,6 +581,7 @@ FFTW = "~1.6.0"
 IterativeSolvers = "~0.9.2"
 LinearMaps = "~3.10.0"
 PlutoTest = "~0.2.2"
+PlutoUI = "~0.7.51"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -566,7 +590,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.0"
 manifest_format = "2.0"
-project_hash = "0dd2035418e90599c8947a44f208b5a46e8167fb"
+project_hash = "42fd3d3f59a7c020ea869ea4d7be1f94f869fa57"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -577,6 +601,12 @@ weakdeps = ["ChainRulesCore"]
 
     [deps.AbstractFFTs.extensions]
     AbstractFFTsChainRulesCoreExt = "ChainRulesCore"
+
+[[deps.AbstractPlutoDingetjes]]
+deps = ["Pkg"]
+git-tree-sha1 = "8eaf9f1b4921132a4cff3f36a1d9ba923b14a481"
+uuid = "6e696c72-6542-2067-7265-42206c756150"
+version = "1.1.4"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -593,6 +623,12 @@ deps = ["Compat", "LinearAlgebra", "SparseArrays"]
 git-tree-sha1 = "e30f2f4e20f7f186dc36529910beaedc60cfa644"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 version = "1.16.0"
+
+[[deps.ColorTypes]]
+deps = ["FixedPointNumbers", "Random"]
+git-tree-sha1 = "eb7f0f8307f71fac7c606984ea5fb2817275d6e4"
+uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
+version = "0.11.4"
 
 [[deps.Compat]]
 deps = ["UUIDs"]
@@ -645,11 +681,29 @@ version = "3.3.10+0"
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
+[[deps.FixedPointNumbers]]
+deps = ["Statistics"]
+git-tree-sha1 = "335bfdceacc84c5cdf16aadc768aa5ddfc5383cc"
+uuid = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
+version = "0.8.4"
+
+[[deps.Hyperscript]]
+deps = ["Test"]
+git-tree-sha1 = "8d511d5b81240fc8e6802386302675bdf47737b9"
+uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
+version = "0.0.4"
+
 [[deps.HypertextLiteral]]
 deps = ["Tricks"]
 git-tree-sha1 = "c47c5fa4c5308f27ccaac35504858d8914e102f9"
 uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
 version = "0.9.4"
+
+[[deps.IOCapture]]
+deps = ["Logging", "Random"]
+git-tree-sha1 = "d75853a0bdbfb1ac815478bacd89cd27b550ace6"
+uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
+version = "0.2.3"
 
 [[deps.IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -682,6 +736,12 @@ deps = ["Preferences"]
 git-tree-sha1 = "abc9885a7ca2052a736a600f7fa66209f96506e1"
 uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
 version = "1.4.1"
+
+[[deps.JSON]]
+deps = ["Dates", "Mmap", "Parsers", "Unicode"]
+git-tree-sha1 = "31e996f0a15c7b280ba9f76636b3ff9e2ae58c9a"
+uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+version = "0.21.4"
 
 [[deps.LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
@@ -738,6 +798,11 @@ version = "0.3.23"
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
+[[deps.MIMEs]]
+git-tree-sha1 = "65f28ad4b594aebe22157d6fac869786a255b7eb"
+uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
+version = "0.1.4"
+
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
 git-tree-sha1 = "2ce8695e1e699b68702c03402672a69f54b8aca9"
@@ -752,6 +817,9 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.2+0"
+
+[[deps.Mmap]]
+uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
@@ -777,6 +845,12 @@ git-tree-sha1 = "13652491f6856acfd2db29360e1bbcd4565d04f1"
 uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
 version = "0.5.5+0"
 
+[[deps.Parsers]]
+deps = ["Dates", "PrecompileTools", "UUIDs"]
+git-tree-sha1 = "a5aef8d4a6e8d81f171b2bd4be5265b01384c74c"
+uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
+version = "2.5.10"
+
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
@@ -787,6 +861,12 @@ deps = ["HypertextLiteral", "InteractiveUtils", "Markdown", "Test"]
 git-tree-sha1 = "17aa9b81106e661cffa1c4c36c17ee1c50a86eda"
 uuid = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 version = "0.2.2"
+
+[[deps.PlutoUI]]
+deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
+git-tree-sha1 = "b478a748be27bd2f2c73a7690da219d0844db305"
+uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+version = "0.7.51"
 
 [[deps.Polynomials]]
 deps = ["LinearAlgebra", "RecipesBase"]
@@ -892,6 +972,11 @@ git-tree-sha1 = "aadb748be58b492045b4f56166b5188aa63ce549"
 uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
 version = "0.1.7"
 
+[[deps.URIs]]
+git-tree-sha1 = "074f993b0ca030848b897beff716d93aca60f06a"
+uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
+version = "1.4.2"
+
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
@@ -921,10 +1006,13 @@ version = "17.4.0+0"
 """
 
 # ╔═╡ Cell order:
+# ╠═a9dd629b-e19e-464f-a9e6-a9675f9ee4ea
+# ╠═f01b439a-5641-488c-b175-a37da23dd94c
+# ╟─16250068-0132-45c6-9de8-971afcb7bf78
+# ╠═c6d68e26-e95d-41d8-b860-6bc4d9c1514e
 # ╟─6c5788a6-a4e7-4edb-be5f-4203d9fe7a36
 # ╠═682f12c9-3753-4398-9135-ad62ea0995c0
 # ╠═583445f3-4704-4465-ba48-fc1e78d370e4
-# ╠═d6883a4a-db29-476e-900a-a5750cc52098
 # ╠═d9020093-5f33-4671-aff3-498f39733011
 # ╠═5d76cc87-5134-4a60-9f7b-55481e0a2442
 # ╠═06ffb8ad-a456-4140-877f-778299d8455c
@@ -936,7 +1024,7 @@ version = "17.4.0+0"
 # ╠═64bb10c8-c021-4167-bbc4-09f236fc8e0a
 # ╠═9f3c1ea0-e590-42ef-bbc8-db4d13f6f5cf
 # ╠═b78e3c5d-23ce-4bb7-bef1-ea41cd831526
-# ╠═f01b439a-5641-488c-b175-a37da23dd94c
+# ╟─c190136a-4993-402c-8ba7-8e03e658b6c9
 # ╠═a9a53efa-86d9-4fd4-adc7-672889b58e26
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
