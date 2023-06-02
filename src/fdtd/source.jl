@@ -68,7 +68,7 @@ end
             if (src_flags[ipw]) # add only if src_flags is non-zero
                 pw = pap[ipw].w1[:t][sfield]
                 pv = pap[ipw].velocity_buffer[sfield] # pick velocity buffer
-                pv_vec = view(pv, :) 
+                pv_vec = view(pv, :)
                 w = pap[ipw].ss[issp].wavelets[it][sfield]
                 ssprayw = pap[ipw].ss[issp].ssprayw[sfield]
                 mul!(pv_vec, ssprayw, w)
@@ -84,7 +84,7 @@ end
             if (src_flags[ipw]) # add only if src_flags is non-zero
                 pw = pap[ipw].w1[:t][sfield]
                 pv = pap[ipw].velocity_buffer[sfield] # pick velocity buffer
-                pv_vec = view(pv, :) 
+                pv_vec = view(pv, :)
                 w = pap[ipw].ss[issp].wavelets[it][sfield]
                 adj_ssprayw = pap[1].ss[issp].rinterpolatew[sfield]
                 mul!(pv_vec, adj_ssprayw, w)

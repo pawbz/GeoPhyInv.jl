@@ -117,11 +117,11 @@ notebook_files = mapreduce(vcat, walkdir(@__DIR__)) do (root, dirs, files)
 	mapreduce(vcat, dirs, init=[]) do dir 
 		filter(Pluto.is_pluto_notebook, readdir(joinpath(root, dir), join=true));
 	end
-end
+end;
 
 # ╔═╡ 88917bd4-3d7b-49da-a12c-d8d16dac84e5
 html_files = broadcast(notebook_files) do f
-	dir = basename(dirname(f))
+	dir = last(split(dirname(f), basename(@__DIR__)))
 	filebase = first(splitext(basename(f)))
     "https://pawbz.github.io/GeoPhyInv.jl/" * dir * "/" * filebase * ".html"
 end;

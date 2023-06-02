@@ -1,6 +1,10 @@
 ### A Pluto.jl notebook ###
 # v0.19.21
 
+#> [frontmatter]
+#> title = "Marmousi"
+#> description = "SeisForwExpt for Marmousi"
+
 using Markdown
 using InteractiveUtils
 
