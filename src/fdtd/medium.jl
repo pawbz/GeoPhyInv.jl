@@ -1,23 +1,45 @@
 # returns non-dimensionalized model vector corresponding to pa.c.mod
+# NOTE: the model vector corresponds to medium, not exmedium
 function get_modelvector(pa::PFdtd, mparams)
-    m = Data.Array(zeros(length(first(pa.c.mod)) * length(mparams)))
+    m = Data.Array(zeros(mapreduce(length, *, pa.c.medium.grid) *  length(mparams)))
     update!(m, pa, mparams)
     return m
 end
 
+
+
+# return a view of medium parameter array `m` after clipping edges according to (:xmin, :xmax, :ymin, :ymax, :zmin, :zmax)
+# m is assumed to be edge padded by npml
+function view_inner(m, npml, edges)
+    n = size(m)
+	N = length(n)
+    istart = [
+        any(edges .== Symbol(string(dim), "min")) ? npml + 1 : 1 for
+        dim in dim_names(N)
+    ]
+	iend = [
+        any(edges .== Symbol(string(dim), "max")) ? n[i] - npml : n[i] for
+        (i, dim) in enumerate(dim_names(N))
+    ]
+    vw = [istart[i]:iend[i] for i = 1:N]
+	return view(m, vw...)
+end
+
 # updated pa.c.mod using a (non-dimensional) medium vector
-# NOTE: this makes pa.c.exmedium inconsistent with pa.c.mod, which is used in propagate functions
+# NOTE: this makes pa.c.medium and pa.c.exmedium inconsistent with pa.c.mod, which is used in propagate functions
+# the edges of 
 function update!(pa::PFdtd, m::AbstractVector, mparams)
+
     CUDA.allowscalar(true)
     mchunks = chunk(m, length(mparams))
     # dimensionalize
     broadcast(enumerate(mparams)) do (i, mname)
-        mod = pa.c.mod[mname]
+        mod = view_inner(pa.c.mod[mname], _fd_npextend, pa.c.pml_faces)
         x = mchunks[i]
         copyto!(mod, x)
     end
     broadcast(mparams) do mname
-        mod = pa.c.mod[mname]
+        mod = view_inner(pa.c.mod[mname], _fd_npextend, pa.c.pml_faces)
         r = pa.c.ref_mod[mname]
         @. mod = exp(mod) * r
         # @. mod = mod * r + r
@@ -38,7 +60,12 @@ function update!(m::AbstractVector, pa::PFdtd, mparams)
         @. mod = log(mod * inv(r))
         # @. mod = (mod - r) * inv(r)
     end
-    copyto!(m, Iterators.flatten(pa.c.mod[mparams]))
+    mchunks = chunk(m, length(mparams))
+    broadcast(enumerate(mparams)) do (i, mname)
+        x = mchunks[i]
+        mod = view_inner(pa.c.mod[mname], _fd_npextend, pa.c.pml_faces)
+        copyto!(x, mod)
+    end
     broadcast(mparams) do mname
         mod = pa.c.mod[mname]
         r = pa.c.ref_mod[mname]

@@ -55,7 +55,7 @@ end
 # @time update!(m1, pa_mod, [:invK])
 
 # ╔═╡ f49439df-3db3-48ae-bf9d-1387e3c14c8f
-N = 2
+N = 200
 
 # ╔═╡ 6d47ae1d-2554-4d42-af6c-02ce952bf14e
 @bind mpara Select([:invK, :rho])
@@ -95,8 +95,7 @@ begin
 end
 
 # ╔═╡ 26c9f7a1-f18b-4fe3-a607-ad1f6a904bb8
-# pa_inv, pa_src = SeisInvExpt(pa_mod, dobs, [range(-100,100,length=N), range(-100,100,length=N)], [mpara])
-pa_inv, pa_src = SeisInvExpt(pa_mod, dobs, [N, N], [mpara])
+pa_inv, pa_src = SeisInvExpt(pa_mod, dobs, [range(-100,100,length=N), range(-100,100,length=N)], [mpara])
 
 # ╔═╡ 0e5eb59a-aad6-4c84-a0e4-c8558964719f
 update!(pa_inv, pa_src)
@@ -158,23 +157,8 @@ m = GeoPhyInv.get_modelvector(pa_inv)
 # ╔═╡ 6c037136-4822-438f-85ba-9d61c724f0d9
 GeoPhyInv.lossvalue(m, loss, dobs, pa_mod, [mpara])
 
-# ╔═╡ dde7e946-ae1d-472d-b35d-033a081c99a0
-heatmap(Array(reshape(m, 200,200)))
-
 # ╔═╡ b57d5882-660b-4b71-b31e-8d461d70d14f
-extrema(m)
-
-# ╔═╡ 6a2c45f1-76a9-4ea9-bfcb-c14bb794ae20
-isnan.(pa_mod.c.data[1][1].d[1])
-
-# ╔═╡ caa96fb8-a2ee-48a6-bd04-4bbe71e8ea73
-GeoPhyInv.gradient!(pa_mod.c.srcwav[2], L2DistLoss(), pa_inv.dobs, pa_mod.c.data[1])
-
-# ╔═╡ 694219d0-32ae-426b-8887-6d2493a7d5e7
-isnan.(pa_mod.c.srcwav[2][1].d[1])
-
-# ╔═╡ e1f06591-268c-494d-b91f-d67a93fdabaa
-isnan.(pa_inv.dobs[1].d[1])
+m
 
 # ╔═╡ 8a47e8ba-08df-40bc-ad77-539c8da17943
 begin
@@ -190,28 +174,31 @@ heatmap(Array(deepcopy(pa_mod.c.gradients[mpara])));
 heatmap(Array(pa_mod.c.mod[1]))
 
 # ╔═╡ cd4bb6a4-91e4-4ab5-b462-1d70e781032a
-Nz, Nx = length.(pa_mod.c.medium.grid)
+Nz, Nx = length.(pa_mod.c.exmedium.grid)
 
 # ╔═╡ cb409839-d520-4d47-8701-48a4ece49990
 heatmap(Array(reshape(pa_inv.P' * m, Nz, Nx)))
 
 # ╔═╡ 01552458-5de7-4627-b417-21745db2ade1
-heatmap(Array(reshape(m, 176, 176)))
+heatmap(Array(reshape(m, 200, 200)))
+
+# ╔═╡ 8ec00fb7-fe18-4741-b987-813ec97d73fe
+heatmap(Array(reshape(gm, N, N)), c=:seismic)
 
 # ╔═╡ cd5bff59-6466-43d7-bd10-795d6f55d4ef
-heatmap(Array(reshape(g, 2, 2)), c=:seismic)
+heatmap(Array(reshape(g, N, N)), c=:seismic, clim=(-1e-15, 1e-15))
 
 # ╔═╡ cb6ba7e9-0685-4e59-96ef-a8a7af640107
-pa_inv.migrid[1]
-
-# ╔═╡ ea324681-7072-491a-9db9-6bf4ed90e3a2
-pa_inv.paf.c.exmedium.grid[1]
+mul!
 
 # ╔═╡ 4bbcd3e5-62f5-408d-a4a4-eee04fb61b26
 gKI = reshape(g, N, N)
 
 # ╔═╡ 630faaff-f7f0-46d7-a36f-31a54e589c8e
 heatmap(Array(gKI), c=:seismic)
+
+# ╔═╡ c6007b1a-3819-4543-bab4-f0dc0c12e075
+gm1 = Array(reshape(gm, N, N))
 
 # ╔═╡ 839cf146-639c-4d13-9470-d25882837169
 # prod(step.(pa_true.c.medium.grid)) #
@@ -222,6 +209,9 @@ GeoPhyInv.Fields(pa_mod.c.attrib_mod, "v")
 
 # ╔═╡ b14a5a36-94c4-4a6c-8b26-730919e3e5ae
 filter(x -> x ∉ Fields(pa_mod.c.attrib_mod, "d"), Fields(pa_mod.c.attrib_mod, "v"))
+
+# ╔═╡ 60a9adc0-466d-4e54-9838-f01b0a2c50c5
+Array(gKI) ./ gm1
 
 # ╔═╡ 417388ad-8709-4d4a-9d81-d4bbb0351a92
 heatmap(Array(pa_mod.c.gradients[1]), clim=(-1e-11, 1e-11), c=:seismic)
@@ -238,16 +228,7 @@ end
 Js(GeoPhyInv.Data.Array(xs))
 
 # ╔═╡ c6626e0f-4bf1-4e29-a0c3-1e7f23805f61
-gm = grad(central_fdm(2, 1, factor=1e8), Js, xs)[1]
-
-# ╔═╡ 8ec00fb7-fe18-4741-b987-813ec97d73fe
-heatmap(Array(reshape(gm, N, N)), c=:seismic)
-
-# ╔═╡ c6007b1a-3819-4543-bab4-f0dc0c12e075
-gm1 = Array(reshape(gm, N, N))
-
-# ╔═╡ 60a9adc0-466d-4e54-9838-f01b0a2c50c5
-Array(gKI) ./ gm1
+# gm = grad(central_fdm(2, 1, factor=1e8), Js, xs)[1]
 
 # ╔═╡ 9371b452-4ad6-4d07-ae98-c86239b6c110
 gs = get_xs(g, xs)
@@ -305,12 +286,8 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═c3cc4fd8-7477-47a8-b1ce-3735a1868666
 # ╠═f059068e-e5ad-44b7-94b7-c99e1fafaff9
 # ╠═6e7d2876-4345-441d-9d29-e36fa02ca2eb
-# ╠═dde7e946-ae1d-472d-b35d-033a081c99a0
+# ╠═c895f6d7-2012-4929-85dd-f0fa1bb97866
 # ╠═b57d5882-660b-4b71-b31e-8d461d70d14f
-# ╠═6a2c45f1-76a9-4ea9-bfcb-c14bb794ae20
-# ╠═caa96fb8-a2ee-48a6-bd04-4bbe71e8ea73
-# ╠═694219d0-32ae-426b-8887-6d2493a7d5e7
-# ╠═e1f06591-268c-494d-b91f-d67a93fdabaa
 # ╠═8a47e8ba-08df-40bc-ad77-539c8da17943
 # ╠═aa0f7f1b-65ff-4a0b-9fb0-e6660911fdc8
 # ╠═02e4d288-bde3-4ef4-877f-5947ef50816a
@@ -321,7 +298,6 @@ step(pa_mod.c.srcwav[1][1].grid) ./ pa_mod.c.medium[:rho]
 # ╠═8ec00fb7-fe18-4741-b987-813ec97d73fe
 # ╠═cd5bff59-6466-43d7-bd10-795d6f55d4ef
 # ╠═cb6ba7e9-0685-4e59-96ef-a8a7af640107
-# ╠═ea324681-7072-491a-9db9-6bf4ed90e3a2
 # ╠═4bbcd3e5-62f5-408d-a4a4-eee04fb61b26
 # ╠═c6007b1a-3819-4543-bab4-f0dc0c12e075
 # ╠═839cf146-639c-4d13-9470-d25882837169

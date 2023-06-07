@@ -2,7 +2,7 @@
 
 function get_modelvector(pa::T) where {T<:NamedTuple{<:Any,<:Tuple{<:PFdtd,<:Records,Vararg}}}
 
-    mmgrid = pa.paf.c.exmedium.grid
+    mmgrid = pa.paf.c.medium.grid
 
     P = get_proj_matrix(pa.migrid, mmgrid, use_gpu=_fd_use_gpu, number=Data.Number)
 

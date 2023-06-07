@@ -29,18 +29,20 @@ function gradient!(g, m, loss, dobs::Records, pa::PFdtd, mparams=Medium(pa.c.att
 
     CUDA.allowscalar(true)
     mchunks = chunk(m, length(mparams))
+    gchunks = chunk(g, length(mparams))
     broadcast(enumerate(mparams)) do (i, mname)
         r = pa.c.ref_mod[mname]
-        gm = pa.c.gradients[mname]
+        gm = view_inner(pa.c.gradients[mname], _fd_npextend, pa.c.pml_faces)
         x = mchunks[i]
         # chainrule
         map!(gm, gm, x) do gm1, x1
             gm1 * exp(x1) * r
             # gm1 * r
         end
+        # copy pac.gradients to g
+        gi = gchunks[i]
+        copyto!(gi, gm)
     end
-    # copy pac.gradients to g
-    copyto!(g, Iterators.flatten(pa.c.gradients[mparams]))
     CUDA.allowscalar(false)
     pa.c.attrib_mod.mode = mode_save
     return lossvalue(loss, dobs, pa.c.data[1])

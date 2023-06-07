@@ -10,15 +10,15 @@ pa=SeisInvExpt(paf, dobs, migrid, mparams; loss)
 function SeisInvExpt(paf::PFdtd, dobs::Records, migrid::Vector{<:AbstractRange}=paf.c.medium.grid, mparams=Medium(paf.c.attrib); loss=L2DistLoss())
     @assert length(migrid) == length(paf.c.medium.grid)
     # modeling mesh
-    mmgrid = paf.c.exmedium.grid
+    mmgrid = paf.c.medium.grid
     P = get_proj_matrix(mmgrid, migrid, use_gpu=_fd_use_gpu, number=Data.Number)
 
-    # don't change the order of first two entries here
-    # P will be repeated based on the number of medium parameters, e.g., KI and rho
+    # P will be repeatedly used on the number of medium parameters, e.g., KI and rho
     mfull = get_modelvector(paf, mparams)
 
     dobs0 = deepcopy(dobs)
     paconv = [Conv.Pconv(Data.Number, dsize=size(d), ssize=(length(d.grid),), gsize=size(d)) for d in dobs0]
+    # don't change the order of first two entries in the NamedTuple here
     return (; paf, dobs, dobs0, P, migrid, mparams, loss, mfull, gmfull=similar(mfull)), paconv
 end
 

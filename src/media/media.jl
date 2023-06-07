@@ -117,13 +117,13 @@ begin
     K(vp, rho) = abs2(vp) * rho
     lambda(vp, rho) = abs2(vp) * rho
     lambda(vp, vs, rho) = (abs2(vp) - 2 * abs2(vs)) * rho
-	invlambda(vp, vs, rho) = inv((abs2(vp) - 2 * abs2(vs)) * rho)
-	invlambda(vp, rho) = inv(abs2(vp) * rho)
+    invlambda(vp, vs, rho) = inv((abs2(vp) - 2 * abs2(vs)) * rho)
+    invlambda(vp, rho) = inv(abs2(vp) * rho)
     M(vp, vs, rho) = abs2(vp) * rho
     M(vp, rho) = abs2(vp) * rho
     mu(vp, vs, rho) = abs2(vs) * rho
     mu(vp, rho) = zero(vp)
-	invmu(vp, vs, rho) = inv(abs2(vs) * rho)
+    invmu(vp, vs, rho) = inv(abs2(vs) * rho)
     invK(vp, vs, rho) = inv(K(vp, vs, rho))
     invK(vp, rho) = inv(K(vp, rho))
     invrho(vp, rho) = inv(rho)
@@ -274,24 +274,31 @@ function padarray!(modex::Medium, mod::Medium, npml, edges)
     return modex
 end
 
-# ╔═╡ 05049ae0-3c72-4f22-aeac-3b5eacf5c0d2
-# edges contains :xmin, :xmax, ... etc
-function padarray(mod::Medium, npml, edges)
-    minpads = [
+# ╔═╡ b4ff271e-7ec3-41fd-b2b5-7143755e7784
+function padmgrid(mgrid, npml, edges)
+	N = length(mgrid)
+	minpads = [
         any(edges .== Symbol(string(dim), "min")) ? npml : 0 for
-        dim in dim_names(ndims(mod))
+        dim in dim_names(N)
     ]
     maxpads = [
         any(edges .== Symbol(string(dim), "max")) ? npml : 0 for
-        dim in dim_names(ndims(mod))
+        dim in dim_names(N)
     ]
     grid_new = [
         range(
             mg[1] - minpads[i] * step(mg),
             stop=mg[end] + maxpads[i] * step(mg),
             length=length(mg) + minpads[i] + maxpads[i],
-        ) for (i, mg) in enumerate(mod.grid)
+		) for (i, mg) in enumerate(mgrid)
     ]
+	return grid_new
+end
+
+# ╔═╡ 05049ae0-3c72-4f22-aeac-3b5eacf5c0d2
+# edges contains :xmin, :xmax, ... etc
+function padarray(mod::Medium, npml, edges)
+	grid_new = padmgrid(mod.grid, npml, edges)
     modex = typeof(mod)(grid_new) # initialize a new medium
     padarray!(modex, mod, npml, edges)
 end
@@ -351,8 +358,8 @@ In-place method to add random noise to medium.
 update!(medium, fields; randn_perc=10)
 ```
 """
-function update!(medium::Medium, fields::Vector{Symbol}; rectangle=nothing,  perc=0.0, randn_perc=0.0)
-	
+function update!(medium::Medium, fields::Vector{Symbol}; rectangle=nothing, perc=0.0, randn_perc=0.0)
+
     number = eltype(medium)
     function χ(m::T, m0::T, flag::Int64=1) where {T<:Real}
         if (flag == 1)
@@ -831,6 +838,7 @@ version = "17.4.0+0"
 # ╠═20bd3b9f-4913-44d5-b652-3e0144f1b81a
 # ╟─8d5a4eb0-7b06-4db7-b458-dfbf5d27d5da
 # ╠═a3291f9d-88ee-4722-a5bd-a02bfae36005
+# ╠═b4ff271e-7ec3-41fd-b2b5-7143755e7784
 # ╠═05049ae0-3c72-4f22-aeac-3b5eacf5c0d2
 # ╠═ac6cec01-ce3d-4a92-842e-e124118ba34f
 # ╠═67f40155-47f1-471a-84b1-79950d91f2bd
