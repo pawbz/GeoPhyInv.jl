@@ -44,6 +44,9 @@ using SpecialFunctions
 using DSP
 using FourierTools
 using CUDA
+using CUDAKernels
+using Tullio
+using KernelAbstractions
 using MLUtils
 using CUDA.CUSPARSE
 import Base.@doc

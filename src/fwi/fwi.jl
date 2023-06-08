@@ -11,7 +11,9 @@ function SeisInvExpt(paf::PFdtd, dobs::Records, migrid::Vector{<:AbstractRange}=
     @assert length(migrid) == length(paf.c.medium.grid)
     # modeling mesh
     mmgrid = paf.c.medium.grid
-    P = get_proj_matrix(mmgrid, migrid, use_gpu=_fd_use_gpu, number=Data.Number)
+    P = broadcast(mmgrid, migrid) do mm, mi
+        Data.Array(Array(get_proj_matrix([mm], [mi], use_gpu=_fd_use_gpu, number=Data.Number)))
+    end
 
     # P will be repeatedly used on the number of medium parameters, e.g., KI and rho
     mfull = get_modelvector(paf, mparams)
