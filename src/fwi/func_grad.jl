@@ -64,7 +64,6 @@ function gradient!(g, m, pa::T) where {T<:NamedTuple{<:Any,<:Tuple{<:PFdtd,<:Rec
         gmc11 = reshape(view(gmc1, :), length.(migrid)...)
         gmfullc11 = reshape(view(gmfullc1, :), length.(mmgrid)...)
         apply_proj_matrix!(gmc11, gmfullc11, map(transpose, pa.P)...)
-        mul!(gmc1, pa.P, gmfullc1)
     end
 end
 
