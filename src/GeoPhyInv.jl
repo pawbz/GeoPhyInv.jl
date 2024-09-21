@@ -44,7 +44,6 @@ using SpecialFunctions
 using DSP
 using FourierTools
 using CUDA
-using CUDAKernels
 using Tullio
 using KernelAbstractions
 using MLUtils
@@ -94,7 +93,7 @@ const _fd_npextend = 20 + (_fd_order - 1) # determines exmedium
 const _fd_nbound = 3 # number of points to store the boundary values
 
 
-ParallelStencil.is_initialized() && ParallelStencil.@reset_parallel_stencil()
+ParallelStencil.@is_initialized() && ParallelStencil.@reset_parallel_stencil()
 @static if _fd_use_gpu
     ParallelStencil.@init_parallel_stencil(CUDA, _fd_datatype, _fd_ndims)
 else
