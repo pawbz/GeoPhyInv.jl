@@ -204,14 +204,14 @@ include("plots.jl")
 
 
 # ============= Precompile =================================
-@setup_workload begin
+# @setup_workload begin
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the
     # precompile file and potentially make loading faster.
-    pa_test = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 1), RandScatterer())
-    @compile_workload begin
-        update!(pa_test);
-    end
-end
+    # pa_test = SeisForwExpt(FdtdAcoustic{FullWave}(:forward, 1), RandScatterer())
+    # @compile_workload begin
+    #     update!(pa_test);
+    # end
+# end
 
 
 end # module GeoPhyInv
