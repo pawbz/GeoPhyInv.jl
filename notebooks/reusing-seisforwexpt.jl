@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.21
+# v0.19.46
 
 #> [frontmatter]
 #> title = "SeisForwExpt"
@@ -8,14 +8,26 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+end
+
 # ╔═╡ 5fc7d3bf-418d-4487-a2d6-bc07c736374b
 begin
     import Pkg
     Pkg.add("PlutoLinks")
+	Pkg.add("Revise")
     Pkg.add("PlutoUI")
     Pkg.add("PlutoTest")
     Pkg.add("Plots")
     Pkg.add("CUDA")
+	using Revise
     using PlutoLinks: @revise
     using PlutoUI, PlutoTest, Plots, CUDA
 end
@@ -52,8 +64,10 @@ various bundles of medium parameters. We will first load a predefined medium, a 
 medium = ElasticMedium(Homogeneous(), 5)
 
 # ╔═╡ ded21d43-99d6-453b-a858-e32f3f82e605
-# surface seismic acquisition with 3 supersources and 100 receivers
-ageom = AGeom(medium.grid, :surf, SSrcs(1), Recs(100))
+begin
+	# surface seismic acquisition with 3 supersources and 100 receivers
+	ageom = AGeom(medium.grid, :xwell, SSrcs(1), Recs(100));
+end
 
 # ╔═╡ a47b1e5d-a08c-4750-b1f3-f8a62225a19f
 # lets choose a time grid
@@ -84,14 +98,19 @@ md"""
 Now we have all the stuff necessary to allocate an instance of `SeisForwExpt`. 
 """
 
+# ╔═╡ 14713ee7-6753-46a7-98b3-ed0b8ef48ae4
+tsnaps=tgrid
+
 # ╔═╡ c7d96dda-17f5-4dbb-98bf-4c29fd784574
 pa = SeisForwExpt(
     FdtdElastic(),
+	snaps_field=:vx,
+	tsnaps=tsnaps,
     medium=medium,
     ageom=ageom,
     srcwav=srcwav,
     tgrid=tgrid,
-    rfields=[:vz],
+    rfields=[:vz, :vx],
     verbose=true,
 );
 
@@ -103,7 +122,7 @@ Before modeling, we will now generate a perturbed medium, which is "similar" to 
 # ╔═╡ df4a4072-a91a-471a-88d9-b74ed58e7823
 begin
     medium_box = deepcopy(medium)
-    update!(medium_box, [:vp, :rho, :vs], rectangle=[[-500, -500], [500, 500]], perc=5.0) # perturbed velocity box
+    update!(medium_box, [:vp, :rho, :vs], rectangle=[[-500, -500], [500, 500]], perc=20.0) # perturbed velocity box
 
 end
 
@@ -127,6 +146,12 @@ begin
     data_box = deepcopy(pa[:data]) # copy data
 end
 
+# ╔═╡ e9c4cb8b-20bf-43c3-8da5-9ecb2e0ddfd2
+@bind it Slider(1:length(tgrid), show_value=true)
+
+# ╔═╡ 3ea41115-2623-4b55-b5a0-9b3a282b6668
+heatmap(pa[:snaps,1][it], c=:seismic,aspect_ratio=:equal)
+
 # ╔═╡ fd11d02d-80cd-4373-a8d1-e0d50d93dcf8
 md"""
 Lets look at the timer objects.
@@ -139,7 +164,16 @@ t1
 t2
 
 # ╔═╡ 4612405a-530b-4eab-8b84-40dc907929e4
-plot(plot(data, 99.9), plot(data_box, 99.9), size=(800, 500))
+plot(plot(data, 10), plot(data_box, 10), size=(800, 500))
+
+# ╔═╡ c3b9e67c-ec42-422f-bb65-f12269b659d7
+plot(data, 90)
+
+# ╔═╡ 994331fc-95b7-4417-89b2-bfab6f9b912e
+data[:vz] |> maximum
+
+# ╔═╡ ca5301e3-6740-4f55-a488-121d50e72358
+data[:vx] |> maximum
 
 # ╔═╡ ec7985c6-7072-4ac4-9caa-74a815193750
 @test data ≠ data_box
@@ -160,14 +194,20 @@ plot(plot(data, 99.9), plot(data_box, 99.9), size=(800, 500))
 # ╠═10be735e-4012-4fa8-b538-9f9a08694458
 # ╠═7fa1ddc5-fe10-44e2-b764-533be1840ab6
 # ╟─cec954f6-c278-4003-99e4-6c995f74b606
+# ╠═14713ee7-6753-46a7-98b3-ed0b8ef48ae4
 # ╠═c7d96dda-17f5-4dbb-98bf-4c29fd784574
 # ╠═9a3360c0-72c7-420f-a7c0-5565a1383f07
 # ╠═df4a4072-a91a-471a-88d9-b74ed58e7823
 # ╠═07da9113-a518-4925-8978-8407dc60c605
 # ╟─7ac4f51d-73b4-4f9c-88a4-a48911742282
 # ╠═033cd313-4e87-4364-a1f8-136e0e06bb65
+# ╠═3ea41115-2623-4b55-b5a0-9b3a282b6668
+# ╠═e9c4cb8b-20bf-43c3-8da5-9ecb2e0ddfd2
 # ╠═fd11d02d-80cd-4373-a8d1-e0d50d93dcf8
 # ╠═368c2bbd-94fb-4826-96eb-8fa37a7e35a3
 # ╠═7236dc4a-fe04-492d-9532-170ac7c22fb8
 # ╠═4612405a-530b-4eab-8b84-40dc907929e4
+# ╠═c3b9e67c-ec42-422f-bb65-f12269b659d7
+# ╠═994331fc-95b7-4417-89b2-bfab6f9b912e
+# ╠═ca5301e3-6740-4f55-a488-121d50e72358
 # ╠═ec7985c6-7072-4ac4-9caa-74a815193750

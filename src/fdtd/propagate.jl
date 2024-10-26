@@ -199,7 +199,7 @@ o     o     o     o     o
             end
 
             @timeit to "add body-force velocity sources" begin
-                add_source!(it, issp, iss, pac, pap, activepw, src_flags, [:vx, :vy, :vz])
+                add_velocity_source!(it, issp, iss, pac, pap, activepw, src_flags, [:vx, :vy, :vz])
             end
             
             add_born_sources_velocity!(Val(pac.attrib_mod.mode), pap, pac)
@@ -220,7 +220,7 @@ o     o     o     o     o
             end
 
             @timeit to "add stress sources" begin # only pressure source, for now
-                add_source!(it, issp, iss, pac, pap, activepw, src_flags, [:p])
+                add_stress_source!(it, issp, iss, pac, pap, activepw, src_flags, [:p, :tauxx, :tauyy, :tauzz])
             end
 
             add_born_sources_stress!(Val(pac.attrib_mod.mode), pap, pac)

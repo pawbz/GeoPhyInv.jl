@@ -37,7 +37,6 @@ using StatsBase
 using InteractiveUtils
 using LaTeXStrings
 using RecipesBase
-using ColorSchemes
 using FFTW
 using HDF5
 using SpecialFunctions
@@ -88,8 +87,8 @@ const _fd_order = @load_preference("order", 2)
 const _fd_ndims = @load_preference("ndims", 2)
 const _fd_datatype = eval(Symbol(@load_preference("datatype", "Float32")))
 const _fd_use_gpu = @load_preference("use_gpu", false)
-const _fd_npml = 20 + (_fd_order - 1)
-const _fd_npextend = 20 + (_fd_order - 1) # determines exmedium
+const _fd_npml = 40 + (_fd_order - 1)
+const _fd_npextend = 40 + (_fd_order - 1) # determines exmedium
 const _fd_nbound = 3 # number of points to store the boundary values
 
 

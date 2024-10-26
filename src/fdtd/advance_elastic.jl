@@ -165,22 +165,22 @@ end
 
     @all(tauxx) =
         @all(tauxx) -
-        (@all(dtM) * @all(dvxdx)) + (@all(dtlambda) * (@all(dvydy) + @all(dvzdz)))
+        (@all(dtM) * @all(dvxdx)) - (@all(dtlambda) * (@all(dvydy) + @all(dvzdz)))
     @all(tauyy) =
         @all(tauyy) -
-        (@all(dtM) * @all(dvydy)) + (@all(dtlambda) * (@all(dvxdx) + @all(dvzdz)))
+        (@all(dtM) * @all(dvydy)) - (@all(dtlambda) * (@all(dvxdx) + @all(dvzdz)))
     @all(tauzz) =
         @all(tauzz) -
-        (@all(dtM) * @all(dvzdz)) + (@all(dtlambda) * (@all(dvydy) + @all(dvxdx)))
+        (@all(dtM) * @all(dvzdz)) - (@all(dtlambda) * (@all(dvydy) + @all(dvxdx)))
 
     return
 end
 
 @parallel function compute_stressii!(tauxx::Data.Array{2}, tauzz, dvxdx, dvzdz, dtM, dtlambda)
     @all(tauxx) =
-        @all(tauxx) - (@all(dtM) * @all(dvxdx)) + (@all(dtlambda) * (@all(dvzdz)))
+        @all(tauxx) - (@all(dtM) * @all(dvxdx)) - (@all(dtlambda) * (@all(dvzdz)))
     @all(tauzz) =
-        @all(tauzz) - (@all(dtM) * @all(dvzdz)) + (@all(dtlambda) * (@all(dvxdx)))
+        @all(tauzz) - (@all(dtM) * @all(dvzdz)) - (@all(dtlambda) * (@all(dvxdx)))
 
     return
 end

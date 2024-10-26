@@ -3,7 +3,6 @@ ENV["GKSwstype"] = "100"
 
 using Documenter, GeoPhyInv, SparseArrays, LinearAlgebra, Random, LinearMaps
 using Plots, Test, Luxor
-using ColorSchemes
 
 # standard setting for generating doc pages
 # @init_parallel_stencil(2, false, Float32, 2)

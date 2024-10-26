@@ -1,6 +1,6 @@
 # borrowed 2-point stencil macros from ParallelStencil.FiniteDifferences; extended to higher-order differences
 
-import ..ParallelStencil: INDICES, WITHIN_DOC
+import ..ParallelStencil: INDICES, WITHIN_DOC, @expandargs
 iz, iy, ix = INDICES[1], INDICES[2], INDICES[3]
 @static if (_fd_order == 2)
     izi, iyi, ixi = :($iz + 1), :($iy + 1), :($ix + 1)
@@ -15,6 +15,7 @@ end
 @static if (_fd_order == 2)
 
     macro within(macroname::String, A::Symbol)
+        @expandargs(A)
         if macroname == "@all"
             esc(:($iz <= size($A, 1) && $iy <= size($A, 2) && $ix <= size($A, 3)))
         elseif macroname == "@inn"
@@ -33,26 +34,33 @@ end
     end
 
     macro d_za(A::Symbol)
+        @expandargs(A)
         esc(:($A[$iz+1, $iy, $ix] - $A[$iz, $iy, $ix]))
     end
     macro d_ya(A::Symbol)
+        @expandargs(A)
         esc(:($A[$iz, $iy+1, $ix] - $A[$iz, $iy, $ix]))
     end
     macro d_xa(A::Symbol)
+        @expandargs(A)
         esc(:($A[$iz, $iy, $ix+1] - $A[$iz, $iy, $ix]))
     end
     macro d_zi(A::Symbol)
+        @expandargs(A)
         esc(:($A[$iz+1, $iyi, $ixi] - $A[$iz, $iyi, $ixi]))
     end
     macro d_yi(A::Symbol)
+        @expandargs(A)
         esc(:($A[$izi, $iy+1, $ixi] - $A[$izi, $iy, $ixi]))
     end
     macro d_xi(A::Symbol)
+        @expandargs(A)
         esc(:($A[$izi, $iyi, $ix+1] - $A[$izi, $iyi, $ix]))
     end
 elseif (_fd_order == 4)
 
     macro within(macroname::String, A::Symbol)
+        @expandargs(A)
         if macroname == "@all"
             esc(:($iz <= size($A, 1) && $iy <= size($A, 2) && $ix <= size($A, 3)))
         elseif macroname == "@inn"
@@ -71,6 +79,7 @@ elseif (_fd_order == 4)
     end
 
     macro d_za(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz+2, $iy, $ix] * 27.0 - $A[$iz+1, $iy, $ix] * 27.0 +
@@ -79,6 +88,7 @@ elseif (_fd_order == 4)
         )
     end
     macro d_ya(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz, $iy+2, $ix] * 27.0 - $A[$iz, $iy+1, $ix] * 27.0 +
@@ -87,6 +97,7 @@ elseif (_fd_order == 4)
         )
     end
     macro d_xa(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz, $iy, $ix+2] * 27.0 - $A[$iz, $iy, $ix+1] * 27.0 +
@@ -95,6 +106,7 @@ elseif (_fd_order == 4)
         )
     end
     macro d_zi(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz+2, $iyi, $ixi] * 27.0 - $A[$iz+1, $iyi, $ixi] * 27.0 +
@@ -103,6 +115,7 @@ elseif (_fd_order == 4)
         )
     end
     macro d_yi(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$izi, $iy+2, $ixi] * 27.0 - $A[$izi, $iy+1, $ixi] * 27.0 +
@@ -111,6 +124,7 @@ elseif (_fd_order == 4)
         )
     end
     macro d_xi(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$izi, $iyi, $ix+2] * 27.0 - $A[$izi, $iyi, $ix+1] * 27.0 +
@@ -120,6 +134,7 @@ elseif (_fd_order == 4)
     end
 elseif (_fd_order == 6)
     macro within(macroname::String, A::Symbol)
+        @expandargs(A)
         if macroname == "@all"
             esc(:($iz <= size($A, 1) && $ix <= size($A, 2)))
         elseif macroname == "@inn"
@@ -138,6 +153,7 @@ elseif (_fd_order == 6)
     end
 
     macro d_za(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz+3, $iy, $ix] * 2250.0 - $A[$iz+2, $iy, $ix] * 2250.0 +
@@ -147,6 +163,7 @@ elseif (_fd_order == 6)
         )
     end
     macro d_ya(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz, $iy+3, $ix] * 2250.0 - $A[$iz, $iy+2, $ix] * 2250.0 +
@@ -156,6 +173,7 @@ elseif (_fd_order == 6)
         )
     end
     macro d_xa(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz, $iy, $ix+3] * 2250.0 - $A[$iz, $iy, $ix+2] * 2250.0 +
@@ -165,6 +183,7 @@ elseif (_fd_order == 6)
         )
     end
     macro d_zi(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz+3, $iyi, $ixi] * 2250.0 - $A[$iz+2, $iyi, $ixi] * 2250.0 +
@@ -174,6 +193,7 @@ elseif (_fd_order == 6)
         )
     end
     macro d_yi(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$izi, $iy+3, $ixi] * 2250.0 - $A[$izi, $iy+2, $ixi] * 2250.0 +
@@ -183,6 +203,7 @@ elseif (_fd_order == 6)
         )
     end
     macro d_xi(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$izi, $iyi, $ix+3] * 2250.0 - $A[$izi, $iyi, $ix+2] * 2250.0 +
@@ -193,6 +214,7 @@ elseif (_fd_order == 6)
     end
 elseif (_fd_order == 8)
     macro within(macroname::String, A::Symbol)
+        @expandargs(A)
         if macroname == "@all"
             esc(:($iz <= size($A, 1) && $ix <= size($A, 2)))
         elseif macroname == "@inn"
@@ -211,6 +233,7 @@ elseif (_fd_order == 8)
     end
 
     macro d_za(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz+4, $iy, $ix] * 128625.0 - $A[$iz+3, $iy, $ix] * 128625.0 +
@@ -221,6 +244,7 @@ elseif (_fd_order == 8)
         )
     end
     macro d_ya(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz, $iy+4, $ix] * 128625.0 - $A[$iz, $iy+3, $ix] * 128625.0 +
@@ -231,6 +255,7 @@ elseif (_fd_order == 8)
         )
     end
     macro d_xa(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz, $iy, $ix+4] * 128625.0 - $A[$iz, $iy, $ix+3] * 128625.0 +
@@ -241,6 +266,7 @@ elseif (_fd_order == 8)
         )
     end
     macro d_zi(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$iz+4, $iyi, $ixi] * 128625.0 - $A[$iz+3, $iyi, $ixi] * 128625.0 +
@@ -251,6 +277,7 @@ elseif (_fd_order == 8)
         )
     end
     macro d_yi(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$izi, $iy+4, $ixi] * 128625.0 - $A[$izi, $iy+3, $ixi] * 128625.0 +
@@ -261,6 +288,7 @@ elseif (_fd_order == 8)
         )
     end
     macro d_xi(A::Symbol)
+        @expandargs(A)
         esc(
             :(
                 $A[$izi, $iyi, $ix+4] * 128625.0 - $A[$izi, $iyi, $ix+3] * 128625.0 +
@@ -273,12 +301,15 @@ elseif (_fd_order == 8)
 end
 
 macro all(A::Symbol)
+    @expandargs(A)
     esc(:($A[$iz, $iy, $ix]))
 end
 macro inn(A::Symbol)
+    @expandargs(A)
     esc(:($A[$izi, $iyi, $ixi]))
 end
 macro av(A::Symbol)
+    @expandargs(A)
     esc(
         :(
             (
@@ -295,15 +326,19 @@ macro av(A::Symbol)
     )
 end
 macro av_zi(A::Symbol)
+    @expandargs(A)
     esc(:(($A[$iz, $iyi, $ixi] + $A[$iz+1, $iyi, $ixi]) * 0.5))
 end
 macro av_yi(A::Symbol)
+    @expandargs(A)
     esc(:(($A[$izi, $iy, $ixi] + $A[$izi, $iy+1, $ixi]) * 0.5))
 end
 macro av_xi(A::Symbol)
+    @expandargs(A)
     esc(:(($A[$izi, $iyi, $ix] + $A[$izi, $iyi, $ix+1]) * 0.5))
 end
 macro av_yzi(A::Symbol)
+    @expandargs(A)
     esc(
         :(
             (
@@ -316,6 +351,7 @@ macro av_yzi(A::Symbol)
     )
 end
 macro av_xzi(A::Symbol)
+    @expandargs(A)
     esc(
         :(
             (
@@ -328,6 +364,7 @@ macro av_xzi(A::Symbol)
     )
 end
 macro av_xyi(A::Symbol)
+    @expandargs(A)
     esc(
         :(
             (

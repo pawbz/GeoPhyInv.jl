@@ -49,7 +49,7 @@ function update!(paw::T1, pac::T2) where {T1<:NamedTuple{<:Any,<:Tuple{<:PFdtd,<
         w = zero(paconv.s)
         # matrix-free operator
         A = Conv.operator(paconv, Conv.G())
-        IterativeSolvers.lsmr!(w, A, dvec)
+        IterativeSolvers.lsmr!(w, A, dvec, maxiter=100)
         copyto!(paconv.s, w)
         # do conv with estimated w
         Conv.mod!(paconv, Conv.D())

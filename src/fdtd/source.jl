@@ -3,7 +3,7 @@
 get_source(w, ::Any, ::Val{0}) = zero(w)
 
 
-get_source(w, ::Union{vz,vx,vy}, ::Val{1}) = copy(w)
+get_source(w, ::Union{vz,vx,vy,p,tauxx,tauyy,tauzz}, ::Val{1}) = copy(w)
 # -ve values correspond to source sink, used while solving boundary value problem
 function get_source(w, ::Union{vz,vx,vy}, ::Val{-1})
     ww = copy(w)
@@ -22,7 +22,6 @@ end
 Use input srcwav to fill wavelets and returns frequency bounds.
 """
 function fill_wavelets!(ipw, iss, wavelets, srcwav, src_types)
-
     nt = size(wavelets, 1)
     sfields = names(srcwav[ipw][iss].d)[1]
     ns = srcwav[ipw][iss][:ns]
@@ -58,8 +57,71 @@ function fill_wavelets!(ipw, iss, wavelets, srcwav, src_types)
     return freqmin, freqmax, Statistics.mean(freqpeaks)
 end
 
-# This routine ABSOLUTELY should not allocate any memory, called inside time loop.
-@inbounds @fastmath function add_source!(it::Int64, issp::Int64, iss::Int64, pac, pap, activepw, src_flags, sfields=Fields(pac.attrib_mod))
+
+@inbounds @fastmath function add_stress_source!(it::Int64, issp::Int64, iss::Int64, pac::T, pap, activepw, src_flags, sfields=Fields(pac.attrib_mod)) where {T<:P_common{<:FdtdAcoustic}}
+    if (1 ∈ activepw)
+        ipw = 1
+        sfields = intersect(names(pac.srcwav[ipw][iss].d)[1], sfields)
+        for sfield in sfields
+            if (src_flags[ipw]) # add only if src_flags is non-zero
+                pv = pap[ipw].tauii_buffer # pick stress buffer
+                pv_vec = view(pv, :)
+                w = pap[ipw].ss[issp].wavelets[it][sfield]
+                ssprayw = pap[ipw].ss[issp].ssprayw[sfield]
+                mul!(pv_vec, ssprayw, w)
+                pw = pap[ipw].w1[:t][:p]
+                @parallel muladd_tauii!(pw, pv, pac.dmod[:dtK])
+            end
+        end
+    end
+end
+
+@inbounds @fastmath function add_stress_source!(it::Int64, issp::Int64, iss::Int64, pac::T, pap, activepw, src_flags, sfields=Fields(pac.attrib_mod)) where {T<:P_common{<:FdtdElastic,2}}
+    if (1 ∈ activepw)
+        ipw = 1
+        sfields = intersect(names(pac.srcwav[ipw][iss].d)[1], sfields)
+        for sfield in sfields
+            if (src_flags[ipw]) # add only if src_flags is non-zero
+                pv = pap[ipw].tauii_buffer # pick stress buffer
+                pv_vec = view(pv, :)
+                w = pap[ipw].ss[issp].wavelets[it][sfield]
+                ssprayw = pap[ipw].ss[issp].ssprayw[sfield]
+                mul!(pv_vec, ssprayw, w)
+                pw = pap[ipw].w1[:t][:tauxx]
+                @parallel muladd_tauii!(pw, pv, pac.dmod[:dtM])
+                pw = pap[ipw].w1[:t][:tauzz]
+                @parallel muladd_tauii!(pw, pv, pac.dmod[:dtM])
+            end
+        end
+    end
+end
+
+@inbounds @fastmath function add_stress_source!(it::Int64, issp::Int64, iss::Int64, pac::T, pap, activepw, src_flags, sfields=Fields(pac.attrib_mod)) where {T<:P_common{<:FdtdElastic,3}}
+    if (1 ∈ activepw)
+        ipw = 1
+        sfields = intersect(names(pac.srcwav[ipw][iss].d)[1], sfields)
+        for sfield in sfields
+            if (src_flags[ipw]) # add only if src_flags is non-zero
+                pv = pap[ipw].tauii_buffer # pick stress buffer
+                pv_vec = view(pv, :)
+                w = pap[ipw].ss[issp].wavelets[it][sfield]
+                ssprayw = pap[ipw].ss[issp].ssprayw[sfield]
+                mul!(pv_vec, ssprayw, w)
+                pw = pap[ipw].w1[:t][:tauxx]
+                @parallel muladd_tauii!(pw, pv, pac.dmod[:dtM])
+                pw = pap[ipw].w1[:t][:tauyy]
+                @parallel muladd_tauii!(pw, pv, pac.dmod[:dtM])
+                pw = pap[ipw].w1[:t][:tauzz]
+                @parallel muladd_tauii!(pw, pv, pac.dmod[:dtM])
+            end
+        end
+    end
+end
+
+
+
+# # This routine ABSOLUTELY should not allocate any memory, called inside time loop.
+@inbounds @fastmath function add_velocity_source!(it::Int64, issp::Int64, iss::Int64, pac, pap, activepw, src_flags, sfields=Fields(pac.attrib_mod))
     # adding source to respective sfield at [it] 
     if (1 ∈ activepw)
         ipw = 1
@@ -72,7 +134,7 @@ end
                 w = pap[ipw].ss[issp].wavelets[it][sfield]
                 ssprayw = pap[ipw].ss[issp].ssprayw[sfield]
                 mul!(pv_vec, ssprayw, w)
-                @parallel eval(Symbol("muladd_with_density_", sfield))(pw, pv, pac.mod[:rho], pac.fc[:dt])
+                @parallel eval(Symbol("muladd_with_density_", sfield, "!"))(pw, pv, pac.mod[:rho], pac.fc[:dt])
             end
         end
     end
@@ -88,22 +150,28 @@ end
                 w = pap[ipw].ss[issp].wavelets[it][sfield]
                 adj_ssprayw = pap[1].ss[issp].rinterpolatew[sfield]
                 mul!(pv_vec, adj_ssprayw, w)
-                @parallel eval(Symbol("muladd_with_density_", sfield))(pw, pv, pac.mod[:rho], pac.fc[:dt])
+                @parallel eval(Symbol("muladd_with_density_", sfield, "!"))(pw, pv, pac.mod[:rho], pac.fc[:dt])
             end
         end
     end
 end
 
-# pw = pw + pv * rho
-@parallel function muladd_with_density_vx(pw, pv, rho, dt)
+
+@parallel function muladd_tauii!(pw, pv, dtK)
+    @all(pw) = @all(pw) + (@all(pv) * @all(dtK))
+    return
+end
+
+# # pw = pw + pv * rho
+@parallel function muladd_with_density_vx!(pw, pv, rho, dt)
     @inn(pw) = @inn(pw) + (@inn(pv) / @av_xi(rho) * dt)
     return
 end
-@parallel function muladd_with_density_vz(pw, pv, rho, dt)
+@parallel function muladd_with_density_vz!(pw, pv, rho, dt)
     @inn(pw) = @inn(pw) + (@inn(pv) / @av_zi(rho) * dt)
     return
 end
-@parallel function muladd_with_density_vy(pw, pv, rho, dt)
+@parallel function muladd_with_density_vy!(pw, pv, rho, dt)
     @inn(pw) = @inn(pw) + (@inn(pv) / @av_yi(rho) * dt)
     return
 end

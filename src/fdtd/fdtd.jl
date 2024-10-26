@@ -322,6 +322,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
         [:t, :tp], # current and previous time step
     )
     velocity_buffer = NamedArray([zeros(eval(f)(), T(), n...) for f in velocity_fields], Symbol.(velocity_fields))
+    tauii_buffer = Data.Array(zeros(n...))
 
     # dummy (use for viscoelastic modeling later)
     w2 = NamedArray(
@@ -338,7 +339,7 @@ function P_x_worker_x_pw(ipw, sschunks::UnitRange{Int64}, pac::P_common{T,N}) wh
 
     ss = [P_x_worker_x_pw_x_ss(ipw, iss, pac) for (issp, iss) in enumerate(sschunks)]
 
-    return P_x_worker_x_pw(ss, w1, w2, memory_pml, velocity_buffer)
+    return P_x_worker_x_pw(ss, w1, w2, memory_pml, velocity_buffer, tauii_buffer)
 end
 
 

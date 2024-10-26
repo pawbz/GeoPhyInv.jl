@@ -55,7 +55,7 @@ end
 # @time update!(m1, pa_mod, [:invK])
 
 # ╔═╡ f49439df-3db3-48ae-bf9d-1387e3c14c8f
-N = 2
+N = 100
 
 # ╔═╡ 6d47ae1d-2554-4d42-af6c-02ce952bf14e
 @bind mpara Select([:invK, :rho])
@@ -180,7 +180,7 @@ isnan.(pa_inv.dobs[1].d[1])
 begin
     g = similar(m)
     GeoPhyInv.gradient!(g, m, pa_inv)
-    heatmap(Array(pa_mod.c.gradients[1]))
+	heatmap(Array(reshape(g, N, N)), c=:seismic)
 end
 
 # ╔═╡ aa0f7f1b-65ff-4a0b-9fb0-e6660911fdc8
@@ -198,6 +198,9 @@ heatmap(Array(reshape(pa_inv.P' * m, Nz, Nx)))
 # ╔═╡ 01552458-5de7-4627-b417-21745db2ade1
 heatmap(Array(reshape(m, 176, 176)))
 
+# ╔═╡ 8ec00fb7-fe18-4741-b987-813ec97d73fe
+heatmap(Array(reshape(gm, N, N)), c=:seismic)
+
 # ╔═╡ cd5bff59-6466-43d7-bd10-795d6f55d4ef
 heatmap(Array(reshape(g, 2, 2)), c=:seismic)
 
@@ -213,6 +216,9 @@ gKI = reshape(g, N, N)
 # ╔═╡ 630faaff-f7f0-46d7-a36f-31a54e589c8e
 heatmap(Array(gKI), c=:seismic)
 
+# ╔═╡ c6007b1a-3819-4543-bab4-f0dc0c12e075
+gm1 = Array(reshape(gm, N, N))
+
 # ╔═╡ 839cf146-639c-4d13-9470-d25882837169
 # prod(step.(pa_true.c.medium.grid)) #
 pa_true.c.srcwav[1][1].grid |> step |> abs2
@@ -222,6 +228,9 @@ GeoPhyInv.Fields(pa_mod.c.attrib_mod, "v")
 
 # ╔═╡ b14a5a36-94c4-4a6c-8b26-730919e3e5ae
 filter(x -> x ∉ Fields(pa_mod.c.attrib_mod, "d"), Fields(pa_mod.c.attrib_mod, "v"))
+
+# ╔═╡ 60a9adc0-466d-4e54-9838-f01b0a2c50c5
+Array(gKI) ./ gm1
 
 # ╔═╡ 417388ad-8709-4d4a-9d81-d4bbb0351a92
 heatmap(Array(pa_mod.c.gradients[1]), clim=(-1e-11, 1e-11), c=:seismic)
@@ -238,16 +247,7 @@ end
 Js(GeoPhyInv.Data.Array(xs))
 
 # ╔═╡ c6626e0f-4bf1-4e29-a0c3-1e7f23805f61
-gm = grad(central_fdm(2, 1, factor=1e8), Js, xs)[1]
-
-# ╔═╡ 8ec00fb7-fe18-4741-b987-813ec97d73fe
-heatmap(Array(reshape(gm, N, N)), c=:seismic)
-
-# ╔═╡ c6007b1a-3819-4543-bab4-f0dc0c12e075
-gm1 = Array(reshape(gm, N, N))
-
-# ╔═╡ 60a9adc0-466d-4e54-9838-f01b0a2c50c5
-Array(gKI) ./ gm1
+# gm = grad(central_fdm(2, 1, factor=1e8), Js, xs)[1]
 
 # ╔═╡ 9371b452-4ad6-4d07-ae98-c86239b6c110
 gs = get_xs(g, xs)

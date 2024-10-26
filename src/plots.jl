@@ -29,7 +29,6 @@
         @series begin
             seriestype := :heatmap
             subplot := j
-            # seriescolor --> colorschemes[:roma]
             title --> title1
             clims --> Tuple(getfield(medium, field).bounds)
             seriescolor --> :grays
@@ -91,14 +90,14 @@ end
     layout := (1, length(dat.d))
     size --> (length(dat.d) * 300, 300)
     margin --> 5Measures.mm
+    dmax = maximum([maximum(dp) for dp in dat.d])
+    dmax_clip = dmax - clip_perc * inv(100) * abs(dmax)
     for (j, field) in enumerate(names(dat.d)[1])
         dp = dat[field]
-        dmax = maximum(abs.(dp))
         if (!iszero(dmax))
             @series begin
                 dz = dat.grid
                 dx = 1:size(dp, 2)
-                dmax_clip = dmax - clip_perc * inv(100) * abs(dmax)
                 seriestype := :heatmap
                 framestyle := :grid
                 title --> field
