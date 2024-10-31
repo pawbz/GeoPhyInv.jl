@@ -70,11 +70,11 @@ function get_neighbour_indices(arr, val)
     len = length(arr)
     idx = searchsortedfirst(arr, val)
     if idx == 1
-        return [1, 2]
+        return 1, 2
     elseif idx >= len
-        return [len - 1, len]
+        return len - 1, len
     else
-        return [idx - 1, idx]
+        return idx - 1, idx
     end
 end
 
@@ -128,7 +128,7 @@ function bilinear_interp(x, y, z, zi, yi, xi; number=Data.Number)
     w111 = dx * dy * dz
     weights = [w000, w001, w010, w011, w100, w101, w110, w111]
     indices = [i000, i001, i010, i011, i100, i101, i110, i111]
-    return sparse(indices, fill(1, 8), number.(weights), n * m * p, 1)
+    return sparsevec(indices, number.(weights), n * m * p)
 end
 
 # ╔═╡ f8a70920-ac87-4126-980f-c3cbd223269a
@@ -172,7 +172,7 @@ function bilinear_interp(x, z, xi, zi; number=Data.Number)
     weights = [w00, w01, w10, w11]
     indices = [i00, i01, i10, i11]
 
-    return sparse(indices, fill(1, 4), number.(weights), n * m, 1)
+    return sparsevec(indices, number.(weights), n * m)
 end
 
 # ╔═╡ 4fa99e86-d6fb-4da1-91d9-8065245c1191
@@ -202,7 +202,7 @@ function bilinear_interp(x, xi; number=Data.Number)
     weights = [w00, w01]
     indices = [i00, i01]
 
-    return sparse(indices, fill(1, 2), number.(weights), n, 1)
+    return sparsevec(indices, number.(weights), n)
 end
 
 # ╔═╡ 1c90e052-ed95-11ed-0cad-ff4e7234f520

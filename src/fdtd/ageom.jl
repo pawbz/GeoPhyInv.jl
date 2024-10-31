@@ -63,7 +63,7 @@ function update!(pa::PFdtd, ageom::Vector{AGeom})
     update!(pa, ageom, Srcs(0))
     update!(pa, ageom, Recs(0))
 end
-function update!(pa::PFdtd, ageom::Vector{AGeom}, ::Srcs)
+function update!(pa::PFdtd, ageom::Vector{AGeom}, sr::Srcs)
     for ipw = 1:pa.c.ic[:npw]
         copyto!(pa.c.ageom[ipw], ageom[ipw])
         @sync begin
@@ -72,7 +72,7 @@ function update!(pa::PFdtd, ageom::Vector{AGeom}, ::Srcs)
                     pap = localpart(pa.p)[ipw]
                     for is = 1:length(pap.ss)
                         iss = pap.ss[is].iss
-                        update!(localpart(pap).ss[is], ipw, iss, ageom[ipw][iss], pa.c)
+                        update!(localpart(pap).ss[is], ipw, iss, ageom[ipw][iss], pa.c, sr)
                     end
                 end
             end
@@ -80,7 +80,7 @@ function update!(pa::PFdtd, ageom::Vector{AGeom}, ::Srcs)
     end
 end
 
-function update!(pa::PFdtd, ageom::Vector{AGeom}, ::Recs)
+function update!(pa::PFdtd, ageom::Vector{AGeom}, sr::Recs)
     for ipw = 1:pa.c.ic[:npw]
         copyto!(pa.c.ageom[ipw], ageom[ipw])
         @sync begin
@@ -89,7 +89,7 @@ function update!(pa::PFdtd, ageom::Vector{AGeom}, ::Recs)
                     pap = localpart(pa.p)[ipw]
                     for is = 1:length(pap.ss)
                         iss = pap.ss[is].iss
-                        update!(localpart(pap).ss[is], ipw, iss, ageom[ipw][iss], pa.c)
+                        update!(localpart(pap).ss[is], ipw, iss, ageom[ipw][iss], pa.c, sr)
                     end
                 end
             end
