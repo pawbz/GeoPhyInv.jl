@@ -82,21 +82,21 @@ end
 """
 This function takes in three vectors x, y, z, and three values xi, yi, zi, corresponding to the interpolation point. It first checks if the interpolation point is inside the grid, then finds the indices of the 8 neighbouring grid points using the get_neighbour_indices function. It then computes the interpolation weights and stores them in a sparse vector with values of 1 and the specified weights at the corresponding indices. The resulting sparse vector has length n * m * p and a single column.
 """
-function bilinear_interp(x, y, z, zi, yi, xi; number=Data.Number)
+function bilinear_interp(x, y, z, zi, yi, xi; weights=zeros(8), indices=zeros(Int, 8))
 
     n, m, p = length(x), length(y), length(z)
     x_idx1, x_idx2 = get_neighbour_indices(x, xi)
     y_idx1, y_idx2 = get_neighbour_indices(y, yi)
     z_idx1, z_idx2 = get_neighbour_indices(z, zi)
     l = LinearIndices((n, m, p))
-    i000 = l[x_idx1, y_idx1, z_idx1]
-    i001 = l[x_idx1, y_idx1, z_idx2]
-    i010 = l[x_idx1, y_idx2, z_idx1]
-    i011 = l[x_idx1, y_idx2, z_idx2]
-    i100 = l[x_idx2, y_idx1, z_idx1]
-    i101 = l[x_idx2, y_idx1, z_idx2]
-    i110 = l[x_idx2, y_idx2, z_idx1]
-    i111 = l[x_idx2, y_idx2, z_idx2]
+    indices[1] = l[x_idx1, y_idx1, z_idx1]
+    indices[2] = l[x_idx1, y_idx1, z_idx2]
+    indices[3] = l[x_idx1, y_idx2, z_idx1]
+    indices[4] = l[x_idx1, y_idx2, z_idx2]
+    indices[5] = l[x_idx2, y_idx1, z_idx1]
+    indices[6] = l[x_idx2, y_idx1, z_idx2]
+    indices[7] = l[x_idx2, y_idx2, z_idx1]
+    indices[8] = l[x_idx2, y_idx2, z_idx2]
 	if(xi < minimum(x))
 		dx = 0
 	elseif(xi > maximum(x))
@@ -118,17 +118,18 @@ function bilinear_interp(x, y, z, zi, yi, xi; number=Data.Number)
 	else
 		dz = (zi - z[z_idx1]) / (z[z_idx2] - z[z_idx1])
 	end    
-    w000 = (1 - dx) * (1 - dy) * (1 - dz)
-    w001 = (1 - dx) * (1 - dy) * dz
-    w010 = (1 - dx) * dy * (1 - dz)
-    w011 = (1 - dx) * dy * dz
-    w100 = dx * (1 - dy) * (1 - dz)
-    w101 = dx * (1 - dy) * dz
-    w110 = dx * dy * (1 - dz)
-    w111 = dx * dy * dz
-    weights = [w000, w001, w010, w011, w100, w101, w110, w111]
-    indices = [i000, i001, i010, i011, i100, i101, i110, i111]
-    return sparsevec(indices, number.(weights), n * m * p)
+    weights[1] = (1 - dx) * (1 - dy) * (1 - dz)
+    weights[2] = (1 - dx) * (1 - dy) * dz
+    weights[3] = (1 - dx) * dy * (1 - dz)
+    weights[4] = (1 - dx) * dy * dz
+    weights[5] = dx * (1 - dy) * (1 - dz)
+    weights[6] = dx * (1 - dy) * dz
+    weights[7] = dx * dy * (1 - dz)
+    weights[8] = dx * dy * dz
+	
+    # weights = [w000, w001, w010, w011, w100, w101, w110, w111]
+    # indices = [i000, i001, i010, i011, i100, i101, i110, i111]
+    return sparsevec(indices, weights, n * m * p)
 end
 
 # ╔═╡ f8a70920-ac87-4126-980f-c3cbd223269a
@@ -137,7 +138,7 @@ This function takes as input the x and y coordinates of the grid points, the cor
 
 Note that if the interpolation point is outside the grid, the function will throw an error.
 """
-function bilinear_interp(x, z, xi, zi; number=Data.Number)
+function bilinear_interp(x, z, xi, zi; weights=zeros(4), indices=zeros(Int, 4))
 
     n, m = length(x), length(z)
     x_idx1, x_idx2 = get_neighbour_indices(x, xi)
@@ -145,10 +146,10 @@ function bilinear_interp(x, z, xi, zi; number=Data.Number)
 
     l = LinearIndices((n, m))
 
-    i00 = l[x_idx1, z_idx1]
-    i01 = l[x_idx1, z_idx2]
-    i10 = l[x_idx2, z_idx1]
-    i11 = l[x_idx2, z_idx2]
+    indices[1] = l[x_idx1, z_idx1]
+    indices[2] = l[x_idx1, z_idx2]
+    indices[3] = l[x_idx2, z_idx1]
+    indices[4] = l[x_idx2, z_idx2]
 
 	if(xi < minimum(x))
 		dx = 0
@@ -164,30 +165,31 @@ function bilinear_interp(x, z, xi, zi; number=Data.Number)
 	else
 		dz = (zi - z[z_idx1]) / (z[z_idx2] - z[z_idx1])
 	end
-    w00 = (1 - dx) * (1 - dz)
-    w01 = (1 - dx) * dz
-    w10 = dx * (1 - dz)
-    w11 = dx * dz
+    weights[1] = (1 - dx) * (1 - dz)
+    weights[2] = (1 - dx) * dz
+    weights[3] = dx * (1 - dz)
+    weights[4] = dx * dz
 
-    weights = [w00, w01, w10, w11]
-    indices = [i00, i01, i10, i11]
+    # weights = [w00, w01, w10, w11]
+    # indices = [i00, i01, i10, i11]
 
-    return sparsevec(indices, number.(weights), n * m)
+    return sparsevec(indices, weights, n * m)
 end
 
 # ╔═╡ 4fa99e86-d6fb-4da1-91d9-8065245c1191
 """
 This function returns a sparse matrix with four nonzero elements, which are the weights for the four surrounding points used in bilinear interpolation. If the given xi value is outside the range of x, the function returns a sparse matrix with a single nonzero element, which is the index of the closest boundary point.
 """
-function bilinear_interp(x, xi; number=Data.Number)
+function bilinear_interp(x, xi; weights=zeros(2), indices=zeros(Int, 2))
 
     n = length(x)
     x_idx1, x_idx2 = get_neighbour_indices(x, xi)
 
     l = LinearIndices((n,))
 
-    i00 = l[x_idx1]
-    i01 = l[x_idx2]
+    indices[1] = l[x_idx1]
+    indices[2] = l[x_idx2]
+	
 	if(xi < minimum(x))
 		dx = 0
 	elseif(xi > maximum(x))
@@ -196,19 +198,25 @@ function bilinear_interp(x, xi; number=Data.Number)
 		dx = (xi - x[x_idx1]) / (x[x_idx2] - x[x_idx1])
 	end
 
-    w00 = 1 - dx
-    w01 = dx
+    weights[1] = 1 - dx
+    weights[2] = dx
 
-    weights = [w00, w01]
-    indices = [i00, i01]
-
-    return sparsevec(indices, number.(weights), n)
+    return sparsevec(indices, weights, n)
 end
 
 # ╔═╡ 1c90e052-ed95-11ed-0cad-ff4e7234f520
 function get_proj_matrix(migrid::T, mmgrid::T; use_gpu=_fd_use_gpu, number=Data.Number) where {T}
+	if(length(mmgrid) == 3)
+		npt = 8
+	elseif(length(mmgrid) == 2)
+		npt = 4
+	else
+		npt = 2
+	end
+	weights=zeros(number, npt)
+	indices=zeros(Int, npt)
     mat = mapreduce(sparse_hcat, Iterators.product(migrid...)) do P
-        bilinear_interp(mmgrid..., P..., number=number)
+        bilinear_interp(mmgrid..., P..., weights=weights, indices=indices)
     end
     if (use_gpu)
         return CuSparseMatrixCSC(mat)
@@ -219,8 +227,17 @@ end
 
 # ╔═╡ 137e4dfd-60f0-460b-8239-082680b09b77
 function get_proj_matrix(Ps, mmgrid; use_gpu=_fd_use_gpu, number=Data.Number)
+	if(length(mmgrid) == 3)
+		npt = 8
+	elseif(length(mmgrid) == 2)
+		npt = 4
+	else
+		npt = 2
+	end
+	weights=zeros(number, npt)
+	indices=zeros(Int, npt)
     mat = mapreduce(sparse_hcat, Ps) do P
-        bilinear_interp(mmgrid..., P..., number=number)
+        bilinear_interp(mmgrid..., P..., weights=weights, indices=indices)
     end
     if (use_gpu)
         return CuSparseMatrixCSC(mat)
@@ -272,16 +289,16 @@ P12=get_proj_matrix( [range(-0.5, 0.5, length=N2)], [range(-0.25, 0.5, length=25
 @btime apply_proj_matrix!(Y, X, P11, P12)
 
 # ╔═╡ be183231-697e-408f-aa08-ad0d6db1f663
-@time bilinear_interp(1:10, 1.8, number=Float32)
+@time bilinear_interp(1:10, 1.8)
 
 # ╔═╡ 08a62f0b-5eee-4cd8-82cb-7d5c2317c257
-@btime bilinear_interp(r1, 0.3, number=Float32)
+@btime bilinear_interp(r1, 0.3)
 
 # ╔═╡ 95ff1284-db71-4927-b509-e4f76da8c892
-@test sum(bilinear_interp(1:10, range(10, 20, length=7), 2.2, 14.4, number=Float64)) ≈ 1
+@test sum(bilinear_interp(1:10, range(10, 20, length=7), 2.2, 14.4)) ≈ 1
 
 # ╔═╡ e1c0c307-2fb4-4fe8-a6d0-cb26624c9075
-@test sum(bilinear_interp(1:10, range(10, 20, length=7), range(30, 41, length=5), 5.2, 14.2, 35.0, number=Float64)) ≈ 1
+@test sum(bilinear_interp(1:10, range(10, 20, length=7), range(30, 41, length=5), 5.2, 14.2, 35.0)) ≈ 1
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

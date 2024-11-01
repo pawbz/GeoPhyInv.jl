@@ -290,7 +290,7 @@ function PFdtd(
     # 	exmedium.fc=vcat(exmedium.fc,NamedArray(2*pi .* [pa.c.fc[:freqmin], pa.c.fc[:freqmax]], ([:freqmin,:freqmax],)))
     # 	memcoeff1, memcoeff2=get_memcoeff(exmedium)
     # else
-    @show to
+    verbose && @show to
     return pa
 end
 
@@ -441,10 +441,26 @@ function P_x_worker_x_pw_x_ss(ipw, iss::Int64, pac::P_common{T,N}) where {T,N}
         # boundary fields stored (after removing derivatives)
         # these fields are stored for the boundary value problem (used for RTM and FWI)
         bfields = filter(x -> x ∉ Fields(pac.attrib_mod, "d"), Fields(pac.attrib_mod))
-        boundary = NamedArray(
-            [get_boundary_store(eval(f)(), T(), n..., nt) for f in bfields],
-            Symbol.(bfields),
-        )
+
+        if (pac.attrib_mod.mode == :forward_save)
+            boundary = NamedArray(
+                [get_boundary_store(eval(f)(), T(), n..., nt) for f in bfields],
+                Symbol.(bfields),
+            )
+        else
+            boundary = NamedArray(
+                [get_boundary_store(eval(f)(), T(), n..., 1) for f in bfields],
+                Symbol.(bfields),
+            )
+        end
+        # else
+        #     boundary = NamedArray([NamedArray(
+        #     [[Data.Array(zeros(fill(1, N)...)) for it = 1:1] for i = 1:length([:dummy])],
+        #     ([:dummy],),
+        # )],([:dummy],))
+        # @show typeof(boundary)
+        #     # boundary = NamedArray([NamedArray([[Data.Array(zeros(fill(1, N)...))]], [:dummy])], [:dummy])
+        # end
     end
 
     @timeit to "alloc ssprayw and rinterpolatew" begin
